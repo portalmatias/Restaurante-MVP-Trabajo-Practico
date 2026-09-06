@@ -81,7 +81,7 @@ context: |
   ├── openapi/
   │   └── openapi.yaml          # contrato formal de la API
   ├── openspec/
-  │   ├── project.md            # este archivo
+  │   ├── config.yaml           # este archivo (constitución del proyecto)
   │   ├── specs/                # specs vigentes (post-archive)
   │   └── changes/              # cambios en curso
   ├── backend/                  # NestJS

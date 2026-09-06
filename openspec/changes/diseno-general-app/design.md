@@ -25,8 +25,8 @@ existen). El stack, la estructura de monorepo y las convenciones ya están fijad
 - No define el `schema.prisma` campo por campo (eso es tarea de `feature/spec-modelo-dominio`).
 - No define los endpoints uno por uno con su request/response (eso es tarea de cada change
   de capability — `feature/auth`, `feature/spec-disponibilidad`, etc.).
-- No decide nada sobre CI/CD (`feature/ci-pipeline` es un change aparte, y `project.md` §14
-  prohíbe tocar `.github/workflows/` fuera de su propio change).
+- No decide nada sobre CI/CD (`feature/ci-pipeline` es un change aparte, y `config.yaml`,
+  línea del contexto §14, prohíbe tocar `.github/workflows/` fuera de su propio change).
 
 ## Decisions
 

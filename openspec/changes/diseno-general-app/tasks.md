@@ -3,8 +3,9 @@
 - [x] 1.1 En §5 (Autenticación), quitar la nota "confirmar con la docente" sobre el modelo
       de cliente y dejar asentado sin ambigüedad el modelo sin cuenta (nombre + email +
       teléfono, código de reserva + email para consultar/cancelar). Verificado con
-      `grep -n "RF-01\|RF-02\|RF-03\|auth/register\|auth/login" openspec/config.yaml`: sin
-      resultados.
+      `grep -n "RF-01\|RF-02\|RF-03\|auth/register\|auth/login" openspec/config.yaml`: los
+      patrones solo aparecen en la nota §5 que documenta la decisión (rechazo del modelo
+      docx), sin otros restos del flujo de registro/login.
 - [x] 1.2 En §6 (tabla de Zonas), confirmar el rango VIP como 2 a 12 comensales sin
       ambigüedad frente a un mínimo por defecto distinto. Verificado con
       `grep -n "mínimo de comensales\|RN-07\|por defecto 4"`: sin resultados; el archivo ya
