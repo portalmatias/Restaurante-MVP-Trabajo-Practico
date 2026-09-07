@@ -7,8 +7,8 @@ context: |
   > artefacto que genere OpenSpec (proposal, specs, design, tasks). Las reglas de acá
   > son **no negociables** y tienen prioridad sobre cualquier sugerencia del asistente.
   >
-  > Ubicación: `openspec/project.md`
-  > (Si el equipo migra a la versión con `config.yaml`, este contenido va en el campo `context:`)
+  > Ubicación: `openspec/config.yaml` (campo `context:`). El equipo no usa un archivo
+  > `openspec/project.md` separado.
 
   ---
 
@@ -81,7 +81,7 @@ context: |
   ├── openapi/
   │   └── openapi.yaml          # contrato formal de la API
   ├── openspec/
-  │   ├── project.md            # este archivo
+  │   ├── config.yaml           # este archivo (constitución del proyecto)
   │   ├── specs/                # specs vigentes (post-archive)
   │   └── changes/              # cambios en curso
   ├── backend/                  # NestJS
@@ -105,9 +105,10 @@ context: |
 
   ## 5. Autenticación y autorización
 
-  > **Decisión:** JWT con `@nestjs/jwt` + Passport para el admin; **reserva sin cuenta** para el cliente.
-  > Es el modelo más habitual en sistemas de reserva de restaurante reales y el que menos alcance
-  > agrega al MVP. Confirmar con la docente si la consigna exige cuentas de cliente.
+  > **Decisión (confirmada en el change `diseno-general-app`):** JWT con `@nestjs/jwt` + Passport
+  > para el admin; **reserva sin cuenta** para el cliente. Es el modelo más habitual en sistemas
+  > de reserva de restaurante reales y el que menos alcance agrega al MVP. Reemplaza el modelo
+  > de registro/login de cliente (RF-01/02/03) que proponía `requerimientos-mvp.docx`.
 
   ### Administrador
   - Login con email + contraseña contra la tabla `Usuario`.
