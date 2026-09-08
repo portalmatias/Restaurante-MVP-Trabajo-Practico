@@ -104,12 +104,39 @@ Contenido de `ci.yml` (dispara en `pull_request` y en push a `main`):
 ```
 job: spec   -> openspec validate --strict  +  lint del openapi.yaml
 job: lint   -> npm run lint  +  tsc --noEmit (ambos workspaces)
-job: test   -> services: postgres; migrate + seed; tests unitarios y e2e del backend
+job: test   -> npm run test -w backend  (los specs que genera `nest new`; SIN base de datos)
 ```
 
-Dos cosas a resolver dentro de este change, ambas con justificación en su `design.md` porque §2
-prohíbe sumar librerías sin argumentarlo: cómo se invoca la CLI de OpenSpec en CI (dependencia de
-dev vs `npx`), y qué linter de OpenAPI se usa (Spectral o Redocly).
+> **Por qué el job `test` no toca la base todavía.** En la Fase 1 no existen `schema.prisma`,
+> migraciones ni `seed.ts` — llegan en la Fase 2. Si el job corriera `db:migrate` / `db:seed`,
+> fallaría con *"Missing script"* y el PR quedaría en rojo, contradiciendo la premisa de que el
+> PR que agrega `ci.yml` puede estar verde por sí mismo. Los pasos con Postgres se agregan
+> después, en el change `ci-integracion-db` (§6.1), y no dentro de `modelo-dominio`, porque §14
+> prohíbe tocar `.github/workflows/` en un PR de feature.
+
+Tres cosas a resolver dentro de este change, las dos primeras con justificación en su `design.md`
+porque §2 prohíbe sumar librerías sin argumentarlo:
+
+1. Cómo se invoca la CLI de OpenSpec en CI (dependencia de dev vs `npx`).
+2. Qué linter de OpenAPI se usa (Spectral o Redocly).
+3. **Quién es la fuente de verdad del contrato OpenAPI** — ver abajo.
+
+### La fuente de verdad del contrato OpenAPI
+
+Hay una tensión real dentro de la constitución: §2 describe el contrato como
+"Generado/validado desde el backend", pero §3 lo llama "el contrato formal de la API,
+**versionado en el repo** y validado en CI". No pueden ser las dos cosas a la vez, y de cuál
+valga depende que el paralelismo de la Fase 5 funcione: si el YAML se genera desde los
+controllers, no existe hasta que el backend exista, y el frontend no puede arrancar antes.
+
+**Propuesta: contract-first.** El `openapi/openapi.yaml` escrito a mano es la fuente de verdad.
+Es lo que habilita que el frontend arranque en paralelo, y es como lo describe §3. Para no
+perder lo que §2 pide, **CI genera el spec desde `@nestjs/swagger` y lo diffea contra el YAML
+commiteado**: si la implementación se desvía del contrato, el job falla. Así el contrato se
+escribe primero *y* queda validado contra el backend.
+
+Si el equipo adopta esto, hay que ajustar la redacción de §2 de `config.yaml`. Entra en el
+alcance de este mismo change, igual que `diseno-general-app` editó §5 y §6.
 
 > **Tradeoff asumido.** Este PR es más grande de lo que le gustaría a §14 ("cambios chicos y
 > revisables"). Casi todo es output de generadores. Mitigación: el `tasks.md` lo parte en tareas
@@ -137,6 +164,17 @@ aunque solo uno apruebe formalmente.
 > **Mientras corren las Fases 1 y 2, las otras dos personas no esperan:** escriben las
 > `feature/spec-*` de la Fase 3. Las specs no necesitan código. Esa es toda la razón de haber
 > elegido dos PRs por change.
+
+### 6.1. Change `ci-integracion-db` — inmediatamente después
+
+**Dueño: FedeWerk** (viene de hacer `modelo-dominio`). Change chico, ~30 minutos.
+
+Único contenido: agregar al `ci.yml` el service container de Postgres y los pasos de
+`db:migrate`, `db:seed` y los tests e2e, que recién ahora existen. Va en un change propio y no
+dentro de `modelo-dominio` porque §14 prohíbe tocar `.github/workflows/` en un PR de feature.
+
+Es la contrapartida directa de haber dejado el job `test` sin base de datos en la Fase 1: a
+partir de acá, los tests de integración contra base real que exige §9 corren en CI.
 
 ## 7. Fase 3 — Backend en paralelo (tres tracks)
 
@@ -189,23 +227,34 @@ por punto de la Definition of Done de §13 sobre cada change archivado**.
 ```
 portalmatias        fundacion-repo, disponibilidad, reservas-crear,
                     frontend-cliente                                  -> 4 changes
-FedeWerk            modelo-dominio, auth-admin, reserva-consultar,
-                    frontend-base, frontend-admin                     -> 5 changes
-lussofacundo-iresm  [chore docs+gitignore], gestion-salon,
-                    cancelacion-turnos, reserva-vip, entrega-final    -> 4 changes + 1 chore
+FedeWerk            modelo-dominio, ci-integracion-db (chico),
+                    auth-admin, reserva-consultar,
+                    frontend-base (chico), frontend-admin             -> 6 changes
+lussofacundo-iresm  gestion-salon, cancelacion-turnos, reserva-vip,
+                    entrega-final                                     -> 4 changes
 ```
 
-13 changes x 2 PRs + 2 PRs de Fase 0 = **~28 PRs**. §11 exige que cada integrante ejecute las
+14 changes x 2 PRs = **~28 PRs**, más los de Fase 0. §11 exige que cada integrante ejecute las
 sesiones de su propio módulo y commitee bajo su propia autoría: nadie mergea trabajo generado en
 nombre de otro.
+
+> **El recuento son items, no esfuerzo.** `ci-integracion-db` y `frontend-base` son chicos, así
+> que los 6 de Fede pesan parecido a los 4 de los demás. Dos ajustes fáciles si al equipo le
+> queda desbalanceado: mover `frontend-admin` a Facundo, o `ci-integracion-db` a Matías.
+>
+> Nota: la tarea 0.3 (docx + `.gitignore`) estaba pensada para abrirle el historial a Facundo,
+> pero la resolvió Fede en el PR #4. Su primer aporte pasa a ser la spec de `gestion-salon`, que
+> puede escribir ya — no necesita que exista código.
 
 ```
 Fase 0  [destrabar]     ---- todos, en paralelo, sin codigo
            |
 Fase 1  [fundacion]     ---- SECUENCIAL (matias)   <-+ los otros dos escriben
-           |                                         | las spec PRs de Fase 3
+           |             CI sin base de datos        | las spec PRs de Fase 3
 Fase 2  [modelo]        ---- SECUENCIAL (fede)     <-+
            |
+       [ci-integracion-db] (fede, chico)
+           |             CI ya corre contra postgres
            +-------------------+-------------------+
            |                   |                   |
 Fase 3  auth-admin      disponibilidad      gestion-salon      <- PARALELO
@@ -233,6 +282,14 @@ Fase 6  entrega-final (facundo)
 - **Librerías nuevas que §2 obliga a justificar en su `design.md`:** el linter de OpenAPI y la CLI
   de OpenSpec en CI (Fase 1), y el generador de tipos desde OpenAPI (Fase 5). `@nestjs/jwt`,
   Passport, bcrypt y `@nestjs/throttler` ya están avaladas por §5.
+- **§2 y §3 de la constitución se contradicen sobre el contrato OpenAPI** ("generado desde el
+  backend" vs "versionado en el repo"). Todo el paralelismo de la Fase 5 depende de resolverlo a
+  favor de *contract-first*; si el equipo prefiere generar desde los controllers, el frontend no
+  puede arrancar antes que el backend y hay que rehacer la Fase 5 como secuencial. Se decide en
+  el `design.md` de `fundacion-repo` (§5) y **es la decisión más cara de cambiar después**.
+- **La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
+  corre lint, tipos y unitarios, pero **no** tests contra base real. Es una ventana corta y
+  deliberada; el riesgo es olvidarse de cerrarla y dejar los e2e de §9 fuera del pipeline.
 - **Los required status checks (0.4) no se pueden configurar antes de la Fase 1** — GitHub solo los
   ofrece después de que el check corrió al menos una vez. Es fácil olvidarse y dejar `main` a medio
   proteger.
@@ -266,6 +323,10 @@ npm run db:migrate -w backend && npm run db:seed -w backend
 npm run db:seed -w backend                             # segunda corrida: sin duplicados
 npm run test -w backend                                # un test por invariante, todos pasan
 ```
+
+**`ci-integracion-db` (§6.1)** — el PR tiene que mostrar el job `test` levantando Postgres y
+corriendo los e2e. Compuerta: que un test de integración que falle a propósito **ponga el PR en
+rojo**; si pasa igual, el service container no se está usando.
 
 **Fases 3 y 4** — por cada change, la Definition of Done completa de §13, con foco en: migración
 commiteada si tocó schema, `openapi/openapi.yaml` actualizado **en el mismo PR** si tocó la API,
