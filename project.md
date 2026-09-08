@@ -1,0 +1,412 @@
+# Project Context — Sistema de Reservas de Restaurante
+
+> Este archivo es la **constitución** del proyecto. Se inyecta como contexto en todo
+> artefacto que genere OpenSpec (proposal, specs, design, tasks). Las reglas de acá
+> son **no negociables** y tienen prioridad sobre cualquier sugerencia del asistente.
+>
+> Ubicación: `openspec/project.md`
+> (Si el equipo migra a la versión con `config.yaml`, este contenido va en el campo `context:`)
+
+---
+
+## 1. Qué es este proyecto
+
+MVP de una **plataforma de reservas para un restaurante**. Permite a un cliente consultar
+disponibilidad, crear una reserva, consultarla y cancelarla; y a un administrador gestionar
+mesas, zonas, horarios y ver el estado del aforo.
+
+Es un **Trabajo Práctico grupal académico** (3 integrantes). El objetivo pedagógico es tan
+importante como el producto: se evalúa la calidad de las especificaciones, el historial de
+commits, los Pull Requests y los workflows de CI. **Las decisiones de diseño deben favorecer
+la trazabilidad y la revisión por pares, no la velocidad de entrega.**
+
+---
+
+## 2. Stack tecnológico (fijo — no proponer alternativas)
+
+| Capa | Tecnología | Nota |
+|---|---|---|
+| Lenguaje | **TypeScript** | Obligatorio en backend y frontend. Nada de JS plano en código de producción. |
+| Backend | **NestJS** (sobre Node.js) | Arquitectura modular por feature. |
+| Base de datos | **PostgreSQL** | |
+| ORM | **Prisma** | Todo cambio de schema pasa por una migración versionada. |
+| Frontend | **Next.js** (App Router) + React | Un solo front sirve el dashboard de admin y el de cliente. |
+| Contrato de API | **OpenAPI 3.1** | Generado/validado desde el backend. Ver §3. |
+| Especificación de cambios | **OpenSpec** (Fission-AI) | Flujo propose → review → apply → archive. |
+| CI | **GitHub Actions** | Ver §6. |
+| Gestor de paquetes | npm | Consistente en todo el repo. |
+
+### Restricciones sobre el stack
+
+- **No** introducir librerías nuevas sin justificarlo en el `design.md` del cambio correspondiente.
+- **No** usar ORMs, query builders ni acceso SQL directo por fuera de Prisma.
+- **No** agregar servicios externos de pago ni que requieran API keys privadas (el repo es público / evaluable).
+- Preferir lo que ya viene en NestJS antes que sumar dependencias (validación con `class-validator`, config con `@nestjs/config`, etc.).
+
+---
+
+## 3. Doble lectura de "OpenSpec" — cómo lo resolvemos
+
+La consigna usa el término "OpenSpec" con vocabulario que corresponde a **OpenAPI**
+("contrato de la API", "esquemas y endpoints", "linter de los archivos"). Para no depender
+de una interpretación, el proyecto produce **ambas cosas**:
+
+1. **OpenSpec (Fission-AI)** como *flujo de trabajo*: cada feature nace como un cambio en
+   `openspec/changes/<nombre>/` con su proposal, specs, design y tasks.
+2. **OpenAPI 3.1** como *artefacto entregable*: el archivo `openapi/openapi.yaml` es el
+   contrato formal de la API, versionado en el repo y validado en CI.
+
+**Regla:** ninguna spec de OpenSpec que toque la API se considera completa si no actualiza
+también el contrato OpenAPI correspondiente.
+
+> **Pendiente de confirmar con la docente:** si esperaba únicamente OpenAPI, el punto 1 suma
+> valor y no resta. Si esperaba OpenSpec SDD, el punto 2 igual es buena práctica.
+
+---
+
+## 4. Estructura del repositorio
+
+El proyecto es un **monorepo** con npm workspaces. Un solo `package.json` en la raíz
+coordina los workspaces; cada uno mantiene el suyo.
+
+```
+/
+├── package.json              # workspaces: ["backend", "frontend"]
+├── docker-compose.yml        # solo PostgreSQL para desarrollo local
+├── .env.example              # plantilla, sin valores reales
+├── .github/workflows/ci.yml
+├── openapi/
+│   └── openapi.yaml          # contrato formal de la API
+├── openspec/
+│   ├── project.md            # este archivo
+│   ├── specs/                # specs vigentes (post-archive)
+│   └── changes/              # cambios en curso
+├── backend/                  # NestJS
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   ├── migrations/
+│   │   └── seed.ts
+│   ├── src/
+│   └── test/
+└── frontend/                 # Next.js
+    ├── src/
+    └── test/
+```
+
+**Reglas del monorepo:**
+- Los comandos se corren desde la raíz con `npm run <script> --workspace=backend` (o `-w backend`).
+- Ninguna dependencia se instala en la raíz salvo herramientas transversales (ESLint, Prettier, husky).
+- `backend/` no importa código de `frontend/` ni al revés. El único contrato entre ambos es `openapi/openapi.yaml`.
+
+---
+
+## 5. Autenticación y autorización
+
+> **Decisión:** JWT con `@nestjs/jwt` + Passport para el admin; **reserva sin cuenta** para el cliente.
+> Es el modelo más habitual en sistemas de reserva de restaurante reales y el que menos alcance
+> agrega al MVP. Confirmar con la docente si la consigna exige cuentas de cliente.
+
+### Administrador
+- Login con email + contraseña contra la tabla `Usuario`.
+- Contraseñas hasheadas con **bcrypt** (nunca en texto plano, nunca reversibles).
+- El backend devuelve un **JWT de acceso** con vida corta (60 min) que incluye `sub` (id) y `rol`.
+- Las rutas de admin se protegen con un `JwtAuthGuard` + `RolesGuard`.
+- En el MVP **no** hay refresh tokens ni recuperación de contraseña: si expira, se vuelve a loguear.
+- El único rol del MVP es `ADMIN`. El enum queda preparado para más roles, pero no se implementan.
+
+### Cliente
+- **No crea cuenta ni se loguea.** Reserva dejando nombre, email y teléfono.
+- Al confirmarse, el sistema genera un **código de reserva** alfanumérico de 8 caracteres, único.
+- Para consultar o cancelar su reserva, el cliente presenta **código + email**. Ambos deben coincidir.
+- El código de reserva **no es un secreto criptográfico**: es un identificador de baja entropía.
+  Por eso las rutas públicas de consulta y cancelación llevan **rate limiting** (`@nestjs/throttler`)
+  para evitar enumeración por fuerza bruta.
+
+### Reglas transversales
+- Ningún endpoint público expone datos personales de otras reservas.
+- El JWT viaja en el header `Authorization: Bearer <token>`.
+- El secreto del JWT sale de variable de entorno. Nunca hardcodeado, nunca commiteado.
+
+---
+
+## 6. Reglas de negocio
+
+> Estas reglas fijan el comportamiento esperado del dominio. Los **valores numéricos** son
+> configurables y viven en la tabla `Configuracion` (o en seeds), no hardcodeados en el código.
+> Si la consigna de la docente define valores distintos, se actualizan acá primero y después el código.
+
+### Zonas
+| | STANDARD | VIP |
+|---|---|---|
+| Anticipación mínima para reservar | 2 horas | 24 horas |
+| Anticipación máxima para reservar | 30 días | 60 días |
+| Comensales por reserva | 1 a 8 | 2 a 12 |
+| Ventana mínima de cancelación | 2 horas antes del turno | 24 horas antes del turno |
+| Requiere confirmación del admin | No (queda `CONFIRMADA`) | Sí (queda `PENDIENTE`) |
+
+### Turnos
+- Un turno tiene día de la semana, hora de inicio y hora de fin.
+- Turnos base del MVP: **almuerzo 12:00–15:00** y **cena 20:00–23:30**.
+- Una reserva ocupa el turno completo. En el MVP **no** se modela la duración real de la comida
+  ni la rotación de mesas dentro de un turno.
+- Un turno puede estar inactivo (día de cierre). No se aceptan reservas en turnos inactivos.
+
+### Mesas y asignación
+- Cada mesa pertenece a exactamente una zona y tiene una capacidad fija de comensales.
+- Una mesa admite **una sola reserva por turno**.
+- La asignación es **automática**: se elige la mesa disponible de menor capacidad que alcance
+  para la cantidad de comensales (*best fit*). Esto evita desperdiciar mesas grandes.
+- En el MVP **no** se combinan mesas: si ningún single table alcanza, no hay disponibilidad.
+- El admin puede reasignar manualmente una reserva a otra mesa de la misma zona,
+  siempre que la mesa destino esté libre en ese turno y su capacidad alcance.
+
+### Aforo
+- El aforo es un **tope duro**: hay un máximo global y uno por zona, en comensales simultáneos.
+- Se valida en el momento de crear la reserva. Si el total de comensales del turno más los nuevos
+  supera el tope, se rechaza aunque haya una mesa físicamente libre.
+- Las reservas `CANCELADA` y `NO_SHOW` no cuentan para el aforo.
+
+### Estados de una reserva
+```
+PENDIENTE ──confirmar──> CONFIRMADA ──cancelar──> CANCELADA
+    │                         │
+    └────rechazar────> CANCELADA
+                              └──marcar ausente──> NO_SHOW
+```
+- `PENDIENTE`: creada, esperando aprobación del admin (solo zona VIP).
+- `CONFIRMADA`: ocupa mesa y cuenta para el aforo.
+- `CANCELADA`: libera la mesa. Estado terminal.
+- `NO_SHOW`: el cliente no se presentó. Solo lo marca el admin, y solo después de que pasó el turno.
+- Las transiciones no listadas son inválidas y devuelven `409 Conflict`.
+
+### Disponibilidad
+- Consultar disponibilidad **no reserva ni bloquea nada**. Es una foto del momento.
+- Entre la consulta y la creación, la disponibilidad puede haber cambiado: la validación real
+  ocurre siempre en el momento de crear.
+- Para evitar doble reserva sobre la misma mesa en peticiones concurrentes, la creación corre
+  dentro de una **transacción de Prisma** y la tabla `Reserva` tiene un índice único parcial
+  sobre `(mesaId, turnoId, fecha)` para las reservas activas.
+
+### Invariantes (nunca deben violarse)
+1. Dos reservas activas no pueden compartir mesa, fecha y turno.
+2. La cantidad de comensales de una reserva nunca supera la capacidad de la mesa asignada.
+3. Una reserva siempre apunta a un turno activo y a una mesa de la zona solicitada.
+4. La suma de comensales activos de un turno nunca supera el aforo de esa zona.
+5. Una reserva en estado terminal (`CANCELADA`, `NO_SHOW`) no vuelve a estados anteriores.
+
+---
+
+## 7. Convenciones de código
+
+### Backend (NestJS)
+- Organización **por módulo de dominio**, no por tipo de archivo:
+  `src/reservas/`, `src/mesas/`, `src/zonas/`, `src/horarios/`, `src/auth/`.
+- Cada módulo: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`, `entities/`.
+- La lógica de negocio vive en los **services**. Los controllers solo orquestan y validan.
+- Todo input de API se valida con un **DTO** + `class-validator`. Nunca confiar en el body crudo.
+- Errores: usar las excepciones HTTP de NestJS (`BadRequestException`, `ConflictException`, etc.), nunca `throw new Error()` en capa de API.
+
+### Frontend (Next.js)
+- App Router. Server Components por defecto; `"use client"` solo donde haga falta interactividad.
+- Rutas separadas por rol: `/admin/...` y `/reservas/...` (cliente).
+- Los tipos del cliente HTTP se derivan del contrato OpenAPI, no se escriben a mano.
+
+### Transversal
+- Nombres de dominio en **español** (`Reserva`, `Mesa`, `Zona`, `Turno`); nombres técnicos en inglés (`createReservaDto`, `findAll`).
+- Archivos y carpetas en `kebab-case`. Clases en `PascalCase`. Variables y funciones en `camelCase`.
+- Fechas y horas: **UTC** en base de datos y en la API (ISO 8601). La conversión a hora local es responsabilidad del frontend.
+- Nada de `any` en TypeScript salvo con un comentario que lo justifique.
+
+---
+
+## 8. Idioma de los artefactos
+
+**Todo se escribe en español**, sin excepción para artefactos de proceso:
+
+- Proposals, specs, `design.md` y `tasks.md` de OpenSpec.
+- Descripciones y títulos de Pull Requests, comentarios de review.
+- Mensajes de commit: el *tipo* de Conventional Commits queda en inglés
+  (`feat:`, `fix:`, `docs:`…), la descripción va en español.
+  Ejemplo: `feat: agregar validación de aforo por zona`
+- Comentarios en el código y mensajes de error de la API dirigidos al usuario final.
+- `description` y `summary` del contrato OpenAPI.
+
+En inglés quedan únicamente los **identificadores técnicos** que ya define §7: nombres de
+funciones, variables, campos de DTO, y las palabras clave del stack.
+
+---
+
+## 9. Testing
+
+**Framework:** Jest — ya viene incluido con NestJS, así que no agrega dependencias nuevas.
+Para tests de endpoints se usa **Supertest** (también incluido en el scaffolding de Nest).
+
+### Dónde viven los tests
+- **Unitarios:** al lado del archivo que prueban, como `*.spec.ts`.
+  Ejemplo: `backend/src/reservas/reservas.service.spec.ts`
+- **Integración / e2e:** en `backend/test/`, como `*.e2e-spec.ts`.
+  Ejemplo: `backend/test/reservas.e2e-spec.ts`
+- **Frontend:** `frontend/test/`, con React Testing Library. Alcance mínimo en el MVP —
+  la prioridad de testing está en el backend, donde vive la lógica de negocio.
+
+### Qué amerita test (y qué no)
+**Sí, obligatorio:**
+- Toda regla de negocio del §6: aforo, ventanas de anticipación, transiciones de estado,
+  asignación *best fit*, límites de comensales por zona.
+- Todos los **invariantes** — cada uno de los cinco debe tener al menos un test que intente violarlo.
+- Los casos borde de fecha/hora: límite exacto de la ventana de cancelación, turno que cruza medianoche.
+- Los guards de auth: que una ruta de admin rechace petición sin token y con token de rol incorrecto.
+
+**No hace falta:**
+- Getters/setters triviales, DTOs sin lógica, o wrappers que solo delegan a Prisma.
+- Testear Prisma o NestJS en sí — se asume que el framework funciona.
+
+### Reglas
+- Los tests de integración corren contra una **base de datos real de test** levantada por
+  `docker-compose`, no contra mocks de Prisma. Se resetea entre suites.
+- Cada test es independiente: no puede depender del orden de ejecución ni del estado que dejó otro.
+- **Todo bug corregido suma un test que falle sin el fix.** Sin excepción.
+- No se exige un porcentaje de cobertura mínimo, pero un PR que toca lógica de negocio
+  sin sumar tests no se aprueba.
+
+---
+
+## 10. Setup local
+
+### Requisitos
+- Node.js 20 LTS o superior
+- Docker y Docker Compose (solo para PostgreSQL)
+- npm 10+
+
+### Primer arranque
+```bash
+git clone <repo> && cd <repo>
+cp .env.example .env          # completar valores locales
+npm install                   # instala todos los workspaces
+docker compose up -d          # levanta PostgreSQL
+npm run db:migrate -w backend # aplica migraciones
+npm run db:seed -w backend    # carga datos de prueba
+npm run dev                   # levanta backend y frontend
+```
+
+### Variables de entorno
+- `.env.example` está versionado y lista **todas** las variables con valores de ejemplo o vacíos.
+- `.env` está en `.gitignore` y **nunca** se commitea.
+- Si un cambio agrega una variable nueva, actualizar `.env.example` en el mismo PR.
+
+Variables mínimas: `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PORT`,
+`NEXT_PUBLIC_API_URL`, `THROTTLE_TTL`, `THROTTLE_LIMIT`.
+
+### Base de datos
+- PostgreSQL corre en Docker, nunca instalado directo en la máquina — así los tres tienen
+  la misma versión.
+- La base de test es **separada** de la de desarrollo (`_test` como sufijo).
+- El schema **nunca** se modifica con `prisma db push`. Siempre `prisma migrate dev`,
+  y la migración generada se commitea.
+
+### Seeds
+`backend/prisma/seed.ts` debe dejar la base en un estado usable para probar disponibilidad:
+- 1 usuario admin con credenciales conocidas (documentadas en el README, no son secreto).
+- Las 2 zonas (`STANDARD`, `VIP`) con sus aforos.
+- Un set de mesas de capacidades variadas en cada zona.
+- Los 2 turnos base, activos de martes a domingo.
+- Algunas reservas de ejemplo en distintos estados.
+
+Los seeds son **idempotentes**: correrlos dos veces no duplica datos.
+
+---
+
+## 11. Flujo de trabajo Git (obligatorio por consigna)
+
+- La rama **`main` está protegida**. Nadie pushea directo.
+- Una rama por spec o funcionalidad:
+  `feature/spec-<nombre>` para specs, `feature/<nombre>` para implementación.
+  Ejemplos: `feature/spec-reserva-vip`, `feature/cancelacion-turnos`.
+- Toda integración a `main` va por **Pull Request** con **al menos una aprobación** de un compañero.
+- El merge se bloquea si CI falla.
+- Commits en formato **Conventional Commits**: `feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`.
+- El trabajo debe quedar **repartido de forma pareja entre los 3 integrantes** — se evalúa el historial. Nadie commitea en nombre de otro.
+
+### Uso de agentes de IA y autoría
+Si un integrante usa un agente (Claude Code u otro) para asistir su trabajo, **los commits
+resultantes van bajo su propia autoría, en su propia rama**. Está permitido correr varias
+sesiones en paralelo sobre módulos distintos, pero **cada integrante ejecuta las de su propio
+módulo**. Nadie mergea trabajo generado en nombre de un compañero: rompe la evaluación del
+historial que exige la consigna.
+
+---
+
+## 12. CI (GitHub Actions)
+
+Workflow en `.github/workflows/ci.yml`, disparado en cada PR y en cada push a `main`. Debe:
+
+1. Validar/lintear la especificación (`openspec validate --strict` y/o linter de OpenAPI).
+2. Correr lint de código (ESLint) y chequeo de tipos (`tsc --noEmit`).
+3. Correr las pruebas unitarias y de integración.
+4. **Bloquear el merge** si cualquiera de los pasos falla.
+
+Regla: **un PR con CI en rojo no se mergea nunca**, aunque "funcione localmente".
+
+---
+
+## 13. Definition of Done
+
+Un cambio no está terminado hasta que **todos** estos puntos se cumplen:
+
+- [ ] El cambio de OpenSpec existe, está aprobado y `openspec validate --strict` pasa.
+- [ ] Todas las tareas de su `tasks.md` están marcadas como completas.
+- [ ] Si tocó el schema: hay migración de Prisma generada y commiteada (nunca `db push`).
+- [ ] Si tocó la API: `openapi/openapi.yaml` está actualizado en el mismo PR.
+- [ ] Si agregó variables de entorno: `.env.example` está actualizado.
+- [ ] Hay tests para las reglas de negocio e invariantes que el cambio toca (§9).
+- [ ] `npm run lint` y `tsc --noEmit` pasan en limpio, sin warnings nuevos.
+- [ ] CI en verde.
+- [ ] PR con descripción en español, enlazado al cambio de OpenSpec correspondiente.
+- [ ] Aprobado por al menos un compañero distinto del autor.
+- [ ] Mergeado a `main` y el cambio archivado con `openspec archive`.
+
+Un PR que no cumple todos los puntos no se mergea, aunque el código funcione.
+
+---
+
+## 14. Reglas para el asistente de IA
+
+**Prioridad 1 — Preguntar antes que suponer.**
+Cuando un requisito, una decisión de diseño o el alcance de una tarea no esté claro:
+- Preguntá directamente antes de asumir nada.
+- No implementes basándote en una suposición sin confirmarla.
+- Si una tarea del `tasks.md` es ambigua, marcala en la etapa de revisión, no durante `apply`.
+- Ante duda entre dos caminos, proponé ambos con sus trade-offs en vez de elegir en silencio.
+
+**Prioridad 2 — La spec manda, el código sigue.**
+- Nunca escribir código de una feature que no tenga su cambio de OpenSpec aprobado.
+- Si a mitad de la implementación cambia el requisito: se actualiza la spec primero, después el código.
+
+**Prioridad 3 — Cambios chicos y revisables.**
+- Las tareas de `tasks.md` deben ser de ~2 horas máximo cada una.
+- Un PR = un cambio de OpenSpec. No mezclar features en la misma rama.
+- No hacer refactors amplios "de paso" dentro de un PR de feature.
+
+**Nunca:**
+- Modificar el schema de Prisma sin generar la migración correspondiente.
+- Tocar `.github/workflows/` dentro de un PR de feature (va en su propio cambio).
+- Commitear secretos, `.env`, credenciales ni la URL real de la base.
+- Reescribir historial de `main`.
+- Hardcodear los valores numéricos del §6 — van a configuración o seeds.
+
+---
+
+## 15. Glosario de dominio
+
+| Término | Definición |
+|---|---|
+| **Reserva** | Solicitud de un cliente para ocupar una mesa en una fecha, turno y zona determinados. |
+| **Zona** | Sector del salón. En el MVP: `VIP` y `STANDARD`. Difieren en capacidad y en reglas de reserva (§6). |
+| **Mesa** | Unidad física asignable, pertenece a una zona y tiene una capacidad de comensales. |
+| **Turno** | Franja horaria de servicio (ej. almuerzo 12:00–15:00, cena 20:00–23:30). |
+| **Aforo** | Cantidad máxima de comensales simultáneos, global y por zona. Es un tope duro. |
+| **Disponibilidad** | Resultado de consultar si existe capacidad para N comensales en una fecha/turno/zona. No bloquea nada. |
+| **Cancelación** | Liberación de una reserva confirmada, sujeta a una ventana mínima de anticipación. |
+| **Código de reserva** | Identificador alfanumérico de 8 caracteres que recibe el cliente. Junto al email, permite consultar y cancelar sin cuenta. |
+| **Best fit** | Criterio de asignación automática: la mesa disponible de menor capacidad que alcance para los comensales pedidos. |
+| **No-show** | Reserva confirmada cuyo cliente no se presentó. Solo la marca el admin, y solo después del turno. |
