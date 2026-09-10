@@ -95,6 +95,35 @@ function diff(generated, committed, keyPath, out) {
     return;
   }
 
+  // Las listas de strings de OpenAPI (`required`, `tags`, `enum`, `security`) no tienen
+  // orden semantico: ["fecha","zonaId"] y ["zonaId","fecha"] declaran lo mismo. NestJS las
+  // emite en el orden en que estan declaradas las propiedades del DTO, que casi nunca va a
+  // coincidir con el orden en que estan escritas a mano en el YAML. Compararlas literalmente
+  // daria rojos falsos en cuanto aparezca el primer DTO, asi que se comparan como conjuntos.
+  if (Array.isArray(generated) && Array.isArray(committed)) {
+    const soloStrings = (a) => a.every((x) => typeof x === 'string');
+    if (soloStrings(generated) && soloStrings(committed)) {
+      const g = [...generated].sort();
+      const c = [...committed].sort();
+      if (JSON.stringify(g) !== JSON.stringify(c)) {
+        out.push(`  - "${keyPath}" difiere (comparado sin tener en cuenta el orden):`);
+        const faltan = g.filter((x) => !c.includes(x));
+        const sobran = c.filter((x) => !g.includes(x));
+        if (faltan.length) out.push(`      el backend expone y el YAML no declara: ${faltan.join(', ')}`);
+        if (sobran.length) out.push(`      el YAML declara y el backend no expone: ${sobran.join(', ')}`);
+      }
+      return;
+    }
+
+    // Listas de objetos (por ejemplo `parameters`): aca el indice si importa para poder
+    // señalar cual difiere, asi que se recorre posicion por posicion.
+    const largo = Math.max(generated.length, committed.length);
+    for (let i = 0; i < largo; i++) {
+      diff(generated[i], committed[i], `${keyPath}[${i}]`, out);
+    }
+    return;
+  }
+
   const same = JSON.stringify(generated) === JSON.stringify(committed);
   if (!same) {
     out.push(`  - "${keyPath || '(raíz)'}" difiere:`);

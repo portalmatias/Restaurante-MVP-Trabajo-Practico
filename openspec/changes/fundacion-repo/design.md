@@ -97,9 +97,11 @@ y recién ahí implementar.
 
 Descubierto durante la implementación, no anticipado en el plan original.
 
-`eslint-config-next@16.3.4` declara `eslint: ">=9.0.0"` y depende de `typescript@6`. Con esos
-rangos, npm instaló ESLint 10 y hoisteó TypeScript 6 a la raíz, mientras cada workspace se
-quedaba con TypeScript 5.9.3 anidado. Eso rompió dos cosas a la vez:
+`eslint-config-next@16.3.4` declara **como peer dependencies** `eslint: ">=9.0.0"` y
+`typescript: ">=3.3.1"`. Son dos rangos sin techo, y npm instala las peer dependencies solo:
+resolvió ESLint a la 10 y TypeScript a la 6.0.3, y hoisteó las dos a la raíz, mientras cada
+workspace se quedaba con su propio TypeScript 5.9.3 anidado (`^5.7.3` en su `package.json`).
+Eso rompió dos cosas a la vez:
 
 1. ESLint 10 crasheaba al cargar `eslint-plugin-react@7.37.5`, que declara peer `eslint ^9.7`.
 2. Con dos compiladores en el mismo repo, ESLint resolvía TypeScript 6 desde la raíz y
@@ -107,13 +109,22 @@ quedaba con TypeScript 5.9.3 anidado. Eso rompió dos cosas a la vez:
    `no-unsafe-call` mientras `tsc` pasaba en limpio desde el workspace.
 
 *Decisión:* `typescript` y `eslint` se declaran **explícitamente como devDependencies de la
-raíz, con versión exacta** (`5.9.3` y `9.39.5`), para que las herramientas transversales y los
-workspaces resuelvan siempre el mismo compilador. Es una extensión natural de D4: en un
-monorepo con hoisting, dejar que una dependencia transitiva elija la versión de una
-herramienta compartida es una fuente silenciosa de fallos que se contradicen entre sí.
+raíz, con versión exacta** (`5.9.3` y `9.39.5`), y los dos workspaces declaran esa misma
+versión exacta de `typescript` en lugar de un rango con caret. Así las herramientas
+transversales y los workspaces resuelven siempre el mismo compilador. Es una extensión natural
+de D4: en un monorepo con hoisting, dejar que el rango de una peer dependency ajena elija la
+versión de una herramienta compartida es una fuente silenciosa de fallos que se contradicen
+entre sí.
 
 *Regla que queda:* cualquier herramienta que corra desde la raíz sobre los dos workspaces
-—compilador, linter, formateador— se declara en la raíz con versión exacta, no se hereda.
+—compilador, linter, formateador— se declara en la raíz con versión exacta, y ningún workspace
+la vuelve a declarar con un rango que pueda derivar.
+
+*Corolario, aprendido en el review:* lo mismo aplica a los **runtimes**. `engines` decía
+`node: "20.x"` mientras el README prometía "Node 20 LTS o superior", y `concurrently@10.0.5`
+pedía `node >=22` sin que nadie lo notara porque la máquina de desarrollo corre Node 24. Los
+rangos de `engines` tienen que decir la verdad de lo que el proyecto soporta, y CI es el único
+lugar donde eso se comprueba.
 
 ### D3 — Spectral como linter de OpenAPI
 

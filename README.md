@@ -51,7 +51,8 @@ Todo se corre desde la raíz del repo.
 | `npm run dev` | Levanta backend y frontend en paralelo |
 | `npm run lint` | ESLint sobre los dos workspaces |
 | `npm run typecheck` | `tsc --noEmit` sobre los dos workspaces |
-| `npm run test -w backend` | Tests del backend (Jest) |
+| `npm run test -w backend` | Tests unitarios del backend (Jest) |
+| `npm run test:e2e` | Tests e2e del backend (`backend/test/*.e2e-spec.ts`) |
 | `npm run build -w backend` | Compila el backend |
 | `npm run openapi:lint` | Lintea el contrato con Spectral |
 | `npm run openapi:check` | Verifica que el backend no se desvíe del contrato |
@@ -93,7 +94,7 @@ Si agregás o cambiás un endpoint: **primero el YAML, después el código.**
 |---|---|
 | `spec` | `openspec validate --all --strict`, Spectral, y el chequeo de deriva del contrato |
 | `lint` | ESLint y chequeo de tipos |
-| `test` | Tests del backend |
+| `test` | Tests unitarios **y** e2e del backend |
 
 Un PR con CI en rojo no se mergea, aunque funcione localmente.
 
@@ -103,7 +104,11 @@ Un PR con CI en rojo no se mergea, aunque funcione localmente.
 
 ## Cómo se trabaja acá
 
-- `main` está protegida: todo entra por Pull Request con al menos una aprobación.
+- Todo entra a `main` por Pull Request, con al menos una aprobación de un compañero.
+  La protección de rama y los *required status checks* todavía **no están activados** en
+  GitHub — son las tareas 0.2 y 0.4 de `docs/roadmap-mvp.md`, y recién se pueden completar
+  ahora que los checks de CI corrieron al menos una vez. Hasta entonces la regla es
+  acuerdo del equipo, no algo que el repositorio haga cumplir.
 - Una rama por cambio: `feature/spec-<nombre>` para las specs, `feature/<nombre>` para el código.
 - Commits en Conventional Commits, con la descripción en español: `feat: agregar validación de aforo`.
 - Toda feature nace como un change de OpenSpec en `openspec/changes/` antes de escribir código.
@@ -115,3 +120,8 @@ El detalle completo está en `openspec/config.yaml` §11 a §14.
 `.env.example` lista todas las variables con valores de ejemplo. `.env` está en `.gitignore` y
 nunca se commitea: el repositorio es público. Si tu cambio agrega una variable, actualizá
 `.env.example` en el mismo PR.
+
+El backend carga ese `.env` con `ConfigModule` de `@nestjs/config`, registrado como global en
+`AppModule`. Busca el archivo en la raíz del monorepo y también en `backend/`, así que funciona
+igual corriendo `npm run dev` desde la raíz que `npm run start:dev -w backend`. Las variables
+quedan disponibles en `process.env` y vía `ConfigService`.
