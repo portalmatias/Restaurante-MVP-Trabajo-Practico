@@ -20,6 +20,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      # El lockfile lo escribe npm 11; el runner trae npm 10.8.2, que exige en el lock
+      # subarboles de dependencias opcionales que npm 11 considera innecesarios (los
+      # @emnapi/* de las variantes wasm32 de sharp y de @tailwindcss/oxide). Fijar la
+      # version alinea quien escribe el lock con quien lo consume.
+      - name: Fijar npm a la version que escribe el lockfile
+        run: npm install -g npm@11.6.1
+
       - run: npm ci
 
       # D4: la CLI de OpenSpec es devDependency de la raíz (versión fijada en
@@ -49,6 +56,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      # El lockfile lo escribe npm 11; el runner trae npm 10.8.2, que exige en el lock
+      # subarboles de dependencias opcionales que npm 11 considera innecesarios (los
+      # @emnapi/* de las variantes wasm32 de sharp y de @tailwindcss/oxide). Fijar la
+      # version alinea quien escribe el lock con quien lo consume.
+      - name: Fijar npm a la version que escribe el lockfile
+        run: npm install -g npm@11.6.1
+
       - run: npm ci
 
       - name: ESLint (backend + frontend)
@@ -67,6 +81,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      # El lockfile lo escribe npm 11; el runner trae npm 10.8.2, que exige en el lock
+      # subarboles de dependencias opcionales que npm 11 considera innecesarios (los
+      # @emnapi/* de las variantes wasm32 de sharp y de @tailwindcss/oxide). Fijar la
+      # version alinea quien escribe el lock con quien lo consume.
+      - name: Fijar npm a la version que escribe el lockfile
+        run: npm install -g npm@11.6.1
 
       - run: npm ci
 
