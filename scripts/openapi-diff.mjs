@@ -14,13 +14,28 @@
  * escritas a mano en el YAML.
  */
 
-// Campos cuyas listas de strings NO tienen orden semantico: ["fecha","zonaId"] y
-// ["zonaId","fecha"] declaran exactamente lo mismo.
+// Campos cuyas listas de valores primitivos NO tienen orden semantico: ["fecha","zonaId"] y
+// ["zonaId","fecha"] declaran exactamente lo mismo, y lo mismo vale para un enum numerico.
 //
-// La lista es deliberadamente corta. Otros campos que tambien son arrays de strings
-// —`example`, `default`, `examples`— SI tienen orden significativo: ahi el orden es dato, y
-// compararlos como conjunto dejaria pasar deriva real del contrato.
+// La lista es deliberadamente corta. Otros campos que tambien son arrays —`example`,
+// `default`, `examples`, `prefixItems`— SI tienen orden significativo: ahi el orden es dato, y
+// compararlos sin orden dejaria pasar deriva real del contrato.
 export const LISTAS_SIN_ORDEN = new Set(['required', 'enum', 'tags']);
+
+// Lo mismo, para listas de objetos. La spec no le define orden a ninguna de estas:
+// `parameters` se identifica por `name` + `in`, `security` y `servers` son conjuntos de
+// opciones, y en JSON Schema `allOf`/`anyOf`/`oneOf` son conjunciones y disyunciones.
+//
+// Cualquier lista de objetos que NO este aca se compara por posicion, porque un `example` con
+// objetos adentro es dato: reordenarlo cambia lo que el contrato declara.
+export const LISTAS_OBJETOS_SIN_ORDEN = new Set([
+  'parameters',
+  'security',
+  'servers',
+  'allOf',
+  'anyOf',
+  'oneOf',
+]);
 
 export function nombreDeCampo(keyPath) {
   const ultimo = keyPath.split('.').pop() ?? '';
@@ -55,27 +70,38 @@ export function claveDeElemento(el) {
   return `json:${jsonCanonico(el)}`;
 }
 
-function diffArrays(generated, committed, keyPath, out) {
-  const soloStrings = (a) => a.every((x) => typeof x === 'string');
+/** Agrupa los elementos por una clave, conservando cuantas veces aparece cada una. */
+function agruparPorClave(arr, clave) {
+  const m = new Map();
+  for (const el of arr) {
+    const k = clave(el);
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(el);
+  }
+  return m;
+}
 
-  if (
-    LISTAS_SIN_ORDEN.has(nombreDeCampo(keyPath)) &&
-    soloStrings(generated) &&
-    soloStrings(committed)
-  ) {
-    // Comparacion por multiconjunto: cuenta cuantas veces aparece cada valor de cada lado,
-    // para que un duplicado tambien se reporte con detalle en vez de dar un titulo sin cuerpo.
-    const contar = (arr) => arr.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map());
-    const g = contar(generated);
-    const c = contar(committed);
+function diffArrays(generated, committed, keyPath, out) {
+  const campo = nombreDeCampo(keyPath);
+  const esPrimitivo = (x) => x === null || ['string', 'number', 'boolean'].includes(typeof x);
+  const todosPrimitivos = (a) => a.every(esPrimitivo);
+
+  // 1. Listas de primitivos sin orden (`required`, `enum`, `tags`). Se comparan como
+  //    multiconjuntos: cuenta cuantas veces aparece cada valor de cada lado, para que un
+  //    duplicado tambien se reporte con detalle en vez de dar un titulo sin cuerpo.
+  //    La clave es el JSON canonico y no el valor crudo, asi el numero 1 no se confunde con
+  //    el string "1", que en un contrato son cosas distintas.
+  if (LISTAS_SIN_ORDEN.has(campo) && todosPrimitivos(generated) && todosPrimitivos(committed)) {
+    const g = agruparPorClave(generated, jsonCanonico);
+    const c = agruparPorClave(committed, jsonCanonico);
     const lineas = [];
-    for (const valor of new Set([...g.keys(), ...c.keys()])) {
-      const ng = g.get(valor) ?? 0;
-      const nc = c.get(valor) ?? 0;
+    for (const clave of new Set([...g.keys(), ...c.keys()])) {
+      const ng = g.get(clave)?.length ?? 0;
+      const nc = c.get(clave)?.length ?? 0;
       if (ng === nc) continue;
-      if (nc === 0) lineas.push(`      el backend expone "${valor}" y el YAML no lo declara`);
-      else if (ng === 0) lineas.push(`      el YAML declara "${valor}" y el backend no lo expone`);
-      else lineas.push(`      "${valor}" aparece ${ng} vez/veces en el backend y ${nc} en el YAML`);
+      if (nc === 0) lineas.push(`      el backend expone ${clave} y el YAML no lo declara`);
+      else if (ng === 0) lineas.push(`      el YAML declara ${clave} y el backend no lo expone`);
+      else lineas.push(`      ${clave} aparece ${ng} vez/veces en el backend y ${nc} en el YAML`);
     }
     if (lineas.length) {
       out.push(`  - "${keyPath}" difiere (comparado sin tener en cuenta el orden):`);
@@ -84,30 +110,48 @@ function diffArrays(generated, committed, keyPath, out) {
     return;
   }
 
-  // Listas de objetos: se emparejan por identidad, no por posicion, y se compara cada par.
-  const hayObjetos =
-    generated.some((x) => x && typeof x === 'object') ||
-    committed.some((x) => x && typeof x === 'object');
-  if (hayObjetos) {
-    const indexar = (arr) => new Map(arr.map((el) => [claveDeElemento(el), el]));
-    const g = indexar(generated);
-    const c = indexar(committed);
+  // 2. Listas de objetos sin orden (`parameters`, `security`, ...). Se emparejan por identidad
+  //    en vez de por posicion, contando ocurrencias para que un elemento duplicado de un lado
+  //    no quede tapado al colapsarse contra el mismo elemento del otro.
+  if (LISTAS_OBJETOS_SIN_ORDEN.has(campo)) {
+    const g = agruparPorClave(generated, claveDeElemento);
+    const c = agruparPorClave(committed, claveDeElemento);
     for (const clave of new Set([...g.keys(), ...c.keys()])) {
-      const enG = g.has(clave);
-      const enC = c.has(clave);
+      const enG = g.get(clave) ?? [];
+      const enC = c.get(clave) ?? [];
       const ruta = `${keyPath}[${clave}]`;
-      if (enG && !enC) out.push(`  - el backend expone "${ruta}" y no está en el YAML`);
-      else if (!enG && enC) out.push(`  - el YAML declara "${ruta}" y el backend no lo expone`);
-      else diff(g.get(clave), c.get(clave), ruta, out);
+      if (enC.length === 0) {
+        out.push(`  - el backend expone "${ruta}" y no está en el YAML`);
+      } else if (enG.length === 0) {
+        out.push(`  - el YAML declara "${ruta}" y el backend no lo expone`);
+      } else {
+        if (enG.length !== enC.length) {
+          out.push(
+            `  - "${ruta}" aparece ${enG.length} vez/veces en el backend y ${enC.length} en el YAML`,
+          );
+        }
+        // Con la misma identidad todavia pueden diferir por dentro (por ejemplo un parametro
+        // que cambio de `required`), asi que se comparan los pares que existen de los dos lados.
+        for (let i = 0; i < Math.min(enG.length, enC.length); i++) {
+          diff(enG[i], enC[i], ruta, out);
+        }
+      }
     }
     return;
   }
 
-  // Cualquier otro array (`example`, `default`, listas de numeros): el orden es dato.
-  if (jsonCanonico(generated) !== jsonCanonico(committed)) {
-    out.push(`  - "${keyPath}" difiere (el orden de esta lista sí es significativo):`);
-    out.push(`      generado por el backend: ${JSON.stringify(generated)}`);
-    out.push(`      declarado en el YAML:    ${JSON.stringify(committed)}`);
+  // 3. Cualquier otra lista (`example`, `default`, `prefixItems`): el orden es dato, asi que
+  //    se compara posicion por posicion, tenga objetos adentro o no.
+  const largo = Math.max(generated.length, committed.length);
+  for (let i = 0; i < largo; i++) {
+    const ruta = `${keyPath}[${i}]`;
+    if (i >= committed.length) {
+      out.push(`  - el backend expone "${ruta}" y no está en el YAML`);
+    } else if (i >= generated.length) {
+      out.push(`  - el YAML declara "${ruta}" y el backend no lo expone`);
+    } else {
+      diff(generated[i], committed[i], ruta, out);
+    }
   }
 }
 

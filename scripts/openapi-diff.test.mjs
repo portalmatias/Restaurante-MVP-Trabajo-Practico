@@ -70,13 +70,58 @@ test('el orden de `example` SI cuenta: ahi la lista es dato, no presentacion', (
   const yaml = { components: { schemas: { R: { example: ['cena', 'almuerzo'] } } } };
   const diferencias = diffSpecs(generado, yaml);
   assert.ok(diferencias.length > 0, 'un cambio de orden en `example` tiene que reportarse');
-  assert.ok(diferencias.some((l) => l.includes('el orden de esta lista sí es significativo')));
+  assert.ok(diferencias.some((l) => l.includes('example[0]')));
 });
 
 test('el orden de `default` tambien cuenta', () => {
   const generado = { components: { schemas: { R: { default: ['a', 'b'] } } } };
   const yaml = { components: { schemas: { R: { default: ['b', 'a'] } } } };
   assert.ok(diffSpecs(generado, yaml).length > 0);
+});
+
+// --- Hallazgo: un `enum` numerico caia en la comparacion posicional -------------------------
+// La guarda pedia que TODOS los elementos fueran strings, asi que enum: [1,2] no entraba por
+// la rama sin orden. Sin el fix, este test falla.
+
+test('el orden de un `enum` numerico tampoco cuenta como deriva', () => {
+  const generado = { components: { schemas: { R: { enum: [1, 2, 3] } } } };
+  const yaml = { components: { schemas: { R: { enum: [3, 1, 2] } } } };
+  assert.deepEqual(diffSpecs(generado, yaml), []);
+});
+
+test('en un `enum` el numero 1 y el string "1" no son lo mismo', () => {
+  const generado = { components: { schemas: { R: { enum: [1] } } } };
+  const yaml = { components: { schemas: { R: { enum: ['1'] } } } };
+  assert.ok(diffSpecs(generado, yaml).length > 0);
+});
+
+// --- Hallazgo: `example` con objetos se emparejaba por identidad ----------------------------
+// El emparejamiento por identidad aplicaba a cualquier lista con objetos, no solo a las que no
+// tienen orden semantico. Sin el fix, este test falla: la deriva pasaba desapercibida.
+
+test('el orden de un `example` con objetos adentro SI cuenta como deriva', () => {
+  const generado = { components: { schemas: { R: { example: [{ zona: 'VIP' }, { zona: 'STANDARD' }] } } } };
+  const yaml = { components: { schemas: { R: { example: [{ zona: 'STANDARD' }, { zona: 'VIP' }] } } } };
+  assert.ok(diffSpecs(generado, yaml).length > 0, 'reordenar un example es deriva');
+});
+
+test('el orden de `security` NO cuenta: es un conjunto de opciones', () => {
+  const generado = doc({ security: [{ bearerAuth: [] }, { apiKey: [] }] });
+  const yaml = doc({ security: [{ apiKey: [] }, { bearerAuth: [] }] });
+  assert.deepEqual(diffSpecs(generado, yaml), []);
+});
+
+// --- Hallazgo: los duplicados de objetos se colapsaban en un Map ----------------------------
+// Indexar por clave descartaba las repeticiones, asi que un parametro duplicado en el backend
+// pasaba como "sin deriva". Sin el fix, este test falla.
+
+test('un `parameters` duplicado en el backend se detecta', () => {
+  const p = { name: 'fecha', in: 'query', schema: { type: 'string' } };
+  const generado = doc({ parameters: [p, p] });
+  const yaml = doc({ parameters: [p] });
+  const diferencias = diffSpecs(generado, yaml);
+  assert.ok(diferencias.length > 0, 'un duplicado no puede pasar como sin deriva');
+  assert.ok(diferencias.some((l) => /aparece 2 vez\/veces .* y 1 /.test(l)));
 });
 
 // --- Hallazgo: los arrays de objetos se comparaban por posicion -----------------------------

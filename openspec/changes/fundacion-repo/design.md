@@ -93,12 +93,20 @@ presente desde el principio: el orden que funciona es escribir el YAML, decorar 
 para que genere exactamente eso, y recién ahí implementar.
 
 *Qué diferencias NO son deriva:* la comparación arrancó siendo literal, y el review mostró que
-así iba a dar rojos falsos en cuanto apareciera el primer DTO. **Una diferencia de orden solo
-cuenta como deriva si el orden es dato.** `required`, `enum` y `tags` se comparan como
-multiconjuntos —NestJS los emite en el orden de declaración de las propiedades del DTO, que no
-tiene por qué coincidir con el del YAML—, y los `parameters` se emparejan por `name` + `in`,
-que es como los identifica la spec de OpenAPI. En cambio `example`, `default` y cualquier otra
-lista de datos se comparan en orden, porque ahí el orden sí es información.
+así iba a dar rojos falsos en cuanto apareciera el primer DTO. La regla que quedó es **una
+diferencia de orden solo cuenta como deriva si el orden es dato**, y se aplica con dos listas
+explícitas de campos, no por la forma de los valores:
+
+| | Campos | Cómo se comparan |
+|---|---|---|
+| Sin orden, primitivos | `required`, `enum`, `tags` | multiconjunto — NestJS los emite en el orden de declaración del DTO, que no tiene por qué coincidir con el del YAML |
+| Sin orden, objetos | `parameters`, `security`, `servers`, `allOf`, `anyOf`, `oneOf` | emparejados por identidad (`name`+`in` para `parameters`), contando repeticiones |
+| Todo lo demás | `example`, `default`, `prefixItems`, … | posición por posición: ahí la lista es dato |
+
+Que sean listas de campos y no heurísticas sobre el tipo de los elementos es deliberado: los
+dos intentos anteriores usaban "¿son todos strings?" y "¿hay algún objeto?", y los dos dejaron
+agujeros —un `enum` numérico caía en la comparación posicional, y un `example` con objetos
+adentro aceptaba reordenarse—.
 
 Esa lógica vive en `scripts/openapi-diff.mjs`, separada del bootstrap de Nest para poder
 testearla sin build. Sus tests (`scripts/openapi-diff.test.mjs`, con `node --test`) corren en
