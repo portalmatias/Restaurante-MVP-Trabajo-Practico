@@ -22,7 +22,14 @@ local, contrato OpenAPI y pipeline de CI. No agrega comportamiento al sistema de
   en puertos distintos. §10 exige que la base de test sea separada de la de desarrollo.
 - **`.env.example`** versionado con las siete variables que enumera §10, sin valores reales.
 - **`openapi/openapi.yaml`** esqueleto: `info`, `servers`, `components.securitySchemes` con
-  bearer JWT y `paths: {}`. Cada capability posterior lo va llenando en su propio PR.
+  bearer JWT, y un único `path`: `GET /`, el endpoint de estado del servicio que deja el
+  scaffolding de NestJS. Cada capability posterior lo va llenando en su propio PR.
+
+  > La intención original era dejar `paths: {}`. Durante la implementación, el chequeo de
+  > deriva detectó que `nest new` genera un `AppController` con `GET /`, y el contrato tiene
+  > que reflejar lo que el backend realmente expone. Se documentó ese endpoint como health
+  > check en lugar de borrar el controller, porque su test es el único que corre el job
+  > `test` de CI en esta fase.
 - **`.github/workflows/ci.yml`** con los cuatro pasos de §12, en tres jobs (`spec`, `lint`,
   `test`). El job `test` **no** levanta PostgreSQL en esta etapa — ver `design.md`.
 - **`README.md`** inicial con el bloque "Primer arranque" de §10.
