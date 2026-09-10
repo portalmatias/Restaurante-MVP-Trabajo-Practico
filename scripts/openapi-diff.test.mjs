@@ -3,6 +3,11 @@
  *
  * Corren con `node --test`, sin dependencias: node:test viene con Node 20.
  *
+ * Ojo: el script `test:scripts` lista los archivos de test uno por uno en vez de usar un glob.
+ * `node --test` no soporta patrones glob hasta Node 21 y este proyecto corre sobre Node 20 (§10),
+ * asi que un glob funciona en una maquina con Node reciente y falla en CI. Si agregas otro
+ * archivo de test, sumalo al script en el package.json de la raiz.
+ *
  * La seccion 9 de openspec/config.yaml exige que todo bug corregido sume un test que falle sin
  * el fix. Cada bloque de abajo corresponde a un hallazgo real del review del change
  * `fundacion-repo`, y esta anotado con cual.
