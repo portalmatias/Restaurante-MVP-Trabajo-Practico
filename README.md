@@ -53,6 +53,7 @@ Todo se corre desde la raíz del repo.
 | `npm run typecheck` | `tsc --noEmit` sobre los dos workspaces |
 | `npm run test -w backend` | Tests unitarios del backend (Jest) |
 | `npm run test:e2e` | Tests e2e del backend (`backend/test/*.e2e-spec.ts`) |
+| `npm run test:scripts` | Tests de las utilidades de `scripts/` (`node --test`) |
 | `npm run build -w backend` | Compila el backend |
 | `npm run openapi:lint` | Lintea el contrato con Spectral |
 | `npm run openapi:check` | Verifica que el backend no se desvíe del contrato |
@@ -94,7 +95,7 @@ Si agregás o cambiás un endpoint: **primero el YAML, después el código.**
 |---|---|
 | `spec` | `openspec validate --all --strict`, Spectral, y el chequeo de deriva del contrato |
 | `lint` | ESLint y chequeo de tipos |
-| `test` | Tests unitarios **y** e2e del backend |
+| `test` | Tests unitarios y e2e del backend, más los de `scripts/` |
 
 Un PR con CI en rojo no se mergea, aunque funcione localmente.
 

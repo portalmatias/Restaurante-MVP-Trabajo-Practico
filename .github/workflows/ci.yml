@@ -102,3 +102,8 @@ jobs:
       # necesiten llegan con el change ci-integracion-db.
       - name: Tests e2e del backend (todavia sin PostgreSQL)
         run: npm run test:e2e
+
+      # La comparacion de contratos de scripts/openapi-diff.mjs es logica pura y sutil
+      # (que diferencias de orden son deriva y cuales no). Se testea aparte, sin build.
+      - name: Tests de las utilidades de scripts/
+        run: npm run test:scripts
