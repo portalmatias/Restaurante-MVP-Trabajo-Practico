@@ -1,0 +1,37 @@
+{
+  "name": "restaurante-mvp",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Sistema de reservas para un restaurante (Trabajo Práctico grupal).",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend",
+    "test": "npm run test -w backend",
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run start:dev -w backend\" \"npm run dev -w frontend\"",
+    "openapi:lint": "spectral lint openapi/openapi.yaml",
+    "openapi:check": "node scripts/openapi-check.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@fission-ai/openspec": "1.13.0",
+    "@stoplight/spectral-cli": "6.16.3",
+    "concurrently": "10.0.5",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.4",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-prettier": "5.5.6",
+    "globals": "17.12.0",
+    "js-yaml": "4.1.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0"
+  }
+}
