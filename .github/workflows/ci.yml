@@ -1,0 +1,97 @@
+name: CI
+
+# Fase 1 (fundacion-repo, D8): sin PostgreSQL en el job `test` todavía. No existen
+# schema.prisma ni seed.ts; eso llega con `ci-integracion-db` (después de `modelo-dominio`).
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  spec:
+    name: Especificación (OpenSpec + OpenAPI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # El lockfile lo escribe npm 11; el runner trae npm 10.8.2, que exige en el lock
+      # subarboles de dependencias opcionales que npm 11 considera innecesarios (los
+      # @emnapi/* de las variantes wasm32 de sharp y de @tailwindcss/oxide). Fijar la
+      # version alinea quien escribe el lock con quien lo consume.
+      - name: Fijar npm a la version que escribe el lockfile
+        run: npm install -g npm@11.6.1
+
+      - run: npm ci
+
+      # D4: la CLI de OpenSpec es devDependency de la raíz (versión fijada en
+      # package-lock.json), se resuelve desde node_modules, no vía npx.
+      - name: openspec validate --all --strict
+        run: ./node_modules/.bin/openspec validate --all --strict
+
+      - name: Lint del contrato OpenAPI (Spectral)
+        run: npm run openapi:lint
+
+      # D1/D2: el chequeo de deriva compara paths + components.schemas contra el spec
+      # que @nestjs/swagger genera desde la app compilada del backend.
+      - name: Compilar backend (para generar el spec con @nestjs/swagger)
+        run: npm run build -w backend
+
+      - name: Chequeo de deriva del contrato OpenAPI
+        run: npm run openapi:check
+
+  lint:
+    name: Lint y tipos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # El lockfile lo escribe npm 11; el runner trae npm 10.8.2, que exige en el lock
+      # subarboles de dependencias opcionales que npm 11 considera innecesarios (los
+      # @emnapi/* de las variantes wasm32 de sharp y de @tailwindcss/oxide). Fijar la
+      # version alinea quien escribe el lock con quien lo consume.
+      - name: Fijar npm a la version que escribe el lockfile
+        run: npm install -g npm@11.6.1
+
+      - run: npm ci
+
+      - name: ESLint (backend + frontend)
+        run: npm run lint
+
+      - name: Chequeo de tipos (tsc --noEmit)
+        run: npm run typecheck
+
+  test:
+    name: Tests (backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # El lockfile lo escribe npm 11; el runner trae npm 10.8.2, que exige en el lock
+      # subarboles de dependencias opcionales que npm 11 considera innecesarios (los
+      # @emnapi/* de las variantes wasm32 de sharp y de @tailwindcss/oxide). Fijar la
+      # version alinea quien escribe el lock con quien lo consume.
+      - name: Fijar npm a la version que escribe el lockfile
+        run: npm install -g npm@11.6.1
+
+      - run: npm ci
+
+      # D8: sin service container de PostgreSQL, sin db:migrate ni db:seed. Todavía no
+      # existen schema.prisma ni seed.ts — llegan con `ci-integracion-db`.
+      - name: Tests del backend
+        run: npm run test -w backend

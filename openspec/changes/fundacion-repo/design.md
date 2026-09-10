@@ -31,7 +31,8 @@ Tres restricciones dan forma al diseño:
 - Ninguna pantalla en `frontend/` — las trae `frontend-base`.
 - Ningún `schema.prisma`, migración ni `seed.ts`. Este change instala Prisma como dependencia
   y deja el `DATABASE_URL`, nada más.
-- Ningún `path` real en `openapi/openapi.yaml`. Solo el esqueleto.
+- Ningún `path` de dominio en `openapi/openapi.yaml`. El único que queda documentado es
+  `GET /`, el endpoint de estado que genera el scaffolding de NestJS (ver D2).
 - Los pasos de CI que necesitan PostgreSQL. Van en `ci-integracion-db` (roadmap §6.1).
 - Los *required status checks* en la protección de `main`: GitHub solo los ofrece después de
   que el check corrió al menos una vez. Es la tarea 0.4 del roadmap, posterior a este PR.
@@ -62,18 +63,57 @@ en NestJS y elimina la posibilidad de deriva por construcción. Se descarta porq
 secuencial toda la Fase 5 y contradice §7. Si el equipo cambia de opinión, **hay que hacerlo
 antes de `auth-admin`**: es la decisión más cara de revertir del proyecto.
 
-### D2 — El chequeo de deriva se implementa ahora, aunque en la Fase 1 no compare nada
+### D2 — El chequeo de deriva se implementa ahora, y resultó no ser vacuo
 
-En este change no hay endpoints: tanto el YAML como el spec generado tienen `paths: {}`, así
-que el chequeo pasa trivialmente. Aun así se implementa acá.
+*Por qué implementarlo acá:* diferirlo significa que el change que lo agregue después va a
+tener que tocar `.github/workflows/`, y §14 solo se lo permite a un change propio de CI. Sería
+un tercer change de pipeline sin necesidad. Además, dejar la compuerta instalada desde el día
+uno evita el escenario de agregarla cuando la deriva ya existe y hay que arreglar diez
+endpoints juntos.
 
-*Por qué:* diferirlo significa que el change que lo agregue después va a tener que tocar
-`.github/workflows/`, y §14 solo se lo permite a un change propio de CI. Sería un tercer
-change de pipeline sin necesidad. Además, dejar la compuerta instalada desde el día uno evita
-el escenario de agregarla cuando la deriva ya existe y hay que arreglar diez endpoints juntos.
+*Lo que se esperaba:* que el chequeo pasara trivialmente, con `paths: {}` de los dos lados, y
+que recién se probara de verdad en `auth-admin`.
 
-*Consecuencia honesta:* la compuerta recién se prueba de verdad en `auth-admin`, que es el
-primer change con un `path` real. Queda anotado como riesgo.
+*Lo que pasó:* en la primera corrida se puso **rojo**. `nest new` genera un `AppController`
+con `GET /` que devuelve `"Hello World!"`, y el YAML declaraba `paths: {}`. La compuerta
+funcionó a la primera, en la Fase 1, sin necesidad de esperar a un endpoint de dominio.
+
+*Cómo se resolvió:* se documentó `GET /` en el contrato como endpoint de estado del servicio,
+en vez de borrar el controller. Borrarlo habría dejado al job `test` de CI sin ningún test que
+correr —es el único que existe hasta la Fase 2— y lo habría vuelto verde por vacuidad, que es
+lo contrario de lo que §12 quiere del pipeline. El controller quedó decorado con
+`@ApiOperation` / `@ApiOkResponse` en español (§8) y el service devuelve un texto de estado
+en lugar del `"Hello World!"` del scaffolding.
+
+*Lo que esto enseñó sobre el chequeo:* el diff es una comparación **exacta**, así que cada
+endpoint nuevo obliga a que los decoradores de Swagger y el YAML escrito a mano coincidan
+literalmente —`summary`, `description`, `operationId`, `tags`, y la forma de cada respuesta—.
+Es más disciplina de la que sugería D1, y es el costo real de contract-first. Conviene que
+`auth-admin`, que es el primer endpoint de dominio, lo tenga presente desde el principio: el
+orden que funciona es escribir el YAML, decorar el controller para que genere exactamente eso,
+y recién ahí implementar.
+
+### D9 — Una sola versión de TypeScript y de ESLint fijadas en la raíz
+
+Descubierto durante la implementación, no anticipado en el plan original.
+
+`eslint-config-next@16.3.4` declara `eslint: ">=9.0.0"` y depende de `typescript@6`. Con esos
+rangos, npm instaló ESLint 10 y hoisteó TypeScript 6 a la raíz, mientras cada workspace se
+quedaba con TypeScript 5.9.3 anidado. Eso rompió dos cosas a la vez:
+
+1. ESLint 10 crasheaba al cargar `eslint-plugin-react@7.37.5`, que declara peer `eslint ^9.7`.
+2. Con dos compiladores en el mismo repo, ESLint resolvía TypeScript 6 desde la raíz y
+   `@types/jest` no resolvía, así que los specs del backend daban once errores fantasma de
+   `no-unsafe-call` mientras `tsc` pasaba en limpio desde el workspace.
+
+*Decisión:* `typescript` y `eslint` se declaran **explícitamente como devDependencies de la
+raíz, con versión exacta** (`5.9.3` y `9.39.5`), para que las herramientas transversales y los
+workspaces resuelvan siempre el mismo compilador. Es una extensión natural de D4: en un
+monorepo con hoisting, dejar que una dependencia transitiva elija la versión de una
+herramienta compartida es una fuente silenciosa de fallos que se contradicen entre sí.
+
+*Regla que queda:* cualquier herramienta que corra desde la raíz sobre los dos workspaces
+—compilador, linter, formateador— se declara en la raíz con versión exacta, no se hereda.
 
 ### D3 — Spectral como linter de OpenAPI
 
@@ -172,10 +212,12 @@ inmediatamente después de `modelo-dominio`, en un change propio por §14.
   `openapi.yaml`, `package.json` de la raíz y la edición de `config.yaml`. Partirlo en dos PRs
   sería peor: el primero no tendría CI y el segundo lo agregaría fuera de su propio change.
 
-- **El chequeo de deriva del contrato (D2) no se ejerce hasta `auth-admin`.** → Se documenta
-  como criterio de aceptación de `auth-admin`: su PR debe demostrar que el job `spec` se pone
-  **rojo** si el controller declara un endpoint que no está en el YAML. Si pasa igual, el
-  chequeo está mal cableado y nadie se enteró durante tres changes.
+- ~~El chequeo de deriva del contrato (D2) no se ejerce hasta `auth-admin`.~~ **Riesgo
+  cerrado en la implementación:** el chequeo se puso rojo en su primera corrida, con el
+  `GET /` del scaffolding. Está probado que funciona. Lo que queda como criterio de
+  aceptación de `auth-admin` es lo inverso: que su PR demuestre que se puede escribir un
+  endpoint de dominio cuyos decoradores generen **exactamente** el YAML escrito a mano, sin
+  falsos rojos. Ese es el costo de contract-first que D2 documenta.
 
 - **Los generadores cambian de versión.** `nest new` y `create-next-app` producen salida
   distinta según cuándo se corran, y los tres integrantes no van a correrlos el mismo día. →
