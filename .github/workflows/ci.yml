@@ -93,5 +93,17 @@ jobs:
 
       # D8: sin service container de PostgreSQL, sin db:migrate ni db:seed. Todavía no
       # existen schema.prisma ni seed.ts — llegan con `ci-integracion-db`.
-      - name: Tests del backend
+      - name: Tests unitarios del backend
         run: npm run test -w backend
+
+      # El jest del backend usa rootDir "src" y testRegex ".*\.spec\.ts$", asi que los
+      # archivos de backend/test/*.e2e-spec.ts NO los corre `npm run test`. Sin este paso
+      # existirian tests que nadie ejecuta. Todavia no necesitan PostgreSQL; los que si lo
+      # necesiten llegan con el change ci-integracion-db.
+      - name: Tests e2e del backend (todavia sin PostgreSQL)
+        run: npm run test:e2e
+
+      # La comparacion de contratos de scripts/openapi-diff.mjs es logica pura y sutil
+      # (que diferencias de orden son deriva y cuales no). Se testea aparte, sin build.
+      - name: Tests de las utilidades de scripts/
+        run: npm run test:scripts

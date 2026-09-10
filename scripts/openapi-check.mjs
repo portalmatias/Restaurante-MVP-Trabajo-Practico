@@ -25,6 +25,8 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import process from 'node:process';
 
+import { diffSpecs } from './openapi-diff.mjs';
+
 const ROOT = process.cwd();
 const OPENAPI_PATH = path.join(ROOT, 'openapi', 'openapi.yaml');
 
@@ -73,36 +75,6 @@ async function loadCommittedSpec() {
   return undefined;
 }
 
-// Diff recursivo simple pensado para mensajes de CI legibles, no para uso general.
-function diff(generated, committed, keyPath, out) {
-  const genIsObj = generated && typeof generated === 'object' && !Array.isArray(generated);
-  const comIsObj = committed && typeof committed === 'object' && !Array.isArray(committed);
-
-  if (genIsObj && comIsObj) {
-    const keys = new Set([...Object.keys(generated), ...Object.keys(committed)]);
-    for (const key of keys) {
-      const childPath = keyPath ? `${keyPath}.${key}` : key;
-      const inGen = Object.prototype.hasOwnProperty.call(generated, key);
-      const inCom = Object.prototype.hasOwnProperty.call(committed, key);
-      if (inGen && !inCom) {
-        out.push(`  - el backend expone "${childPath}" y no está en el YAML`);
-      } else if (!inGen && inCom) {
-        out.push(`  - el YAML declara "${childPath}" y el backend no lo expone`);
-      } else {
-        diff(generated[key], committed[key], childPath, out);
-      }
-    }
-    return;
-  }
-
-  const same = JSON.stringify(generated) === JSON.stringify(committed);
-  if (!same) {
-    out.push(`  - "${keyPath || '(raíz)'}" difiere:`);
-    out.push(`      generado por el backend: ${JSON.stringify(generated)}`);
-    out.push(`      declarado en el YAML:    ${JSON.stringify(committed)}`);
-  }
-}
-
 async function generateSpecFromBackend() {
   const appModulePath = findCompiledAppModule();
   if (!appModulePath) {
@@ -147,17 +119,7 @@ async function main() {
   const committed = await loadCommittedSpec();
   const generated = await generateSpecFromBackend();
 
-  const generatedSlice = {
-    paths: generated.paths ?? {},
-    schemas: generated.components?.schemas ?? {},
-  };
-  const committedSlice = {
-    paths: committed.paths ?? {},
-    schemas: committed.components?.schemas ?? {},
-  };
-
-  const differences = [];
-  diff(generatedSlice, committedSlice, '', differences);
+  const differences = diffSpecs(generated, committed);
 
   if (differences.length > 0) {
     console.error(
