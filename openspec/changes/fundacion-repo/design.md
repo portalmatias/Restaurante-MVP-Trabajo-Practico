@@ -85,21 +85,43 @@ lo contrario de lo que §12 quiere del pipeline. El controller quedó decorado c
 `@ApiOperation` / `@ApiOkResponse` en español (§8) y el service devuelve un texto de estado
 en lugar del `"Hello World!"` del scaffolding.
 
-*Lo que esto enseñó sobre el chequeo:* el diff es una comparación **exacta**, así que cada
-endpoint nuevo obliga a que los decoradores de Swagger y el YAML escrito a mano coincidan
-literalmente —`summary`, `description`, `operationId`, `tags`, y la forma de cada respuesta—.
-Es más disciplina de la que sugería D1, y es el costo real de contract-first. Conviene que
-`auth-admin`, que es el primer endpoint de dominio, lo tenga presente desde el principio: el
-orden que funciona es escribir el YAML, decorar el controller para que genere exactamente eso,
-y recién ahí implementar.
+*Lo que esto enseñó sobre el chequeo:* cada endpoint nuevo obliga a que los decoradores de
+Swagger y el YAML escrito a mano coincidan en `summary`, `description`, `operationId` y la
+forma de cada respuesta. Es más disciplina de la que sugería D1, y es el costo real de
+contract-first. Conviene que `auth-admin`, que es el primer endpoint de dominio, lo tenga
+presente desde el principio: el orden que funciona es escribir el YAML, decorar el controller
+para que genere exactamente eso, y recién ahí implementar.
+
+*Qué diferencias NO son deriva:* la comparación arrancó siendo literal, y el review mostró que
+así iba a dar rojos falsos en cuanto apareciera el primer DTO. La regla que quedó es **una
+diferencia de orden solo cuenta como deriva si el orden es dato**, y se aplica con dos listas
+explícitas de campos, no por la forma de los valores:
+
+| | Campos | Cómo se comparan |
+|---|---|---|
+| Sin orden, primitivos | `required`, `enum`, `tags` | multiconjunto — NestJS los emite en el orden de declaración del DTO, que no tiene por qué coincidir con el del YAML |
+| Sin orden, objetos | `parameters`, `security`, `servers`, `allOf`, `anyOf`, `oneOf` | emparejados por identidad (`name`+`in` para `parameters`), contando repeticiones |
+| Todo lo demás | `example`, `default`, `prefixItems`, … | posición por posición: ahí la lista es dato |
+
+Que sean listas de campos y no heurísticas sobre el tipo de los elementos es deliberado: los
+dos intentos anteriores usaban "¿son todos strings?" y "¿hay algún objeto?", y los dos dejaron
+agujeros —un `enum` numérico caía en la comparación posicional, y un `example` con objetos
+adentro aceptaba reordenarse—.
+
+Esa lógica vive en `scripts/openapi-diff.mjs`, separada del bootstrap de Nest para poder
+testearla sin build. Sus tests (`scripts/openapi-diff.test.mjs`, con `node --test`) corren en
+CI y cubren cada uno de los casos de arriba en las dos direcciones: que el orden no dispare un
+rojo falso, y que una diferencia real se siga detectando.
 
 ### D9 — Una sola versión de TypeScript y de ESLint fijadas en la raíz
 
 Descubierto durante la implementación, no anticipado en el plan original.
 
-`eslint-config-next@16.3.4` declara `eslint: ">=9.0.0"` y depende de `typescript@6`. Con esos
-rangos, npm instaló ESLint 10 y hoisteó TypeScript 6 a la raíz, mientras cada workspace se
-quedaba con TypeScript 5.9.3 anidado. Eso rompió dos cosas a la vez:
+`eslint-config-next@16.3.4` declara **como peer dependencies** `eslint: ">=9.0.0"` y
+`typescript: ">=3.3.1"`. Son dos rangos sin techo, y npm instala las peer dependencies solo:
+resolvió ESLint a la 10 y TypeScript a la 6.0.3, y hoisteó las dos a la raíz, mientras cada
+workspace se quedaba con su propio TypeScript 5.9.3 anidado, resuelto desde rangos con caret
+distintos (`^5.7.3` en `backend`, `^5` en `frontend`). Eso rompió dos cosas a la vez:
 
 1. ESLint 10 crasheaba al cargar `eslint-plugin-react@7.37.5`, que declara peer `eslint ^9.7`.
 2. Con dos compiladores en el mismo repo, ESLint resolvía TypeScript 6 desde la raíz y
@@ -107,13 +129,23 @@ quedaba con TypeScript 5.9.3 anidado. Eso rompió dos cosas a la vez:
    `no-unsafe-call` mientras `tsc` pasaba en limpio desde el workspace.
 
 *Decisión:* `typescript` y `eslint` se declaran **explícitamente como devDependencies de la
-raíz, con versión exacta** (`5.9.3` y `9.39.5`), para que las herramientas transversales y los
-workspaces resuelvan siempre el mismo compilador. Es una extensión natural de D4: en un
-monorepo con hoisting, dejar que una dependencia transitiva elija la versión de una
-herramienta compartida es una fuente silenciosa de fallos que se contradicen entre sí.
+raíz, con versión exacta** (`5.9.3` y `9.39.5`), y los dos workspaces declaran esa misma
+versión exacta de `typescript` en lugar de un rango con caret. Así las herramientas
+transversales y los workspaces resuelven siempre el mismo compilador. Es una extensión natural
+de D4: en un monorepo con hoisting, dejar que el rango de una peer dependency ajena elija la
+versión de una herramienta compartida es una fuente silenciosa de fallos que se contradicen
+entre sí.
 
 *Regla que queda:* cualquier herramienta que corra desde la raíz sobre los dos workspaces
-—compilador, linter, formateador— se declara en la raíz con versión exacta, no se hereda.
+—compilador, linter, formateador— se declara en la raíz con versión exacta, y ningún workspace
+la vuelve a declarar con un rango que pueda derivar.
+
+*Corolario, aprendido en el review:* lo mismo aplica a los **runtimes**. `engines` decía
+`node: "20.x"` mientras el README prometía "Node 20 LTS o superior", y `concurrently@10.0.5`
+pedía `node >=22` sin que nadie lo notara porque la máquina de desarrollo corre Node 24. Los
+rangos de `engines` tienen que decir la verdad de lo que el proyecto soporta, y CI es el único
+lugar donde eso se comprueba. *(La versión de `concurrently` que disparó esto fue la 10.0.5, que
+se instaló brevemente durante la implementación; el repo quedó en la 9.2.4, que pide `node >=18`.)*
 
 ### D3 — Spectral como linter de OpenAPI
 
