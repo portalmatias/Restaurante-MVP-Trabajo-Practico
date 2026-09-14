@@ -1,0 +1,8 @@
+# Linter del contrato OpenAPI (D3 en openspec/changes/fundacion-repo/design.md).
+# Ruleset base estándar de OAS, sin reglas propias de un vendor. Ajuste mínimo: el
+# proyecto no publica un objeto "contact" (no hay un canal de soporte real que ofrecer
+# en un TP académico), así que se apaga esa única regla.
+extends:
+  - spectral:oas
+rules:
+  info-contact: off

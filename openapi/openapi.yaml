@@ -1,0 +1,45 @@
+openapi: 3.1.0
+info:
+  title: API de Reservas de Restaurante
+  description: >-
+    Contrato formal de la API del sistema de reservas de restaurante. Permite a un
+    cliente consultar disponibilidad, crear una reserva, consultarla y cancelarla; y a
+    un administrador gestionar mesas, zonas, horarios y ver el estado del aforo.
+
+    Este archivo, escrito a mano, es la fuente de verdad del contrato (contract-first):
+    cada capability agrega acá sus propios paths y schemas en su propio change de
+    OpenSpec. El CI genera el spec real desde el backend (`@nestjs/swagger`) y lo
+    compara contra este archivo para detectar desvíos.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3001
+    description: Backend local de desarrollo
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        JWT de acceso del administrador (ver §5 de openspec/config.yaml). Se envía en
+        el header `Authorization: Bearer <token>`. Las rutas públicas del cliente
+        (disponibilidad, creación, consulta y cancelación de reservas sin cuenta) no
+        requieren autenticación.
+paths:
+  /:
+    get:
+      summary: Estado del servicio
+      description: >-
+        Devuelve un texto fijo que confirma que el backend está en pie. No consulta la
+        base de datos ni requiere autenticación.
+      operationId: AppController_estado
+      tags:
+        - Estado
+      parameters: []
+      responses:
+        '200':
+          description: El backend está operativo.
+          content:
+            application/json:
+              schema:
+                type: string

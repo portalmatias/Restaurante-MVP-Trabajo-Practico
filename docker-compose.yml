@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: reservas-postgres
+    restart: unless-stopped
+    environment:
+      # Credenciales de desarrollo local únicamente (no son secretos de producción).
+      # Deben coincidir con el DATABASE_URL de ejemplo en .env.example.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # Base por defecto que crea la imagen al iniciar. La segunda base (reservas_test)
+      # la crea el script de init de abajo — ver D5 en design.md de fundacion-repo.
+      POSTGRES_DB: reservas_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - reservas_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d reservas_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  reservas_postgres_data:
