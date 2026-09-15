@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DiaSemana } from '@prisma/client';
+import { diaSemanaDeFecha } from '../src/common/timezone';
 
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -49,6 +50,40 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     return fecha;
   }
 
+  /**
+   * Devuelve una fecha futura que cae en el día de la semana indicado (0 = domingo ... 6 = sábado).
+   * Busca hacia adelante desde hoy hasta encontrar el primer día que coincida.
+   */
+  function fechaFuturaConDiaSemana(diaSemanaObjetivo: number): Date {
+    const fecha = new Date();
+    fecha.setUTCHours(0, 0, 0, 0);
+    // Avanzamos días hasta que getUTCDay() coincida con el objetivo
+    while (fecha.getUTCDay() !== diaSemanaObjetivo) {
+      fecha.setUTCDate(fecha.getUTCDate() + 1);
+    }
+    return fecha;
+  }
+
+  const DIAS_SEMANA_ENUM: DiaSemana[] = [
+    DiaSemana.DOMINGO,
+    DiaSemana.LUNES,
+    DiaSemana.MARTES,
+    DiaSemana.MIERCOLES,
+    DiaSemana.JUEVES,
+    DiaSemana.VIERNES,
+    DiaSemana.SABADO,
+  ];
+
+  /**
+   * El nuevo invariante de "turno coincide con el día de la semana de la reserva" exige que
+   * el Turno usado en cada test tenga el mismo diaSemana que la fecha (fechaFutura) que ese
+   * test va a usar. Este helper deriva el DiaSemana correcto para un offset dado, para no
+   * tener que hardcodear manualmente qué día de la semana cae "hoy + N" en cada test.
+   */
+  function diaSemanaParaOffset(diasDesdeHoy: number): DiaSemana {
+    return DIAS_SEMANA_ENUM[diaSemanaDeFecha(fechaFutura(diasDesdeHoy))];
+  }
+
   async function crearMesa(
     zonaId: string,
     capacidad: number,
@@ -61,10 +96,13 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     return mesa;
   }
 
-  async function crearTurno(activo = true) {
+  async function crearTurno(
+    diaSemana: DiaSemana = DiaSemana.MIERCOLES,
+    activo = true,
+  ) {
     const turno = await prisma.turno.create({
       data: {
-        diaSemana: DiaSemana.MIERCOLES,
+        diaSemana,
         horaInicio: horaDeTestUnica(),
         horaFin: new Date(Date.UTC(1970, 0, 1, 4, 0, 0)),
         activo,
@@ -162,7 +200,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
   // --- 4.1 — Invariante 1: exclusividad de mesa por turno y fecha ---------------------
   it('rechaza una segunda reserva activa para la misma mesa, turno y fecha', async () => {
     const mesa = await crearMesa(zonaStandardId, 4, 'INV1-M1');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(10));
     const fecha = fechaFutura(10);
 
     const primera = await service.crearReserva({
@@ -202,7 +240,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     // Refuerza que el índice es PARCIAL: una Reserva CANCELADA no debe bloquear la
     // combinación (a diferencia de un índice único "a secas").
     const mesa = await crearMesa(zonaStandardId, 4, 'INV1-M2');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(11));
     const fecha = fechaFutura(11);
 
     const primera = await service.crearReserva({
@@ -233,7 +271,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
   // --- 4.2 — Invariante 2: capacidad de la mesa no excedida ---------------------------
   it('rechaza una reserva con más comensales que la capacidad de la mesa', async () => {
     const mesa = await crearMesa(zonaStandardId, 4, 'INV2-M1');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(12));
 
     await expect(
       service.crearReserva({
@@ -253,7 +291,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
   // --- 4.3 — Invariante 3: turno activo y mesa de la zona solicitada ------------------
   it('rechaza una reserva sobre un turno inactivo', async () => {
     const mesa = await crearMesa(zonaStandardId, 4, 'INV3-M1');
-    const turnoInactivo = await crearTurno(false);
+    const turnoInactivo = await crearTurno(diaSemanaParaOffset(13), false);
 
     await expect(
       service.crearReserva({
@@ -269,7 +307,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
 
   it('rechaza una reserva cuya mesa pertenece a otra zona distinta de la solicitada', async () => {
     const mesaVip = await crearMesa(zonaVipId, 4, 'INV3-M2');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(14));
 
     await expect(
       service.crearReserva({
@@ -283,12 +321,61 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // --- 4.3b — Invariante 3: turno coincide con el día de la semana de la reserva ---
+  it('rechaza una reserva cuya fecha no cae en el día de la semana del turno', async () => {
+    // El turno por defecto en crearTurno() es MIERCOLES (diaSemana = 3 en getUTCDay).
+    // Buscamos una fecha que caiga en JUEVES (4) para que no coincida.
+    const mesa = await crearMesa(zonaStandardId, 4, 'INV3B-M1');
+    const turno = await crearTurno(); // MIERCOLES
+    const fechaJueves = fechaFuturaConDiaSemana(4); // JUEVES
+
+    // Sanity check: la fecha efectivamente cae en jueves y el turno es miércoles
+    expect(diaSemanaDeFecha(fechaJueves)).toBe(4);
+    expect(turno.diaSemana).toBe(DiaSemana.MIERCOLES);
+
+    await expect(
+      service.crearReserva({
+        mesaId: mesa.id,
+        turnoId: turno.id,
+        zonaSolicitadaId: zonaStandardId,
+        fecha: fechaJueves,
+        comensales: 2,
+        ...datosClienteBase('inv3b-dia'),
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    const creadas = await prisma.reserva.count({ where: { mesaId: mesa.id } });
+    expect(creadas).toBe(0);
+  });
+
+  it('permite una reserva cuando la fecha cae en el mismo día de la semana del turno', async () => {
+    // Mismo turno (MIERCOLES), pero fecha que cae en miércoles
+    const mesa = await crearMesa(zonaStandardId, 4, 'INV3B-M2');
+    const turno = await crearTurno(); // MIERCOLES
+    const fechaMiercoles = fechaFuturaConDiaSemana(3); // MIERCOLES
+
+    expect(diaSemanaDeFecha(fechaMiercoles)).toBe(3);
+    expect(turno.diaSemana).toBe(DiaSemana.MIERCOLES);
+
+    const reserva = await service.crearReserva({
+      mesaId: mesa.id,
+      turnoId: turno.id,
+      zonaSolicitadaId: zonaStandardId,
+      fecha: fechaMiercoles,
+      comensales: 2,
+      ...datosClienteBase('inv3b-ok'),
+    });
+    reservaIds.push(reserva.id);
+
+    expect(reserva.id).toBeDefined();
+  });
+
   // --- 4.4 — Invariante 4: aforo de zona respetado ------------------------------------
   it('rechaza una reserva que excede el aforo restante de la zona aunque haya mesa libre', async () => {
     // aforoMaximo de STANDARD en este test = 10 (ver beforeAll).
     const mesaA = await crearMesa(zonaStandardId, 8, 'INV4-M1');
     const mesaB = await crearMesa(zonaStandardId, 8, 'INV4-M2');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(15));
     const fecha = fechaFutura(15);
 
     const primera = await service.crearReserva({
@@ -323,7 +410,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
   // --- 4.5 — Invariante 5: estados terminales no retroceden ---------------------------
   it('rechaza transicionar una reserva CANCELADA a cualquier otro estado', async () => {
     const mesa = await crearMesa(zonaStandardId, 4, 'INV5-M1');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(16));
 
     const reserva = await service.crearReserva({
       mesaId: mesa.id,
@@ -352,7 +439,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
 
   it('rechaza transicionar una reserva NO_SHOW a cualquier otro estado', async () => {
     const mesa = await crearMesa(zonaStandardId, 4, 'INV5-M2');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(17));
 
     const reserva = await service.crearReserva({
       mesaId: mesa.id,
@@ -377,11 +464,11 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
   // --- 4.6 — Código de reserva único ---------------------------------------------------
   it('reintenta con un código nuevo si el generado colisiona con uno existente', async () => {
     const mesa = await crearMesa(zonaStandardId, 4, 'INV6-M1');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(19));
 
     // Pre-inserta una Reserva "ocupando" un código de reserva conocido.
     const otraMesa = await crearMesa(zonaStandardId, 2, 'INV6-M-colision');
-    const otroTurno = await crearTurno();
+    const otroTurno = await crearTurno(diaSemanaParaOffset(18));
     const codigoColisionado = 'COLISION';
     const existente = await prisma.reserva.create({
       data: {
@@ -425,7 +512,7 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
 
   it('genera códigos de reserva distintos entre sí para reservas creadas en secuencia', async () => {
     const mesa = await crearMesa(zonaStandardId, 4, 'INV6-M2');
-    const turno = await crearTurno();
+    const turno = await crearTurno(diaSemanaParaOffset(100));
     const cantidad = 15;
 
     const codigos: string[] = [];
@@ -433,9 +520,10 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
       const reserva = await service.crearReserva({
         mesaId: mesa.id,
         turnoId: turno.id,
-        // Distinta fecha en cada iteración para no chocar con el invariante 1 (que no es
-        // lo que este test quiere ejercitar).
-        fecha: fechaFutura(100 + i),
+        // Distinta fecha en cada iteración (una semana de diferencia, para no chocar con
+        // el invariante 1 que no es lo que este test quiere ejercitar) que además cae
+        // siempre en el mismo día de la semana que `turno` (invariante nuevo).
+        fecha: fechaFutura(100 + i * 7),
         zonaSolicitadaId: zonaStandardId,
         comensales: 2,
         ...datosClienteBase(`inv6-seq-${i}`),

@@ -104,6 +104,16 @@ a la Zona solicitada.
 - **AND** la Mesa elegida pertenece a la Zona STANDARD
 - **THEN** el sistema rechaza la Reserva
 
+### Requirement: Invariante — turno coincide con el día de la semana de la reserva
+El sistema SHALL exigir que el día de la semana de la fecha de una Reserva coincida con el
+`diaSemana` del `Turno` seleccionado. Una reserva para un lunes no puede usar un turno de
+martes, ni viceversa.
+
+#### Scenario: Reserva con fecha en día distinto al del turno rechazada
+- **WHEN** se intenta crear una Reserva con `fecha` que cae en lunes
+- **AND** el `Turno` seleccionado tiene `diaSemana = MARTES`
+- **THEN** el sistema rechaza la Reserva
+
 ### Requirement: Invariante — aforo de zona respetado
 El sistema SHALL impedir que la suma de comensales de las Reservas activas de un Turno supere
 el aforo configurado de la Zona correspondiente, incluso si existe una Mesa físicamente

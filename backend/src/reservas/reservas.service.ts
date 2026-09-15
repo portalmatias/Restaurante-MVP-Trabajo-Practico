@@ -5,9 +5,10 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { EstadoReserva, Prisma } from '@prisma/client';
+import { DiaSemana, EstadoReserva, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { diaSemanaDeFecha } from '../common/timezone';
 
 const CODIGO_RESERVA_LONGITUD = 8;
 // Sin caracteres ambiguos (0/O, 1/I/L) para que sea legible por teléfono/email.
@@ -95,6 +96,25 @@ export class ReservasService {
       if (mesa.zonaId !== input.zonaSolicitadaId) {
         throw new ConflictException(
           'La mesa elegida no pertenece a la zona solicitada.',
+        );
+      }
+
+      // Invariante 3 (parte 3): el día de la semana de la fecha debe coincidir con el
+      // diaSemana del turno. Usamos getUTCDay() (via diaSemanaDeFecha) porque
+      // Reserva.fecha es @db.Date (fecha calendario pura sin zona horaria).
+      const diaSemanaFecha = diaSemanaDeFecha(input.fecha);
+      const diaSemanaTurnoNumero: Record<DiaSemana, number> = {
+        DOMINGO: 0,
+        LUNES: 1,
+        MARTES: 2,
+        MIERCOLES: 3,
+        JUEVES: 4,
+        VIERNES: 5,
+        SABADO: 6,
+      };
+      if (diaSemanaFecha !== diaSemanaTurnoNumero[turno.diaSemana]) {
+        throw new ConflictException(
+          'La fecha de la reserva no coincide con el día de la semana del turno seleccionado.',
         );
       }
 

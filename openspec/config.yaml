@@ -222,6 +222,7 @@ context: |
   - Nombres de dominio en **español** (`Reserva`, `Mesa`, `Zona`, `Turno`); nombres técnicos en inglés (`createReservaDto`, `findAll`).
   - Archivos y carpetas en `kebab-case`. Clases en `PascalCase`. Variables y funciones en `camelCase`.
   - Fechas y horas: **UTC** en base de datos y en la API (ISO 8601). La conversión a hora local es responsabilidad del frontend.
+  - **Excepción — horarios de `Turno`**: los campos `horaInicio` y `horaFin` del modelo `Turno` (`@db.Time`) representan **hora local de Argentina** (`America/Argentina/Buenos_Aires`, UTC-3 fijo — Argentina no tiene horario de verano desde 2009, por lo que el offset nunca cambia). No son UTC. El resto de fechas/horas (`createdAt`, timestamps, lo que devuelve la API) sigue en UTC. El backend es responsable de convertir entre la hora local del turno y UTC cuando haga falta comparar contra "ahora" (lo usarán los changes `reservas-crear`, `cancelacion-turnos`, `reserva-vip`); el frontend no debe adivinar el offset.
   - Nada de `any` en TypeScript salvo con un comentario que lo justifique.
 
   ---
