@@ -26,14 +26,15 @@
 
 - [ ] 3.1 Test: confirmar una Reserva `PENDIENTE` la deja `CONFIRMADA` (spec: "Confirmación de
       Reserva pendiente").
-- [ ] 3.2 Test: confirmar una Reserva que no está `PENDIENTE` responde `409` (spec: "Confirmar
-      una Reserva que no está pendiente rechazado").
+- [ ] 3.2 Test: confirmar una Reserva que no está `PENDIENTE` responde `409` (spec:
+      "Confirmación bloqueada si la Reserva no está pendiente").
 - [ ] 3.3 Test: rechazar una Reserva `PENDIENTE` la deja `CANCELADA` (spec: "Rechazo de Reserva
       pendiente").
-- [ ] 3.4 Test: rechazar una Reserva que no está `PENDIENTE` responde `409` (spec: "Rechazar
-      una Reserva que no está pendiente rechazado").
-- [ ] 3.5 Test e2e: confirmar o rechazar sin token responde `401` (spec: "Rutas de confirmación
-      y rechazo protegidas por autenticación de administrador").
+- [ ] 3.4 Test: rechazar una Reserva que no está `PENDIENTE` responde `409` (spec: "Rechazo
+      bloqueado si la Reserva no está pendiente").
+- [ ] 3.5 Test e2e: confirmar o rechazar sin token responde `401`, y con un JWT válido de un
+      rol distinto de `ADMIN` responde `403` (spec: "Confirmación o rechazo sin token
+      rechazados" y "Confirmación o rechazo con token de rol incorrecto rechazados").
 
 ## 4. Verificación final
 
