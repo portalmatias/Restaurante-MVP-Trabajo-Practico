@@ -84,9 +84,13 @@
       cada rechazo que la Mesa, la Reserva y su relación permanecen intactas (spec: "Baja de
       Mesa preserva las Reservas activas e históricas").
 - [ ] 5.6.1 Test de integración de la carrera entre consulta y DELETE: sincronizar la
-      inserción de una Reserva después del `count` y antes del DELETE, sin sleeps ni mocks
-      de Prisma. Verificar que la FK real impide la baja y la operación devuelve `409`,
-      conservando ambos registros. Confirmar que la FK usa `ON DELETE RESTRICT`.
+      inserción de una Reserva después del `count` y antes del DELETE siguiendo la sección
+      "Prueba determinística de la carrera entre consulta y DELETE" del diseño. Usar un spy
+      temporal sobre `prisma.mesa.delete` que espere una barrera y delegue en el método real;
+      confirmar la inserción con un segundo cliente antes de liberar la barrera. Sin sleeps
+      ni resultados/errores simulados. Verificar que la FK real impide la baja y el service
+      lanza `ConflictException` (`409`), conservando ambos registros. Confirmar que la FK usa
+      `ON DELETE RESTRICT`. Liberar la barrera y restaurar la interceptación en `finally`.
 - [ ] 5.7 Test: alta de Turno sin indicar `activo` queda `activo = true` (spec: "Alta de
       Turno").
 - [ ] 5.8 Test: desactivar un Turno lo marca `activo = false` sin eliminarlo y sigue

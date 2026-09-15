@@ -88,6 +88,30 @@ historial permanece listada y disponible para nuevas reservas si cumple las dem�
 La baja de Turno sigue siendo `activo = false`. El contrato de implementación debe documentar
 las respuestas `204`, `404` y `409` del DELETE de Mesa en `openapi/openapi.yaml`.
 
+### Prueba determinística de la carrera entre consulta y DELETE
+La prueba de integración usa PostgreSQL real y una barrera de promesas controlada desde el
+test. Se permite interceptar temporalmente `prisma.mesa.delete` con un spy de Jest sobre la
+misma instancia de `PrismaService` inyectada en `MesasService`: el spy solo demora la llamada
+y luego delega en el método original, previamente guardado y ligado a su delegado. No fabrica
+resultados ni errores, y no reemplaza la base de datos ni las consultas por mocks.
+
+Secuencia de la prueba:
+1. Crear una Mesa sin Reservas y preparar dos señales: `deleteAlcanzado` y `permitirDelete`.
+2. Interceptar el DELETE: notificar `deleteAlcanzado`, esperar `permitirDelete` y ejecutar el
+   método original con los mismos argumentos. Iniciar `MesasService.eliminar(id)` y capturar
+   su resultado o error desde ese momento para evitar rechazos de promesas sin manejar.
+3. Esperar `deleteAlcanzado`: el service ya verificó que no había Reservas, pero el DELETE
+   todavía no llegó a PostgreSQL. Insertar y confirmar una Reserva de esa Mesa mediante un
+   segundo cliente Prisma conectado a la misma base de test, fuera de una transacción pendiente.
+4. Resolver `permitirDelete` y comprobar que el DELETE real falla por la FK, que el service
+   lo traduce a `ConflictException` (`409`) y que Mesa, Reserva y relación siguen persistidas.
+5. En `finally`, liberar siempre la barrera, esperar que termine la operación, restaurar el
+   spy, limpiar los datos y desconectar el segundo cliente. Usar el timeout de Jest como
+   límite ante fallos, nunca sleeps para ordenar operaciones.
+
+La interceptación existe solo en la suite; no se agrega ningún hook de sincronización al
+código de producción. Los e2e de 5.6 verifican además la respuesta HTTP del controller.
+
 ## Risks / Trade-offs
 
 - **[Riesgo]** Editar el horario o el día de un Turno que ya tiene Reservas activas asociadas
