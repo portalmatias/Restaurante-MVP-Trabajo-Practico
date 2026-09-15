@@ -7,6 +7,12 @@
 - [ ] 1.2 Confirmar si `reserva-consultar` ya está implementado. Si existe una función de
       búsqueda de Reserva por código + email, reutilizarla en la sección 2 en vez de
       duplicarla (ver `design.md` — comparten servicio).
+- [ ] 1.3 Confirmar que `disponibilidad` está mergeado y localizar `inicioTurnoUtc` (nace en
+      `backend/src/disponibilidad/zona-horaria.ts` según su `tasks.md`; puede haberse movido a
+      un módulo compartido). Confirmar también que `ConfiguracionNegocio.zonaHoraria` existe en
+      el schema (pedido en el review de `modelo-dominio` #12); si no existe ninguna de las dos
+      cosas, no continuar con las secciones 2.2/3.1 — son un prerrequisito real, no solo una
+      referencia (ver `design.md`, corrección post-review).
 
 ## 2. Cancelación por el cliente
 
@@ -14,11 +20,14 @@
       `npm run build -w backend` compila.
 - [ ] 2.2 Implementar `ReservasService.cancelar(codigo, email)`: busca la Reserva por código,
       rechaza con una respuesta genérica si no existe o el email no coincide, rechaza con
-      `409 Conflict` si no está `PENDIENTE`/`CONFIRMADA`, rechaza si al Turno le quedan menos
-      horas que `Zona.ventanaCancelacionHoras`, y transiciona a `CANCELADA` por el único punto
-      de escritura de estado. Verificar con tests unitarios de cada rechazo y del caso exitoso,
-      incluyendo el límite exacto de la ventana (permitido) y un instante después del límite
-      (rechazado).
+      `409 Conflict` si no está `PENDIENTE`/`CONFIRMADA`, calcula el inicio real del Turno con
+      `inicioTurnoUtc(reserva.fecha, turno.horaInicio, configuracion.zonaHoraria)` (de
+      `disponibilidad`, no reimplementar — ver `design.md`) y rechaza si a ese instante le
+      quedan menos horas que `Zona.ventanaCancelacionHoras`, y transiciona a `CANCELADA` por el
+      único punto de escritura de estado. Verificar con tests unitarios de cada rechazo y del
+      caso exitoso, incluyendo el límite exacto de la ventana (permitido) y un instante después
+      del límite (rechazado); correr la suite con `TZ=UTC` y con
+      `TZ=America/Argentina/Buenos_Aires` (mismo patrón que D9 de `disponibilidad`).
 - [ ] 2.3 Implementar `POST /reservas/:codigo/cancelar` en `ReservasController`, sin guard
       (ruta pública). Verificar con Supertest contra una Reserva de prueba.
 - [ ] 2.4 Aplicar el throttler global (`THROTTLE_TTL`/`THROTTLE_LIMIT`, ya configurado desde
@@ -28,9 +37,13 @@
 ## 3. Marcado de NO_SHOW (admin)
 
 - [ ] 3.1 Implementar `ReservasService.marcarNoShow(id)`: rechaza con `409 Conflict` si la
-      Reserva no está `CONFIRMADA`, rechaza si el Turno (combinando `Reserva.fecha` +
-      `Turno.horaFin` en UTC) todavía no terminó, y transiciona a `NO_SHOW` por el único punto
-      de escritura de estado. Verificar con tests unitarios de cada rechazo y del caso exitoso.
+      Reserva no está `CONFIRMADA`, calcula el fin real del Turno con
+      `inicioTurnoUtc(reserva.fecha, turno.horaFin, configuracion.zonaHoraria)` (de
+      `disponibilidad`, no combinar `fecha` + `horaFin` como si ya fueran UTC — ver
+      `design.md`) y rechaza si ese instante todavía no pasó, y transiciona a `NO_SHOW` por el
+      único punto de escritura de estado. Verificar con tests unitarios de cada rechazo y del
+      caso exitoso, incluyendo el turno de cena (20:00–23:30 local) que cruza medianoche en
+      UTC; correr la suite con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
 - [ ] 3.2 Implementar `PATCH /admin/reservas/:id/no-show` en `ReservasController`, protegido
       por `JwtAuthGuard` + `RolesGuard(ADMIN)`. Verificar con Supertest.
 
@@ -47,6 +60,12 @@
       código ni email (spec: "Límite de intentos de cancelación").
 - [ ] 4.5 Test: marcar `NO_SHOW` antes de que termine el turno rechazado, y después de que
       termina exitoso (spec: "Marcado de NO_SHOW por el admin").
+- [ ] 4.5b Test: marcar `NO_SHOW` un minuto antes del cierre del turno de cena (20:00–23:30
+      local) rechazado, corriendo el test con `TZ=UTC` y con
+      `TZ=America/Argentina/Buenos_Aires` para confirmar que da el mismo resultado en los dos
+      (spec: "Marcar NO_SHOW rechazado un minuto antes del cierre, con el turno cruzando
+      medianoche en UTC" — este es el escenario que expone el bug de tratar `horaFin` como si
+      ya fuera UTC).
 - [ ] 4.6 Test: marcar `NO_SHOW` sobre una Reserva no `CONFIRMADA` responde `409` (spec:
       "Marcar NO_SHOW sobre una Reserva que no está CONFIRMADA rechazado").
 - [ ] 4.7 Test e2e: `PATCH /admin/reservas/:id/no-show` sin token responde `401` (spec: "Ruta

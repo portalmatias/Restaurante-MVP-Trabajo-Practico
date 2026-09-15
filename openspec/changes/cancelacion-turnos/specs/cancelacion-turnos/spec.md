@@ -72,6 +72,13 @@ El sistema SHALL exponer una operación protegida por rol `ADMIN` que transicion
   no terminó
 - **THEN** el sistema rechaza la operación
 
+#### Scenario: Marcar NO_SHOW rechazado un minuto antes del cierre, con el turno cruzando medianoche en UTC
+- **WHEN** el admin intenta marcar como `NO_SHOW` una Reserva `CONFIRMADA` del turno de cena
+  (20:00–23:30 hora local del restaurante), a un minuto de que termine, aunque en UTC el fin
+  de ese turno ya caiga después de medianoche del día siguiente
+- **THEN** el sistema rechaza la operación, calculando "el turno terminó" sobre la hora local
+  del restaurante y no sobre una lectura literal de la hora en UTC
+
 #### Scenario: Marcar NO_SHOW sobre una Reserva que no está CONFIRMADA rechazado
 - **WHEN** el admin intenta marcar como `NO_SHOW` una Reserva que no está en estado
   `CONFIRMADA`
