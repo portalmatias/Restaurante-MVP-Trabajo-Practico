@@ -124,6 +124,17 @@ libre.
   solicitados
 - **THEN** el sistema rechaza la nueva Reserva aunque haya una Mesa disponible
 
+### Requirement: Invariante — aforo global respetado
+El sistema SHALL impedir que la suma de comensales de las Reservas activas de un Turno y una
+fecha, sumando **todas** las Zonas, supere el `aforoGlobal` configurado en
+`ConfiguracionNegocio`, incluso si el aforo de cada Zona individual todavía no se superó.
+
+#### Scenario: Reserva que excede el aforo global rechazada aunque el aforo de su Zona alcance
+- **WHEN** la suma de comensales activos de todas las Zonas para un Turno y una fecha, más los
+  comensales solicitados, supera el `aforoGlobal` configurado
+- **AND** el aforo restante de la Zona solicitada individualmente todavía alcanzaría
+- **THEN** el sistema rechaza la nueva Reserva
+
 ### Requirement: Invariante — estados terminales no retroceden
 El sistema SHALL impedir que una Reserva en estado `CANCELADA` o `NO_SHOW` transicione a
 cualquier otro estado.

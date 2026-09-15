@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DiaSemana } from '@prisma/client';
 import { diaSemanaDeFecha } from '../src/common/timezone';
@@ -168,7 +168,6 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     zonaStandardId = standard.id;
     zonaVipId = vip.id;
   });
-
   afterEach(async () => {
     // Orden: Reserva primero (FK a Mesa/Turno), después Mesa y Turno.
     if (reservaIds.length) {
@@ -183,9 +182,21 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     reservaIds = [];
     mesaIds = [];
     turnoIds = [];
+
+    // Restaurar mocks por si algún test falló antes de restaurarlos
+    jest.restoreAllMocks();
   });
 
   afterAll(async () => {
+    // Restaurar aforoMaximo original de las zonas (valores del seed: STANDARD=40, VIP=20)
+    await prisma.zona.update({
+      where: { nombre: 'STANDARD' },
+      data: { aforoMaximo: 40 },
+    });
+    await prisma.zona.update({
+      where: { nombre: 'VIP' },
+      data: { aforoMaximo: 20 },
+    });
     await prisma.$disconnect();
   });
 
@@ -283,6 +294,36 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
         ...datosClienteBase('inv2'),
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+
+    const creadas = await prisma.reserva.count({ where: { mesaId: mesa.id } });
+    expect(creadas).toBe(0);
+  });
+
+  it('rechaza una reserva con una cantidad de comensales no positiva', async () => {
+    const mesa = await crearMesa(zonaStandardId, 4, 'INV2-M2');
+    const turno = await crearTurno(diaSemanaParaOffset(12));
+
+    await expect(
+      service.crearReserva({
+        mesaId: mesa.id,
+        turnoId: turno.id,
+        zonaSolicitadaId: zonaStandardId,
+        fecha: fechaFutura(12),
+        comensales: 0,
+        ...datosClienteBase('inv2-cero'),
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(
+      service.crearReserva({
+        mesaId: mesa.id,
+        turnoId: turno.id,
+        zonaSolicitadaId: zonaStandardId,
+        fecha: fechaFutura(12),
+        comensales: -1,
+        ...datosClienteBase('inv2-negativo'),
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
 
     const creadas = await prisma.reserva.count({ where: { mesaId: mesa.id } });
     expect(creadas).toBe(0);

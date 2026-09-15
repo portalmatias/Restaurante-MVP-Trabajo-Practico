@@ -267,7 +267,7 @@ async function seedReservas(
     telefonoCliente: string;
   }> = [
     {
-      codigoReserva: 'SEEDPEND1',
+      codigoReserva: 'SEEDPND01',
       mesaId: mesas['V1'].id,
       turnoId: turnos['VIERNES_CENA'].id,
       fecha: proximaFecha(DiaSemana.VIERNES),
@@ -278,7 +278,7 @@ async function seedReservas(
       telefonoCliente: '+54 9 11 5555-0001',
     },
     {
-      codigoReserva: 'SEEDCONF1',
+      codigoReserva: 'SEEDCNF01',
       mesaId: mesas['S3'].id,
       turnoId: turnos['SABADO_CENA'].id,
       fecha: proximaFecha(DiaSemana.SABADO),
@@ -289,7 +289,7 @@ async function seedReservas(
       telefonoCliente: '+54 9 11 5555-0002',
     },
     {
-      codigoReserva: 'SEEDCANC1',
+      codigoReserva: 'SEEDCAN01',
       mesaId: mesas['S1'].id,
       turnoId: turnos['DOMINGO_ALMUERZO'].id,
       fecha: proximaFecha(DiaSemana.DOMINGO),
@@ -300,7 +300,7 @@ async function seedReservas(
       telefonoCliente: '+54 9 11 5555-0003',
     },
     {
-      codigoReserva: 'SEEDNOSH1',
+      codigoReserva: 'SEEDNOS01',
       mesaId: mesas['S4'].id,
       turnoId: turnos['MARTES_ALMUERZO'].id,
       // NO_SHOW solo se marca después de que pasó el turno (config.yaml §6): se usa una
@@ -315,9 +315,22 @@ async function seedReservas(
   ];
 
   for (const reserva of ejemplos) {
+    // El campo `estado` se excluye del `update`: si el seed corre de nuevo sobre una base
+    // donde alguien ya transicionó esta reserva de ejemplo (a mano o por un test), no debe
+    // pisarla de vuelta a su valor inicial — eso violaría el invariante 5 (los estados
+    // terminales no retroceden) para CANCELADA/NO_SHOW, y para PENDIENTE/CONFIRMADA
+    // simplemente descartaría trabajo real sin que nadie lo pidiera.
     await prisma.reserva.upsert({
       where: { codigoReserva: reserva.codigoReserva },
-      update: reserva,
+      update: {
+        mesaId: reserva.mesaId,
+        turnoId: reserva.turnoId,
+        fecha: reserva.fecha,
+        comensales: reserva.comensales,
+        nombreCliente: reserva.nombreCliente,
+        emailCliente: reserva.emailCliente,
+        telefonoCliente: reserva.telefonoCliente,
+      },
       create: reserva,
     });
   }
