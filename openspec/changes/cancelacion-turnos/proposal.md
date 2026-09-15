@@ -25,6 +25,11 @@ igual que se hizo con `gestion-salon`.
 - No modifica el schema de `modelo-dominio`: reutiliza `Reserva`, `EstadoReserva` y las
   transiciones ya definidas (`PENDIENTE → CANCELADA`, `CONFIRMADA → CANCELADA`,
   `CONFIRMADA → NO_SHOW`).
+- Requiere que `disponibilidad` entregue el helper de conversión y el campo
+  `ConfiguracionNegocio.zonaHoraria`: si el campo no llega en `modelo-dominio`, la migración
+  corresponde al plan B de `disponibilidad`, no a este change.
+- Aclara en `config.yaml` la distinción entre horarios locales e instantes UTC y el flujo
+  de contrato OpenAPI en diseño primero, YAML ejecutable junto con la implementación.
 - No introduce librerías nuevas: `@nestjs/throttler` ya está avalado por `config.yaml` §2.
 
 ## Capabilities
@@ -43,12 +48,14 @@ dominio, solo expone las operaciones que las disparan.
 
 - **Depende de:** `reservas-crear` (para que existan Reservas sobre las que operar, y porque
   este change extiende el mismo `ReservasService` — ver roadmap §8), `modelo-dominio` (entidad
-  `Reserva`, enum `EstadoReserva`, configuración de Zona) y `auth-admin` (`JwtAuthGuard` +
+  `Reserva`, enum `EstadoReserva`, configuración de Zona), `disponibilidad` (helper
+  `inicioTurnoUtc` y configuración `zonaHoraria`, incluida su migración si corresponde) y
+  `auth-admin` (`JwtAuthGuard` +
   `RolesGuard(ADMIN)` sobre la ruta de `NO_SHOW`). La ruta pública de cancelación además asume
-  que `ThrottlerModule` ya está registrado en `AppModule` — lo agrega quien implemente primero
-  una ruta pública con throttling (`disponibilidad` o `reserva-consultar`, según cuál se
-  implemente antes; `fundacion-repo` solo dejó las variables de entorno, no el módulo
-  registrado). La spec de este change no necesita nada de esto implementado; su implementación
+  que exista `ThrottlerModule` con su guard: se reutiliza si ya lo registró `auth-admin` o
+  `reserva-consultar`; si falta, se configura en este change. `fundacion-repo` solo dejó las
+  variables de entorno y `disponibilidad` no incluye throttling. La spec no necesita esto
+  implementado; su implementación
   sí.
 - **Comparte servicio con:** `reserva-consultar` — el roadmap recomienda mergear
   `reserva-consultar` primero y que la implementación de `cancelacion-turnos` rebase sobre ella,
@@ -58,7 +65,8 @@ dominio, solo expone las operaciones que las disparan.
   no-show); tests en `backend/src/reservas/**/*.spec.ts` y
   `backend/test/cancelacion-turnos.e2e-spec.ts`.
 - **Afecta `openapi/openapi.yaml`:** agrega un endpoint público de cancelación (bajo
-  `/reservas/...`, sin `security`) y un endpoint `/admin/reservas/:id/no-show` (con
-  `security: [bearerAuth]`), en el mismo PR de implementación.
+  `/reservas/...`, con `security: []`) y un endpoint `/admin/reservas/:id/no-show` (con
+  `security: [{ bearerAuth: [] }]`), en el mismo PR de implementación. El fragmento completo
+  se define ahora en `design.md`, según `config.yaml` §3 y el roadmap actualizado.
 - No agrega variables de entorno nuevas (`THROTTLE_TTL`/`THROTTLE_LIMIT` ya existen desde
   `fundacion-repo`).

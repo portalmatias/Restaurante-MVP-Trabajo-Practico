@@ -10,7 +10,8 @@
 - [ ] 1.3 Confirmar que `disponibilidad` está mergeado y localizar `inicioTurnoUtc` (nace en
       `backend/src/disponibilidad/zona-horaria.ts` según su `tasks.md`; puede haberse movido a
       un módulo compartido). Confirmar también que `ConfiguracionNegocio.zonaHoraria` existe en
-      el schema (pedido en el review de `modelo-dominio` #12); si no existe ninguna de las dos
+      el schema y está configurado en el seed (`modelo-dominio` o plan B de `disponibilidad`);
+      si falta cualquiera de las dos
       cosas, no continuar con las secciones 2.2/3.1 — son un prerrequisito real, no solo una
       referencia (ver `design.md`, corrección post-review).
 
@@ -30,17 +31,19 @@
       `TZ=America/Argentina/Buenos_Aires` (mismo patrón que D9 de `disponibilidad`).
 - [ ] 2.3 Implementar `POST /reservas/:codigo/cancelar` en `ReservasController`, sin guard
       (ruta pública). Verificar con Supertest contra una Reserva de prueba.
-- [ ] 2.4 Aplicar el throttler global (`THROTTLE_TTL`/`THROTTLE_LIMIT`, ya configurado desde
+- [ ] 2.4 Verificar el registro de `ThrottlerModule` y su guard; reutilizarlos si existen o
+      configurarlos aquí si faltan. Aplicar `THROTTLE_TTL`/`THROTTLE_LIMIT` (las variables de
       `fundacion-repo`) sobre la ruta. Verificar corriendo más intentos que el límite
       configurado y confirmando que el excedente responde `429` sin tocar la base.
 
 ## 3. Marcado de NO_SHOW (admin)
 
 - [ ] 3.1 Implementar `ReservasService.marcarNoShow(id)`: rechaza con `409 Conflict` si la
-      Reserva no está `CONFIRMADA`, calcula el fin real del Turno con
-      `inicioTurnoUtc(reserva.fecha, turno.horaFin, configuracion.zonaHoraria)` (de
+      Reserva no existe (`404`) o no está `CONFIRMADA` (`409`); calcular `fechaFin` avanzando
+      un día de calendario si `horaFin < horaInicio`, según el diseño, y el fin real con
+      `inicioTurnoUtc(fechaFin, turno.horaFin, configuracion.zonaHoraria)` (de
       `disponibilidad`, no combinar `fecha` + `horaFin` como si ya fueran UTC — ver
-      `design.md`) y rechaza si ese instante todavía no pasó, y transiciona a `NO_SHOW` por el
+      `design.md`) y rechazar si `ahora <= finTurnoUtc`, y transicionar a `NO_SHOW` por el
       único punto de escritura de estado. Verificar con tests unitarios de cada rechazo y del
       caso exitoso, incluyendo el turno de cena (20:00–23:30 local) que cruza medianoche en
       UTC; correr la suite con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
@@ -72,13 +75,22 @@
       válido de un rol distinto de `ADMIN` responde `403` (spec: "Ruta de marcado de NO_SHOW
       sin token rechazada" y "Ruta de marcado de NO_SHOW con token de rol incorrecto
       rechazada").
+- [ ] 4.9 Tests del turno 23:00–01:00 local, también del 31 de diciembre al 1 de enero:
+      rechazar a las 23:30, a las 00:59 y exactamente a la 01:00; permitir a la 01:01.
+      Ejecutar con `TZ=UTC` y `TZ=America/Argentina/Buenos_Aires` y verificar los mismos
+      instantes de fin. Cubrir por separado el escenario de cena que cruza medianoche en UTC.
+- [ ] 4.10 Tests del contrato: ambas operaciones exitosas responden `204` sin cuerpo;
+      identificadores con formato inválido y body/email inválido responden `400`; NO_SHOW
+      con UUID válido inexistente responde `404`. Las pruebas anteriores cubren los demás
+      errores `401`, `403`, `409` y `429` según cada ruta.
 
 ## 5. Verificación final
 
 - [ ] 5.1 Correr `openspec validate cancelacion-turnos --strict` y confirmar que el change es
       válido.
-- [ ] 5.2 Agregar a `openapi/openapi.yaml` los paths `POST /reservas/{codigo}/cancelar` (sin
-      `security`) y `PATCH /admin/reservas/{id}/no-show` (con `security: [bearerAuth]`), en el
-      mismo PR (Definition of Done, `config.yaml` §13).
+- [ ] 5.2 Incorporar el fragmento "Contrato OpenAPI" de `design.md` a
+      `openapi/openapi.yaml` junto con los controllers en el PR de implementación; declarar
+      `security: []` para cancelar y `security: [{ bearerAuth: [] }]` para NO_SHOW. Validar
+      con Spectral y `openapi:check` (Definition of Done, `config.yaml` §13).
 - [ ] 5.3 Confirmar que no hicieron falta variables de entorno nuevas ni migraciones de
       Prisma — este change no agrega campos a `Reserva` ni a `Zona`.

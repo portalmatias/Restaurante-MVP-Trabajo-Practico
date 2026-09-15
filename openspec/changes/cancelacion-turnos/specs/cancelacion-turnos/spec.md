@@ -10,6 +10,8 @@ turno.
 El sistema SHALL exponer una operación pública (sin cuenta) que recibe el código de una
 Reserva y el email del cliente, y SHALL exigir que ambos coincidan con una Reserva existente
 para procesar la cancelación, sin indicar cuál de los dos datos era incorrecto si no coinciden.
+La operación SHALL ser `POST /reservas/:codigo/cancelar`, con el email en el body JSON,
+y SHALL responder `204 No Content` sin cuerpo cuando la cancelación sea exitosa.
 
 #### Scenario: Código y email coincidentes cancelan la Reserva
 - **WHEN** el cliente envía el código y el email correctos de una Reserva `PENDIENTE` o
@@ -66,6 +68,11 @@ tiempo, rechazando los intentos que superan ese límite antes de validar código
 ### Requirement: Marcado de NO_SHOW por el admin
 El sistema SHALL exponer una operación protegida por rol `ADMIN` que transiciona una Reserva
 `CONFIRMADA` a `NO_SHOW`, y SHALL rechazarla si el Turno de esa Reserva todavía no terminó.
+La operación SHALL ser `PATCH /admin/reservas/:id/no-show` y SHALL responder `204 No Content`
+sin cuerpo al completarse, o `404 Not Found` si no existe la Reserva. El sistema SHALL exigir
+que el instante actual sea estrictamente posterior al fin real del Turno. Si `horaFin` es
+anterior a `horaInicio` en hora local, el fin SHALL calcularse sobre el día siguiente del
+calendario local de la Reserva, antes de convertirlo a UTC con la zona horaria del restaurante.
 
 #### Scenario: Marcar NO_SHOW después de que terminó el turno
 - **WHEN** el admin marca como `NO_SHOW` una Reserva `CONFIRMADA` cuyo Turno ya terminó
@@ -88,6 +95,26 @@ El sistema SHALL exponer una operación protegida por rol `ADMIN` que transicion
   `CONFIRMADA`
 - **THEN** el sistema rechaza la operación con `409 Conflict`
 
+#### Scenario: Turno que termina al día siguiente conserva la fecha local de fin
+- **GIVEN** una Reserva `CONFIRMADA` del 31 de diciembre con Turno 23:00–01:00 local
+- **WHEN** el admin intenta marcar `NO_SHOW` a las 23:30 del 31 de diciembre o a las 00:59
+  del 1 de enero
+- **THEN** el sistema responde `409 Conflict` porque el fin es el 1 de enero a la 01:00 local
+
+#### Scenario: NO_SHOW en el instante exacto de fin rechazado
+- **GIVEN** una Reserva `CONFIRMADA` con Turno 23:00–01:00 local
+- **WHEN** el admin intenta marcar `NO_SHOW` exactamente a la 01:00 local del día siguiente
+- **THEN** el sistema responde `409 Conflict`
+
+#### Scenario: NO_SHOW después del fin del turno nocturno permitido
+- **GIVEN** una Reserva `CONFIRMADA` del 31 de diciembre con Turno 23:00–01:00 local
+- **WHEN** el admin marca `NO_SHOW` a la 01:01 local del 1 de enero
+- **THEN** el sistema transiciona a `NO_SHOW` y responde `204 No Content` sin cuerpo
+
+#### Scenario: NO_SHOW de Reserva inexistente rechazado
+- **WHEN** el admin solicita marcar `NO_SHOW` con un UUID válido que no identifica una Reserva
+- **THEN** el sistema responde `404 Not Found`
+
 #### Scenario: Ruta de marcado de NO_SHOW sin token rechazada
 - **WHEN** se solicita marcar `NO_SHOW` sin header `Authorization`
 - **THEN** el sistema responde `401 Unauthorized` sin ejecutar la operación
@@ -96,3 +123,17 @@ El sistema SHALL exponer una operación protegida por rol `ADMIN` que transicion
 - **WHEN** se solicita marcar `NO_SHOW` presentando un JWT válido pero emitido para un rol
   distinto de `ADMIN`
 - **THEN** el sistema responde `403 Forbidden` sin ejecutar la operación
+
+### Requirement: Validación del formato de las solicitudes
+El sistema SHALL responder `400 Bad Request` si el código de cancelación no es alfanumérico
+de 8 caracteres, si el body no contiene un email válido o si el identificador de NO_SHOW no
+es un UUID válido. Los errores de negocio SHALL usar los códigos definidos en los requisitos
+anteriores; un código con formato válido inexistente SHALL responder `404`, no `400`.
+
+#### Scenario: Cancelación con formato inválido rechazada
+- **WHEN** se solicita cancelar con un código de formato inválido o sin un email válido en el body
+- **THEN** el sistema responde `400 Bad Request` sin modificar Reservas
+
+#### Scenario: NO_SHOW con identificador inválido rechazado
+- **WHEN** el admin solicita marcar `NO_SHOW` con un identificador que no es un UUID válido
+- **THEN** el sistema responde `400 Bad Request` sin modificar Reservas
