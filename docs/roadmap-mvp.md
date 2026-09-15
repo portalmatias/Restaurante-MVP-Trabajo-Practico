@@ -4,6 +4,56 @@
 > deja asentados los huecos que hoy bloquean la Definition of Done de `openspec/config.yaml` §13.
 > Las referencias con "§" apuntan a secciones del campo `context:` de `openspec/config.yaml`.
 
+## Estado al 2026-09-14
+
+Esta sección se agrega arriba para que se lea primero. El resto del documento es el plan
+original y se deja como estaba, salvo las marcas de las tareas ya cerradas.
+
+**Fase 0 y Fase 1: cerradas.**
+
+- `fundacion-repo` mergeado (#10, #11) y archivado (#13).
+- `main` protegida (tareas 0.2 y 0.4). La configuración aplicada:
+
+  | Regla | Valor |
+  |---|---|
+  | PR obligatorio | sí, **1 aprobación** |
+  | Aprobaciones viejas se descartan si entran commits nuevos | sí |
+  | Checks obligatorios | `Especificación (OpenSpec + OpenAPI)`, `Lint y tipos`, `Tests (backend)` |
+  | Rama al día con `main` antes de mergear | no (con tres tracks en paralelo obligaría a rebasear todo el tiempo) |
+  | Se aplica también a admins | **sí** |
+  | Force-push y borrado de `main` | prohibidos |
+
+  Consecuencia práctica: **nadie mergea su propio PR**, tampoco quien es admin del repo. Para
+  aprobar: pestaña *Files changed* → *Review changes* (o *Submit review*) → *Approve*. El
+  botón de merge aparece recién después.
+
+**Tres cosas que aprendimos y afectan a todos los changes que vienen:**
+
+1. **Un PR de spec no puede agregar paths a `openapi/openapi.yaml`.** El job obligatorio
+   "Especificación" corre `npm run openapi:check`, que compara literalmente `paths` y
+   `components.schemas` del YAML contra lo que genera `@nestjs/swagger` desde los controllers.
+   Un path sin controller pone CI en rojo. Por eso el fragmento OpenAPI de cada endpoint va en
+   el `design.md` del change (sección "Contrato OpenAPI") y se copia al YAML en el PR de
+   implementación, junto con el controller. Esto corrige lo que prometía §9 de este documento
+   (ver ahí): el frontend puede arrancar leyendo el contrato del `design.md`, no del YAML.
+   Si el equipo necesita el YAML antes, la salida es enseñarle a `openapi-check` a ignorar
+   paths marcados como planeados, en un change propio que toque `scripts/`.
+2. **`openapi:check` da un falso rojo con enums.** Con cualquier enum declarado con `enumName`,
+   `@nestjs/swagger` deja `x-enumNames: undefined` en el documento en memoria y el diff lo
+   cuenta como deriva. Se arregla normalizando el documento generado con
+   `JSON.parse(JSON.stringify(doc))` antes de comparar. Detalle en el `design.md` de
+   `disponibilidad` (Risks). Le va a pasar a cualquier endpoint con enums.
+3. **Fechas y zona horaria.** Los horarios de `Turno` (`12:00`, `20:00`) son hora **local** del
+   restaurante, no UTC, aunque la columna sea `@db.Time`. Cualquier cálculo contra "ahora"
+   (anticipación, ventana de cancelación, "el turno ya pasó") tiene que convertir
+   `fecha + hora` local a un instante UTC usando la zona horaria del restaurante. Si se toman
+   como UTC, todas las ventanas quedan corridas 3 horas. Además, `getDay()`/`getHours()`
+   dependen de la zona horaria del proceso (la máquina de desarrollo está en Buenos Aires y CI
+   en UTC): hay que usar siempre `getUTC*` y `Date.UTC`. Dónde se guarda la zona horaria está
+   pedido en el PR #12 (`modelo-dominio`). La propuesta de conversión sin librerías está en el
+   `design.md` de `disponibilidad` (D5), para que la reusen `cancelacion-turnos` y
+   `reserva-consultar`.
+
 ## 1. Punto de partida
 
 El repositorio tiene **cinco archivos y cero líneas de código**: solo `.claude/` y `openspec/`.
@@ -72,9 +122,9 @@ Nada de esto necesita un change de OpenSpec: no son features y no cambian compor
 | # | Acción | Dueño |
 |---|---|---|
 | 0.1 | Revisar y mergear **PR #3** (`chore/archive-diseno-general-app`). | FedeWerk (review) |
-| 0.2 | Activar **branch protection** en `main`: require PR, 1 approval, prohibir force-push. Los *required status checks* se agregan recién en 0.4. | portalmatias |
+| 0.2 | ✅ Activar **branch protection** en `main`: require PR, 1 approval, prohibir force-push. Los *required status checks* se agregan recién en 0.4. | portalmatias |
 | 0.3 | PR `docs:` — agregar `docs/requerimientos-mvp.docx` y crear `.gitignore` (`node_modules/`, `.env`, `dist/`, `.next/`, `coverage/`). | **lussofacundo-iresm** |
-| 0.4 | *(tras Fase 1)* Marcar los jobs de `ci.yml` como required status checks. | portalmatias |
+| 0.4 | ✅ *(tras Fase 1)* Marcar los jobs de `ci.yml` como required status checks. | portalmatias |
 
 **0.3 va deliberadamente al integrante sin commits**: es chico, sin dependencias, y le abre el
 historial antes de que empiece lo grande. El docx además es *input* de las specs de la Fase 3 —
@@ -208,6 +258,11 @@ de §6 de que consulta y creación validan lo mismo. Merece revisión de los tre
 Arranca en paralelo al backend: cada pantalla solo necesita que **la spec del endpoint y su
 entrada en `openapi.yaml` estén mergeadas**, no la implementación.
 
+> **Corrección (2026-09-14):** la entrada en `openapi.yaml` no puede mergearse antes que el
+> controller, porque el chequeo de deriva de CI lo impide (ver "Estado al 2026-09-14"). Lo que
+> se mergea con la spec es el fragmento OpenAPI dentro del `design.md` del change. Mientras
+> un endpoint no esté implementado, el frontend toma sus tipos de ahí.
+
 | Change | Dueño | Alcance |
 |---|---|---|
 | `frontend-base` | FedeWerk | Layout, rutas `/admin` y `/reservas`, y el cliente HTTP con **tipos derivados de `openapi.yaml`** (§7 lo exige: no se escriben a mano). La herramienta de generación es una dependencia nueva → justificarla en su `design.md`. |
@@ -290,11 +345,11 @@ Fase 6  entrega-final (facundo)
 - **La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
   corre lint, tipos y unitarios, pero **no** tests contra base real. Es una ventana corta y
   deliberada; el riesgo es olvidarse de cerrarla y dejar los e2e de §9 fuera del pipeline.
-- **Los required status checks (0.4) no se pueden configurar antes de la Fase 1** — GitHub solo los
+- ~~**Los required status checks (0.4) no se pueden configurar antes de la Fase 1** — GitHub solo los
   ofrece después de que el check corrió al menos una vez. Es fácil olvidarse y dejar `main` a medio
-  proteger.
+  proteger.~~ **Cerrado el 2026-09-14:** configurados junto con la protección de `main`.
 - **El repositorio es público.** Ningún `.env`, credencial ni URL real de base entra en ningún
-  commit; el `.gitignore` de 0.3 es la primera línea de defensa y hoy no existe.
+  commit; el `.gitignore` de 0.3 es la primera línea de defensa (ya existe desde el PR #4).
 - **`openspec/specs/` va a seguir vacío hasta la Fase 2**, porque `diseno-general-app` usa
   `skip_specs`. Es esperable, no un error.
 
