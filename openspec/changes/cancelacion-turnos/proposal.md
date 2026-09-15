@@ -42,9 +42,14 @@ dominio, solo expone las operaciones que las disparan.
 ## Impact
 
 - **Depende de:** `reservas-crear` (para que existan Reservas sobre las que operar, y porque
-  este change extiende el mismo `ReservasService` — ver roadmap §8) y `modelo-dominio`
-  (entidad `Reserva`, enum `EstadoReserva`, configuración de Zona). La spec de este change no
-  necesita ninguna de las dos implementadas; su implementación sí.
+  este change extiende el mismo `ReservasService` — ver roadmap §8), `modelo-dominio` (entidad
+  `Reserva`, enum `EstadoReserva`, configuración de Zona) y `auth-admin` (`JwtAuthGuard` +
+  `RolesGuard(ADMIN)` sobre la ruta de `NO_SHOW`). La ruta pública de cancelación además asume
+  que `ThrottlerModule` ya está registrado en `AppModule` — lo agrega quien implemente primero
+  una ruta pública con throttling (`disponibilidad` o `reserva-consultar`, según cuál se
+  implemente antes; `fundacion-repo` solo dejó las variables de entorno, no el módulo
+  registrado). La spec de este change no necesita nada de esto implementado; su implementación
+  sí.
 - **Comparte servicio con:** `reserva-consultar` — el roadmap recomienda mergear
   `reserva-consultar` primero y que la implementación de `cancelacion-turnos` rebase sobre ella,
   para no duplicar el código de búsqueda por código + email.

@@ -19,7 +19,7 @@
 - [ ] 2.1 Crear `dto/cancelar-reserva.dto.ts` (`email`, con `class-validator`). Verificar que
       `npm run build -w backend` compila.
 - [ ] 2.2 Implementar `ReservasService.cancelar(codigo, email)`: busca la Reserva por código,
-      rechaza con una respuesta genérica si no existe o el email no coincide, rechaza con
+      responde `404 Not Found` genérico si no existe o el email no coincide, rechaza con
       `409 Conflict` si no está `PENDIENTE`/`CONFIRMADA`, calcula el inicio real del Turno con
       `inicioTurnoUtc(reserva.fecha, turno.horaInicio, configuracion.zonaHoraria)` (de
       `disponibilidad`, no reimplementar — ver `design.md`) y rechaza si a ese instante le
@@ -49,27 +49,29 @@
 
 ## 4. Tests de los requisitos de la spec
 
-- [ ] 4.1 Test: email que no coincide y código inexistente responden de forma indistinguible
-      (spec: "Cancelación de Reserva por código y email").
+- [ ] 4.1 Test: email que no coincide y código inexistente responden `404` de forma
+      indistinguible (spec: "Cancelación de Reserva por código y email").
 - [ ] 4.2 Test: cancelación en el límite exacto de la ventana permitida, y fuera de la ventana
-      rechazada (spec: "Ventana mínima de cancelación por Zona") — un caso por Zona
+      rechazada con `409` (spec: "Ventana mínima de cancelación por Zona") — un caso por Zona
       (`STANDARD` 2h, `VIP` 24h).
-- [ ] 4.3 Test: cancelar una Reserva ya `CANCELADA` responde `409` (spec: "Solo Reservas
-      activas pueden cancelarse").
+- [ ] 4.3 Test: cancelar una Reserva ya `CANCELADA` responde `409`, y cancelar una Reserva ya
+      `NO_SHOW` también responde `409` (spec: "Solo Reservas activas pueden cancelarse").
 - [ ] 4.4 Test e2e: superar el límite de intentos de cancelación responde `429` sin validar
       código ni email (spec: "Límite de intentos de cancelación").
-- [ ] 4.5 Test: marcar `NO_SHOW` antes de que termine el turno rechazado, y después de que
-      termina exitoso (spec: "Marcado de NO_SHOW por el admin").
-- [ ] 4.5b Test: marcar `NO_SHOW` un minuto antes del cierre del turno de cena (20:00–23:30
-      local) rechazado, corriendo el test con `TZ=UTC` y con
+- [ ] 4.5 Test: marcar `NO_SHOW` antes de que termine el turno responde `409`, y después de que
+      termina es exitoso (spec: "Marcado de NO_SHOW por el admin").
+- [ ] 4.6 Test: marcar `NO_SHOW` un minuto antes del cierre del turno de cena (20:00–23:30
+      local) responde `409`, corriendo el test con `TZ=UTC` y con
       `TZ=America/Argentina/Buenos_Aires` para confirmar que da el mismo resultado en los dos
       (spec: "Marcar NO_SHOW rechazado un minuto antes del cierre, con el turno cruzando
       medianoche en UTC" — este es el escenario que expone el bug de tratar `horaFin` como si
       ya fuera UTC).
-- [ ] 4.6 Test: marcar `NO_SHOW` sobre una Reserva no `CONFIRMADA` responde `409` (spec:
+- [ ] 4.7 Test: marcar `NO_SHOW` sobre una Reserva no `CONFIRMADA` responde `409` (spec:
       "Marcar NO_SHOW sobre una Reserva que no está CONFIRMADA rechazado").
-- [ ] 4.7 Test e2e: `PATCH /admin/reservas/:id/no-show` sin token responde `401` (spec: "Ruta
-      de marcado de NO_SHOW sin token rechazada").
+- [ ] 4.8 Test e2e: `PATCH /admin/reservas/:id/no-show` sin token responde `401`, y con un JWT
+      válido de un rol distinto de `ADMIN` responde `403` (spec: "Ruta de marcado de NO_SHOW
+      sin token rechazada" y "Ruta de marcado de NO_SHOW con token de rol incorrecto
+      rechazada").
 
 ## 5. Verificación final
 
