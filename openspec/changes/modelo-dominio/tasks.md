@@ -52,6 +52,6 @@
 
 - [x] 5.1 Correr `openspec validate modelo-dominio --strict` y confirmar que el change es
       válido.
-- [ ] 5.2 Confirmar que `backend/prisma/schema.prisma`, la migración generada y `seed.ts`
+- [x] 5.2 Confirmar que `backend/prisma/schema.prisma`, la migración generada y `seed.ts`
       quedaron commiteados (nunca aplicados con `prisma db push`), según la Definition of
       Done de `config.yaml` §13.
