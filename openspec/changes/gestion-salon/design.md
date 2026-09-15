@@ -5,13 +5,14 @@ Ver `proposal.md` — `Why`. Las entidades `Zona`, `Mesa` y `Turno` ya están de
 Este change no agrega campos ni migraciones: expone operaciones administrativas sobre esas
 entidades ya existentes. `reservas-crear` todavía no existe como capability, así que no hay
 `ReservasModule` al que importar — las validaciones de este change que necesitan consultar
-Reservas activas leen directamente la tabla `Reserva` vía Prisma.
+Reservas leen directamente la tabla `Reserva` vía Prisma: activas para edición de Mesa y
+de cualquier estado para su baja.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Definir las rutas concretas y el naming de cada operación de `specs/gestion-salon/spec.md`.
-- Decidir cómo verificar "Reservas activas asociadas" sin depender de un módulo de Reservas
+- Decidir cómo verificar Reservas asociadas sin depender de un módulo de Reservas
   que todavía no existe.
 - Decidir dónde vive la validación de reglas que comparan dos campos entre sí (rango de
   comensales de Zona, capacidad de Mesa vs. Reserva existente).
@@ -43,16 +44,17 @@ propio schema: crear una tercera Zona requeriría una migración que agregue un 
 no una fila nueva. Por eso la capability solo expone `GET` y `PATCH` sobre las dos Zonas ya
 sembradas por el seed de `modelo-dominio`.
 
-### Verificación de Reservas activas: consulta directa a la tabla `Reserva`, no a un service
-`MesasService` (para baja/edición de Mesa) inyecta `PrismaService` y consulta
-`prisma.reserva.count({ where: { mesaId, estado: { in: ['PENDIENTE', 'CONFIRMADA'] } } })`
-directamente, en vez de depender de un `ReservasService` que todavía no existe (nace en
+### Verificación de Reservas: consulta directa a la tabla `Reserva`, no a un service
+`MesasService` inyecta `PrismaService`. Para editar una Mesa consulta
+`prisma.reserva.count({ where: { mesaId, estado: { in: ['PENDIENTE', 'CONFIRMADA'] } } })`;
+para eliminarla consulta `prisma.reserva.count({ where: { mesaId } })`, sin filtro de estado.
+Lo hace directamente, en vez de depender de un `ReservasService` que todavía no existe (nace en
 `reservas-crear`, posterior en el roadmap). **Alternativa considerada:** esperar a que exista
 `reservas-crear` y consumir su service — se descarta porque bloquearía innecesariamente este
 change, que el roadmap marca como paralelo y sin esa dependencia. Es una lectura (`count`), no
 escritura, así que no hay riesgo de que este change y `reservas-crear` diverjan en cómo se
-crea una Reserva; ambos leen la misma tabla con el mismo criterio de "activa" que ya fija
-`modelo-dominio` (`PENDIENTE` o `CONFIRMADA`).
+crea una Reserva. La edición conserva el criterio de "activa" de `modelo-dominio`
+(`PENDIENTE` o `CONFIRMADA`); la baja protege también el historial (`CANCELADA` y `NO_SHOW`).
 
 ### Validación de reglas que comparan dos campos: en el service, no en el DTO
 El rechazo de `minComensales > maxComensales` (Zona) y de "capacidad de Mesa por debajo de una
@@ -64,9 +66,27 @@ tipos de cada campo por separado, el service valida relaciones entre campos y co
 de la base.
 
 ### Baja de Mesa es DELETE físico; baja de Turno es un toggle de `activo`
-Ya justificado en `proposal.md` — `What Changes`. Consecuencia de diseño: `MesasService` no
-necesita el campo `activo` que sí tiene `Turno` en el schema de `modelo-dominio`, así que no
-hace falta ninguna migración para este change.
+**Decisión:** `DELETE /admin/mesas/{id}` elimina físicamente solo una Mesa sin Reservas
+asociadas de ningún estado. Si no existe responde `404 Not Found`; si tiene Reservas responde
+`409 Conflict`, con el mensaje "No se puede eliminar una mesa con reservas asociadas.";
+si se elimina responde `204 No Content`, sin cuerpo. Una Reserva `CANCELADA` o `NO_SHOW`
+sigue referenciando su Mesa: liberar cupo no elimina esa relación ni autoriza borrar el historial.
+
+El service verifica existencia y Reservas asociadas antes de llamar a `prisma.mesa.delete`.
+La FK de `Reserva.mesaId` debe conservar su comportamiento restrictivo (`ON DELETE RESTRICT`):
+no se usa borrado en cascada ni se pone la relación en null. Si una Reserva se inserta entre
+la consulta y el DELETE, la FK impide la eliminación y el service traduce el error `P2003`
+a `409 Conflict`. Si la Mesa desaparece concurrentemente, traduce `P2025` a `404 Not Found`.
+La consulta previa mejora el mensaje; la FK garantiza que no queden Reservas huérfanas.
+
+**Alternativa considerada:** baja lógica con `Mesa.activa`. Permitiría retirar una Mesa con
+historial conservando sus Reservas, pero requiere migración y cambios coordinados en listado,
+disponibilidad, creación y reasignación para excluir Mesas inactivas. Se difiere a un change
+propio para mantener el alcance actual sin cambios de schema. En este change una Mesa con
+historial permanece listada y disponible para nuevas reservas si cumple las demás reglas.
+
+La baja de Turno sigue siendo `activo = false`. El contrato de implementación debe documentar
+las respuestas `204`, `404` y `409` del DELETE de Mesa en `openapi/openapi.yaml`.
 
 ## Risks / Trade-offs
 
@@ -77,8 +97,8 @@ hace falta ninguna migración para este change.
   Queda como pregunta abierta, no bloquea este change.
 - **[Riesgo]** Consultar `Reserva` directamente desde `MesasService` antes de que exista
   `reservas-crear` acopla este change a la forma de la tabla en vez de a un service estable →
-  **Mitigación:** es una lectura simple (`count` por `estado`), y ese mismo criterio de
-  "Reserva activa" ya está fijado por el invariante 1 de `modelo-dominio`; no hay lógica de
+  **Mitigación:** son lecturas simples (`count` por Mesa, con filtro de estado solo para
+  edición); no hay lógica de
   negocio propia de `reservas-crear` que este change necesite reutilizar.
 - **[Riesgo]** Este change puede escribirse y mergearse su spec antes que `auth-admin`, pero
   su implementación no puede probarse end-to-end (con guard real) hasta que el guard exista →

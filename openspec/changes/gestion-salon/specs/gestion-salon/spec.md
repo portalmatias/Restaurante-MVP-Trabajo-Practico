@@ -94,17 +94,39 @@ Reserva).
 - **AND** el admin intenta cambiarla a una Zona distinta
 - **THEN** el sistema rechaza la edición
 
-### Requirement: Baja de Mesa bloqueada si tiene Reservas activas
-El sistema SHALL exponer `DELETE /admin/mesas/:id` y SHALL rechazar la eliminación si la Mesa
-tiene alguna Reserva activa (`PENDIENTE` o `CONFIRMADA`) asociada.
+### Requirement: Baja de Mesa preserva las Reservas activas e históricas
+El sistema SHALL exponer `DELETE /admin/mesas/:id` y SHALL permitir la eliminación física
+únicamente si la Mesa no tiene Reservas asociadas de ningún estado. El sistema SHALL responder
+`409 Conflict` si existe alguna Reserva `PENDIENTE`, `CONFIRMADA`, `CANCELADA` o `NO_SHOW`
+asociada, conservando la Mesa, las Reservas y sus relaciones sin modificaciones. El sistema
+SHALL NOT eliminar Reservas en cascada ni desvincularlas de su Mesa para permitir la baja.
 
-#### Scenario: Baja exitosa sin Reservas activas
-- **WHEN** el admin elimina una Mesa sin Reservas activas asociadas
-- **THEN** el sistema la elimina
+#### Scenario: Baja exitosa sin Reservas asociadas
+- **WHEN** el admin elimina una Mesa existente sin Reservas asociadas de ningún estado
+- **THEN** el sistema la elimina físicamente y responde `204 No Content` sin cuerpo
+- **AND** la Mesa deja de aparecer en el listado
 
 #### Scenario: Baja rechazada por Reservas activas
 - **WHEN** el admin intenta eliminar una Mesa que tiene al menos una Reserva activa asociada
-- **THEN** el sistema rechaza la eliminación
+- **THEN** el sistema responde `409 Conflict` y conserva la Mesa y sus Reservas sin cambios
+
+#### Scenario: Baja rechazada por Reserva cancelada
+- **WHEN** el admin intenta eliminar una Mesa cuya única Reserva asociada está `CANCELADA`
+- **THEN** el sistema responde `409 Conflict` y conserva la Mesa y la Reserva sin cambios
+
+#### Scenario: Baja rechazada por Reserva NO_SHOW
+- **WHEN** el admin intenta eliminar una Mesa cuya única Reserva asociada está `NO_SHOW`
+- **THEN** el sistema responde `409 Conflict` y conserva la Mesa y la Reserva sin cambios
+
+#### Scenario: Baja de Mesa inexistente
+- **WHEN** el admin solicita eliminar una Mesa que no existe
+- **THEN** el sistema responde `404 Not Found`
+
+#### Scenario: Reserva creada concurrentemente impide la baja
+- **WHEN** una Reserva asociada se persiste después de verificar que la Mesa no tiene
+  Reservas, pero antes de ejecutar su eliminación
+- **THEN** el sistema responde `409 Conflict`, conserva la Mesa y la Reserva asociada y no
+  expone un error interno de base de datos
 
 ### Requirement: Alta de Turno
 El sistema SHALL exponer `POST /admin/turnos`, que recibe día de la semana, hora de inicio y
