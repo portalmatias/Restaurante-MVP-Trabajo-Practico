@@ -168,6 +168,9 @@ context: |
   - El aforo es un **tope duro**: hay un máximo global y uno por zona, en comensales simultáneos.
   - Se valida en el momento de crear la reserva. Si el total de comensales del turno más los nuevos
     supera el tope, se rechaza aunque haya una mesa físicamente libre.
+  - Se validan **los dos topes**, el de la zona y el global (no solo el de la zona), tanto al
+    consultar disponibilidad como al crear la reserva. Los lugares restantes que informa la
+    consulta son el mínimo entre lo que queda del aforo de la zona y lo que queda del global.
   - Las reservas `CANCELADA` y `NO_SHOW` no cuentan para el aforo.
 
   ### Estados de una reserva
@@ -185,6 +188,8 @@ context: |
 
   ### Disponibilidad
   - Consultar disponibilidad **no reserva ni bloquea nada**. Es una foto del momento.
+  - La consulta responde si hay lugar, cuántos lugares (comensales) quedan y **todos** los motivos
+    por los que no lo hay, sin cortar en la primera regla que falla.
   - Entre la consulta y la creación, la disponibilidad puede haber cambiado: la validación real
     ocurre siempre en el momento de crear.
   - Para evitar doble reserva sobre la misma mesa en peticiones concurrentes, la creación corre
@@ -195,7 +200,8 @@ context: |
   1. Dos reservas activas no pueden compartir mesa, fecha y turno.
   2. La cantidad de comensales de una reserva nunca supera la capacidad de la mesa asignada.
   3. Una reserva siempre apunta a un turno activo y a una mesa de la zona solicitada.
-  4. La suma de comensales activos de un turno nunca supera el aforo de esa zona.
+  4. La suma de comensales activos de un turno nunca supera el aforo de esa zona, ni la suma de
+     todas las zonas supera el aforo global.
   5. Una reserva en estado terminal (`CANCELADA`, `NO_SHOW`) no vuelve a estados anteriores.
 
   ---
@@ -209,6 +215,14 @@ context: |
   - La lógica de negocio vive en los **services**. Los controllers solo orquestan y validan.
   - Todo input de API se valida con un **DTO** + `class-validator`. Nunca confiar en el body crudo.
   - Errores: usar las excepciones HTTP de NestJS (`BadRequestException`, `ConflictException`, etc.), nunca `throw new Error()` en capa de API.
+    Qué código corresponde a cada caso:
+    - `400`: input mal formado, lo que rechaza el `ValidationPipe` (falta un campo, tipo o formato inválido).
+    - `404`: el recurso referenciado no existe.
+    - `409`: al escribir, se viola una regla de negocio del §6 o un invariante.
+    - `401` / `403`: autenticación y autorización (§5).
+    - `429`: rate limiting.
+    - `422` no se usa.
+    - Una consulta que responde "no hay lugar" es `200`, no un error.
 
   ### Frontend (Next.js)
   - App Router. Server Components por defecto; `"use client"` solo donde haga falta interactividad.
@@ -219,6 +233,10 @@ context: |
   - Nombres de dominio en **español** (`Reserva`, `Mesa`, `Zona`, `Turno`); nombres técnicos en inglés (`createReservaDto`, `findAll`).
   - Archivos y carpetas en `kebab-case`. Clases en `PascalCase`. Variables y funciones en `camelCase`.
   - Fechas y horas: **UTC** en base de datos y en la API (ISO 8601). La conversión a hora local es responsabilidad del frontend.
+  - Fechas de calendario sin hora (como la `fecha` de una reserva): viajan en la API como `YYYY-MM-DD` y
+    representan el día del calendario local del restaurante, nunca un instante con hora. En código se leen
+    y escriben siempre con los métodos `getUTC*` y `Date.UTC`: la máquina de desarrollo y CI corren con
+    zonas horarias distintas, y `getDay()` o `new Date(y, m, d)` dan resultados distintos en cada una.
   - Nada de `any` en TypeScript salvo con un comentario que lo justifique.
 
   ---
