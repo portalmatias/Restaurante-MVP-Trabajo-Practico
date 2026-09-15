@@ -18,6 +18,8 @@
     "test:e2e": "npm run test:e2e -w backend",
     "test:scripts": "node --test scripts/openapi-diff.test.mjs",
     "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run start:dev -w backend\" \"npm run dev -w frontend\"",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:seed": "npm run db:seed -w backend",
     "openapi:lint": "spectral lint openapi/openapi.yaml",
     "openapi:check": "node scripts/openapi-check.mjs"
   },
