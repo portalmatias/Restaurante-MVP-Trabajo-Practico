@@ -149,9 +149,5 @@ Después de correr `npm run db:seed -w backend`, la base de desarrollo queda con
 - Mesas de capacidades variadas en cada zona, los turnos de almuerzo/cena (activos de
   martes a domingo, inactivos los lunes) y algunas reservas de ejemplo en distintos estados.
 
-> **Pendiente de confirmar:** `config.yaml` §6 fija los rangos de comensales, las
-> anticipaciones y la ventana de cancelación por zona, pero no fija un número concreto de
-> aforo máximo (ni por zona ni global) — solo dice que existe un tope duro. Los valores de
-> `aforoMaximo`/`aforoGlobal` que carga el seed (`backend/prisma/seed.ts`) son ilustrativos,
-> pensados para poder demostrar el invariante de aforo con datos de ejemplo. Falta que el
-> equipo (o la docente, si la consigna define un número) confirme el valor real de negocio.
+Los valores de aforo (`aforoMaximo` 40 para `STANDARD`, 20 para `VIP`, `aforoGlobal` 60) están
+confirmados por el equipo y documentados en `openspec/config.yaml` §6.

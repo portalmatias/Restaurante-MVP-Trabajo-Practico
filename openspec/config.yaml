@@ -169,6 +169,9 @@ context: |
   - Se valida en el momento de crear la reserva. Si el total de comensales del turno más los nuevos
     supera el tope, se rechaza aunque haya una mesa físicamente libre.
   - Las reservas `CANCELADA` y `NO_SHOW` no cuentan para el aforo.
+  - Valores confirmados: `aforoMaximo` de `STANDARD` = 40, `aforoMaximo` de `VIP` = 20,
+    `aforoGlobal` = 60 comensales simultáneos. Viven en `ConfiguracionNegocio`/`Zona`
+    (`backend/prisma/seed.ts`), no hardcodeados en el código.
 
   ### Estados de una reserva
   ```

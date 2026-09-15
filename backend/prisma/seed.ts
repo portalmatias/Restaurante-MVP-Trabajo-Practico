@@ -12,13 +12,10 @@
  * Idempotencia: todo se escribe con `upsert` por clave natural (design.md → Seed
  * idempotente), nunca con `create`. Correr este script dos veces no duplica filas.
  *
- * NOTA sobre valores de aforo: config.yaml §6 fija los rangos de comensales, las
- * anticipaciones y la ventana de cancelación por zona, pero NO fija un número concreto de
- * aforo máximo (ni por zona ni global) — solo dice que "hay un máximo global y uno por
- * zona". Los valores de `aforoMaximo`/`aforoGlobal` de este seed son ilustrativos para que
- * el invariante 4 sea demostrable con datos de ejemplo, y quedan pendientes de que el
- * equipo/docente confirme el número real de negocio (ver resumen de la sesión de
- * implementación de este change).
+ * NOTA sobre valores de aforo: config.yaml §6 fijaba los rangos de comensales, las
+ * anticipaciones y la ventana de cancelación por zona, pero no el número concreto de aforo
+ * máximo. Confirmado por el equipo: `aforoMaximo` STANDARD = 40, `aforoMaximo` VIP = 20,
+ * `aforoGlobal` = 60 (ver openspec/config.yaml §6, sección Aforo).
  */
 import { PrismaClient, DiaSemana, EstadoReserva } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -63,7 +60,7 @@ async function seedAdmin() {
 }
 
 async function seedZonas() {
-  // Valores de config.yaml §6. aforoMaximo es ilustrativo (ver nota de cabecera).
+  // Valores de config.yaml §6, incluido aforoMaximo (confirmado, ver nota de cabecera).
   const standard = await prisma.zona.upsert({
     where: { nombre: 'STANDARD' },
     update: {
