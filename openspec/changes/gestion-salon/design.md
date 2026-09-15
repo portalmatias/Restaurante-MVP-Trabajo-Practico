@@ -100,14 +100,35 @@ Secuencia de la prueba:
 2. Interceptar el DELETE: notificar `deleteAlcanzado`, esperar `permitirDelete` y ejecutar el
    método original con los mismos argumentos. Iniciar `MesasService.eliminar(id)` y capturar
    su resultado o error desde ese momento para evitar rechazos de promesas sin manejar.
-3. Esperar `deleteAlcanzado`: el service ya verificó que no había Reservas, pero el DELETE
-   todavía no llegó a PostgreSQL. Insertar y confirmar una Reserva de esa Mesa mediante un
-   segundo cliente Prisma conectado a la misma base de test, fuera de una transacción pendiente.
+3. Esperar mediante `Promise.race` entre `deleteAlcanzado`, la terminación anticipada de la
+   operación y un plazo explícito de la prueba. Si la operación termina antes de alcanzar el
+   DELETE (con éxito o error), fallar inmediatamente y entrar al `finally`; si vence el plazo,
+   rechazar la espera con un error descriptivo y entrar al mismo `finally`. El timer se cancela
+   siempre al concluir la espera. Alcanzada la barrera, el service ya verificó que no había
+   Reservas, pero el DELETE todavía no llegó a PostgreSQL. Insertar y confirmar una Reserva
+   de esa Mesa mediante un segundo cliente Prisma conectado a la misma base de test, fuera
+   de una transacción pendiente.
 4. Resolver `permitirDelete` y comprobar que el DELETE real falla por la FK, que el service
    lo traduce a `ConflictException` (`409`) y que Mesa, Reserva y relación siguen persistidas.
-5. En `finally`, liberar siempre la barrera, esperar que termine la operación, restaurar el
-   spy, limpiar los datos y desconectar el segundo cliente. Usar el timeout de Jest como
-   límite ante fallos, nunca sleeps para ordenar operaciones.
+5. En `finally`, liberar siempre la barrera y consumir el resultado de la operación mediante
+   la promesa que captura éxito/error desde el paso 2. Acotar también esta espera con un
+   plazo explícito y cancelar su timer al terminar. Restaurar el spy en un `finally` anidado,
+   aunque falle esa espera; intentar la limpieza de datos y garantizar la desconexión del
+   segundo cliente y el cierre del módulo de pruebas en otro `finally`. Propagar el fallo
+   original después de la limpieza y registrar también los errores de limpieza, sin ocultar
+   ninguno ni dejar rechazos de promesas sin manejar.
+
+Los plazos internos deben dejar margen para la limpieza antes del timeout externo de Jest;
+este último solo es una salvaguarda y no dispara la limpieza. Configurar límites de conexión,
+consulta y bloqueo en los clientes/base de test menores que ese presupuesto. `Promise.race`
+no cancela una consulta: si vence la espera de la operación, detener o esperar la consulta
+pendiente bajo esos límites antes de borrar los datos de prueba, para evitar escrituras tardías.
+Los timers solo detectan fallos; el orden de la carrera se controla con promesas, nunca sleeps.
+
+Verificar además el mecanismo de prueba con una Mesa inexistente: la operación debe terminar
+antes del DELETE con `NotFoundException`, la espera debe fallar inmediatamente y la limpieza
+debe restaurar el spy y cerrar los clientes. Ese error no debe quedar esperando el timeout
+de Jest. Esta comprobación usa también Prisma real y no simula sus respuestas.
 
 La interceptación existe solo en la suite; no se agrega ningún hook de sincronización al
 código de producción. Los e2e de 5.6 verifican además la respuesta HTTP del controller.

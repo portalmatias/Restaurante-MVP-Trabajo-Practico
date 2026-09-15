@@ -90,7 +90,12 @@
       confirmar la inserción con un segundo cliente antes de liberar la barrera. Sin sleeps
       ni resultados/errores simulados. Verificar que la FK real impide la baja y el service
       lanza `ConflictException` (`409`), conservando ambos registros. Confirmar que la FK usa
-      `ON DELETE RESTRICT`. Liberar la barrera y restaurar la interceptación en `finally`.
+      `ON DELETE RESTRICT`. Acotar explícitamente la espera de la barrera y detectar la
+      terminación anticipada del service con `Promise.race`; cancelar los timers al terminar.
+      Liberar la barrera, consumir el resultado de la operación, restaurar el spy y cerrar
+      clientes con `finally` anidados según el diseño, antes de propagar el fallo. Verificar
+      también la limpieza con una Mesa inexistente que falle antes del DELETE, sin depender
+      del timeout externo de Jest.
 - [ ] 5.7 Test: alta de Turno sin indicar `activo` queda `activo = true` (spec: "Alta de
       Turno").
 - [ ] 5.8 Test: desactivar un Turno lo marca `activo = false` sin eliminarlo y sigue
