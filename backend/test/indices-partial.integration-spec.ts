@@ -42,7 +42,11 @@ describe('Índice único parcial de Reserva — guard contra drift de Prisma', (
     // señal real (a nivel de catálogo) de que el índice tiene una condición WHERE, en vez
     // de parsear el texto de `indexdef` con una regex.
     const filas = await prisma.$queryRaw<
-      Array<{ indexrelid: bigint; indpred: string | null; indisunique: boolean }>
+      Array<{
+        indexrelid: bigint;
+        indpred: string | null;
+        indisunique: boolean;
+      }>
     >`
       SELECT
         i.indexrelid,

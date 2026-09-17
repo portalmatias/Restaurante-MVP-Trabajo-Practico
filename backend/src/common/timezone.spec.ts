@@ -19,7 +19,8 @@ describe('timezone', () => {
   const fecha = new Date(Date.UTC(2026, 2, 15)); // 2026-03-15
 
   // @db.Time: Prisma los devuelve como Date en época 1970-01-01 con la hora en su parte UTC.
-  const hora = (h: number, m = 0, s = 0) => new Date(Date.UTC(1970, 0, 1, h, m, s));
+  const hora = (h: number, m = 0, s = 0) =>
+    new Date(Date.UTC(1970, 0, 1, h, m, s));
 
   describe('combinarFechaYHoraLocalEnUtc', () => {
     it('combina una fecha calendario con una hora local de Argentina en el instante UTC correcto (turno normal, ej. 12:00)', () => {

@@ -41,7 +41,10 @@ export const ARGENTINA_OFFSET_HORAS = -3;
  * @param horaLocal Date en época 1970 cuya parte UTC codifica una hora local de Argentina
  * @returns Date en UTC real correspondiente a "esa fecha calendario, a esa hora local"
  */
-export function combinarFechaYHoraLocalEnUtc(fecha: Date, horaLocal: Date): Date {
+export function combinarFechaYHoraLocalEnUtc(
+  fecha: Date,
+  horaLocal: Date,
+): Date {
   const instanteNaive = Date.UTC(
     fecha.getUTCFullYear(),
     fecha.getUTCMonth(),
@@ -65,7 +68,13 @@ export function combinarFechaYHoraLocalEnUtc(fecha: Date, horaLocal: Date): Date
  * @returns Date con la fecha calendario siguiente
  */
 function avanzarFechaUnDia(fecha: Date): Date {
-  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate() + 1));
+  return new Date(
+    Date.UTC(
+      fecha.getUTCFullYear(),
+      fecha.getUTCMonth(),
+      fecha.getUTCDate() + 1,
+    ),
+  );
 }
 
 /**
@@ -96,7 +105,11 @@ export function inicioTurnoUtc(fecha: Date, horaInicio: Date): Date {
  * @param horaFin Hora de fin local del turno (`@db.Time`)
  * @returns Date en UTC real del fin del turno
  */
-export function finTurnoUtc(fecha: Date, horaInicio: Date, horaFin: Date): Date {
+export function finTurnoUtc(
+  fecha: Date,
+  horaInicio: Date,
+  horaFin: Date,
+): Date {
   const cruzaMedianoche = horaFin.getTime() < horaInicio.getTime();
   const fechaDeFin = cruzaMedianoche ? avanzarFechaUnDia(fecha) : fecha;
   return combinarFechaYHoraLocalEnUtc(fechaDeFin, horaFin);
