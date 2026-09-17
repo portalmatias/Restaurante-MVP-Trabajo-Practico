@@ -57,6 +57,7 @@ Todo se corre desde la raíz del repo.
 | `npm run typecheck` | `tsc --noEmit` sobre los dos workspaces |
 | `npm run test -w backend` | Tests unitarios del backend (Jest) |
 | `npm run test:e2e` | Tests e2e del backend (`backend/test/*.e2e-spec.ts`) |
+| `npm run test:integration -w backend` | Tests de integración contra PostgreSQL real (`backend/test/*.integration-spec.ts`). Requiere tener PostgreSQL levantado (`docker compose up -d`) |
 | `npm run test:scripts` | Tests de las utilidades de `scripts/` (`node --test`) |
 | `npm run build -w backend` | Compila el backend |
 | `npm run db:migrate -w backend` | Aplica las migraciones de Prisma (`prisma migrate dev`) |
@@ -105,9 +106,12 @@ Si agregás o cambiás un endpoint: **primero el YAML, después el código.**
 
 Un PR con CI en rojo no se mergea, aunque funcione localmente.
 
-> El job `test` **todavía no levanta PostgreSQL**: en esta etapa no existen migraciones ni
-> seed. Los tests de integración contra base real se suman en el change `ci-integracion-db`,
-> justo después de `modelo-dominio`.
+> Las migraciones y el seed ya existen (change `modelo-dominio`), pero el job `test` de CI
+> **todavía no levanta PostgreSQL**: `npm run test:integration -w backend` (los tests contra
+> base real, como `reservas-invariantes.integration-spec.ts`) hoy corre solo localmente, no en
+> CI. Conectar ese comando a CI con un service container de Postgres es exactamente el
+> alcance completo del próximo change, `ci-integracion-db` — no puede ir en este PR porque
+> tocaría `.github/workflows/`, prohibido para un PR de feature (`openspec/config.yaml` §14).
 
 ## Cómo se trabaja acá
 
