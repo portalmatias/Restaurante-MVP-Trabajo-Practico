@@ -1,16 +1,26 @@
 /**
  * Utilidad de zona horaria fija para la aplicación.
  *
- * Argentina (America/Argentina/Buenos_Aires) está en UTC-3 desde 2009 y no observa
- * horario de verano (DST). Por eso el offset es una constante fija y no requiere
- * una librería de zonas horarias completa (date-fns-tz, luxon, etc.).
+ * Decisión de diseño (config.yaml §7, confirmada en la revisión del PR #12): el backend
+ * usa el **offset fijo de Argentina** (`America/Argentina/Buenos_Aires`, UTC-3 desde 2009,
+ * sin horario de verano). No existe un campo `zonaHoraria` en `ConfiguracionNegocio` ni
+ * dependencia de ningún otro módulo (en particular, no de `disponibilidad/zona-horaria.ts`,
+ * que pertenece a otro change todavía no integrado en esta rama). Por eso el offset es una
+ * constante fija y no requiere una librería de zonas horarias completa (date-fns-tz, luxon,
+ * etc.) — es una decisión deliberada de simplicidad para el MVP (config.yaml §2: no agregar
+ * deps sin justificar en design.md).
  *
- * Si en el futuro el equipo necesitara soportar otro huso horario, esta decisión
- * deberá revisarse: habría que reemplazar esta constante por una configuración
- * dinámica (variable de entorno, tabla en BD, o librería TZ completa) y auditar
- * todos los puntos de consumo (reservas-crear, cancelacion-turnos, reserva-vip).
- * No está pensado para ser extensible ahora — es una decisión deliberada de
- * simplicidad para el MVP (config.yaml §2: no agregar deps sin justificar en design.md).
+ * Si en el futuro el equipo necesitara soportar otro huso horario, esta decisión deberá
+ * revisarse explícitamente: habría que introducir una configuración dinámica (variable de
+ * entorno, tabla en BD, o librería TZ completa) y auditar todos los puntos de consumo
+ * (reservas-crear, cancelacion-turnos, reserva-vip).
+ *
+ * `Turno.horaInicio` / `Turno.horaFin` son horas locales del restaurante sin fecha ni offset
+ * (`@db.Time`); Prisma las devuelve como `Date` en la época Unix (1970-01-01) con la hora en
+ * su parte UTC. `Reserva.fecha` es una fecha calendario pura (`@db.Date`), también sin hora
+ * significativa. Para validar anticipación, cancelación y NO_SHOW contra "ahora" (un instante
+ * UTC real) hay que combinar ambos campos y aplicar el offset fijo — ver
+ * `combinarFechaYHoraLocalEnUtc`, `inicioTurnoUtc` y `finTurnoUtc` más abajo.
  */
 
 /** Offset fijo de Argentina respecto a UTC en milisegundos: -3 horas = -10800000 ms. */
@@ -20,30 +30,76 @@ export const ARGENTINA_OFFSET_MS = -3 * 60 * 60 * 1000;
 export const ARGENTINA_OFFSET_HORAS = -3;
 
 /**
- * Convierte una hora local de Argentina (representada como Date con componente de hora
- * en UTC, como la devuelve Prisma para @db.Time) a un Date en UTC real para
- * comparaciones contra "ahora".
+ * Combina una fecha calendario local (`@db.Date`) con una hora local del restaurante
+ * (`@db.Time`, `Date` en época 1970 con la hora en su parte UTC) y devuelve el instante
+ * UTC real que representan juntas, aplicando el offset fijo de Argentina.
  *
- * Prisma devuelve @db.Time como un Date en la época Unix (1970-01-01) con la hora
- * en UTC. Como esa hora en realidad es "hora local de Argentina", para obtener el
- * instante UTC real hay que restar el offset (sumar 3 horas).
+ * Ambos parámetros se leen con métodos `getUTC*` para no depender de la zona horaria del
+ * proceso que ejecuta el código (config.yaml §7).
  *
- * @param horaLocalArgentina Date con la hora en UTC que representa hora local AR
- * @returns Date en UTC real (mismo instante, zona distinta)
+ * @param fecha Date que representa una fecha calendario local (sin componente de hora significativo)
+ * @param horaLocal Date en época 1970 cuya parte UTC codifica una hora local de Argentina
+ * @returns Date en UTC real correspondiente a "esa fecha calendario, a esa hora local"
  */
-export function horaLocalArgentinaAUtc(horaLocalArgentina: Date): Date {
-  return new Date(horaLocalArgentina.getTime() - ARGENTINA_OFFSET_MS);
+export function combinarFechaYHoraLocalEnUtc(fecha: Date, horaLocal: Date): Date {
+  const instanteNaive = Date.UTC(
+    fecha.getUTCFullYear(),
+    fecha.getUTCMonth(),
+    fecha.getUTCDate(),
+    horaLocal.getUTCHours(),
+    horaLocal.getUTCMinutes(),
+    horaLocal.getUTCSeconds(),
+    horaLocal.getUTCMilliseconds(),
+  );
+  // instanteNaive trata la combinación fecha+hora como si ya fuera UTC. Como en realidad es
+  // hora local de Argentina, hay que sumarle 3 horas para obtener el instante UTC real
+  // (restar el offset, que es negativo).
+  return new Date(instanteNaive - ARGENTINA_OFFSET_MS);
 }
 
 /**
- * Convierte un Date en UTC a la hora local de Argentina equivalente (como Date
- * en época Unix con la hora desplazada), para guardar en @db.Time.
+ * Devuelve el día calendario siguiente a `fecha` (sin tocar ninguna hora), usando
+ * aritmética de componentes UTC para no depender de la zona horaria del proceso.
  *
- * @param utc Date en UTC
- * @returns Date en época Unix con hora local AR
+ * @param fecha Date que representa una fecha calendario local
+ * @returns Date con la fecha calendario siguiente
  */
-export function utcAHoraLocalArgentina(utc: Date): Date {
-  return new Date(utc.getTime() + ARGENTINA_OFFSET_MS);
+function avanzarFechaUnDia(fecha: Date): Date {
+  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate() + 1));
+}
+
+/**
+ * Calcula el instante UTC real de inicio de un turno: la fecha calendario de la reserva
+ * combinada con la hora de inicio local del turno.
+ *
+ * @param fecha Fecha calendario de la reserva (`@db.Date`)
+ * @param horaInicio Hora de inicio local del turno (`@db.Time`)
+ * @returns Date en UTC real del inicio del turno
+ */
+export function inicioTurnoUtc(fecha: Date, horaInicio: Date): Date {
+  return combinarFechaYHoraLocalEnUtc(fecha, horaInicio);
+}
+
+/**
+ * Calcula el instante UTC real de fin de un turno: la fecha calendario de la reserva
+ * combinada con la hora de fin local del turno.
+ *
+ * Si la hora de fin es anterior a la hora de inicio (comparando solo la hora del día), el
+ * turno cruza la medianoche y el fin corresponde al día calendario siguiente: se avanza la
+ * `fecha` un día antes de combinarla con `horaFin`, en vez de sumar 24 horas a un instante
+ * UTC ya calculado (evita asumir que un día siempre dura 24 horas exactas, aunque con un
+ * offset fijo sin DST esto no varía; mantiene el patrón exigido por config.yaml §7 para
+ * cuando esta decisión se revise).
+ *
+ * @param fecha Fecha calendario de la reserva (`@db.Date`)
+ * @param horaInicio Hora de inicio local del turno (`@db.Time`)
+ * @param horaFin Hora de fin local del turno (`@db.Time`)
+ * @returns Date en UTC real del fin del turno
+ */
+export function finTurnoUtc(fecha: Date, horaInicio: Date, horaFin: Date): Date {
+  const cruzaMedianoche = horaFin.getTime() < horaInicio.getTime();
+  const fechaDeFin = cruzaMedianoche ? avanzarFechaUnDia(fecha) : fecha;
+  return combinarFechaYHoraLocalEnUtc(fechaDeFin, horaFin);
 }
 
 /**
