@@ -241,10 +241,11 @@ context: |
   - Fechas y horas: **UTC** en base de datos y en la API (ISO 8601). La conversión a hora local es responsabilidad del frontend.
   - Excepción para horarios recurrentes: `Turno.horaInicio` y `horaFin` son horas locales del
     restaurante, sin fecha ni offset (`@db.Time`), no instantes UTC. El backend combina la fecha
-    local de la Reserva y esas horas usando `ConfiguracionNegocio.zonaHoraria` (identificador
-    IANA) para validar anticipación, cancelación y NO_SHOW contra instantes UTC. Si la hora de
-    fin es anterior a la de inicio, el fin corresponde al día siguiente del calendario local;
-    se avanza la fecha antes de convertirla, sin sumar 24 horas a un instante UTC.
+    local de la Reserva y esas horas usando el offset fijo de Argentina (UTC-3, sin horario de
+    verano desde 2009: `America/Argentina/Buenos_Aires`) para validar anticipación, cancelación
+    y NO_SHOW contra instantes UTC. Si la hora de fin es anterior a la de inicio, el fin
+    corresponde al día siguiente del calendario local; se avanza la fecha antes de convertirla,
+    sin sumar 24 horas a un instante UTC.
   - Fechas de calendario sin hora (como la `fecha` de una reserva): viajan en la API como `YYYY-MM-DD` y
     representan el día del calendario local del restaurante, nunca un instante con hora. En código se leen
     y escriben siempre con los métodos `getUTC*` y `Date.UTC`: la máquina de desarrollo y CI corren con
