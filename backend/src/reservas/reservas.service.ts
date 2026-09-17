@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { DiaSemana, EstadoReserva, Prisma } from '@prisma/client';
 
@@ -102,12 +103,19 @@ export class ReservasService {
         const esConflictoDeSerializacion =
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === 'P2034';
+        if (!esConflictoDeSerializacion) {
+          throw error;
+        }
         const quedanIntentos =
           intentoSerializacion < SERIALIZACION_MAX_INTENTOS - 1;
-        if (esConflictoDeSerializacion && quedanIntentos) {
+        if (quedanIntentos) {
           continue;
         }
-        throw error;
+        // Se agotaron los reintentos de serialización: en vez de propagar el P2034 crudo
+        // (que Nest traduciría en un 500), lo convertimos en un 409 legible para el cliente.
+        throw new ConflictException(
+          'No se pudo completar la reserva por conflictos de concurrencia. Volvé a intentarlo.',
+        );
       }
     }
     // Inalcanzable en la práctica (el loop siempre retorna o lanza), pero TypeScript
@@ -122,14 +130,14 @@ export class ReservasService {
       async (tx) => {
         const mesa = await tx.mesa.findUnique({ where: { id: input.mesaId } });
         if (!mesa) {
-          throw new BadRequestException('La mesa indicada no existe.');
+          throw new NotFoundException('La mesa indicada no existe.');
         }
 
         const turno = await tx.turno.findUnique({
           where: { id: input.turnoId },
         });
         if (!turno) {
-          throw new BadRequestException('El turno indicado no existe.');
+          throw new NotFoundException('El turno indicado no existe.');
         }
 
         // Invariante 3 (parte 1): el turno debe estar activo.
@@ -174,7 +182,7 @@ export class ReservasService {
           where: { id: input.zonaSolicitadaId },
         });
         if (!zona) {
-          throw new BadRequestException('La zona indicada no existe.');
+          throw new NotFoundException('La zona indicada no existe.');
         }
 
         // Invariante 4: la suma de comensales activos del turno/fecha en la zona no puede
@@ -290,12 +298,20 @@ export class ReservasService {
    * Único método autorizado a escribir el campo `estado` de una Reserva (design.md,
    * invariante 5). Valida la transición contra `TRANSICIONES_VALIDAS` antes de escribir;
    * ningún otro punto del código debe hacer `reserva.update({ data: { estado } })`.
+   *
+   * Corre en Read Committed (el nivel default): leer el estado, validarlo y recién después
+   * escribir por `id` deja una ventana entre la lectura y la escritura. Si dos transiciones
+   * concurrentes parten del mismo estado (por ejemplo, cliente cancela y admin confirma una
+   * misma reserva PENDIENTE al mismo tiempo), las dos pasan la validación y gana la última
+   * escritura, rompiendo el invariante 5. Para evitarlo, el `update` se condiciona con
+   * `updateMany({ where: { id, estado: <el que se validó> } })`: si otra transacción ya
+   * cambió el estado entremedio, `count` da 0 y se responde 409 en vez de pisar el estado.
    */
   async transicionarEstado(reservaId: string, nuevoEstado: EstadoReserva) {
     return this.prisma.$transaction(async (tx) => {
       const reserva = await tx.reserva.findUnique({ where: { id: reservaId } });
       if (!reserva) {
-        throw new BadRequestException('La reserva indicada no existe.');
+        throw new NotFoundException('La reserva indicada no existe.');
       }
 
       const permitidas = TRANSICIONES_VALIDAS[reserva.estado];
@@ -305,10 +321,17 @@ export class ReservasService {
         );
       }
 
-      return tx.reserva.update({
-        where: { id: reservaId },
+      const resultado = await tx.reserva.updateMany({
+        where: { id: reservaId, estado: reserva.estado },
         data: { estado: nuevoEstado },
       });
+      if (resultado.count !== 1) {
+        throw new ConflictException(
+          'La reserva cambió de estado antes de poder confirmar esta transición. Volvé a intentarlo.',
+        );
+      }
+
+      return tx.reserva.findUniqueOrThrow({ where: { id: reservaId } });
     });
   }
 }
