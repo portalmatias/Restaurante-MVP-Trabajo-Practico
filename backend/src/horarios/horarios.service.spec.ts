@@ -1,8 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { HorariosService } from './horarios.service';
+
+function errorPrisma(code: string) {
+  return new Prisma.PrismaClientKnownRequestError('mock', {
+    code,
+    clientVersion: '6.19.0',
+  });
+}
 
 describe('HorariosService', () => {
   let service: HorariosService;
@@ -70,17 +78,34 @@ describe('HorariosService', () => {
       await service.crear(dto);
       expect(prisma.turno.create).toHaveBeenCalledWith({ data: dto });
     });
+
+    it('traduce P2002 (mismo día y hora de inicio) a ConflictException', async () => {
+      prisma.turno.create.mockRejectedValue(errorPrisma('P2002'));
+
+      await expect(
+        service.crear({
+          diaSemana: 'MARTES' as const,
+          horaInicio: turnoAlmuerzo.horaInicio,
+          horaFin: turnoAlmuerzo.horaFin,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
   });
 
   describe('listar', () => {
-    it('devuelve todos los turnos, activos e inactivos', async () => {
-      prisma.turno.findMany.mockResolvedValue([
+    it('devuelve todos los turnos, activos e inactivos, sin filtro', async () => {
+      const turnos = [
         turnoAlmuerzo,
         { ...turnoAlmuerzo, id: 'turno-lunes', activo: false },
-      ]);
+      ];
+      prisma.turno.findMany.mockResolvedValue(turnos);
 
       const resultado = await service.listar();
-      expect(resultado).toHaveLength(2);
+      // Sin argumentos: `findMany()` no filtra por `activo`, así que una implementación
+      // que sí filtrara (y dejara afuera los inactivos) no se detectaría solo con
+      // `toHaveLength` sobre un mock que ya devuelve los dos.
+      expect(prisma.turno.findMany).toHaveBeenCalledWith();
+      expect(resultado).toEqual(turnos);
     });
   });
 
@@ -111,8 +136,37 @@ describe('HorariosService', () => {
           diaSemana: undefined,
           horaInicio: nuevoHorario.horaInicio,
           horaFin: nuevoHorario.horaFin,
+          activo: undefined,
         },
       });
+    });
+
+    it.each([true, false])(
+      'persiste activo=%s recibido en el mismo PATCH de edición',
+      async (activo) => {
+        prisma.turno.findUnique.mockResolvedValue(turnoAlmuerzo);
+        prisma.turno.update.mockResolvedValue({ ...turnoAlmuerzo, activo });
+
+        await service.actualizar(turnoAlmuerzo.id, { activo });
+        expect(prisma.turno.update).toHaveBeenCalledWith({
+          where: { id: turnoAlmuerzo.id },
+          data: {
+            diaSemana: undefined,
+            horaInicio: undefined,
+            horaFin: undefined,
+            activo,
+          },
+        });
+      },
+    );
+
+    it('traduce P2002 (mismo día y hora de inicio) a ConflictException', async () => {
+      prisma.turno.findUnique.mockResolvedValue(turnoAlmuerzo);
+      prisma.turno.update.mockRejectedValue(errorPrisma('P2002'));
+
+      await expect(
+        service.actualizar(turnoAlmuerzo.id, { diaSemana: 'LUNES' as const }),
+      ).rejects.toBeInstanceOf(ConflictException);
     });
   });
 

@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, Min } from 'class-validator';
+import { IsBoolean, IsInt, Min, ValidateIf } from 'class-validator';
 
 /**
  * Todos los campos son opcionales: `PATCH /admin/zonas/:id` solo actualiza los que vienen
@@ -6,38 +6,44 @@ import { IsBoolean, IsInt, IsOptional, Min } from 'class-validator';
  * valores ya persistidos para los campos que no vienen en el `dto`) se valida en
  * `ZonasService.actualizar`, no acá — config.yaml §7: "la lógica de negocio vive en los
  * services", el DTO solo valida forma y tipo de cada campo por separado.
+ *
+ * `@ValidateIf` en vez de `@IsOptional()` en los siete campos: `@IsOptional()` también
+ * deja pasar `null` como si el campo no hubiera venido, y ese `null` termina en un error
+ * crudo de Prisma al persistir una columna no nullable. Con `@ValidateIf` un `null`
+ * explícito sigue validando (y se rechaza con `400`); solo `undefined` (campo ausente del
+ * body) se considera "no cambiar este valor".
  */
 export class ActualizarZonaDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(1)
   minComensales?: number;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(1)
   maxComensales?: number;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   anticipacionMinHoras?: number;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   anticipacionMaxDias?: number;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   ventanaCancelacionHoras?: number;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   requiereConfirmacionAdmin?: boolean;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   aforoMaximo?: number;
