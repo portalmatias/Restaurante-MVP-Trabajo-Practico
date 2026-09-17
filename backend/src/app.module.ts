@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DisponibilidadModule } from './disponibilidad/disponibilidad.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AppService } from './app.service';
     // `Test.createTestingModule({ imports: [PrismaModule, ZonasModule] })`, como ya hacen
     // `reservas-invariantes.integration-spec.ts` y `mesas.integration-spec.ts`. Se
     // registran en `AppModule` recién cuando tengan un controller real que exponer.
+    DisponibilidadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

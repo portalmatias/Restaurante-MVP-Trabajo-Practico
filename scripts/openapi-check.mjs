@@ -119,7 +119,13 @@ async function main() {
   const committed = await loadCommittedSpec();
   const generated = await generateSpecFromBackend();
 
-  const differences = diffSpecs(generated, committed);
+  // El spec generado puede traer claves con valor `undefined` (por ejemplo
+  // `x-enumNames`, que @nestjs/swagger siempre escribe para los enums, con o sin valor).
+  // El YAML commiteado nunca puede tenerlas, así que serían un rojo permanente que no
+  // corresponde a ninguna diferencia real de contrato. El ida y vuelta por JSON las borra.
+  const generatedNormalized = JSON.parse(JSON.stringify(generated));
+
+  const differences = diffSpecs(generatedNormalized, committed);
 
   if (differences.length > 0) {
     console.error(
