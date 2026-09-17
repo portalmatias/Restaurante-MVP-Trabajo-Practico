@@ -10,8 +10,8 @@
 // carga (feature real de la librería, no un error) — no aporta nada en un test run.
 import { config as loadEnv } from 'dotenv';
 
-loadEnv({ path: '../../.env', quiet: true });
 loadEnv({ path: '../.env', quiet: true });
+loadEnv({ path: '.env', quiet: true });
 
 process.env.DATABASE_URL =
   process.env.DATABASE_URL_TEST ??
