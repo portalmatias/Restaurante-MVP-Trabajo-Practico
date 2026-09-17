@@ -22,8 +22,8 @@ import { AppService } from './app.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [
         {
-          ttl: Number(config.getOrThrow<string>('THROTTLE_TTL')) * 1000,
-          limit: Number(config.getOrThrow<string>('THROTTLE_LIMIT')),
+          ttl: Number(config.get<string>('THROTTLE_TTL', '60')) * 1000,
+          limit: Number(config.get<string>('THROTTLE_LIMIT', '10')),
         },
       ],
     }),
