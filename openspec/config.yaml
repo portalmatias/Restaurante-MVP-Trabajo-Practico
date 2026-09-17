@@ -59,8 +59,11 @@ context: |
   2. **OpenAPI 3.1** como *artefacto entregable*: el archivo `openapi/openapi.yaml` es el
      contrato formal de la API, versionado en el repo y validado en CI.
 
-  **Regla:** ninguna spec de OpenSpec que toque la API se considera completa si no actualiza
-  también el contrato OpenAPI correspondiente.
+  **Regla:** todo PR de spec que toque la API incluye su fragmento OpenAPI (paths, esquemas,
+  respuestas y seguridad) en el `design.md` del change. El PR de implementación incorpora ese
+  contrato a `openapi/openapi.yaml` junto con los controllers y pasa `openapi:check`. No se
+  agregan al YAML ejecutable endpoints todavía no implementados: el chequeo de deriva exige
+  que coincida con el backend. Esto mantiene el contrato disponible desde la etapa de diseño.
 
   > **Pendiente de confirmar con la docente:** si esperaba únicamente OpenAPI, el punto 1 suma
   > valor y no resta. Si esperaba OpenSpec SDD, el punto 2 igual es buena práctica.
@@ -233,6 +236,12 @@ context: |
   - Nombres de dominio en **español** (`Reserva`, `Mesa`, `Zona`, `Turno`); nombres técnicos en inglés (`createReservaDto`, `findAll`).
   - Archivos y carpetas en `kebab-case`. Clases en `PascalCase`. Variables y funciones en `camelCase`.
   - Fechas y horas: **UTC** en base de datos y en la API (ISO 8601). La conversión a hora local es responsabilidad del frontend.
+  - Excepción para horarios recurrentes: `Turno.horaInicio` y `horaFin` son horas locales del
+    restaurante, sin fecha ni offset (`@db.Time`), no instantes UTC. El backend combina la fecha
+    local de la Reserva y esas horas usando `ConfiguracionNegocio.zonaHoraria` (identificador
+    IANA) para validar anticipación, cancelación y NO_SHOW contra instantes UTC. Si la hora de
+    fin es anterior a la de inicio, el fin corresponde al día siguiente del calendario local;
+    se avanza la fecha antes de convertirla, sin sumar 24 horas a un instante UTC.
   - Fechas de calendario sin hora (como la `fecha` de una reserva): viajan en la API como `YYYY-MM-DD` y
     representan el día del calendario local del restaurante, nunca un instante con hora. En código se leen
     y escriben siempre con los métodos `getUTC*` y `Date.UTC`: la máquina de desarrollo y CI corren con
