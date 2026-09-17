@@ -1,28 +1,42 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaModule } from '../src/prisma/prisma.module';
+import { AuthModule } from '../src/auth/auth.module';
 
 interface LoginResponseBody {
   accessToken: string;
 }
 
-describe('AuthController (e2e)', () => {
+// Necesita Postgres real (login contra el admin del seed, vía PrismaService) — por eso es
+// `.integration-spec.ts` y no `.e2e-spec.ts`. `AppModule` todavía no registra `AuthModule`
+// (ver el comentario en `app.module.ts`: el job `test` de CI corre sin PostgreSQL hasta
+// `ci-integracion-db`), así que este test arma su propio módulo mínimo con lo que
+// `AuthModule` necesita, igual que ya hacen `reservas-invariantes.integration-spec.ts` y
+// `mesas.integration-spec.ts`.
+describe('AuthController (integration)', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let jwtSecret: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
+        PrismaModule,
+        AuthModule,
+      ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    // Mismo pipe que `main.ts`: sin esto, LoginDto no valida nada en runtime.
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+    );
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    // Obtener el JWT_SECRET del ConfigService
     const configService = moduleFixture.get<ConfigService>(ConfigService);
     jwtSecret = configService.getOrThrow<string>('JWT_SECRET');
     await app.init();
@@ -83,6 +97,20 @@ describe('AuthController (e2e)', () => {
 
       expect(response.body).toHaveProperty('message', 'Credenciales inválidas');
       expect(response.body).not.toHaveProperty('accessToken');
+    });
+
+    it('debería devolver 400 con un email mal formado', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'no-es-un-email', password: ADMIN_PASSWORD })
+        .expect(400);
+    });
+
+    it('debería devolver 400 si el body trae campos no declarados en el DTO', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD, esAdmin: true })
+        .expect(400);
     });
 
     it('debería devolver 429 después de superar el límite de intentos (rate limiting)', async () => {
