@@ -47,11 +47,18 @@ function hora(hh: number, mm: number): Date {
 }
 
 async function seedAdmin() {
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, BCRYPT_SALT_ROUNDS);
-  return prisma.usuario.upsert({
+  // Buscar primero y hashear solo si no existe: `bcrypt.hash` es trabajo costoso que no
+  // tiene sentido repetir en cada corrida si el `update` de un upsert lo va a descartar de
+  // todas formas, y si algún día se rota ADMIN_PASSWORD acá, una base existente conservaría
+  // el hash viejo sin que nadie lo note.
+  const existente = await prisma.usuario.findUnique({
     where: { email: ADMIN_EMAIL },
-    update: {}, // no pisar el hash en corridas siguientes: el email ya identifica al admin
-    create: {
+  });
+  if (existente) return existente;
+
+  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, BCRYPT_SALT_ROUNDS);
+  return prisma.usuario.create({
+    data: {
       email: ADMIN_EMAIL,
       passwordHash,
       rol: 'ADMIN',
@@ -243,6 +250,19 @@ async function seedReservas(
   // Reservas de ejemplo en distintos estados, identificadas por un código de reserva fijo
   // para que el upsert sea idempotente (el código de reserva es la clave natural pública
   // del dominio — config.yaml §5).
+  //
+  // Los códigos siguen el formato real que genera `generarCodigoReserva()` en
+  // reservas.service.ts: 8 caracteres del alfabeto CODIGO_RESERVA_ALFABETO
+  // ('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', sin I/O/0/1 por ambigüedad visual).
+  //
+  // Nota sobre cambiar estas claves: como son la clave del `upsert`, modificarlas no
+  // actualiza filas ya creadas con códigos anteriores, sino que crea filas nuevas y deja
+  // huérfanas las viejas. Esto es aceptable acá: este seed es exclusivamente para bases de
+  // desarrollo/test locales (nunca producción — no hay usuarios reales todavía, el
+  // proyecto es un TP), así que no hace falta una migración de datos. Si tenías datos del
+  // seed anterior, alcanza con resetear tu base local:
+  //   docker compose down -v && docker compose up -d
+  //   npm run db:migrate -w backend && npm run db:seed -w backend
   const ejemplos: Array<{
     codigoReserva: string;
     mesaId: string;
@@ -255,7 +275,7 @@ async function seedReservas(
     telefonoCliente: string;
   }> = [
     {
-      codigoReserva: 'SEEDPND01',
+      codigoReserva: 'SEEDPND2',
       mesaId: mesas['V1'].id,
       turnoId: turnos['VIERNES_CENA'].id,
       fecha: proximaFecha(DiaSemana.VIERNES),
@@ -266,7 +286,7 @@ async function seedReservas(
       telefonoCliente: '+54 9 11 5555-0001',
     },
     {
-      codigoReserva: 'SEEDCNF01',
+      codigoReserva: 'SEEDCNF2',
       mesaId: mesas['S3'].id,
       turnoId: turnos['SABADO_CENA'].id,
       fecha: proximaFecha(DiaSemana.SABADO),
@@ -277,7 +297,7 @@ async function seedReservas(
       telefonoCliente: '+54 9 11 5555-0002',
     },
     {
-      codigoReserva: 'SEEDCAN01',
+      codigoReserva: 'SEEDCAN2',
       mesaId: mesas['S1'].id,
       turnoId: turnos['DOMINGO_ALMUERZO'].id,
       fecha: proximaFecha(DiaSemana.DOMINGO),
@@ -288,7 +308,7 @@ async function seedReservas(
       telefonoCliente: '+54 9 11 5555-0003',
     },
     {
-      codigoReserva: 'SEEDNOS01',
+      codigoReserva: 'SEEDNSW2',
       mesaId: mesas['S4'].id,
       turnoId: turnos['MARTES_ALMUERZO'].id,
       // NO_SHOW solo se marca después de que pasó el turno (config.yaml §6): se usa una
