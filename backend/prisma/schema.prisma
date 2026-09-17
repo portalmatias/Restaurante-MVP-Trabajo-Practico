@@ -87,8 +87,11 @@ model Mesa {
   zonaId    String
   zona      Zona      @relation(fields: [zonaId], references: [id])
   capacidad Int
-  /// Identificador legible para el admin (ej. "M12"), no es una clave técnica.
-  etiqueta  String
+  /// Identificador legible para el admin (ej. "M12"), no es una clave técnica pero sí debe
+  /// ser único: el seed lo usa como clave natural para hacer upsert de forma idempotente
+  /// (sin este @@unique, dos corridas concurrentes del seed podían crear la misma mesa
+  /// duplicada — ver hallazgo de review del PR #12).
+  etiqueta  String    @unique
   reservas  Reserva[]
 
   @@index([zonaId])

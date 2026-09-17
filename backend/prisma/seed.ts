@@ -141,44 +141,32 @@ async function seedMesas(zonaStandardId: string, zonaVipId: string) {
     { id: string; zonaId: string; capacidad: number }
   > = {};
 
+  // Clave natural: etiqueta, respaldada por un índice único real en la base
+  // (schema.prisma: Mesa.etiqueta @unique). El upsert es atómico: dos corridas
+  // concurrentes del seed ya no pueden crear la misma mesa duplicada.
   for (const mesa of mesasStandard) {
-    // Clave natural: etiqueta (única dentro del negocio, aunque no está declarada como
-    // @@unique en el schema porque no se especifica como invariante — se resuelve acá con
-    // findFirst + upsert manual para no duplicar entre corridas).
-    const existente = await prisma.mesa.findFirst({
+    const row = await prisma.mesa.upsert({
       where: { etiqueta: mesa.etiqueta },
+      update: { capacidad: mesa.capacidad, zonaId: zonaStandardId },
+      create: {
+        etiqueta: mesa.etiqueta,
+        capacidad: mesa.capacidad,
+        zonaId: zonaStandardId,
+      },
     });
-    const row = existente
-      ? await prisma.mesa.update({
-          where: { id: existente.id },
-          data: { capacidad: mesa.capacidad, zonaId: zonaStandardId },
-        })
-      : await prisma.mesa.create({
-          data: {
-            etiqueta: mesa.etiqueta,
-            capacidad: mesa.capacidad,
-            zonaId: zonaStandardId,
-          },
-        });
     creadas[mesa.etiqueta] = row;
   }
 
   for (const mesa of mesasVip) {
-    const existente = await prisma.mesa.findFirst({
+    const row = await prisma.mesa.upsert({
       where: { etiqueta: mesa.etiqueta },
+      update: { capacidad: mesa.capacidad, zonaId: zonaVipId },
+      create: {
+        etiqueta: mesa.etiqueta,
+        capacidad: mesa.capacidad,
+        zonaId: zonaVipId,
+      },
     });
-    const row = existente
-      ? await prisma.mesa.update({
-          where: { id: existente.id },
-          data: { capacidad: mesa.capacidad, zonaId: zonaVipId },
-        })
-      : await prisma.mesa.create({
-          data: {
-            etiqueta: mesa.etiqueta,
-            capacidad: mesa.capacidad,
-            zonaId: zonaVipId,
-          },
-        });
     creadas[mesa.etiqueta] = row;
   }
 

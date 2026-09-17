@@ -22,7 +22,7 @@
     "test:integration": "jest --config ./test/jest-integration.json",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "ts-node --transpile-only prisma/seed.ts",
+    "db:seed": "prisma db seed",
     "prisma:generate": "prisma generate"
   },
   "prisma": {
