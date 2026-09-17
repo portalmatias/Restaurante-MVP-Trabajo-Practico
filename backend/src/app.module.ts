@@ -3,9 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { HorariosModule } from './horarios/horarios.module';
-import { MesasModule } from './mesas/mesas.module';
-import { ZonasModule } from './zonas/zonas.module';
 
 @Module({
   imports: [
@@ -16,12 +13,17 @@ import { ZonasModule } from './zonas/zonas.module';
       isGlobal: true,
       envFilePath: ['../.env', '.env'],
     }),
-    // change `gestion-salon`: los tres módulos solo exponen sus services por ahora — los
-    // controllers protegidos por guard quedan pendientes hasta que `auth-admin` exista
-    // (ver tasks.md, prerrequisito 1.2).
-    ZonasModule,
-    MesasModule,
-    HorariosModule,
+    // change `gestion-salon`: ZonasModule, MesasModule y HorariosModule (services, sin
+    // controller todavía — ver tasks.md, prerrequisito 1.2) NO se registran acá a
+    // propósito. Importan PrismaModule (@Global()), y AppModule es lo que arranca
+    // `test/app.e2e-spec.ts`, que corre en el job de CI "Tests (backend)" **sin**
+    // PostgreSQL disponible (esa base llega con `ci-integracion-db`) — registrarlos acá
+    // hace que `PrismaService.onModuleInit` intente `$connect()` y ese smoke test falle en
+    // CI. Mismo motivo por el que `ReservasModule` (de `modelo-dominio`, PR #12) tampoco
+    // está registrado: los tests que ejercitan estos módulos los instancian directo con
+    // `Test.createTestingModule({ imports: [PrismaModule, ZonasModule] })`, como ya hacen
+    // `reservas-invariantes.integration-spec.ts` y `mesas.integration-spec.ts`. Se
+    // registran en `AppModule` recién cuando tengan un controller real que exponer.
   ],
   controllers: [AppController],
   providers: [AppService],

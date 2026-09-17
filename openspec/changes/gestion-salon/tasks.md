@@ -31,9 +31,16 @@
 
 - [x] 2.1 Crear `zonas.module.ts`, `dto/actualizar-zona.dto.ts` (`class-validator`, todos los
       campos opcionales) y registrar el módulo en `AppModule`. Verificar que
-      `npm run build -w backend` compila sin errores. **Hecho** — `npm run build -w backend`
-      en verde. Se sumaron `class-validator`/`class-transformer` a `backend/package.json`
-      (avalados por `config.yaml` §2, no existían todavía en el repo).
+      `npm run build -w backend` compila sin errores. **Hecho, con una corrección:** se
+      sumaron `class-validator`/`class-transformer` a `backend/package.json` (avalados por
+      `config.yaml` §2, no existían todavía en el repo). **`ZonasModule` (igual que
+      `MesasModule`/`HorariosModule`) NO se registró en `AppModule`, a propósito** — se
+      había registrado en el primer commit y rompió `test/app.e2e-spec.ts` en CI: importan
+      `PrismaModule` (`@Global()`), y ese smoke test arranca `AppModule` completo en el job
+      "Tests (backend)", que corre **sin** PostgreSQL (llega con `ci-integracion-db`);
+      `PrismaService.onModuleInit` intenta `$connect()` y falla. Mismo motivo por el que
+      `ReservasModule` (PR #12) tampoco está en `AppModule`. Se registra ahí cuando tenga
+      un controller real.
 - [x] 2.2 Implementar `ZonasService.listar()` y `ZonasService.actualizar(id, dto)`, este
       último lanzando `BadRequestException` si el `dto` deja `minComensales > maxComensales`.
       Verificar con tests unitarios: actualización válida persiste los valores, rango inválido
