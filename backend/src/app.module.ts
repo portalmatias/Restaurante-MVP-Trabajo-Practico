@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { HorariosModule } from './horarios/horarios.module';
+import { MesasModule } from './mesas/mesas.module';
+import { ZonasModule } from './zonas/zonas.module';
 
 @Module({
   imports: [
@@ -13,6 +16,12 @@ import { AppService } from './app.service';
       isGlobal: true,
       envFilePath: ['../.env', '.env'],
     }),
+    // change `gestion-salon`: los tres módulos solo exponen sus services por ahora — los
+    // controllers protegidos por guard quedan pendientes hasta que `auth-admin` exista
+    // (ver tasks.md, prerrequisito 1.2).
+    ZonasModule,
+    MesasModule,
+    HorariosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
