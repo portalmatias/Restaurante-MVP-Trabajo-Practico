@@ -19,9 +19,10 @@ guard de `auth-admin`.
   (`minComensales`, `maxComensales`, anticipación mínima/máxima, ventana de cancelación,
   `requiereConfirmacionAdmin`, `aforoMaximo`).
 - **Mesas:** CRUD completo (alta, listado con filtro por zona, edición de capacidad/etiqueta/
-  zona, baja). La baja y el cambio de zona se rechazan si la Mesa tiene Reservas activas
-  (`PENDIENTE`/`CONFIRMADA`) que dependen de ella, para no romper el invariante 1 de
-  `modelo-dominio` (exclusividad mesa+turno+fecha) ni dejar reservas huérfanas.
+  zona, baja). La baja física solo se permite si la Mesa no tiene Reservas asociadas de
+  ningún estado; con Reservas activas o históricas responde `409 Conflict` y conserva tanto
+  la Mesa como las Reservas. El cambio de zona sigue bloqueado por Reservas activas
+  (`PENDIENTE`/`CONFIRMADA`). No se eliminan Reservas en cascada ni se desvincula su Mesa.
 - **Turnos:** alta, listado, edición de horario/día, y activación/desactivación. La
   desactivación es el mecanismo de "baja" (`activo = false`, ya modelado en `modelo-dominio`) en
   vez de un delete físico, porque las Reservas existentes referencian el Turno por FK.

@@ -39,11 +39,15 @@
       con tests unitarios de los tres escenarios de la spec: edición libre de etiqueta/aumento
       de capacidad, reducción de capacidad rechazada, cambio de Zona rechazado.
 - [ ] 3.5 Implementar `MesasService.eliminar(id)`, lanzando `ConflictException` si la Mesa
-      tiene Reservas activas asociadas. Verificar con tests unitarios de ambos casos (baja
-      exitosa, baja rechazada).
+      tiene Reservas asociadas de cualquier estado (`count` sin filtro por estado) y
+      `NotFoundException` si no existe. Eliminar físicamente solo si no tiene Reservas.
+      Traducir `P2003` del DELETE a `ConflictException` y `P2025` a `NotFoundException`.
+      Verificar con tests unitarios los rechazos por cada estado, la baja exitosa, la Mesa
+      inexistente y ambos errores concurrentes; no borrar ni desvincular Reservas.
 - [ ] 3.6 Implementar `MesasController` con `POST`, `GET`, `PATCH /admin/mesas/:id` y
       `DELETE /admin/mesas/:id`, todos protegidos por los guards. Verificar con Supertest
-      contra datos del seed.
+      contra datos del seed. El DELETE responde `204` sin cuerpo al eliminar, `404` si la
+      Mesa no existe y `409` si tiene Reservas asociadas.
 
 ## 4. Módulo Turnos (`backend/src/horarios/`)
 
@@ -74,8 +78,24 @@
       cambio de Zona de una Mesa con Reserva activa rechazado (spec: "Edición de Mesa preserva
       las Reservas activas") — sembrar una Reserva activa de prueba contra la Mesa antes de
       cada caso.
-- [ ] 5.6 Test: baja de Mesa con Reserva activa rechazada, y baja exitosa sin Reservas activas
-      (spec: "Baja de Mesa bloqueada si tiene Reservas activas").
+- [ ] 5.6 Tests e2e contra PostgreSQL real: baja exitosa sin ninguna Reserva (`204`, sin
+      cuerpo y ausente del listado), baja de Mesa inexistente (`404`) y rechazo con `409`
+      para cada estado (`PENDIENTE`, `CONFIRMADA`, `CANCELADA`, `NO_SHOW`). Verificar tras
+      cada rechazo que la Mesa, la Reserva y su relación permanecen intactas (spec: "Baja de
+      Mesa preserva las Reservas activas e históricas").
+- [ ] 5.6.1 Test de integración de la carrera entre consulta y DELETE: sincronizar la
+      inserción de una Reserva después del `count` y antes del DELETE siguiendo la sección
+      "Prueba determinística de la carrera entre consulta y DELETE" del diseño. Usar un spy
+      temporal sobre `prisma.mesa.delete` que espere una barrera y delegue en el método real;
+      confirmar la inserción con un segundo cliente antes de liberar la barrera. Sin sleeps
+      ni resultados/errores simulados. Verificar que la FK real impide la baja y el service
+      lanza `ConflictException` (`409`), conservando ambos registros. Confirmar que la FK usa
+      `ON DELETE RESTRICT`. Acotar explícitamente la espera de la barrera y detectar la
+      terminación anticipada del service con `Promise.race`; cancelar los timers al terminar.
+      Liberar la barrera, consumir el resultado de la operación, restaurar el spy y cerrar
+      clientes con `finally` anidados según el diseño, antes de propagar el fallo. Verificar
+      también la limpieza con una Mesa inexistente que falle antes del DELETE, sin depender
+      del timeout externo de Jest.
 - [ ] 5.7 Test: alta de Turno sin indicar `activo` queda `activo = true` (spec: "Alta de
       Turno").
 - [ ] 5.8 Test: desactivar un Turno lo marca `activo = false` sin eliminarlo y sigue
@@ -88,6 +108,7 @@
 - [ ] 6.2 Agregar a `openapi/openapi.yaml` los paths `/admin/zonas`, `/admin/mesas` y
       `/admin/turnos` (operaciones GET/POST/PATCH/DELETE según corresponda, `security:
       [bearerAuth]` en cada una, y los schemas de request/response), en el mismo PR
-      (Definition of Done, `config.yaml` §13).
+      (Definition of Done, `config.yaml` §13). Documentar en el DELETE de Mesa las respuestas
+      `204` sin cuerpo, `404` y `409` por Reservas asociadas de cualquier estado.
 - [ ] 6.3 Confirmar que no hicieron falta variables de entorno nuevas ni migraciones de
       Prisma — este change no agrega campos a `Zona`, `Mesa` ni `Turno`.
