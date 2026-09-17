@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { DiaSemana, EstadoReserva } from '@prisma/client';
+import { DiaSemana, EstadoReserva, Prisma } from '@prisma/client';
 
 import { MesasModule } from '../src/mesas/mesas.module';
 import { MesasService } from '../src/mesas/mesas.service';
@@ -84,22 +84,43 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
     service = moduleRef.get(MesasService);
     await prisma.$connect();
 
-    const standard = await prisma.zona.upsert({
-      where: { nombre: 'STANDARD' },
-      update: {},
-      create: {
-        nombre: 'STANDARD',
-        minComensales: 1,
-        maxComensales: 8,
-        anticipacionMinHoras: 2,
-        anticipacionMaxDias: 30,
-        ventanaCancelacionHoras: 2,
-        requiereConfirmacionAdmin: false,
-        aforoMaximo: 40,
-      },
-    });
+    // `upsert` no es atómico contra otro proceso haciendo lo mismo: Jest corre cada
+    // *.integration-spec.ts en su propio worker, y este archivo corre en paralelo con
+    // reservas-invariantes.integration-spec.ts, que hace su propio upsert de la misma fila
+    // (Zona.nombre = 'STANDARD' es un valor de enum, efectivamente singleton). Si el otro
+    // proceso gana la carrera y crea la fila primero, este upsert puede chocar contra el
+    // `@unique` — se resuelve re-leyendo en vez de fallar (mismo problema de fondo que la
+    // colisión de Mesa.etiqueta documentada en schema.prisma).
+    const standard = await obtenerOCrearZonaStandard();
     zonaStandardId = standard.id;
   });
+
+  async function obtenerOCrearZonaStandard() {
+    try {
+      return await prisma.zona.upsert({
+        where: { nombre: 'STANDARD' },
+        update: {},
+        create: {
+          nombre: 'STANDARD',
+          minComensales: 1,
+          maxComensales: 8,
+          anticipacionMinHoras: 2,
+          anticipacionMaxDias: 30,
+          ventanaCancelacionHoras: 2,
+          requiereConfirmacionAdmin: false,
+          aforoMaximo: 40,
+        },
+      });
+    } catch (error) {
+      const esColisionDeNombre =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002';
+      if (!esColisionDeNombre) {
+        throw error;
+      }
+      return prisma.zona.findUniqueOrThrow({ where: { nombre: 'STANDARD' } });
+    }
+  }
 
   afterEach(async () => {
     if (reservaIds.length > 0) {

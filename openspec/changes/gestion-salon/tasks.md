@@ -1,13 +1,18 @@
 > **Estado al 2026-09-17 (esta sesión):** se implementaron los tres services (Zonas, Mesas,
 > Horarios) con sus DTOs y tests unitarios — sección 2.1/2.2, 3.1–3.5 y 4.1–4.3, más la
-> cobertura de la sección 5 que ya cubren esos mismos tests. `auth-admin` todavía no existe
-> (`backend/src/auth/`), así que los tres `*Controller*` (2.3, 3.6, 4.4), el test e2e de
-> `401` (5.1) y la actualización de `openapi/openapi.yaml` (6.2, que requiere el controller
-> para no romper `openapi:check`) quedan pendientes hasta que `auth-admin` esté mergeado —
-> ver 1.2. Esta sesión tampoco tuvo Docker disponible para correr Postgres real: se escribió
-> `backend/test/mesas.integration-spec.ts` (baja exitosa, `404`, `409` por cada estado) pero
-> no se pudo ejecutar contra la base de test; la prueba de la carrera de promesas (5.6.1) no
-> se escribió — ver la nota en esa tarea.
+> cobertura de la sección 5 que ya cubren esos mismos tests, incluida la baja de Mesa contra
+> Postgres real (5.6). `auth-admin` todavía no existe (`backend/src/auth/`), así que los tres
+> `*Controller*` (2.3, 3.6, 4.4), el test e2e de `401` (5.1) y la actualización de
+> `openapi/openapi.yaml` (6.2, que requiere el controller para no romper `openapi:check`)
+> quedan pendientes hasta que `auth-admin` esté mergeado — ver 1.2. La prueba de la carrera
+> de promesas (5.6.1) tampoco se escribió — ver la nota en esa tarea.
+>
+> **Nota de entorno para quien retome esto en esta máquina:** hay un Postgres nativo (no
+> Docker) escuchando en el 5432 (`/Library/PostgreSQL/17`), así que `docker compose up -d`
+> tal como está el `docker-compose.yml` del repo va a fallar con "address already in use".
+> Para correr los tests de integración acá, remapear el contenedor a otro puerto local
+> (ej. `5433:5432` en `docker-compose.yml`, sin commitear ese cambio) y apuntar
+> `DATABASE_URL`/`DATABASE_URL_TEST` del `.env` a ese puerto.
 
 ## 1. Prerrequisitos (bloqueante)
 
@@ -102,18 +107,20 @@
       cambio de Zona de una Mesa con Reserva activa rechazado (spec: "Edición de Mesa preserva
       las Reservas activas") — sembrar una Reserva activa de prueba contra la Mesa antes de
       cada caso. **Cubierto** por `mesas.service.spec.ts` (3.4).
-- [ ] 5.6 Tests e2e contra PostgreSQL real: baja exitosa sin ninguna Reserva (`204`, sin
-      cuerpo y ausente del listado), baja de Mesa inexistente (`404`) y rechazo con `409`
-      para cada estado (`PENDIENTE`, `CONFIRMADA`, `CANCELADA`, `NO_SHOW`). Verificar tras
-      cada rechazo que la Mesa, la Reserva y su relación permanecen intactas (spec: "Baja de
-      Mesa preserva las Reservas activas e históricas"). **Parcial:** se escribió
-      `backend/test/mesas.integration-spec.ts` con estos casos contra `MesasService`
-      directamente (sin HTTP, mismo patrón que `reservas-invariantes.integration-spec.ts` —
-      no hay controller todavía, ver 3.6). `npm run typecheck` y la carga del archivo por
-      `ts-jest` pasan, pero esta sesión no tuvo Docker/Postgres disponible para correr
-      `npm run test:integration -w backend` y confirmar que los tests realmente pasan contra
-      la base de test. Falta correrlo localmente (`docker compose up -d && npm run
-      test:integration -w backend`) antes de dar esto por cerrado.
+- [x] 5.6 Tests de integración contra PostgreSQL real: baja exitosa sin ninguna Reserva
+      (ausente del listado), baja de Mesa inexistente (`NotFoundException`) y rechazo con
+      `ConflictException` para cada estado (`PENDIENTE`, `CONFIRMADA`, `CANCELADA`,
+      `NO_SHOW`). Verificar tras cada rechazo que la Mesa, la Reserva y su relación
+      permanecen intactas (spec: "Baja de Mesa preserva las Reservas activas e históricas").
+      **Hecho y confirmado** contra Postgres real — `backend/test/mesas.integration-spec.ts`
+      contra `MesasService` directamente (sin HTTP: no hay controller todavía, ver 3.6),
+      mismo patrón que `reservas-invariantes.integration-spec.ts`. `npm run test:integration
+      -w backend`: 21/21 en verde (3 suites), repetido 4 veces sin flaky. La corrida real
+      expuso y corrigió un bug genuino en el `beforeAll` del test: dos
+      `*.integration-spec.ts` corriendo en paralelo (workers de Jest) hacían `upsert` de la
+      misma fila `Zona.nombre = 'STANDARD'` — se resolvió reintentando con `findUniqueOrThrow`
+      ante un `P2002`. El HTTP real (`204`/`404`/`409` vía Supertest) sigue pendiente hasta
+      que exista el controller.
 - [ ] 5.6.1 Test de integración de la carrera entre consulta y DELETE: sincronizar la
       inserción de una Reserva después del `count` y antes del DELETE siguiendo la sección
       "Prueba determinística de la carrera entre consulta y DELETE" del diseño. Usar un spy
