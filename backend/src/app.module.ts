@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
+import { ReservasModule } from './reservas/reservas.module';
 
 @Module({
   imports: [
@@ -13,8 +17,27 @@ import { AppService } from './app.service';
       isGlobal: true,
       envFilePath: ['../.env', '.env'],
     }),
+    // THROTTLE_TTL/THROTTLE_LIMIT (config.yaml §10) son el default global; `/auth/login`
+    // lo sobreescribe con un límite más estricto vía @Throttle() (design.md de auth-admin).
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: Number(config.getOrThrow<string>('THROTTLE_TTL')) * 1000,
+          limit: Number(config.getOrThrow<string>('THROTTLE_LIMIT')),
+        },
+      ],
+    }),
+    AuthModule,
+    ReservasModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
