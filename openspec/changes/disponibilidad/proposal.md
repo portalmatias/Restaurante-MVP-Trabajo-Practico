@@ -26,12 +26,13 @@ Fase 3, antes de que `reservas-crear` escriba su propia versión.
 - Una query mal formada responde `400` y un turno o una zona inexistentes responden `404`.
   Este endpoint nunca responde `409` ni `422`.
 - `fecha` es una **fecha de calendario local del restaurante** en formato `YYYY-MM-DD`, sin
-  hora. El inicio del turno se interpreta en la zona horaria IANA del restaurante, así que el
+  hora. El inicio del turno se interpreta en hora local de Argentina (UTC-3 fijo), así que el
   día de la semana y la anticipación se calculan sobre el calendario local y no sobre UTC.
 - Se crea el módulo `backend/src/disponibilidad/` con el validador compartido: un cargador de
-  contexto (el único punto que lee la base), las reglas como función pura, un helper de zona
-  horaria sin librerías y el lock de creación por `(turno, fecha)`. El módulo exporta esas
-  piezas para que `reservas-crear` las use en lugar de reimplementarlas.
+  contexto (el único punto que lee la base), las reglas como función pura y el lock de creación por `(turno, fecha)`. El módulo exporta esas
+  piezas para que `reservas-crear` las use en lugar de reimplementarlas. El helper
+  `inicioTurnoUtc` (fecha más hora local a instante UTC, sin librerías) va en
+  `backend/src/common/timezone.ts`, junto a `diaSemanaDeFecha` de #12.
 - **Contradicciones entre `requerimientos-mvp.docx` y `config.yaml` que este change resuelve:**
   - *Aforo global.* El docx solo menciona el aforo de zona (RN-04) y el invariante 4 de §6
     habla solo de la zona, pero §6 "Aforo" lo define como tope duro global y por zona. Se
@@ -72,30 +73,31 @@ Fase 3, antes de que `reservas-crear` escriba su propia versión.
 
 ### Modified Capabilities
 _Ninguna._ `modelo-dominio` todavía no está archivada en `openspec/specs/`, y este change
-consume sus entidades sin cambiarles requisitos. El campo de zona horaria es una dependencia
-pedida a ese change (ver Impact), no un delta de este.
+consume sus entidades sin cambiarles requisitos. La zona horaria (UTC-3 fijo) es una decisión
+de ese change (ver Impact), no un delta de este.
 
 ## Impact
 
 - **Depende de:**
   - **PR #12 (`modelo-dominio`)**: schema de Prisma, seed y `PrismaService`. Sin ese merge
     no hay nada que consultar.
-  - **Zona horaria del restaurante**: se le pidió a FedeWerk en #12 un campo
-    `ConfiguracionNegocio.zonaHoraria` (IANA, seed `America/Argentina/Buenos_Aires`) y la
-    aclaración en §7 de que los horarios de `Turno` son hora local. Si #12 se mergea sin ese
-    campo, el PR de implementación de este change lo agrega con su propia migración (plan B
-    en `design.md`).
+  - **Zona horaria del restaurante**: #12 fija como decisión del equipo que los horarios de
+    `Turno` son hora local de Argentina (`America/Argentina/Buenos_Aires`, UTC-3 fijo, sin
+    horario de verano desde 2009) y lo deja en §7. No hay campo `zonaHoraria` en
+    `ConfiguracionNegocio`, así que este change no agrega migraciones. También reusa
+    `backend/src/common/timezone.ts` de #12.
   - **`ci-integracion-db`**: para que los e2e con Supertest y el test de integración del lock
     corran en CI.
 - **Desbloquea:** `reservas-crear`, que toma el lock, el cargador y las reglas de este módulo.
   También el formulario con disponibilidad en vivo del frontend (RF-22).
 - **Código afectado (en la implementación):** `backend/src/disponibilidad/` (module,
-  controller, service, DTOs, cargador, reglas, helper de zona horaria, lock) y sus tests
-  `*.spec.ts`, más `backend/test/disponibilidad.e2e-spec.ts`. No toca `backend/src/reservas/`.
+  controller, service, DTOs, cargador, reglas, lock) y sus tests `*.spec.ts`,
+  `inicioTurnoUtc` en `backend/src/common/timezone.ts` con su `timezone.spec.ts`, más
+  `backend/test/disponibilidad.e2e-spec.ts`. No toca `backend/src/reservas/`.
 - **API / `openapi/openapi.yaml`:** agrega `GET /disponibilidad` y los schemas
   `DisponibilidadRespuesta`, `MotivoNoDisponible`, `CodigoMotivo` y `ErrorRespuesta`. En
   **este** PR de spec el fragmento vive en `design.md` y no en el YAML, porque el chequeo de
   deriva (`npm run openapi:check`) pondría CI en rojo con un path sin controller. Se copia al
   YAML en el PR de implementación, junto con el controller.
-- **Dependencias npm:** ninguna librería de fechas. La conversión de zona horaria usa `Intl`,
-  que viene con Node.
+- **Dependencias npm:** ninguna librería de fechas. La conversión a UTC suma un offset fijo de
+  3 h con getters `getUTC*`, sin `Intl` ni datos de zonas horarias.

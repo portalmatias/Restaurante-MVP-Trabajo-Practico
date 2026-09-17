@@ -9,7 +9,7 @@ anticipación de 2 horas a 30 días, aforo 40, mesas de capacidad 2, 2, 4, 6 y 8
 (2 a 12 comensales, anticipación de 24 horas a 60 días, aforo 20, mesas de capacidad 2, 4, 6
 y 12), aforo global 60, turnos almuerzo 12:00–15:00 y cena 20:00–23:30 de martes a domingo
 y turnos del lunes inactivos. Las horas son hora local del restaurante
-(`America/Argentina/Buenos_Aires`, UTC-3). Salvo que un escenario diga otra cosa, no hay
+(`America/Argentina/Buenos_Aires`, UTC-3 fijo). Salvo que un escenario diga otra cosa, no hay
 reservas activas para el turno y la fecha consultados.
 
 ## ADDED Requirements
@@ -274,10 +274,10 @@ Si el cálculo da negativo, SHALL devolver 0.
 
 ### Requirement: Fecha de calendario y zona horaria del restaurante
 El sistema SHALL interpretar `fecha` como una fecha de calendario local del restaurante, y el
-inicio del turno como esa fecha más la hora de inicio del turno en la zona horaria
-configurada del restaurante. El día de la semana y las reservas que cuentan para la ocupación
-SHALL tomarse de esa fecha local, nunca de la fecha UTC del inicio o del fin del turno. El
-resultado SHALL ser el mismo sin importar la zona horaria del proceso del servidor.
+inicio del turno como esa fecha más la hora de inicio del turno en hora local de Argentina
+(`America/Argentina/Buenos_Aires`, UTC-3 fijo, sin horario de verano). El día de la semana y
+las reservas que cuentan para la ocupación SHALL tomarse de esa fecha local, nunca de la fecha
+UTC del inicio o del fin del turno. El resultado SHALL ser el mismo sin importar la zona horaria del proceso del servidor.
 
 #### Scenario: Cena que termina al día siguiente en UTC
 - **WHEN** se consulta la cena del sábado (20:00–23:30 hora local, es decir
@@ -307,6 +307,13 @@ resultado SHALL ser el mismo sin importar la zona horaria del proceso del servid
   `comensales=2`
 - **AND** el instante actual es 2026-09-19 22:00 hora local (2026-09-20T01:00Z)
 - **THEN** `motivos` contiene exactamente `ANTICIPACION_MINIMA`
+
+#### Scenario: Turno cuyo inicio en UTC cae al día siguiente
+- **WHEN** el turno de cena del sábado está configurado de 22:00 a 23:30 hora local
+- **AND** se consulta con `fecha=2026-09-19`, zona STANDARD y `comensales=2`
+- **AND** el instante actual es 2026-09-19 20:00 hora local (2026-09-19T23:00Z)
+- **THEN** `motivos` no contiene `TURNO_NO_CORRESPONDE_A_FECHA` ni `ANTICIPACION_MINIMA`,
+  porque el turno empieza a las 2026-09-20T01:00Z, exactamente 2 horas después
 
 #### Scenario: Mismo resultado con el servidor en UTC o en Buenos Aires
 - **WHEN** se hace la misma consulta de la cena del sábado con `fecha=2026-09-19`, con el

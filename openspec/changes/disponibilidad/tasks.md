@@ -5,13 +5,10 @@
       `git log origin/main --oneline | grep -i modelo` y confirmando que
       `backend/prisma/schema.prisma` tiene `Turno`, `Reserva` y `ConfiguracionNegocio`, y que
       `npm run db:migrate -w backend` y `npm run db:seed -w backend` corren sin errores.
-- [ ] 1.2 Confirmar que `ConfiguracionNegocio` tiene `zonaHoraria` (IANA) con seed
-      `America/Argentina/Buenos_Aires`. Si no lo tiene, aplicar el plan B de `design.md`
-      (Migration Plan): agregar el campo con default, generar la migración con
-      `--create-only`, revisar que el SQL no toque el índice único parcial de `Reserva` y
-      actualizar el `upsert` de `seed.ts`. Verificar con `npx prisma migrate status` (dentro de
-      `backend/`) sin migraciones pendientes y con una consulta a la fila `id = 1` que devuelva
-      la zona horaria.
+- [ ] 1.2 Confirmar que `backend/src/common/timezone.ts` existe en `main` con
+      `diaSemanaDeFecha`, y anotar si ya trae una función de fecha más hora local a UTC
+      equivalente a `inicioTurnoUtc` (D5). Verificar con
+      `grep -n "export" backend/src/common/timezone.ts`.
 - [ ] 1.3 Si ni #12 ni `auth-admin` los agregaron, sumar `class-validator` y
       `class-transformer` a `backend/` y registrar un `ValidationPipe` global con
       `transform: true` en `main.ts` (D8). Verificar que `npm run build -w backend` compila y
@@ -22,20 +19,21 @@
 
 ## 2. Zona horaria: tests primero, después `inicioTurnoUtc`
 
-- [ ] 2.1 Escribir `backend/src/disponibilidad/zona-horaria.spec.ts` **antes** de la
-      implementación, con una función `inicioTurnoUtc` que por ahora solo lanza un error. Casos:
-      `2026-09-19` + `12:00` en Buenos Aires da `2026-09-19T15:00:00Z`; `+ 20:00` da
-      `2026-09-19T23:00:00Z`; `2026-09-20` + `23:30` da `2026-09-21T02:30:00Z` (cruce de
-      medianoche UTC); `2009-01-15` + `12:00` da `2009-01-15T14:00:00Z` (horario de verano
-      histórico); `America/New_York` `2026-03-08` + `03:30` da `2026-03-08T07:30:00Z`. Sumar
-      los casos del día de la semana con `getUTCDay`: `2026-09-19` da `SABADO` y
+- [ ] 2.1 Escribir `backend/src/common/timezone.spec.ts` **antes** de la
+      implementación, con una función `inicioTurnoUtc` que por ahora solo lanza un error (si
+      1.2 encontró una equivalente, los tests apuntan a esa). Casos: almuerzo `2026-09-19` +
+      `12:00` da `2026-09-19T15:00:00Z`; `+ 20:00` da `2026-09-19T23:00:00Z`; cena del sábado
+      `2026-09-19` + `22:00` da `2026-09-20T01:00:00Z` (el instante UTC cae al día
+      siguiente); y que los resultados son idénticos con el proceso en `TZ=UTC` y en
+      `TZ=America/Argentina/Buenos_Aires` (comandos de 2.2). Sumar los casos del día de la
+      semana con `diaSemanaDeFecha` y el mapeo al enum: `2026-09-19` da `SABADO` y
       `2026-09-21` da `LUNES`. Verificar que la suite corre y falla (rojo).
-- [ ] 2.2 Implementar `inicioTurnoUtc(fecha, horaInicio, zonaHoraria)` con
-      `Intl.DateTimeFormat(...).formatToParts` y la segunda pasada, más el mapeo de
-      `getUTCDay()` al enum `DiaSemana` (D5, Trampas de fechas). Verificar en Git Bash que la
-      suite de 2.1 pasa con las dos zonas horarias:
-      `TZ=UTC npm test -w backend -- zona-horaria` y
-      `TZ=America/Argentina/Buenos_Aires npm test -w backend -- zona-horaria`.
+- [ ] 2.2 Implementar `inicioTurnoUtc(fecha, horaInicio)` en `backend/src/common/timezone.ts`
+      con offset fijo -3 h (reusar si #12 ya la trae), solo con getters `getUTC*`, más el
+      mapeo de `diaSemanaDeFecha` al enum `DiaSemana` (D5, Trampas de fechas). Verificar en
+      Git Bash que la suite de 2.1 pasa con las dos zonas horarias:
+      `TZ=UTC npm test -w backend -- timezone` y
+      `TZ=America/Argentina/Buenos_Aires npm test -w backend -- timezone`.
 
 ## 3. Reglas: tests primero, después `evaluarReglas`
 
@@ -60,7 +58,9 @@
       `min(zona, global)`, sin restar lo solicitado (20, no 8) y 0 cuando el aforo quedó por
       debajo de lo ocupado; cena del sábado con `ahora` a las 18:00 local permitida (2 h
       exactas contra 23:00Z) y a las 22:00 local (`2026-09-20T01:00Z`) con
-      `ANTICIPACION_MINIMA`. Verificar que la suite falla (rojo).
+      `ANTICIPACION_MINIMA`; turno configurado a las 22:00 local con `ahora` a las 20:00 local
+      permitido (2 h exactas contra `2026-09-20T01:00Z`, sin `TURNO_NO_CORRESPONDE_A_FECHA`).
+      Verificar que la suite falla (rojo).
 - [ ] 3.5 Implementar `evaluarReglas` y `calcularLugaresRestantes` como funciones puras (D1,
       D2). Verificar que toda la suite de 3.2–3.4 pasa con `TZ=UTC` y con
       `TZ=America/Argentina/Buenos_Aires` (mismos comandos que 2.2, filtrando por
@@ -153,13 +153,12 @@
 
 - [ ] 9.1 `openspec validate disponibilidad --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
-- [ ] 9.2 Si se aplicó el plan B de 1.2, la migración está generada y commiteada (nunca
-      `db push`) y el índice parcial de `Reserva` sigue intacto. Verificar con
-      `npx prisma migrate status` y leyendo el `migration.sql` nuevo.
+- [ ] 9.2 El change no agrega migraciones ni toca `schema.prisma` (D5, Migration Plan).
+      Verificar con `git diff main --stat -- backend/prisma` vacío.
 - [ ] 9.3 `openapi/openapi.yaml` actualizado en el mismo PR. Verificar con
       `npm run openapi:lint` y `npm run openapi:check` en verde.
-- [ ] 9.4 No se agregaron variables de entorno (la zona horaria es un dato de
-      `ConfiguracionNegocio`, no de `.env`). Verificar con `git diff main -- .env.example`
+- [ ] 9.4 No se agregaron variables de entorno (la zona horaria es UTC-3 fijo por decisión
+      del equipo en #12, no se configura por `.env`). Verificar con `git diff main -- .env.example`
       vacío. Si alguna hizo falta, sumarla ahí.
 - [ ] 9.5 Tests de las reglas del §6 que toca el change: `npm test -w backend` en verde con
       `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`, y `npm run test:e2e -w backend` en
