@@ -1,0 +1,154 @@
+// Modelo de dominio del sistema de reservas — change `modelo-dominio`.
+// Ver openspec/changes/modelo-dominio/design.md para las decisiones detrás de cada modelo
+// y de cómo se hace cumplir cada invariante (constraint de base vs. validación de servicio).
+//
+// IMPORTANTE — invariante 1 (exclusividad mesa+turno+fecha): el `@@unique` de abajo en
+// `Reserva` es una aproximación del DSL de Prisma, que no soporta una condición `WHERE` en
+// un índice único. El índice realmente aplicado en la base es PARCIAL (solo bloquea
+// combinaciones con estado PENDIENTE/CONFIRMADA) y se edita a mano en el SQL de la
+// migración inicial — ver backend/prisma/migrations/*_init_modelo_dominio/migration.sql.
+// Por eso este archivo y esa migración quedan intencionalmente "desincronizados": si
+// alguien corre `prisma migrate dev` de nuevo sin revisar el diff, Prisma va a intentar
+// "reparar" el índice a su versión no-parcial y hay que rechazar ese diff (ver Risks en
+// design.md).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Único rol implementado en el MVP. El enum queda preparado para sumar roles a futuro
+/// (config.yaml §5) sin necesitar otra migración de tipo.
+enum RolUsuario {
+  ADMIN
+}
+
+/// Zonas del salón del MVP (config.yaml §6).
+enum NombreZona {
+  STANDARD
+  VIP
+}
+
+/// Estados posibles de una Reserva. Las transiciones válidas se hacen cumplir en el
+/// service (`transicionarEstado`), no acá — ver design.md, invariante 5.
+enum EstadoReserva {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  NO_SHOW
+}
+
+/// Día de la semana de un Turno.
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+/// Administrador del sistema. Único usuario con cuenta — el cliente reserva sin cuenta
+/// (config.yaml §5).
+model Usuario {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  /// Hash de la contraseña (bcrypt). Nunca se persiste ni se loguea en texto plano.
+  passwordHash String
+  rol          RolUsuario @default(ADMIN)
+  createdAt    DateTime   @default(now())
+}
+
+/// Sector del salón. Los valores numéricos de reglas de negocio (anticipación, rango de
+/// comensales, ventana de cancelación, aforo) son datos de configuración, nunca
+/// constantes en el código (config.yaml §6, §14).
+model Zona {
+  id                        String     @id @default(uuid())
+  nombre                    NombreZona @unique
+  minComensales             Int
+  maxComensales             Int
+  anticipacionMinHoras      Int
+  anticipacionMaxDias       Int
+  ventanaCancelacionHoras   Int
+  requiereConfirmacionAdmin Boolean    @default(false)
+  /// Aforo máximo de comensales simultáneos para esta Zona (invariante 4).
+  aforoMaximo               Int
+  mesas                     Mesa[]
+}
+
+/// Unidad física asignable. Pertenece a exactamente una Zona (invariante 3).
+model Mesa {
+  id        String    @id @default(uuid())
+  zonaId    String
+  zona      Zona      @relation(fields: [zonaId], references: [id])
+  capacidad Int
+  /// Identificador legible para el admin (ej. "M12"), no es una clave técnica pero sí debe
+  /// ser único: el seed lo usa como clave natural para hacer upsert de forma idempotente
+  /// (sin este @@unique, dos corridas concurrentes del seed podían crear la misma mesa
+  /// duplicada — ver hallazgo de review del PR #12).
+  etiqueta  String    @unique
+  reservas  Reserva[]
+
+  @@index([zonaId])
+}
+
+/// Franja horaria de servicio (ej. almuerzo 12:00–15:00). Un Turno inactivo no admite
+/// Reservas (invariante 3).
+model Turno {
+  id         String    @id @default(uuid())
+  diaSemana  DiaSemana
+  horaInicio DateTime  @db.Time
+  horaFin    DateTime  @db.Time
+  activo     Boolean   @default(true)
+  reservas   Reserva[]
+
+  // Clave natural usada por el seed para el upsert idempotente (design.md → Seed
+  // idempotente): un mismo día no puede tener dos turnos que arrancan a la misma hora.
+  @@unique([diaSemana, horaInicio])
+}
+
+/// Solicitud de un cliente sin cuenta para ocupar una Mesa en una fecha y Turno.
+/// El campo `estado` SOLO se escribe desde el método `transicionarEstado` del service
+/// (design.md, invariante 5) — nunca con un `update` genérico.
+model Reserva {
+  id        String        @id @default(uuid())
+  mesaId    String
+  mesa      Mesa          @relation(fields: [mesaId], references: [id])
+  turnoId   String
+  turno     Turno         @relation(fields: [turnoId], references: [id])
+  fecha     DateTime      @db.Date
+  comensales Int
+  estado    EstadoReserva @default(PENDIENTE)
+
+  // Datos de contacto del cliente sin cuenta (config.yaml §5).
+  nombreCliente   String
+  emailCliente    String
+  telefonoCliente String
+
+  /// Código alfanumérico de 8 caracteres, único, que junto al email permite al cliente
+  /// consultar o cancelar su Reserva sin cuenta (config.yaml §5).
+  codigoReserva String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Ver el comentario al inicio del archivo: la garantía real de este invariante es el
+  // índice único PARCIAL (con WHERE por estado activo) editado a mano en la migración, no
+  // este `@@unique` sin condición — el DSL de Prisma no soporta `WHERE` en índices únicos.
+  @@unique([mesaId, turnoId, fecha])
+}
+
+/// Fila única (singleton) con valores de configuración global del negocio que no son
+/// específicos de una Zona. design.md documenta por qué se eligió una fila tipada en vez
+/// de una tabla clave/valor.
+model ConfiguracionNegocio {
+  id          Int      @id @default(1)
+  /// Aforo máximo global de comensales simultáneos, independiente del aforo por Zona.
+  aforoGlobal Int
+  updatedAt   DateTime @updatedAt
+}

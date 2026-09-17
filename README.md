@@ -19,14 +19,18 @@ constitución del repo. El orden de trabajo está en [`docs/roadmap-mvp.md`](doc
 ```bash
 git clone <repo> && cd <repo>
 cp .env.example .env          # completar valores locales
+cp .env.example backend/.env  # Prisma CLI corre con cwd=backend/, busca su propio .env ahí
 npm install                   # instala todos los workspaces
 docker compose up -d          # levanta PostgreSQL
+npm run db:migrate -w backend # aplica las migraciones de Prisma
+npm run db:seed -w backend    # carga datos de prueba (admin, zonas, mesas, turnos, reservas)
 npm run dev                   # levanta backend y frontend
 ```
 
-> **Todavía no corras `npm run db:migrate` ni `npm run db:seed`.** Esos scripts no existen
-> aún: llegan con el change `modelo-dominio`, que es el que introduce `schema.prisma`, las
-> migraciones y el seed. Hasta entonces el backend levanta sin tocar la base.
+> **Por qué hay dos copias de `.env`:** el backend en tiempo de ejecución (`ConfigModule`)
+> busca `.env` tanto en la raíz como en `backend/`, pero el Prisma CLI (`db:migrate`,
+> `db:seed`) corre con el working directory en `backend/` y solo mira ahí. Ambos archivos
+> están en `.gitignore` — nunca se commitean.
 
 ## Puertos y bases
 
@@ -53,8 +57,11 @@ Todo se corre desde la raíz del repo.
 | `npm run typecheck` | `tsc --noEmit` sobre los dos workspaces |
 | `npm run test -w backend` | Tests unitarios del backend (Jest) |
 | `npm run test:e2e` | Tests e2e del backend (`backend/test/*.e2e-spec.ts`) |
+| `npm run test:integration -w backend` | Tests de integración contra PostgreSQL real (`backend/test/*.integration-spec.ts`). Requiere tener PostgreSQL levantado (`docker compose up -d`) |
 | `npm run test:scripts` | Tests de las utilidades de `scripts/` (`node --test`) |
 | `npm run build -w backend` | Compila el backend |
+| `npm run db:migrate -w backend` | Aplica las migraciones de Prisma (`prisma migrate dev`) |
+| `npm run db:seed -w backend` | Corre el seed idempotente (`backend/prisma/seed.ts`) |
 | `npm run openapi:lint` | Lintea el contrato con Spectral |
 | `npm run openapi:check` | Verifica que el backend no se desvíe del contrato |
 
@@ -99,9 +106,12 @@ Si agregás o cambiás un endpoint: **primero el YAML, después el código.**
 
 Un PR con CI en rojo no se mergea, aunque funcione localmente.
 
-> El job `test` **todavía no levanta PostgreSQL**: en esta etapa no existen migraciones ni
-> seed. Los tests de integración contra base real se suman en el change `ci-integracion-db`,
-> justo después de `modelo-dominio`.
+> Las migraciones y el seed ya existen (change `modelo-dominio`), pero el job `test` de CI
+> **todavía no levanta PostgreSQL**: `npm run test:integration -w backend` (los tests contra
+> base real, como `reservas-invariantes.integration-spec.ts`) hoy corre solo localmente, no en
+> CI. Conectar ese comando a CI con un service container de Postgres es exactamente el
+> alcance completo del próximo change, `ci-integracion-db` — no puede ir en este PR porque
+> tocaría `.github/workflows/`, prohibido para un PR de feature (`openspec/config.yaml` §14).
 
 ## Cómo se trabaja acá
 
@@ -126,3 +136,22 @@ El backend carga ese `.env` con `ConfigModule` de `@nestjs/config`, registrado c
 `AppModule`. Busca el archivo en la raíz del monorepo y también en `backend/`, así que funciona
 igual corriendo `npm run dev` desde la raíz que `npm run start:dev -w backend`. Las variables
 quedan disponibles en `process.env` y vía `ConfigService`.
+
+## Modelo de datos y datos de prueba (seed)
+
+El modelo de dominio (`Usuario`, `Zona`, `Mesa`, `Turno`, `Reserva`, `ConfiguracionNegocio`)
+vive en [`backend/prisma/schema.prisma`](backend/prisma/schema.prisma) — ver el change de
+OpenSpec `modelo-dominio` para el diseño completo, en particular cómo se hace cumplir cada
+uno de los cinco invariantes de negocio (`openspec/config.yaml` §6).
+
+Después de correr `npm run db:seed -w backend`, la base de desarrollo queda con:
+
+- Un usuario admin de prueba: `admin@restaurante-mvp.local` / `AdminMVP2026!`. No es un
+  secreto real — es solo para loguearse en tu entorno local; nunca se usa en producción.
+- Las zonas `STANDARD` y `VIP` con los rangos de comensales, anticipación y ventana de
+  cancelación de `config.yaml` §6.
+- Mesas de capacidades variadas en cada zona, los turnos de almuerzo/cena (activos de
+  martes a domingo, inactivos los lunes) y algunas reservas de ejemplo en distintos estados.
+
+Los valores de aforo (`aforoMaximo` 40 para `STANDARD`, 20 para `VIP`, `aforoGlobal` 60) están
+confirmados por el equipo y documentados en `openspec/config.yaml` §6.

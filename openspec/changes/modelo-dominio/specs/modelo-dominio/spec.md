@@ -104,6 +104,16 @@ a la Zona solicitada.
 - **AND** la Mesa elegida pertenece a la Zona STANDARD
 - **THEN** el sistema rechaza la Reserva
 
+### Requirement: Invariante — turno coincide con el día de la semana de la reserva
+El sistema SHALL exigir que el día de la semana de la fecha de una Reserva coincida con el
+`diaSemana` del `Turno` seleccionado. Una reserva para un lunes no puede usar un turno de
+martes, ni viceversa.
+
+#### Scenario: Reserva con fecha en día distinto al del turno rechazada
+- **WHEN** se intenta crear una Reserva con `fecha` que cae en lunes
+- **AND** el `Turno` seleccionado tiene `diaSemana = MARTES`
+- **THEN** el sistema rechaza la Reserva
+
 ### Requirement: Invariante — aforo de zona respetado
 El sistema SHALL impedir que la suma de comensales de las Reservas activas de un Turno supere
 el aforo configurado de la Zona correspondiente, incluso si existe una Mesa físicamente
@@ -113,6 +123,17 @@ libre.
 - **WHEN** el aforo restante de una Zona para un Turno y una fecha es menor a los comensales
   solicitados
 - **THEN** el sistema rechaza la nueva Reserva aunque haya una Mesa disponible
+
+### Requirement: Invariante — aforo global respetado
+El sistema SHALL impedir que la suma de comensales de las Reservas activas de un Turno y una
+fecha, sumando **todas** las Zonas, supere el `aforoGlobal` configurado en
+`ConfiguracionNegocio`, incluso si el aforo de cada Zona individual todavía no se superó.
+
+#### Scenario: Reserva que excede el aforo global rechazada aunque el aforo de su Zona alcance
+- **WHEN** la suma de comensales activos de todas las Zonas para un Turno y una fecha, más los
+  comensales solicitados, supera el `aforoGlobal` configurado
+- **AND** el aforo restante de la Zona solicitada individualmente todavía alcanzaría
+- **THEN** el sistema rechaza la nueva Reserva
 
 ### Requirement: Invariante — estados terminales no retroceden
 El sistema SHALL impedir que una Reserva en estado `CANCELADA` o `NO_SHOW` transicione a
