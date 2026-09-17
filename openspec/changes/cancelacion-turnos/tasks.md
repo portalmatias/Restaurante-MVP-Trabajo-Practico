@@ -7,13 +7,11 @@
 - [ ] 1.2 Confirmar si `reserva-consultar` ya está implementado. Si existe una función de
       búsqueda de Reserva por código + email, reutilizarla en la sección 2 en vez de
       duplicarla (ver `design.md` — comparten servicio).
-- [ ] 1.3 Confirmar que `disponibilidad` está mergeado y localizar `inicioTurnoUtc` (nace en
-      `backend/src/disponibilidad/zona-horaria.ts` según su `tasks.md`; puede haberse movido a
-      un módulo compartido). Confirmar también que `ConfiguracionNegocio.zonaHoraria` existe en
-      el schema y está configurado en el seed (`modelo-dominio` o plan B de `disponibilidad`);
-      si falta cualquiera de las dos
-      cosas, no continuar con las secciones 2.2/3.1 — son un prerrequisito real, no solo una
-      referencia (ver `design.md`, corrección post-review).
+- [ ] 1.3 Confirmar que `backend/src/common/timezone.ts` existe en `main` (lo trajo #12) y
+      revisar la firma vigente de `inicioTurnoUtc(fecha, horaInicio)` y
+      `finTurnoUtc(fecha, horaInicio, horaFin)` — ninguna recibe zona horaria, no existe
+      `ConfiguracionNegocio.zonaHoraria` (ver `design.md`, segunda corrección). Si la firma
+      cambió, ajustar las tareas 2.2 y 3.1 antes de escribir código.
 
 ## 2. Cancelación por el cliente
 
@@ -22,13 +20,12 @@
 - [ ] 2.2 Implementar `ReservasService.cancelar(codigo, email)`: busca la Reserva por código,
       responde `404 Not Found` genérico si no existe o el email no coincide, rechaza con
       `409 Conflict` si no está `PENDIENTE`/`CONFIRMADA`, calcula el inicio real del Turno con
-      `inicioTurnoUtc(reserva.fecha, turno.horaInicio, configuracion.zonaHoraria)` (de
-      `disponibilidad`, no reimplementar — ver `design.md`) y rechaza si a ese instante le
-      quedan menos horas que `Zona.ventanaCancelacionHoras`, y transiciona a `CANCELADA` por el
-      único punto de escritura de estado. Verificar con tests unitarios de cada rechazo y del
-      caso exitoso, incluyendo el límite exacto de la ventana (permitido) y un instante después
-      del límite (rechazado); correr la suite con `TZ=UTC` y con
-      `TZ=America/Argentina/Buenos_Aires` (mismo patrón que D9 de `disponibilidad`).
+      `inicioTurnoUtc(reserva.fecha, turno.horaInicio)` (de `backend/src/common/timezone.ts`,
+      no reimplementar — ver `design.md`) y rechaza si a ese instante le quedan menos horas que
+      `Zona.ventanaCancelacionHoras`, y transiciona a `CANCELADA` por el único punto de
+      escritura de estado. Verificar con tests unitarios de cada rechazo y del caso exitoso,
+      incluyendo el límite exacto de la ventana (permitido) y un instante después del límite
+      (rechazado); correr la suite con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
 - [ ] 2.3 Implementar `POST /reservas/:codigo/cancelar` en `ReservasController`, sin guard
       (ruta pública). Verificar con Supertest contra una Reserva de prueba.
 - [ ] 2.4 Verificar el registro de `ThrottlerModule` y su guard; reutilizarlos si existen o
@@ -39,11 +36,10 @@
 ## 3. Marcado de NO_SHOW (admin)
 
 - [ ] 3.1 Implementar `ReservasService.marcarNoShow(id)`: rechaza con `409 Conflict` si la
-      Reserva no existe (`404`) o no está `CONFIRMADA` (`409`); calcular `fechaFin` avanzando
-      un día de calendario si `horaFin < horaInicio`, según el diseño, y el fin real con
-      `inicioTurnoUtc(fechaFin, turno.horaFin, configuracion.zonaHoraria)` (de
-      `disponibilidad`, no combinar `fecha` + `horaFin` como si ya fueran UTC — ver
-      `design.md`) y rechazar si `ahora <= finTurnoUtc`, y transicionar a `NO_SHOW` por el
+      Reserva no existe (`404`) o no está `CONFIRMADA` (`409`); calcula el fin real del Turno
+      con `finTurnoUtc(reserva.fecha, turno.horaInicio, turno.horaFin)` (de
+      `backend/src/common/timezone.ts` — ya resuelve el cruce de medianoche, no reimplementarlo
+      — ver `design.md`) y rechaza si `ahora <= finTurnoUtc`, y transiciona a `NO_SHOW` por el
       único punto de escritura de estado. Verificar con tests unitarios de cada rechazo y del
       caso exitoso, incluyendo el turno de cena (20:00–23:30 local) que cruza medianoche en
       UTC; correr la suite con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.

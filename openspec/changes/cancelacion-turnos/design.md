@@ -9,9 +9,15 @@ Reservas reales sobre las que operar. La spec no necesita ninguna de las dos.
 **Corrección post-review (2026-09-15, comentario de portalmatias en PR #16):** la primera
 versión de este documento asumía que `Turno.horaInicio`/`horaFin` ya estaban en UTC. Es
 incorrecto: son **hora local del restaurante** (la cena 20:00–23:30 es hora de Buenos Aires).
-La spec de `disponibilidad` (PR #19, mergeado; implementación pendiente) define esta conversión para el resto del
-sistema con el helper `inicioTurnoUtc` (su `design.md`, decisión D5); este change lo reutiliza
-en vez de reinventar la conversión, ver más abajo.
+
+**Segunda corrección (2026-09-17, tras el merge de #12 y #21):** el equipo descartó la zona
+horaria IANA configurable que proponía la primera versión de `disponibilidad` (D5) y decidió
+un **offset fijo UTC-3** (Argentina no usa horario de verano desde 2009). El helper vive en
+`backend/src/common/timezone.ts` — lo trajo #12, no `disponibilidad` — como
+`inicioTurnoUtc(fecha, horaInicio)` y `finTurnoUtc(fecha, horaInicio, horaFin)`, sin parámetro
+de zona horaria: no existe (ni va a existir) `ConfiguracionNegocio.zonaHoraria`. Este change
+reutiliza ese módulo tal cual está en `main`, no el que describía la versión original de este
+documento.
 
 ## Goals / Non-Goals
 
@@ -41,45 +47,38 @@ más natural de "mínimo de N horas de anticipación" es que N horas exactas ya 
 mínimo. Si el equipo o la consigna de la docente esperan lo contrario, es un cambio de una
 sola comparación (`>=` vs `>`) y un ajuste del escenario de borde en la spec.
 
-### Instante real de inicio/fin de Turno: reusar `inicioTurnoUtc` de `disponibilidad`, no reinventarlo
-**Decisión:** tanto la ventana de cancelación (instante de **inicio** del Turno) como
-`NO_SHOW` (instante de **fin** del Turno) se calculan con la misma función
-`inicioTurnoUtc(fecha, hora, zonaHoraria)` que define `disponibilidad` (design.md, D5) —a
-pesar del nombre, la función solo combina una fecha, una hora local y una zona en un instante
-UTC, así que sirve igual para `horaInicio` que para `horaFin`. La función usa
-`Intl.DateTimeFormat(...).formatToParts` para el offset de la zona en ese instante (con una
-segunda pasada por si hay cambio de horario de verano entre medio) y toma la zona horaria de
-`ConfiguracionNegocio.zonaHoraria` (IANA, seed `America/Argentina/Buenos_Aires`) — campo
-pedido a `modelo-dominio` en el review de PR #12; si no llega ahí, `disponibilidad` agrega el
-campo con su propia migración y seed, según su plan B. Este change no agrega esa migración:
-su implementación espera tanto el helper como el campo. Todo el
-código que lee `fecha`/`hora` de Prisma usa `getUTC*` (nunca `getDate`/`getHours`/`getDay`),
-porque el proceso local corre en `America/Argentina/Buenos_Aires` y CI en UTC — usar los
-métodos no-UTC da un resultado distinto en cada entorno.
+### Instante real de inicio/fin de Turno: reusar `backend/src/common/timezone.ts`, no reinventarlo
+**Decisión:** la ventana de cancelación (instante de **inicio** del Turno) usa
+`inicioTurnoUtc(fecha, horaInicio): Date`, y `NO_SHOW` (instante de **fin** del Turno) usa
+`finTurnoUtc(fecha, horaInicio, horaFin): Date` — ambas de `backend/src/common/timezone.ts`,
+el módulo que trajo #12 y que `disponibilidad` (D5) ya adoptó como fuente de verdad tras
+descartar la zona horaria IANA configurable. Ninguna de las dos recibe zona horaria: el
+offset de Argentina (UTC-3) es una constante (`ARGENTINA_OFFSET_MS`) porque no hay horario de
+verano desde 2009 y el restaurante es uno solo. `finTurnoUtc` ya resuelve el cruce de
+medianoche internamente (compara `horaFin` contra `horaInicio` y avanza la fecha un día si
+hace falta) — este change no reimplementa esa lógica, solo la llama. Todo el código que lee
+`fecha`/`hora` de Prisma usa `getUTC*` (nunca `getDate`/`getHours`/`getDay`), porque el
+proceso local corre en `America/Argentina/Buenos_Aires` y CI en UTC — usar los métodos no-UTC
+da un resultado distinto en cada entorno.
 
-**Alternativa considerada:** tratar `horaInicio`/`horaFin` como si ya fueran UTC (versión
-original de este documento, antes del review) — es el bug que reportó portalmatias: corre la
-ventana de cancelación y el chequeo de `NO_SHOW` exactamente el offset de la zona (3 horas hoy
-en Buenos Aires), y ese offset puede variar si Argentina vuelve a tener horario de verano.
-**Alternativa considerada:** implementar una conversión propia en vez de reusar
-`inicioTurnoUtc` — se descarta porque duplicaría la misma lógica (con las mismas trampas de
-horario de verano y cruce de medianoche) en dos changes que corren en paralelo
-(`disponibilidad` y este), exactamente el escenario que el comentario de portalmatias pide
-evitar ("para que lo reusemos todos").
+**Alternativa considerada:** tratar `horaInicio`/`horaFin` como si ya fueran UTC (primera
+versión de este documento) — es el bug que reportó portalmatias: corre la ventana de
+cancelación y el chequeo de `NO_SHOW` 3 horas.
+**Alternativa considerada:** la zona horaria IANA configurable con `Intl`
+(`ConfiguracionNegocio.zonaHoraria`, propuesta original de `disponibilidad` D5, y lo que
+describía la segunda versión de este documento) — el equipo la descartó en el review de #12: el
+restaurante es uno solo, está en Argentina, y no hay horario de verano que justifique el costo
+de `Intl.DateTimeFormat(...).formatToParts` con doble pasada. `ConfiguracionNegocio.zonaHoraria`
+no existe ni va a existir; no hay plan B que ejecutar.
+**Alternativa considerada:** implementar una conversión propia en vez de reusar el módulo
+compartido — se descarta por lo mismo que en la primera versión: duplicaría la misma lógica
+(incluido el cruce de medianoche, que ya resuelve `finTurnoUtc`) en varios changes que la
+necesitan (`disponibilidad`, `reservas-crear`, este).
 
-### Turnos que cruzan medianoche local
-Comparar `horaFin` y `horaInicio` como horas locales completas (hora, minuto, segundo),
-leyendo los campos de Prisma con `getUTC*`. Si `horaFin < horaInicio`, calcular `fechaFin`
-como el día siguiente del calendario local de `Reserva.fecha`, usando `Date.UTC` y sus
-componentes UTC para manejar también cambios de mes y año. En los demás casos usar la misma
-fecha. Convertir recién entonces con `inicioTurnoUtc(fechaFin, horaFin, zonaHoraria)`.
-No sumar 24 horas al instante convertido: un cambio de horario de verano puede alterar la
-duración real de un día local. Horas iguales no implican un turno de 24 horas.
-
-Para un turno 23:00–01:00 del 31 de diciembre, el fin es el 1 de enero a la 01:00 local:
-`NO_SHOW` se rechaza tanto a las 23:30 como a las 00:59 y se admite después de la 01:00,
-si la Reserva sigue `CONFIRMADA`. En el instante exacto del fin también se rechaza: la
-operación exige `ahora > finTurnoUtc`, consistente con "después de que terminó".
+Para un turno 23:00–01:00 del 31 de diciembre, `finTurnoUtc` calcula el fin como el 1 de enero
+a la 01:00 local: `NO_SHOW` se rechaza tanto a las 23:30 como a las 00:59 y se admite después
+de la 01:00, si la Reserva sigue `CONFIRMADA`. En el instante exacto del fin también se
+rechaza: la operación exige `ahora > finTurnoUtc`, consistente con "después de que terminó".
 
 ### Rutas: `POST /reservas/:codigo/cancelar` y `PATCH /admin/reservas/:id/no-show`
 **Decisión:** la cancelación del cliente es un `POST` con el email en el body (no un `DELETE`
@@ -252,15 +251,12 @@ no equivalencia semántica. Mantener los mismos códigos, descripciones y esquem
   solo valor → **Mitigación:** se cubre con un escenario de la spec ("Marcar NO_SHOW antes de
   que termine el turno rechazado") y `config.yaml` §9 ya exige testear estos bordes de
   fecha/hora explícitamente.
-- **[Riesgo]** `inicioTurnoUtc` depende de `ConfiguracionNegocio.zonaHoraria`, un campo que
-  todavía no existe en el schema mergeado (pedido a `modelo-dominio` en el review de PR #12) →
-  **Mitigación:** si no se agrega ahí, `disponibilidad` ejecuta su plan B
-  (migración y seed con `America/Argentina/Buenos_Aires`); este change espera ese resultado
-  y no asume una migración alternativa. De cualquier forma la
-  implementación de este change no puede empezar antes de que `reservas-crear` exista, así que
-  hay margen para que se resuelva río arriba.
-- **[Riesgo]** Este change corre en paralelo a `disponibilidad`, de donde toma
-  `inicioTurnoUtc` — si la firma o el nombre del export cambian antes de mergearse, hay que
-  actualizar la importación acá → **Mitigación:** bajo costo (es una sola función pura,
-  documentada con tests en `disponibilidad`); se verifica en la tarea de prerrequisitos antes
-  de escribir código.
+- **[Riesgo, cerrado]** Las dos primeras versiones de este documento dependían de
+  `ConfiguracionNegocio.zonaHoraria`, un campo que nunca se agregó → ya no aplica: #12 y #21
+  fijaron el offset UTC-3 constante, sin campo de configuración que esperar. Se deja esta
+  entrada para que quien lea el historial de este archivo entienda por qué cambió.
+- **[Riesgo]** `backend/src/common/timezone.ts` ya está mergeado (#12) y `disponibilidad` (#21)
+  ya lo adoptó, así que la firma de `inicioTurnoUtc`/`finTurnoUtc` es estable — pero si
+  `reservas-crear` (todavía sin implementar) necesitara una firma distinta para su propio uso,
+  el cambio se coordina ahí, no en este change → **Mitigación:** verificar la firma vigente en
+  la tarea de prerrequisitos antes de escribir código, no asumir lo que dice este documento.
