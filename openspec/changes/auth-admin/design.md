@@ -65,6 +65,94 @@ del mismo módulo. `THROTTLE_TTL` y `THROTTLE_LIMIT` (ya listadas en `config.yam
 reusan como default global; el guard de `/auth/login` sobreescribe esos valores con un límite
 más estricto vía el decorador.
 
+### `AuthModule` no se registra todavía en `AppModule`
+
+**Decisión, tomada durante el review de este PR:** `AuthController` existe y sus tests pasan
+(instanciando su propio módulo mínimo en `backend/test/auth.integration-spec.ts`), pero
+`AppModule` no importa `AuthModule` en este PR. Motivo: `AuthModule` depende de
+`PrismaService` (vía `PrismaModule`, `@Global()`), cuyo `onModuleInit` hace `$connect()`
+contra Postgres. `AppModule` es lo que arranca `test/app.e2e-spec.ts`, y ese smoke test corre
+en el job `test` de CI **sin PostgreSQL** hasta que se mergee `ci-integracion-db`. Es
+exactamente la misma decisión que ya tomó `gestion-salon` para `ZonasModule`/`MesasModule`/
+`HorariosModule` (ver el comentario en `app.module.ts`), aplicada acá porque el mismo
+problema de fondo (`PrismaModule` global) es transversal a cualquier módulo de dominio, no
+específico de auth.
+
+**Consecuencia que esto tiene sobre el contrato OpenAPI (ver más abajo):** como el roadmap
+(`docs/roadmap-mvp.md`, "Estado al 2026-09-14") establece que el fragmento OpenAPI de un
+endpoint se copia a `openapi/openapi.yaml` recién "en el PR de implementación, junto con el
+controller" — y acá el controller todavía no es alcanzable desde la app real que arranca
+`main.ts` — este PR **no** toca `openapi/openapi.yaml`. El fragmento queda documentado abajo
+y se copia al YAML en el PR que registre `AuthModule` en `AppModule` (candidato natural:
+inmediatamente después de `ci-integracion-db`, cuando el job `test` ya tenga Postgres para
+todos sus pasos, incluido `test:e2e`).
+
+### Contrato OpenAPI (pendiente de copiar al YAML — ver decisión de arriba)
+
+```yaml
+paths:
+  /auth/login:
+    post:
+      summary: Login de administrador
+      description: >-
+        Autentica a un usuario administrador con email y contraseña, y devuelve un JWT
+        de acceso (openspec/config.yaml §5).
+      operationId: AuthController_login
+      tags:
+        - Auth
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: 'Login exitoso: devuelve el JWT de acceso.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponseDto'
+        '401':
+          description: >-
+            Credenciales inválidas: email inexistente o contraseña incorrecta. El
+            mensaje es genérico y no distingue cuál dato falló.
+        '429':
+          description: >-
+            Se superó el límite de intentos de login permitidos en la ventana
+            configurada (rate limiting).
+components:
+  securitySchemes: {} # bearerAuth ya existe en el YAML publicado, no se duplica acá
+  schemas:
+    LoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Email del usuario administrador.
+          example: admin@restaurante-mvp.local
+        password:
+          type: string
+          description: Contraseña del usuario administrador.
+          example: AdminMVP2026!
+      required:
+        - email
+        - password
+    LoginResponseDto:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT de acceso del administrador (ver openspec/config.yaml §5).
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.abc123
+      required:
+        - accessToken
+tags:
+  - name: Auth
+    description: Autenticación y autorización del administrador (openspec/config.yaml §5).
+```
+
 ## Risks / Trade-offs
 
 - **[Riesgo]** Sin refresh tokens, un JWT expirado interrumpe el trabajo del admin a mitad de
