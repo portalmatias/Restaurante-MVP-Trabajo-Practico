@@ -9,7 +9,10 @@ Estado del que se parte, en la rama `origin/feature/modelo-dominio` (PR #12, sin
 - `schema.prisma` define `Turno.diaSemana` como enum `DiaSemana` (`LUNES`…`DOMINGO`),
   `Turno.horaInicio` como `@db.Time`, `Reserva.fecha` como `@db.Date`, la zona de una reserva
   **a través de su mesa** (`Reserva` no tiene `zonaId`) y `ConfiguracionNegocio` como fila
-  única con `aforoGlobal`. Todavía no hay campo de zona horaria.
+  única con `aforoGlobal`. No hay campo de zona horaria ni se va a agregar: el equipo fijó que
+  `horaInicio`/`horaFin` son hora local de Argentina, UTC-3 fijo (§7 cuando se mergee #12).
+- `backend/src/common/timezone.ts` (de #12) exporta `ARGENTINA_OFFSET_MS`,
+  `horaLocalArgentinaAUtc` (solo la hora, sin fecha) y `diaSemanaDeFecha` (`getUTCDay()`).
 - `ReservasService.crearReserva` valida inline turno activo, zona de la mesa, capacidad y
   aforo de zona dentro de `$transaction`, y ya usa `$executeRawUnsafe` para los `SAVEPOINT`.
   Este change no lo toca (ver proposal, Fuera de alcance).
@@ -74,7 +77,7 @@ Módulo `backend/src/disponibilidad/`, con cinco piezas:
  :  |  (db o tx)         |  |  PURA: sin base y con  |  | TurnoFecha   | :
  :  |  unico acceso a la |  |  ahora inyectado       |  |  (solo tx)   | :
  :  |  base; 404 si no   |  |  usa inicioTurnoUtc    |  |              | :
- :  |  existe turno/zona |  |  (PURA, Intl)          |  |              | :
+ :  |  existe turno/zona |  |  (PURA, UTC-3 fijo)    |  |              | :
  :  +---------+----------+  +------------------------+  +------+-------+ :
  :............|.................................................|.........:
               v                                                 v
@@ -85,8 +88,7 @@ Módulo `backend/src/disponibilidad/`, con cinco piezas:
 
 - **`cargarContexto(db: PrismaService | Prisma.TransactionClient, solicitud)`** devuelve un
   `ContextoReserva` de datos planos: turno (`activo`, `diaSemana`, `horaInicio`), zona
-  (rango de comensales, anticipaciones, `aforoMaximo`), `aforoGlobal`, `zonaHoraria`,
-  `ocupadosZona`, `ocupadosGlobal` y las capacidades de las mesas de la zona sin reserva
+  (rango de comensales, anticipaciones, `aforoMaximo`), `aforoGlobal`, `ocupadosZona`, `ocupadosGlobal` y las capacidades de las mesas de la zona sin reserva
   activa en ese turno y esa fecha. Es el **único** punto que lee la base, siempre con la API
   tipada de Prisma (`findUnique`, `aggregate` con `estado in [PENDIENTE, CONFIRMADA]` y
   `mesa: { zonaId }` para la zona, `findMany` de mesas con `reservas: { none: ... }`). Si el
@@ -97,7 +99,8 @@ Módulo `backend/src/disponibilidad/`, con cinco piezas:
   reloj entra como parámetro, así que los bordes exactos (2 h, 1 h 59 min, 30 días) se
   prueban sin mocks ni timers falsos. El mismo archivo exporta un cálculo puro de
   `lugaresRestantes = max(0, min(aforoMaximo - ocupadosZona, aforoGlobal - ocupadosGlobal))`.
-- **`inicioTurnoUtc(fecha, horaInicio, zonaHoraria): Date`** es un helper puro (D5).
+- **`inicioTurnoUtc(fecha, horaInicio): Date`** es un helper puro en
+  `backend/src/common/timezone.ts` (D5).
 - **`bloquearTurnoFecha(tx, turnoId, fecha)`** ejecuta
   `` tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${turnoId} || ':' || ${fechaISO}))` ``.
   Vive en este módulo para que la clave del lock exista en un solo lugar. Lo usa
@@ -152,29 +155,37 @@ UTC. Con eso la pregunta de qué día de la semana es pasa a depender de quién 
 `YYYY-MM-DD` es igual un formato ISO 8601 (fecha sin hora), así que no contradice RNF-06. La
 aclaración va en §7.
 
-### D5: Zona horaria con `Intl`, sin librería, y con nombre IANA
+### D5: Zona horaria: offset fijo UTC-3 (decisión del equipo en #12)
 
-`inicioTurnoUtc` arma el instante "ingenuo" `Date.UTC(año, mes, día, hh, mm)` con los
-`getUTC*` de `fecha` y `horaInicio`. Después calcula el offset de la zona en ese instante con
-`Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', ... }).formatToParts` y resta.
-Hace una **segunda pasada** con el offset del instante ya corregido, por si entre el ingenuo y
-el real hay un cambio de horario de verano. La zona sale de `ConfiguracionNegocio.zonaHoraria`
-(IANA, seed `America/Argentina/Buenos_Aires`). Un prototipo de esta función, fuera del repo, ya dio
-los resultados esperados para Buenos Aires, para la cena que cruza medianoche UTC, para el
-horario de verano que tuvo Argentina en 2009 y para un salto de horario en
-`America/New_York`. Esos casos pasan a ser los tests unitarios.
+#12 fija que `Turno.horaInicio`/`horaFin` son hora local de Argentina
+(`America/Argentina/Buenos_Aires`), UTC-3 fijo. Argentina no usa horario de verano desde 2009,
+así que el offset no cambia. `inicioTurnoUtc(fecha, horaInicio): Date` es una función pura en
+`backend/src/common/timezone.ts`, el archivo que crea #12:
+
+```ts
+new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate(),
+  horaInicio.getUTCHours(), horaInicio.getUTCMinutes()) + 3 * 60 * 60 * 1000)
+```
+
+Solo usa getters `getUTC*`, así que no depende de la zona del proceso. Ejemplo: la cena del
+sábado 2026-09-19 a las 22:00 local es `2026-09-20T01:00:00Z`. El instante UTC cae al día
+siguiente y está bien: la fecha de la reserva sigue siendo el sábado. Hoy #12 trae
+`horaLocalArgentinaAUtc`, que convierte solo la hora (sin fecha), y no alcanza; si al
+implementar ya existe una función equivalente de fecha más hora se reusa, y si no, este change
+la agrega a ese archivo (puede expresar el `+ 3 h` con `ARGENTINA_OFFSET_MS`).
+`diaSemanaDeFecha` de #12 se reusa tal cual para el día de la semana.
 
 **Alternativa considerada (librería):** `date-fns-tz` o `luxon`. Se descarta: §2 obliga a
-justificar dependencias nuevas, y lo único que hace falta es un offset en un instante, que
-`Intl` ya resuelve con los datos de zonas horarias que trae Node (full ICU desde Node 13).
-`Temporal` sería lo ideal, pero no existe en Node 20 sin flag ni polyfill, y el polyfill es
-otra dependencia.
+justificar dependencias nuevas, y con un offset fijo no hay nada que resolver en tiempo de
+ejecución. `Temporal` no existe en Node 20 sin flag ni polyfill, y el polyfill es otra
+dependencia.
 
-**Alternativa considerada (offset fijo):** interpretar las horas como `-03:00` fijo. Es
-correcto hoy, porque Argentina no usa horario de verano desde 2009. Se descarta porque
-guardaría en el código un dato que es de configuración (§14 prohíbe hardcodear valores de
-negocio), porque ya hubo horario de verano en Argentina y puede volver, y porque la diferencia
-de costo es una función de 15 líneas con tests.
+**Alternativa considerada (zona IANA configurable):** un campo
+`ConfiguracionNegocio.zonaHoraria` (seed `America/Argentina/Buenos_Aires`) y el offset
+calculado en cada instante con `Intl.DateTimeFormat(...).formatToParts`. Se descarta porque el
+equipo decidió la zona fija, el restaurante es uno solo, está en Argentina y no hay horario de
+verano. Queda como camino si alguna vez hay que soportar DST u otra sede: cambiaría solo el
+helper (y de dónde sale la zona), no la spec ni las reglas.
 
 ### D6: Lock advisory por `(turno, fecha)` para la creación
 
@@ -223,8 +234,9 @@ los nombran como la validación del proyecto, así que no son una librería a ju
 
 Los bordes exactos se prueban en los tests unitarios de `evaluarReglas` y de `inicioTurnoUtc`,
 con `ahora` inyectado, y corren dos veces: con `TZ=UTC` y con
-`TZ=America/Argentina/Buenos_Aires`. Así el escenario "mismo resultado con el servidor en UTC
-o en Buenos Aires" se cumple por construcción. Los e2e con Supertest usan el reloj real
+`TZ=America/Argentina/Buenos_Aires`. Como el offset es fijo, correr dos veces no prueba reglas
+de zona sino que ningún cálculo use getters locales: el escenario "mismo resultado con el
+servidor en UTC o en Buenos Aires" se cumple por construcción. Los e2e con Supertest usan el reloj real
 (`consultar` hace `new Date()`), fechas lejos de los bordes y datos propios, y cubren solo
 400, 404 y la forma del 200.
 
@@ -234,7 +246,7 @@ o en Buenos Aires" se cumple por construcción. Los e2e con Supertest usan el re
   `2026-09-19T00:00:00Z`. En un proceso con zona Buenos Aires eso es viernes 18 a las 21:00, y
   `getDay()` da 5 (viernes) en la máquina local y 6 (sábado) en CI. Regla: `fecha` y
   `horaInicio` se leen **siempre** con `getUTCFullYear/Month/Date/Day/Hours/Minutes`. El día de
-  la semana sale de `DIAS[fecha.getUTCDay()]`, con `DIAS` empezando en `DOMINGO` para respetar
+  la semana sale de `DIAS[diaSemanaDeFecha(fecha)]` (que es `getUTCDay()`), con `DIAS` empezando en `DOMINGO` para respetar
   el índice de JavaScript.
 - **`@db.Date` trunca en UTC.** Prisma guarda la parte de fecha **UTC** del `Date` que recibe.
   Si en un filtro o en un `INSERT` se pasa un instante con hora (por ejemplo `inicioTurno`, o
@@ -480,9 +492,6 @@ components:
 
 ## Risks / Trade-offs
 
-- **[Riesgo]** #12 se mergea sin `ConfiguracionNegocio.zonaHoraria` → **Mitigación:** plan B
-  en Migration Plan. El PR de implementación agrega el campo con su propia migración y
-  actualiza el seed. Ni la spec ni `inicioTurnoUtc` cambian, solo de dónde sale el valor.
 - **[Riesgo]** La consulta dice "disponible" y la creación, segundos después, responde `409`
   → **Mitigación:** es el comportamiento que define §6 (foto del momento). El lock y la
   reevaluación dentro de la transacción garantizan que el `409` sea correcto. El frontend
@@ -524,25 +533,17 @@ components:
   `scripts/openapi-check.mjs`, en un PR `fix:` propio antes del de implementación. Es un
   `scripts/`, no `.github/workflows/`, así que §14 no lo impide. La otra opción, declarar
   `x-enumNames` en el decorador y en el YAML, ensucia el contrato por un detalle del generador.
-- **[Trade-off]** Los datos de zonas horarias de `Intl` vienen con la versión de Node. Si un
-  país cambia sus reglas, hace falta actualizar Node. Es aceptable para el MVP.
+- **[Trade-off]** El offset UTC-3 queda fijo en el código. Si Argentina volviera a usar horario
+  de verano o hubiera otra sede, las horas darían corridas una hora. Es la decisión del equipo
+  en #12 para el MVP, y el cambio quedaría acotado a `timezone.ts` (D5).
 
 ## Migration Plan
 
-1. Con #12 mergeado, verificar si `ConfiguracionNegocio` tiene `zonaHoraria`.
-2. **Plan B** (solo si no lo tiene): agregar `zonaHoraria String @default("America/Argentina/Buenos_Aires")`
-   y generar la migración con `prisma migrate dev --name agregar_zona_horaria --create-only`.
-   Revisar que el SQL generado **no** toque el índice único parcial de `Reserva` (el riesgo
-   documentado en `modelo-dominio`) antes de aplicarlo. Actualizar `seed.ts` para escribir el
-   valor en el `upsert` de la fila única.
-3. Sin plan B, este change no tiene migraciones: solo lee tablas existentes.
-4. Rollback: revertir el PR. La columna del plan B tiene default, así que revertir el código
-   sin revertir la migración no rompe nada.
+1. Sin migraciones: este change solo lee tablas existentes de #12.
+2. Rollback: revertir el PR.
 
 ## Open Questions
 
-- **Zona horaria en #12.** Está pedida a FedeWerk y todavía no hay respuesta. No cambia la spec
-  ni las tareas: el plan B ya está en el Migration Plan y en `tasks.md`.
 - **Cuerpo del `409` de `POST /reservas`** (el primer motivo o todos): lo decide
   `reservas-crear`. Los dos casos salen del mismo `MotivoNoDisponible[]` ordenado.
 - **Seed sin forma de alcanzar `AFORO_GLOBAL`.** Si el equipo quiere verlo en la UI con datos
