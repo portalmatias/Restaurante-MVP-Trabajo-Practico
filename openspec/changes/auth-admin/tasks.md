@@ -61,9 +61,16 @@
 - [x] 5.2 Si `openapi/openapi.yaml` ya existe para este momento, agregar `POST /auth/login` y
       el `securityScheme` de bearer JWT en el mismo PR (Definition of Done, `config.yaml`
       §13). Si todavía no existe, dejarlo anotado en la descripción del PR como pendiente.
-      Se agregó el path con sus DTOs (`LoginDto`, `LoginResponseDto`) y las respuestas
-      200/401/429; el `securityScheme` de bearer JWT ya existía. `npm run openapi:lint` y
-      `npm run openapi:check` pasan sin deriva.
+      **Actualizado durante el review de este PR:** `AppModule` no registra `AuthModule`
+      todavía (conflicto real al mergear `main` después de `gestion-salon` — ver el
+      comentario en `app.module.ts` y la decisión nueva en `design.md`), así que el
+      controller no es alcanzable desde la app que corre `openapi:check`. Agregar el path al
+      YAML en ese estado hacía fallar `openapi:check` con deriva real (el YAML declaraba un
+      endpoint que el backend no expone). Siguiendo la regla del roadmap ("el fragmento
+      OpenAPI se copia al YAML en el PR de implementación, junto con el controller"), el
+      fragmento queda en `design.md` (sección "Contrato OpenAPI") y se copia al YAML real en
+      el PR que registre `AuthModule` en `AppModule`. `npm run openapi:lint` y
+      `npm run openapi:check` pasan sin deriva en este estado.
 - [x] 5.3 Confirmar que no hicieron falta variables de entorno nuevas (`JWT_SECRET` y
       `JWT_EXPIRES_IN` ya están en `.env.example` desde `fundacion-repo`). Si alguna
       implementación concreta necesitó una variable adicional, agregarla y documentarla en

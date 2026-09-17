@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtService } from '@nestjs/jwt';
@@ -16,30 +18,51 @@ interface LoginResponseBody {
 // (ver el comentario en `app.module.ts`: el job `test` de CI corre sin PostgreSQL hasta
 // `ci-integracion-db`), así que este test arma su propio módulo mínimo con lo que
 // `AuthModule` necesita, igual que ya hacen `reservas-invariantes.integration-spec.ts` y
-// `mesas.integration-spec.ts`.
+// `mesas.integration-spec.ts`. Replica también el `ThrottlerModule`/`APP_GUARD` de
+// `AppModule` — sin eso, `@Throttle()` en `AuthController` queda decorado pero sin ningún
+// guard que lo haga cumplir.
+async function crearAppDeTest(): Promise<INestApplication<App>> {
+  const moduleFixture: TestingModule = await Test.createTestingModule({
+    imports: [
+      ConfigModule.forRoot({
+        isGlobal: true,
+        envFilePath: ['../.env', '.env'],
+      }),
+      ThrottlerModule.forRootAsync({
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => [
+          {
+            ttl: Number(config.getOrThrow<string>('THROTTLE_TTL')) * 1000,
+            limit: Number(config.getOrThrow<string>('THROTTLE_LIMIT')),
+          },
+        ],
+      }),
+      PrismaModule,
+      AuthModule,
+    ],
+    providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  }).compile();
+
+  const app: INestApplication<App> = moduleFixture.createNestApplication();
+  // Mismo pipe que `main.ts`: sin esto, LoginDto no valida nada en runtime.
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+  );
+  await app.init();
+  return app;
+}
+
 describe('AuthController (integration)', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
   let jwtSecret: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
-        PrismaModule,
-        AuthModule,
-      ],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    // Mismo pipe que `main.ts`: sin esto, LoginDto no valida nada en runtime.
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
-    );
-    jwtService = moduleFixture.get<JwtService>(JwtService);
-    const configService = moduleFixture.get<ConfigService>(ConfigService);
+    app = await crearAppDeTest();
+    const jwtServiceRef = app.get(JwtService);
+    jwtService = jwtServiceRef;
+    const configService = app.get(ConfigService);
     jwtSecret = configService.getOrThrow<string>('JWT_SECRET');
-    await app.init();
   });
 
   afterAll(async () => {
@@ -97,20 +120,6 @@ describe('AuthController (integration)', () => {
 
       expect(response.body).toHaveProperty('message', 'Credenciales inválidas');
       expect(response.body).not.toHaveProperty('accessToken');
-    });
-
-    it('debería devolver 400 con un email mal formado', async () => {
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'no-es-un-email', password: ADMIN_PASSWORD })
-        .expect(400);
-    });
-
-    it('debería devolver 400 si el body trae campos no declarados en el DTO', async () => {
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD, esAdmin: true })
-        .expect(400);
     });
 
     it('debería devolver 429 después de superar el límite de intentos (rate limiting)', async () => {
@@ -202,5 +211,38 @@ describe('AuthController (integration)', () => {
         .set('Authorization', `Bearer ${nonAdminToken}`)
         .expect(403);
     });
+  });
+});
+
+// Instancia de app separada (y por lo tanto un ThrottlerStorage en memoria propio): estos
+// tests pegan contra /auth/login igual que la suite de arriba, y compartir la misma app
+// pisaría la cuenta del rate limiter que usa el test de 429 de más arriba (5 intentos/60s).
+describe('POST /auth/login — validación de input (DTO)', () => {
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    app = await crearAppDeTest();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('debería devolver 400 con un email mal formado', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'no-es-un-email', password: 'AdminMVP2026!' })
+      .expect(400);
+  });
+
+  it('debería devolver 400 si el body trae campos no declarados en el DTO', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'admin@restaurante-mvp.local',
+        password: 'AdminMVP2026!',
+        esAdmin: true,
+      })
+      .expect(400);
   });
 });
