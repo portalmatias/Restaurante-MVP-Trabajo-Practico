@@ -167,6 +167,15 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     });
     zonaStandardId = standard.id;
     zonaVipId = vip.id;
+
+    // aforoGlobal alto por defecto (muy por encima de cualquier aforoMaximo de zona usado
+    // en este archivo) para que ningún test existente lo choque sin querer. El test del
+    // invariante de aforo global lo baja temporalmente y lo restaura al terminar.
+    await prisma.configuracionNegocio.upsert({
+      where: { id: 1 },
+      update: { aforoGlobal: 1000 },
+      create: { id: 1, aforoGlobal: 1000 },
+    });
   });
   afterEach(async () => {
     // Orden: Reserva primero (FK a Mesa/Turno), después Mesa y Turno.
@@ -196,6 +205,11 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     await prisma.zona.update({
       where: { nombre: 'VIP' },
       data: { aforoMaximo: 20 },
+    });
+    // Restaurar aforoGlobal original (valor del seed: 60, ver config.yaml §6).
+    await prisma.configuracionNegocio.update({
+      where: { id: 1 },
+      data: { aforoGlobal: 60 },
     });
     await prisma.$disconnect();
   });
@@ -446,6 +460,57 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
       where: { mesaId: mesaB.id },
     });
     expect(creadasEnMesaB).toBe(0);
+  });
+
+  it('rechaza una reserva que excede el aforo global aunque el aforo de su propia zona alcance', async () => {
+    // Baja aforoGlobal a 12 solo para este test (se restaura al final). El aforo por zona
+    // (10 en STANDARD y en VIP, ver beforeAll) sigue intacto: la reserva de STANDARD de
+    // abajo pasa esa validación individual sin problema — lo que la tiene que rechazar es
+    // el aforo GLOBAL, sumando ambas zonas.
+    await prisma.configuracionNegocio.update({
+      where: { id: 1 },
+      data: { aforoGlobal: 12 },
+    });
+
+    try {
+      const mesaVip = await crearMesa(zonaVipId, 8, 'INV4B-MVIP');
+      const mesaStandard = await crearMesa(zonaStandardId, 8, 'INV4B-MSTD');
+      const turno = await crearTurno(diaSemanaParaOffset(20));
+      const fecha = fechaFutura(20);
+
+      const enVip = await service.crearReserva({
+        mesaId: mesaVip.id,
+        turnoId: turno.id,
+        zonaSolicitadaId: zonaVipId,
+        fecha,
+        comensales: 8, // aforo de VIP: 8/10, todavía le sobra lugar individualmente
+        ...datosClienteBase('inv4b-vip'),
+      });
+      reservaIds.push(enVip.id);
+
+      // 6 comensales en STANDARD pasa el aforo de zona (0+6 <= 10), pero 8 (VIP) + 6
+      // (STANDARD) = 14 > 12 (aforoGlobal): el rechazo tiene que venir del chequeo global.
+      await expect(
+        service.crearReserva({
+          mesaId: mesaStandard.id,
+          turnoId: turno.id,
+          zonaSolicitadaId: zonaStandardId,
+          fecha,
+          comensales: 6,
+          ...datosClienteBase('inv4b-standard'),
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      const creadasEnStandard = await prisma.reserva.count({
+        where: { mesaId: mesaStandard.id },
+      });
+      expect(creadasEnStandard).toBe(0);
+    } finally {
+      await prisma.configuracionNegocio.update({
+        where: { id: 1 },
+        data: { aforoGlobal: 1000 },
+      });
+    }
   });
 
   // --- 4.5 — Invariante 5: estados terminales no retroceden ---------------------------
