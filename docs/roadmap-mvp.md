@@ -342,9 +342,11 @@ Fase 6  entrega-final (facundo)
   favor de *contract-first*; si el equipo prefiere generar desde los controllers, el frontend no
   puede arrancar antes que el backend y hay que rehacer la Fase 5 como secuencial. Se decide en
   el `design.md` de `fundacion-repo` (§5) y **es la decisión más cara de cambiar después**.
-- **La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
+- ~~**La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
   corre lint, tipos y unitarios, pero **no** tests contra base real. Es una ventana corta y
-  deliberada; el riesgo es olvidarse de cerrarla y dejar los e2e de §9 fuera del pipeline.
+  deliberada; el riesgo es olvidarse de cerrarla y dejar los e2e de §9 fuera del pipeline.~~
+  **Cerrado el 2026-09-17:** `ci-integracion-db` conectó un service container de Postgres al
+  job `test`, con migración, seed y `test:integration` corriendo en cada PR.
 - ~~**Los required status checks (0.4) no se pueden configurar antes de la Fase 1** — GitHub solo los
   ofrece después de que el check corrió al menos una vez. Es fácil olvidarse y dejar `main` a medio
   proteger.~~ **Cerrado el 2026-09-14:** configurados junto con la protección de `main`.

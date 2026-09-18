@@ -18,6 +18,15 @@ Ver `proposal.md` — Why. Estado de partida (post-merge de `modelo-dominio`, PR
   datos con `prisma.zona.upsert(...)` (por nombre, no por id) y sus propios `mesa.create` /
   `turno.create`, y limpian lo que crearon en `afterAll`. Verificado leyendo el código de las
   dos, no asumido.
+- **Actualizado durante la implementación (2026-09-17):** en el tiempo que tardó en escribirse
+  esta spec, se mergeó `gestion-salon` (PR #24) y se abrió `auth-admin` (PR #25). Los dos
+  agregaron controllers reales y, con ellos, suites de integración que **sí** necesitan datos
+  conocidos (el admin del seed, para `auth.integration-spec.ts`). Además, portalmatias
+  reportó en el PR #12 que `disponibilidad` (con `GET /disponibilidad`, controller real) va a
+  registrar `DisponibilidadModule` en `AppModule` — y simuló que eso rompe `test:e2e` sin
+  Postgres (las 4 suites fallan, incluida `app.e2e-spec.ts`, hoy verde). Esto invalida la
+  Non-Goal original de "sin seed" (ver D3 revisada abajo) y confirma que este change ya no es
+  opcional: bloquea la apertura en verde de `disponibilidad`.
 
 Tres restricciones de `config.yaml` dan forma al diseño:
 
@@ -43,10 +52,6 @@ Tres restricciones de `config.yaml` dan forma al diseño:
 
 - No se agrega una base `reservas_dev` en CI: nada en el pipeline necesita datos de
   desarrollo, solo la de test.
-- No se corre `npm run db:seed -w backend` en CI: ninguna suite de integración depende del
-  seed (ver Context). Si un change futuro agrega una suite que sí lo necesite, ese change
-  agrega el paso de seed — no se anticipa acá sin necesidad concreta (config.yaml §14,
-  Prioridad 3).
 - No se tocan los *required status checks* de la protección de `main`: el job sigue
   llamándose `test` ("Tests (backend)"), solo se le agregan pasos. No hace falta re-configurar
   nada en GitHub.
@@ -92,9 +97,13 @@ services:
 
 Con esas credenciales y ese puerto, el **fallback que ya tiene** `jest-integration.setup.ts`
 (`postgresql://postgres:postgres@localhost:5432/reservas_test`) apunta directo al service
-container. No hace falta declarar `DATABASE_URL_TEST` como variable de CI ni como secret —
-son las mismas credenciales de juguete que ya documenta `.env.example` para desarrollo local,
-nunca secretas (config.yaml §10).
+container.
+
+**Revisado durante la implementación:** sí hace falta declarar `DATABASE_URL`/
+`DATABASE_URL_TEST` explícitas como `env:` del job (no alcanza con el fallback) — ver D3, más
+abajo, sobre por qué el alcance de las variables de entorno creció más allá de solo la base de
+datos. Ninguna es secreta: son las mismas credenciales de juguete que ya documenta
+`.env.example` para desarrollo local (config.yaml §10).
 
 ### D2 — `prisma migrate deploy`, no `prisma migrate dev`
 
@@ -107,56 +116,91 @@ las migraciones ya commiteadas sin generar ninguna nueva y sin pedir input — e
 dev` porque ese sí es para desarrollo local, donde la interactividad es la ventaja, no un
 problema.
 
-*Paso concreto (después de "Tests e2e del backend", antes de "Tests de las utilidades de
-scripts/"):*
+*Paso concreto (antes de correr ningún test, para que la base ya esté migrada y seedeada
+cuando arranque incluso el smoke test e2e — ver D3):*
 
 ```yaml
-- name: Migrar la base de test para los tests de integracion
+- name: Migrar la base de datos de test
   run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
-  env:
-    DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reservas_test
 
-- name: Tests de integracion del backend (contra Postgres real)
-  run: npm run test:integration -w backend
+- name: Seed de la base de datos de test
+  run: npm run db:seed -w backend
 ```
 
-`DATABASE_URL` se declara explícita en ese paso porque el CLI de Prisma no lee
-`jest-integration.setup.ts` (eso solo corre dentro de Jest) — sin un `.env` en el runner (CI no
-copia `.env.example`, config.yaml §10 dice que `.env` nunca se commitea), Prisma no tiene de
-dónde tomarlo. El paso de `test:integration` en sí no necesita el `env:` porque Jest carga el
-fallback del propio `jest-integration.setup.ts`.
+Ninguno de los dos pasos necesita un `env:` propio: `DATABASE_URL` ya está declarada a nivel
+del job (D3).
 
-### D3 — Sin seed en CI
+### D3 — Alcance de las variables de entorno: todo el job, no solo la base de datos
 
-Ver Non-Goals. Se verificó leyendo las dos suites existentes que ninguna depende de
-`npm run db:seed -w backend`; agregar un paso de seed sin una necesidad concreta sería
-contradecir la Prioridad 3 de §14 ("no hacer de más"). Si una suite futura sí lo necesita, la
-agrega ese change.
+**Decisión revisada durante la implementación**, a partir del hallazgo de portalmatias en el
+PR #12 (ver Context): no alcanza con que Prisma tenga `DATABASE_URL` para el paso de
+migración. Una vez que un módulo de dominio con controller real (auth-admin, disponibilidad)
+se registra en `AppModule`, **cualquier test que haga `app.init()` sobre esa app completa**
+—no solo los que corren contra Postgres a propósito— necesita TODAS las variables que ese
+módulo lea de `ConfigService`, o el `useFactory` que las pide con `getOrThrow` explota antes
+de llegar a la lógica de negocio (pasó en vivo con `THROTTLE_TTL`/`THROTTLE_LIMIT` de
+`auth-admin`, PR #25, corregido ahí a `config.get(clave, default)` — pero ese fix no exime a
+CI de proveerlas cuando el código sí las necesita para tener el comportamiento real, no solo
+un default).
+
+*Decisión:* declarar como `env:` del job `test` completo (no de un paso suelto) las
+variables mínimas de `config.yaml` §10 que **no** tienen (o no deberían depender de) un
+default de código: `DATABASE_URL`, `DATABASE_URL_TEST`, `JWT_SECRET`, `JWT_EXPIRES_IN`,
+`THROTTLE_TTL`, `THROTTLE_LIMIT`. Ninguna es secreta (config.yaml §10) — son las mismas de
+`.env.example`, con `JWT_SECRET` cambiado a un valor obviamente no reutilizable
+(`secreto-de-ci-no-es-real`) para que nadie lo copie por error a un entorno real.
+
+*Por qué a nivel de job y no por paso:* así, el próximo módulo de dominio que se registre en
+`AppModule` (disponibilidad, reservas-crear, cancelacion-turnos, reserva-vip) ya tiene lo que
+necesita para arrancar en CI sin que haga falta tocar `.github/workflows/` de nuevo — que
+además §14 prohíbe hacer desde un PR de feature. Es la diferencia entre resolver el problema
+una vez acá, o repetir este mismo descubrimiento (y este mismo bloqueo) en cada change que
+agregue un controller nuevo.
+
+*Se agrega también un seed* (`npm run db:seed -w backend`, después de migrar): los tests de
+`auth-admin` (`auth.integration-spec.ts`) loguean contra el admin del seed por email/password
+conocidos — a diferencia de `reservas-invariantes.integration-spec.ts` e
+`indices-partial.integration-spec.ts`, que siguen sin necesitarlo (arman sus propios datos).
+Como el seed es idempotente (config.yaml §10) y no tarda, correrlo siempre es más simple que
+condicionar el paso a qué suites existen en cada momento.
 
 ## Risks / Trade-offs
 
-- **El job `test` se vuelve más lento** (levantar Postgres + aplicar 2 migraciones antes de la
-  suite de integración). → Es exactamente el costo que `fundacion-repo` decidió posponer en
-  D8, no evitar. Con dos migraciones y sin seed, el costo adicional es de segundos, no minutos.
-- **Las mismas credenciales de juguete (`postgres`/`postgres`) quedan repetidas en el YAML y en
-  `.env.example`.** → Ya son públicas y no-secretas por decisión explícita de config.yaml §10;
-  duplicarlas en el workflow no cambia esa superficie.
-- **Si una suite de integración futura sí necesita el seed**, este change no lo previó. →
-  Aceptado (D3): se agrega en el change que la introduzca, no especulativamente acá.
+- **El job `test` se vuelve más lento** (levantar Postgres + migrar + seedear antes de correr
+  ningún test). → Es exactamente el costo que `fundacion-repo` decidió posponer en D8, no
+  evitar. Verificado en la implementación: el costo adicional es de un puñado de segundos, no
+  minutos.
+- **Las mismas credenciales de juguete (`postgres`/`postgres`, y ahora también un `JWT_SECRET`
+  de CI) quedan en el YAML y en `.env.example`.** → Ya son públicas y no-secretas por decisión
+  explícita de config.yaml §10; el `JWT_SECRET` de CI es un valor propio, obviamente falso, no
+  el mismo que documenta `.env.example` para desarrollo.
+- **El `env:` del job es una lista fija de variables.** Si un change futuro necesita una
+  variable nueva de `.env.example` para que su módulo arranque en CI, va a tener que tocar
+  `.github/workflows/` igual que este change — pero eso ya está permitido para un change de
+  infraestructura de CI (no para un PR de feature, config.yaml §14). Se aceptó ampliar la
+  lista ahora a las seis variables documentadas en vez de agregar solo `DATABASE_URL`, para no
+  repetir este mismo bloqueo con cada módulo nuevo (ver D3).
 - **Riesgo cerrado, no abierto:** con esto se cierra la "ventana corta y deliberada" que
   `docs/roadmap-mvp.md` §12 marca como riesgo del proyecto ("la cobertura de CI crece en dos
-  etapas... el riesgo es olvidarse de cerrarla").
+  etapas... el riesgo es olvidarse de cerrarla"), y se desbloquea la apertura en verde de
+  `disponibilidad` (pedido explícito de portalmatias en el PR #12, 2026-09-17).
 
 ## Migration Plan
 
 No hay migración de datos: es un cambio de configuración de CI únicamente.
 
 ```
-1. Editar .github/workflows/ci.yml: agregar `services.postgres` y los dos pasos nuevos al job `test`.
-2. Actualizar la nota de README.md sobre el estado de CI (ya no es cierto que test:integration "no corre en CI").
-3. Abrir el PR: verificar que los tres checks siguen en verde, y en particular que "Tests (backend)"
-   ahora muestra los pasos de migracion y test:integration ejecutandose (no solo unitarios/e2e).
-4. Verificacion negativa: romper a proposito una aserción de indices-partial.integration-spec.ts
+1. Editar .github/workflows/ci.yml: agregar `services.postgres`, el `env:` del job, y los pasos
+   de migracion + seed + test:integration al job `test`.
+2. Actualizar la nota de README.md y docs/roadmap-mvp.md sobre el estado de CI (ya no es cierto
+   que test:integration "no corre en CI").
+3. Verificacion local simulando CI exactamente: sin ningun .env presente, con Postgres efimero
+   en el puerto 5432 y las variables del `env:` del job exportadas a mano (no dadas por sentado
+   via un .env de desarrollo que CI no tiene) — asi se evita repetir el error que rompio el
+   PR #25 (un getOrThrow que funcionaba local por tener .env, pero explotaba en CI).
+4. Abrir el PR: verificar que los tres checks siguen en verde, y en particular que "Tests (backend)"
+   ahora muestra los pasos de migracion, seed y test:integration ejecutandose (no solo unitarios/e2e).
+5. Verificacion negativa: romper a proposito una aserción de indices-partial.integration-spec.ts
    en una rama de prueba y confirmar que el PR de esa rama queda en rojo — la compuerta que pidió
    lussofacundo-iresm como criterio de cierre del PR #12.
 ```
