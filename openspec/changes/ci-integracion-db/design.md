@@ -194,8 +194,10 @@ No hay migración de datos: es un cambio de configuración de CI únicamente.
 2. Actualizar README.md, docs/roadmap-mvp.md y la equivalencia de infraestructura en
    openspec/config.yaml §9. Coordinar los artefactos de spec compartidos con #26.
 3. Verificacion local simulando CI exactamente: sin ningun .env presente, con Postgres efimero
-   en el puerto 5432 y las variables del `env:` del job exportadas a mano (no dadas por sentado
-   via un .env de desarrollo que CI no tiene) — asi se evita repetir el error que rompio el
+   en el puerto 5432 y el entorno efectivo exportado a mano: las variables del `env:` del
+   workflow (JWT_SECRET, JWT_EXPIRES_IN, THROTTLE_TTL, THROTTLE_LIMIT) mas las del job `test`
+   (DATABASE_URL, DATABASE_URL_TEST). No darlas por sentado via un .env de desarrollo que
+   CI no tiene — asi se evita repetir el error que rompio el
    PR #25 (un getOrThrow que funcionaba local por tener .env, pero explotaba en CI).
 4. Abrir el PR: verificar que los tres checks siguen en verde, y en particular que "Tests (backend)"
    ahora muestra los pasos de migracion, seed y test:integration ejecutandose (no solo unitarios/e2e).
