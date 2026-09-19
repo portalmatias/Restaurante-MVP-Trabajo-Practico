@@ -1,31 +1,27 @@
 # Tareas — `ci-integracion-db`
 
-Change chico (~30 minutos de trabajo real, per roadmap §6.1). Una sola tarea de
-implementación porque no tiene sentido partir un cambio de 15 líneas de YAML en pasos de
-2 horas — sería ceremonia sin valor (config.yaml §14, Prioridad 3: cambios chicos y
-revisables, no cambios artificialmente trozados).
+Change de infraestructura: PostgreSQL real en CI, configuración de arranque y documentación.
+Las verificaciones originales y las del seguimiento se distinguen para no atribuir a CI
+pruebas que solo se ejecutaron localmente.
 
 ## 1. Prerrequisitos (bloqueante)
 
 - [x] 1.1 Confirmar que `modelo-dominio` está mergeado a `main`: existen
       `backend/prisma/schema.prisma`, dos migraciones, y `backend/test/*.integration-spec.ts`
       con el script `test:integration` en `backend/package.json`. Verificado: PR #12 mergeado
-      2026-09-17, ambos archivos de test existen en `main`.
-- [x] 1.2 Leer las dos suites de integración existentes y confirmar si dependen de
-      `npm run db:seed -w backend`. Verificado: ninguna depende del seed — las dos arman sus
-      propios datos con `upsert`/`create` y limpian en `afterAll` (ver `design.md`, Context).
-      **Superado por los hechos (2026-09-17):** para cuando se implementó este change ya
-      existían `auth-admin` (PR #25) y el pedido de portalmatias sobre `disponibilidad`
-      (PR #12) — ver la nota de Context. El seed sí hace falta ahora (D3 revisada).
+      2026-09-17; además, #24 incorporó la suite de mesas.
+- [x] 1.2 Revisar las tres suites: invariantes y mesas crean fixtures y comparten zonas;
+      índices consulta el catálogo. El seed crea STANDARD/VIP antes de los workers y prepara
+      el admin que usará auth cuando se integre #25, todavía abierto. No aísla las ediciones
+      posteriores de filas compartidas (ver `design.md`, Context y Risks).
 
 ## 2. CI
 
 - [x] 2.1 Agregar `services.postgres` al job `test` de `.github/workflows/ci.yml`
       (`postgres:16.4-alpine`, credenciales `postgres`/`postgres`, base `reservas_test`,
       puerto `5432`, healthcheck `pg_isready`) — ver `design.md` D1 para el YAML exacto.
-      También se agregó el `env:` a nivel de job con `DATABASE_URL`, `DATABASE_URL_TEST`,
-      `JWT_SECRET`, `JWT_EXPIRES_IN`, `THROTTLE_TTL`, `THROTTLE_LIMIT` (D3 revisada — no
-      estaba en el plan original). Verificado: YAML parseado con `js-yaml` sin errores.
+      URLs a nivel de job; `JWT_SECRET`, `JWT_EXPIRES_IN`, `THROTTLE_TTL` y `THROTTLE_LIMIT`
+      compartidos a nivel workflow para cubrir también `spec` (seguimiento del review).
 - [x] 2.2 Agregar los pasos "Migrar la base de datos de test" (`prisma migrate deploy`) y
       "Seed de la base de datos de test" (`npm run db:seed -w backend`), antes de cualquier
       test — ver `design.md` D2/D3. Verificado localmente simulando CI exacto: Postgres
@@ -49,8 +45,9 @@ revisables, no cambios artificialmente trozados).
       `npm run build -w backend`, `npm run openapi:lint`, `npm run openapi:check`,
       `./node_modules/.bin/openspec validate --all --strict` (7/7), `npm run test -w backend`
       (47/47), `npm run test:e2e` (1/1), `npm run test:integration -w backend` (21/21),
-      `npm run test:scripts` (20/20) — todo en verde. Falta abrir el PR real y confirmar los
-      tres checks de GitHub Actions (siguiente paso, fuera de este archivo).
+      `npm run test:scripts` (20/20) — todo en verde. Confirmación en GitHub Actions del
+      head original `ad708c5`: run `35291195947`, tres jobs de CI exitosos, con migraciones,
+      seed y las tres suites de integración ejecutadas. Repetir checks para el nuevo head.
 - [x] 3.2 Verificación negativa (criterio de cierre pedido por lussofacundo-iresm en el review
       del PR #12): se reemplazó a propósito el nombre del índice en
       `indices-partial.integration-spec.ts` por uno inexistente — la suite falló como se
@@ -62,3 +59,18 @@ revisables, no cambios artificialmente trozados).
       reglas de negocio — no aplica (sin comportamiento de dominio nuevo, `skip_specs: true`).
       Confirmado que ya no queda ninguna mención de "test:integration no corre en CI" en
       `README.md` ni en `docs/roadmap-mvp.md`.
+
+## 4. Seguimiento del review
+
+- [x] 4.1 Explicitar en `openspec/config.yaml` §9 la equivalencia entre Docker Compose local
+      y service container PostgreSQL en CI, sin permitir mocks en integración.
+- [x] 4.2 Corregir propuesta, inventario de archivos, suites existentes, justificación del
+      seed y rollback; distinguir auth futuro de los services de salón ya mergeados.
+- [x] 4.3 Compartir JWT/throttling entre jobs sin mover las URLs de base fuera de `test`.
+- [x] 4.4 Validación local del seguimiento (2026-09-19): YAML parseado y aserciones sobre
+      herencia de JWT, alcance de URLs, orden de pasos y ausencia de `continue-on-error`.
+      OpenSpec 8/8, lint, tipos, build, Spectral y OpenAPI sin deriva. PostgreSQL 16.4 efímero
+      en puerto dinámico, dos migraciones y seed; 47 unitarios, 1 e2e, 21 de integración y
+      20 tests de scripts aprobados. Variables de CI exportadas explícitamente; no se eliminó
+      el `.env` local ni se usó su base. Contenedor eliminado al terminar. No se repitió la
+      prueba negativa histórica de 3.2 ni se afirma haber probado la combinación con #25/#27.

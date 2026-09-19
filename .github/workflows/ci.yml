@@ -6,6 +6,12 @@ on:
     branches:
       - main
 
+env:
+  JWT_SECRET: secreto-de-ci-no-es-real
+  JWT_EXPIRES_IN: 60m
+  THROTTLE_TTL: 60
+  THROTTLE_LIMIT: 10
+
 jobs:
   spec:
     name: Especificación (OpenSpec + OpenAPI)
@@ -92,16 +98,9 @@ jobs:
           --health-retries 10
     # Ningún valor de acá es secreto (config.yaml §10): son las mismas credenciales de
     # juguete que ya documentan .env.example y docker-compose.yml para desarrollo local.
-    # Job-level porque cualquier módulo de dominio que se registre en AppModule (auth,
-    # disponibilidad, gestion-salon, ...) puede necesitar cualquiera de estas variables
-    # para arrancar, no solo los pasos que migran/seedean explícitamente.
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reservas_test
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/reservas_test
-      JWT_SECRET: secreto-de-ci-no-es-real
-      JWT_EXPIRES_IN: 60m
-      THROTTLE_TTL: 60
-      THROTTLE_LIMIT: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -125,8 +124,6 @@ jobs:
       - name: Migrar la base de datos de test
         run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
 
-      # Necesario para los tests que dependen de datos conocidos (ej. el admin del seed
-      # que usan los tests de auth-admin). Es idempotente (config.yaml §10).
       - name: Seed de la base de datos de test
         run: npm run db:seed -w backend
 
