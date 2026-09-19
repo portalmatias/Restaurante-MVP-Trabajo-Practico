@@ -8,25 +8,21 @@ Ver `proposal.md` — Why. Estado de partida (post-merge de `modelo-dominio`, PR
 - `backend/package.json` ya tiene el script `test:integration` (`jest --config
   ./test/jest-integration.json`), que matchea `backend/test/*.integration-spec.ts` y no lo
   corre ningún otro script.
-- Dos suites viven ahí hoy: `reservas-invariantes.integration-spec.ts` (los cinco invariantes
-  de negocio del §6, incluido aforo global) e `indices-partial.integration-spec.ts` (guard
-  contra drift del índice único parcial de `Reserva`, consultando `pg_index` directo).
+- Tres suites viven ahí hoy: `reservas-invariantes.integration-spec.ts` (invariantes del §6),
+  `indices-partial.integration-spec.ts` (índice único parcial, consultando `pg_index`) y
+  `mesas.integration-spec.ts` (baja de mesas con reservas, incorporada por #24).
 - `backend/test/jest-integration.setup.ts` fija `process.env.DATABASE_URL` a
   `process.env.DATABASE_URL_TEST`, con fallback a
   `postgresql://postgres:postgres@localhost:5432/reservas_test` si esa variable no está.
-- Ninguna de las dos suites depende de `npm run db:seed -w backend`: ambas arman sus propios
-  datos con `prisma.zona.upsert(...)` (por nombre, no por id) y sus propios `mesa.create` /
-  `turno.create`, y limpian lo que crearon en `afterAll`. Verificado leyendo el código de las
-  dos, no asumido.
-- **Actualizado durante la implementación (2026-09-17):** en el tiempo que tardó en escribirse
-  esta spec, se mergeó `gestion-salon` (PR #24) y se abrió `auth-admin` (PR #25). Los dos
-  agregaron controllers reales y, con ellos, suites de integración que **sí** necesitan datos
-  conocidos (el admin del seed, para `auth.integration-spec.ts`). Además, portalmatias
-  reportó en el PR #12 que `disponibilidad` (con `GET /disponibilidad`, controller real) va a
-  registrar `DisponibilidadModule` en `AppModule` — y simuló que eso rompe `test:e2e` sin
-  Postgres (las 4 suites fallan, incluida `app.e2e-spec.ts`, hoy verde). Esto invalida la
-  Non-Goal original de "sin seed" (ver D3 revisada abajo) y confirma que este change ya no es
-  opcional: bloquea la apertura en verde de `disponibilidad`.
+- Invariantes y mesas crean sus fixtures y comparten zonas por nombre; índices solo consulta
+  el catálogo. Ejecutar el seed primero deja STANDARD/VIP creadas y evita la carrera de alta
+  inicial entre sus `upsert`. No aísla escrituras posteriores sobre esas filas compartidas.
+- `gestion-salon` (#24) incorporó services y tests, no controllers ni dependencia del admin
+  del seed. `auth-admin` (#25) sigue abierto: su `auth.integration-spec.ts` no existe en esta
+  rama, pero necesitará el admin del seed cuando se integre.
+- `disponibilidad` registrará un módulo con Prisma en `AppModule`; los tests que inicializan
+  la aplicación necesitarán PostgreSQL aunque antes fueran solo un smoke test. Por eso se
+  prepara la base antes de cualquier test, no solamente antes de `test:integration`.
 
 Tres restricciones de `config.yaml` dan forma al diseño:
 
@@ -62,6 +58,10 @@ Tres restricciones de `config.yaml` dan forma al diseño:
 ## Decisions
 
 ### D1 — Un solo `services: postgres` en el job `test`, no un `docker-compose up` en CI
+
+Este change actualiza `openspec/config.yaml` §9 para admitir explícitamente esta alternativa
+en CI. Se conserva PostgreSQL real, base exclusiva de test y migraciones versionadas;
+Docker Compose sigue siendo la forma de levantar la base local.
 
 GitHub Actions soporta *service containers* nativos (`jobs.<job>.services`), que arrancan
 antes que los `steps` y exponen su puerto al runner. Se usa eso en vez de instalar Docker
@@ -130,7 +130,7 @@ cuando arranque incluso el smoke test e2e — ver D3):*
 Ninguno de los dos pasos necesita un `env:` propio: `DATABASE_URL` ya está declarada a nivel
 del job (D3).
 
-### D3 — Alcance de las variables de entorno: todo el job, no solo la base de datos
+### D3 — Variables compartidas de arranque y URLs limitadas al job de tests
 
 **Decisión revisada durante la implementación**, a partir del hallazgo de portalmatias en el
 PR #12 (ver Context): no alcanza con que Prisma tenga `DATABASE_URL` para el paso de
@@ -143,26 +143,22 @@ de llegar a la lógica de negocio (pasó en vivo con `THROTTLE_TTL`/`THROTTLE_LI
 CI de proveerlas cuando el código sí las necesita para tener el comportamiento real, no solo
 un default).
 
-*Decisión:* declarar como `env:` del job `test` completo (no de un paso suelto) las
-variables mínimas de `config.yaml` §10 que **no** tienen (o no deberían depender de) un
-default de código: `DATABASE_URL`, `DATABASE_URL_TEST`, `JWT_SECRET`, `JWT_EXPIRES_IN`,
-`THROTTLE_TTL`, `THROTTLE_LIMIT`. Ninguna es secreta (config.yaml §10) — son las mismas de
-`.env.example`, con `JWT_SECRET` cambiado a un valor obviamente no reutilizable
-(`secreto-de-ci-no-es-real`) para que nadie lo copie por error a un entorno real.
+*Decisión:* declarar `JWT_SECRET`, `JWT_EXPIRES_IN`, `THROTTLE_TTL` y `THROTTLE_LIMIT`
+como `env:` del workflow. `DATABASE_URL` y `DATABASE_URL_TEST` quedan en el job `test`,
+que es el único con un service container. Son valores ficticios de CI; el JWT usa
+`secreto-de-ci-no-es-real`, nunca una clave de producción.
 
-*Por qué a nivel de job y no por paso:* así, el próximo módulo de dominio que se registre en
-`AppModule` (disponibilidad, reservas-crear, cancelacion-turnos, reserva-vip) ya tiene lo que
-necesita para arrancar en CI sin que haga falta tocar `.github/workflows/` de nuevo — que
-además §14 prohíbe hacer desde un PR de feature. Es la diferencia entre resolver el problema
-una vez acá, o repetir este mismo descubrimiento (y este mismo bloqueo) en cada change que
-agregue un controller nuevo.
+*Por qué compartir la configuración de arranque:* `spec` también construye `AppModule`
+mediante `NestFactory.create` en `openapi:check`. Cuando se registre auth, `JwtStrategy`
+necesitará `JWT_SECRET` durante esa construcción. El script no llama `app.init()` ni
+`app.listen()`, por lo que no ejecuta el hook de conexión de Prisma y no requiere otra base
+por ese motivo. Si un módulo futuro realiza I/O en su constructor o exige variables nuevas,
+habrá que reevaluar el workflow; esto no promete cubrir requisitos futuros desconocidos.
 
-*Se agrega también un seed* (`npm run db:seed -w backend`, después de migrar): los tests de
-`auth-admin` (`auth.integration-spec.ts`) loguean contra el admin del seed por email/password
-conocidos — a diferencia de `reservas-invariantes.integration-spec.ts` e
-`indices-partial.integration-spec.ts`, que siguen sin necesitarlo (arman sus propios datos).
-Como el seed es idempotente (config.yaml §10) y no tarda, correrlo siempre es más simple que
-condicionar el paso a qué suites existen en cada momento.
+*Se agrega también un seed* (`npm run db:seed -w backend`, después de migrar): crea las zonas
+compartidas antes de los workers de Jest y prepara el admin que requerirá la suite de auth
+del PR #25. Ninguna de las tres suites actuales usa ese admin. El seed es idempotente
+(config.yaml §10); no sustituye la limpieza de fixtures ni el aislamiento entre suites.
 
 ## Risks / Trade-offs
 
@@ -174,13 +170,16 @@ condicionar el paso a qué suites existen en cada momento.
   de CI) quedan en el YAML y en `.env.example`.** → Ya son públicas y no-secretas por decisión
   explícita de config.yaml §10; el `JWT_SECRET` de CI es un valor propio, obviamente falso, no
   el mismo que documenta `.env.example` para desarrollo.
-- **El `env:` del job es una lista fija de variables.** Si un change futuro necesita una
+- **La configuración de entorno es una lista fija de variables.** Si un change futuro necesita una
   variable nueva de `.env.example` para que su módulo arranque en CI, va a tener que tocar
   `.github/workflows/` igual que este change — pero eso ya está permitido para un change de
   infraestructura de CI (no para un PR de feature, config.yaml §14). Se aceptó ampliar la
   lista ahora a las seis variables documentadas en vez de agregar solo `DATABASE_URL`, para no
   repetir este mismo bloqueo con cada módulo nuevo (ver D3).
-- **Riesgo cerrado, no abierto:** con esto se cierra la "ventana corta y deliberada" que
+- **Datos compartidos:** el seed evita la carrera de creación inicial, no que dos suites
+  sobrescriban STANDARD/VIP. #27 propone serializarlas; verificar esa configuración al
+  combinar los PRs y usar bases distintas para ejecuciones independientes simultáneas.
+- **Riesgo cerrado al mergear:** con esto se cierra la "ventana corta y deliberada" que
   `docs/roadmap-mvp.md` §12 marca como riesgo del proyecto ("la cobertura de CI crece en dos
   etapas... el riesgo es olvidarse de cerrarla"), y se desbloquea la apertura en verde de
   `disponibilidad` (pedido explícito de portalmatias en el PR #12, 2026-09-17).
@@ -190,20 +189,22 @@ condicionar el paso a qué suites existen en cada momento.
 No hay migración de datos: es un cambio de configuración de CI únicamente.
 
 ```
-1. Editar .github/workflows/ci.yml: agregar `services.postgres`, el `env:` del job, y los pasos
-   de migracion + seed + test:integration al job `test`.
-2. Actualizar la nota de README.md y docs/roadmap-mvp.md sobre el estado de CI (ya no es cierto
-   que test:integration "no corre en CI").
+1. Editar .github/workflows/ci.yml: agregar `services.postgres`, URLs en el job `test`,
+   JWT/throttling a nivel workflow y los pasos de migracion + seed + test:integration.
+2. Actualizar README.md, docs/roadmap-mvp.md y la equivalencia de infraestructura en
+   openspec/config.yaml §9. Coordinar los artefactos de spec compartidos con #26.
 3. Verificacion local simulando CI exactamente: sin ningun .env presente, con Postgres efimero
    en el puerto 5432 y las variables del `env:` del job exportadas a mano (no dadas por sentado
    via un .env de desarrollo que CI no tiene) — asi se evita repetir el error que rompio el
    PR #25 (un getOrThrow que funcionaba local por tener .env, pero explotaba en CI).
 4. Abrir el PR: verificar que los tres checks siguen en verde, y en particular que "Tests (backend)"
    ahora muestra los pasos de migracion, seed y test:integration ejecutandose (no solo unitarios/e2e).
-5. Verificacion negativa: romper a proposito una aserción de indices-partial.integration-spec.ts
-   en una rama de prueba y confirmar que el PR de esa rama queda en rojo — la compuerta que pidió
-   lussofacundo-iresm como criterio de cierre del PR #12.
+5. Verificacion negativa: ejecutar una aserción deliberadamente incorrecta en una copia
+   temporal de la suite y comprobar salida distinta de cero. Verificar que el paso de CI
+   ejecuta el mismo comando sin continue-on-error ni mecanismos que oculten fallos.
+   Distinguir esta prueba local de una ejecución negativa real en GitHub Actions.
 ```
 
-*Rollback:* revertir el commit que tocó `ci.yml`. Ningún otro archivo cambia, así que el
-rollback es de costo cero.
+*Rollback:* revertir los cambios de workflow y las afirmaciones de cobertura de README y
+roadmap de forma coordinada. Revisar también `openspec/config.yaml` y los artefactos del
+change. Se perderá la cobertura de integración en CI; no hay migraciones de datos que revertir.

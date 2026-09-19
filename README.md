@@ -108,11 +108,12 @@ Un PR con CI en rojo no se mergea, aunque funcione localmente.
 
 > El job `test` levanta un service container de PostgreSQL (`postgres:16.4-alpine`, una sola
 > base `reservas_test` — no hace falta separar dev de test en CI), aplica las migraciones
-> (`prisma migrate deploy`) y el seed, y recién ahí corre las cuatro suites. Las credenciales
-> (`postgres`/`postgres`) y las demás variables del job (`JWT_SECRET`, `THROTTLE_TTL`, etc.)
-> son las mismas de juguete que documenta `.env.example`, nunca secretas (config.yaml §10).
-> Cualquier módulo de dominio que se registre en `AppModule` (auth-admin, disponibilidad, ...)
-> ya tiene lo que necesita para arrancar en CI, sin tener que tocar el workflow de nuevo.
+> (`prisma migrate deploy`) y el seed, y recién ahí corre las cuatro categorías de tests.
+> Las URLs de base quedan en `test`; JWT y throttling se comparten a nivel workflow para
+> que `spec` también pueda construir la app al generar OpenAPI cuando se registre auth.
+> Todos los valores son ficticios de CI (config.yaml §10), nunca secretos de producción.
+> Esto prepara las variables conocidas; módulos que agreguen configuración o conexiones
+> durante su construcción requerirán revisar nuevamente el entorno de CI.
 
 ## Cómo se trabaja acá
 

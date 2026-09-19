@@ -298,7 +298,8 @@ context: |
 
   ### Reglas
   - Los tests de integración corren contra una **base de datos real de test** levantada por
-    `docker-compose`, no contra mocks de Prisma. Se resetea entre suites.
+    `docker-compose` en desarrollo local o un service container equivalente de PostgreSQL
+    en CI, no contra mocks de Prisma. Se resetea entre suites.
   - Cada test es independiente: no puede depender del orden de ejecución ni del estado que dejó otro.
   - **Todo bug corregido suma un test que falle sin el fix.** Sin excepción.
   - No se exige un porcentaje de cobertura mínimo, pero un PR que toca lógica de negocio
