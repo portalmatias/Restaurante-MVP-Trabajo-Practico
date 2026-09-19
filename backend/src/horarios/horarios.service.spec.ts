@@ -110,6 +110,14 @@ describe('HorariosService', () => {
   });
 
   describe('actualizar', () => {
+    it('devuelve 404 si el turno desaparece antes de actualizar', async () => {
+      prisma.turno.findUnique.mockResolvedValue(turnoAlmuerzo);
+      prisma.turno.update.mockRejectedValue(errorPrisma('P2025'));
+
+      await expect(
+        service.actualizar(turnoAlmuerzo.id, { activo: false }),
+      ).rejects.toEqual(new NotFoundException('El turno indicado no existe.'));
+    });
     it('rechaza si el turno no existe', async () => {
       prisma.turno.findUnique.mockResolvedValue(null);
 
@@ -171,6 +179,14 @@ describe('HorariosService', () => {
   });
 
   describe('cambiarActivo', () => {
+    it('devuelve 404 si el turno desaparece antes de cambiar activo', async () => {
+      prisma.turno.findUnique.mockResolvedValue(turnoAlmuerzo);
+      prisma.turno.update.mockRejectedValue(errorPrisma('P2025'));
+
+      await expect(
+        service.cambiarActivo(turnoAlmuerzo.id, false),
+      ).rejects.toEqual(new NotFoundException('El turno indicado no existe.'));
+    });
     it('rechaza si el turno no existe', async () => {
       prisma.turno.findUnique.mockResolvedValue(null);
 
@@ -189,7 +205,12 @@ describe('HorariosService', () => {
       const resultado = await service.cambiarActivo(turnoAlmuerzo.id, false);
       expect(prisma.turno.update).toHaveBeenCalledWith({
         where: { id: turnoAlmuerzo.id },
-        data: { activo: false },
+        data: {
+          diaSemana: undefined,
+          horaInicio: undefined,
+          horaFin: undefined,
+          activo: false,
+        },
       });
       expect(resultado.activo).toBe(false);
     });

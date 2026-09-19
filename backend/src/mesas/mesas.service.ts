@@ -47,7 +47,7 @@ export class MesasService {
     try {
       return await this.prisma.mesa.create({ data: dto });
     } catch (error) {
-      throw this.traducirErrorDePrisma(error);
+      throw this.traducirErrorDePrisma(error, 'crear');
     }
   }
 
@@ -86,7 +86,7 @@ export class MesasService {
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === 'P2034';
         if (!esConflictoDeSerializacion) {
-          throw this.traducirErrorDePrisma(error);
+          throw this.traducirErrorDePrisma(error, 'actualizar');
         }
         if (intento < SERIALIZACION_MAX_INTENTOS - 1) {
           continue;
@@ -175,7 +175,7 @@ export class MesasService {
     try {
       await this.prisma.mesa.delete({ where: { id } });
     } catch (error) {
-      throw this.traducirErrorDePrisma(error);
+      throw this.traducirErrorDePrisma(error, 'eliminar');
     }
   }
 
@@ -186,7 +186,10 @@ export class MesasService {
    * cumplir el `where` concurrentemente) a `404`, `P2003` (la FK de una Reserva impide el
    * `DELETE`) a `409`. Cualquier otro error se propaga sin tocar.
    */
-  private traducirErrorDePrisma(error: unknown): unknown {
+  private traducirErrorDePrisma(
+    error: unknown,
+    operacion: 'crear' | 'actualizar' | 'eliminar',
+  ): unknown {
     if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
       return error;
     }
@@ -197,6 +200,9 @@ export class MesasService {
       return new NotFoundException('La mesa indicada no existe.');
     }
     if (error.code === 'P2003') {
+      if (operacion !== 'eliminar') {
+        return new NotFoundException('La zona indicada no existe.');
+      }
       return new ConflictException(
         'No se puede eliminar una mesa con reservas asociadas.',
       );

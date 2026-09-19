@@ -20,15 +20,29 @@
 > corren en una transacción `Serializable` (evita que dos escrituras concurrentes dejen
 > `minComensales > maxComensales`, o una Reserva activa inconsistente con una edición de
 > capacidad/zona — verificado con tests de integración nuevos contra Postgres real, no solo
-> mocks); `HorariosService.actualizar` ahora persiste `activo`; `crear`/`actualizar` de los
-> tres services traducen `P2002`/`P2025` de Prisma a `409`/`404` en vez de dejarlos escapar
-> como `500`; los DTOs con campos opcionales usan `@ValidateIf` en vez de `@IsOptional()`
+> mocks); `HorariosService.actualizar` ahora persiste `activo`; Mesas traduce `P2002` a `409`
+> y `P2025` a `404`, y distingue `P2003` por operación (zona inexistente al crear/editar:
+> `404`; reservas que impiden eliminar: `409`). Zonas traduce `P2025` al actualizar a `404`;
+> Horarios traduce `P2002` al crear/actualizar a `409` y `P2025` al actualizar o cambiar
+> actividad a `404`. Zonas no tiene operación de alta. Los DTOs con campos opcionales usan
+> `@ValidateIf` en vez de `@IsOptional()`
 > (un `null` explícito ya no se cuela como "campo ausente"); `CrearTurnoDto`/
 > `ActualizarTurnoDto` transforman `HH:mm`/`HH:mm:ss` a `Date` en vez de exigir un ISO
 > completo; la etiqueta de Mesa rechaza strings de solo espacios; y la carrera de `upsert`
 > de Zona en los tests de integración (que el primer fix solo trasladó a
 > `reservas-invariantes.integration-spec.ts`, no la eliminó) ahora usa un helper compartido
 > (`test/helpers/upsert-seguro.ts`) en los dos archivos.
+
+> **Seguimiento del PR #27 (2026-09-19):** las suites de integración comparten las filas
+> STANDARD/VIP, por lo que `jest-integration.json` fija `maxWorkers: 1`. El helper de upsert
+> no evita que una suite sobrescriba los valores de otra; ejecutar las suites en serie sí
+> impide esa interferencia dentro de una ejecución de Jest. Las operaciones concurrentes
+> dentro de cada test siguen usando `Promise.allSettled`. No correr dos ejecuciones de
+> integración simultáneas contra la misma base; usar bases separadas para ello. Los unitarios
+> verifican el aislamiento `Serializable`, exactamente tres intentos al agotarse `P2034`
+> y los errores de fila/relación eliminada entre la consulta y la escritura. La prueba de
+> capacidad concurrente verifica un valor final solicitado, sin afirmar que solo una escritura
+> pueda persistir.
 
 ## 1. Prerrequisitos (bloqueante)
 

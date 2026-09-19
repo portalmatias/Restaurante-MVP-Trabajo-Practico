@@ -204,29 +204,30 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
       expect(persistida.capacidad).toBe(9);
     });
 
-    it(
-      'dos reducciones de capacidad concurrentes sobre la misma Mesa no corrompen el ' +
-        'valor final: como mucho una persiste',
-      async () => {
-        const mesa = await crearMesa('INT-ACT-2');
+    it('dos cambios concurrentes de capacidad dejan uno de los valores solicitados', async () => {
+      const mesa = await crearMesa('INT-ACT-2');
 
-        const resultados = await Promise.allSettled([
-          service.actualizar(mesa.id, { capacidad: 3 }),
-          service.actualizar(mesa.id, { capacidad: 5 }),
-        ]);
+      const resultados = await Promise.allSettled([
+        service.actualizar(mesa.id, { capacidad: 3 }),
+        service.actualizar(mesa.id, { capacidad: 5 }),
+      ]);
 
-        const cumplidas = resultados.filter((r) => r.status === 'fulfilled');
-        // Bajo Serializable, Postgres resuelve la escritura concurrente sobre la misma fila
-        // serializando una detrás de la otra (ambas pueden terminar aplicándose, en orden,
-        // sin conflicto real de lectura/escritura) o abortando una con 409 — lo que nunca
-        // puede pasar es un resultado que no sea ninguno de los dos valores pedidos.
-        expect(cumplidas.length).toBeGreaterThanOrEqual(1);
+      const cumplidas = resultados.filter(
+        (resultado) => resultado.status === 'fulfilled',
+      );
+      expect(cumplidas.length).toBeGreaterThanOrEqual(1);
+      for (const resultado of resultados) {
+        if (resultado.status === 'fulfilled') {
+          expect([3, 5]).toContain(resultado.value.capacidad);
+        } else {
+          expect(resultado.reason).toBeInstanceOf(ConflictException);
+        }
+      }
 
-        const final = await prisma.mesa.findUniqueOrThrow({
-          where: { id: mesa.id },
-        });
-        expect([3, 5]).toContain(final.capacidad);
-      },
-    );
+      const final = await prisma.mesa.findUniqueOrThrow({
+        where: { id: mesa.id },
+      });
+      expect([3, 5]).toContain(final.capacidad);
+    });
   });
 });

@@ -67,6 +67,20 @@ describe('ZonasService', () => {
   });
 
   describe('actualizar', () => {
+    it('devuelve 404 si la Zona desaparece antes de actualizar', async () => {
+      prisma.zona.findUnique.mockResolvedValue(zonaVip);
+      prisma.zona.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('mock', {
+          code: 'P2025',
+          clientVersion: '6.19.0',
+        }),
+      );
+
+      await expect(
+        service.actualizar(zonaVip.id, { aforoMaximo: 25 }),
+      ).rejects.toEqual(new NotFoundException('La zona indicada no existe.'));
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
     it('rechaza si la Zona no existe', async () => {
       prisma.zona.findUnique.mockResolvedValue(null);
 
@@ -88,6 +102,9 @@ describe('ZonasService', () => {
         data: dto,
       });
       expect(resultado.aforoMaximo).toBe(25);
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
     });
 
     it('rechaza si el dto deja minComensales > maxComensales explícitamente', async () => {
@@ -149,6 +166,7 @@ describe('ZonasService', () => {
       await expect(
         service.actualizar(zonaVip.id, { aforoMaximo: 30 }),
       ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3);
     });
   });
 });

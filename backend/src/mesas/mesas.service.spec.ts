@@ -64,6 +64,18 @@ describe('MesasService', () => {
   });
 
   describe('crear', () => {
+    it('devuelve 404 de zona si desaparece antes del alta', async () => {
+      prisma.zona.findUnique.mockResolvedValue(zonaStandard);
+      prisma.mesa.create.mockRejectedValue(errorPrisma('P2003'));
+
+      await expect(
+        service.crear({
+          zonaId: zonaStandard.id,
+          capacidad: 4,
+          etiqueta: 'M2',
+        }),
+      ).rejects.toEqual(new NotFoundException('La zona indicada no existe.'));
+    });
     it('crea la mesa cuando la zona existe y la capacidad es positiva', async () => {
       prisma.zona.findUnique.mockResolvedValue(zonaStandard);
       prisma.mesa.create.mockResolvedValue(mesa);
@@ -125,6 +137,16 @@ describe('MesasService', () => {
   });
 
   describe('actualizar', () => {
+    it('devuelve 404 de zona si desaparece antes de la edición', async () => {
+      prisma.mesa.findUnique.mockResolvedValue(mesa);
+      prisma.zona.findUnique.mockResolvedValue(zonaVip);
+      prisma.reserva.count.mockResolvedValue(0);
+      prisma.mesa.update.mockRejectedValue(errorPrisma('P2003'));
+
+      await expect(
+        service.actualizar(mesa.id, { zonaId: zonaVip.id }),
+      ).rejects.toEqual(new NotFoundException('La zona indicada no existe.'));
+    });
     it.each([0, -1, 1.5])(
       'rechaza capacidad no positiva (%s), sin llegar a la transacción',
       async (capacidad) => {
@@ -149,6 +171,9 @@ describe('MesasService', () => {
 
       await service.actualizar(mesa.id, { etiqueta: 'M1-nueva' });
       expect(prisma.reserva.count).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
       expect(prisma.mesa.update).toHaveBeenCalledWith({
         where: { id: mesa.id },
         data: { etiqueta: 'M1-nueva' },
@@ -247,6 +272,7 @@ describe('MesasService', () => {
       await expect(
         service.actualizar(mesa.id, { etiqueta: 'M1-nueva' }),
       ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3);
     });
   });
 

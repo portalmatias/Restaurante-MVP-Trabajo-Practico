@@ -70,6 +70,12 @@ export class HorariosService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('El turno indicado no existe.');
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
         throw new ConflictException(
@@ -85,7 +91,6 @@ export class HorariosService {
    * (spec: "Activación y desactivación de Turno").
    */
   async cambiarActivo(id: string, activo: boolean) {
-    await this.obtenerOFallar(id);
-    return this.prisma.turno.update({ where: { id }, data: { activo } });
+    return this.actualizar(id, { activo });
   }
 }

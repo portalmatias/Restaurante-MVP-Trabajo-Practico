@@ -44,6 +44,12 @@ export class ZonasService {
       try {
         return await this.ejecutarActualizacion(id, dto);
       } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2025'
+        ) {
+          throw new NotFoundException('La zona indicada no existe.');
+        }
         const esConflictoDeSerializacion =
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === 'P2034';
