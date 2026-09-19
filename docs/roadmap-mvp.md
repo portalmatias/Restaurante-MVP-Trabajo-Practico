@@ -30,15 +30,17 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 
 ### PRs abiertos y revisión
 
-Los cuatro PRs tienen checks de GitHub Actions y Cubic en verde al consultar. El estado del
-check de Cubic **no implica que sus observaciones estén resueltas**.
+Hay cinco PRs abiertos, incluido este roadmap (#29). Los checks se vuelven a ejecutar
+después de cada push: verificar siempre el último commit. El estado del check de Cubic
+**no implica que sus observaciones estén resueltas**.
 
 | PR | Estado de aprobación | Pendiente |
 |---|---|---|
 | [#25 — auth](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/25) | Aprobado | Persisten rutas de prueba en el controller, diferencias de tiempo al validar credenciales, cobertura insuficiente del umbral de rate limiting y de firma JWT alterada, y observaciones de documentación/configuración. `ValidationPipe` ya está incorporado. Auth no está registrado en `AppModule`. |
-| [#26 — spec CI](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/26) | Aprobado | Coordinar con #28, que también incluye estos artefactos, para no integrar versiones divergentes de la spec. |
-| [#27 — correcciones salón](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/27) | Requiere aprobación | Revisión de un compañero sobre el último commit; las correcciones siguen fuera de `main`. |
-| [#28 — PostgreSQL en CI](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/28) | Requiere aprobación | Cinco hilos de Cubic sobre documentación y equivalencia Compose/service container; comentario preventivo sobre `JWT_SECRET` para el job `spec`. Federico debe atenderlos antes de una nueva revisión. |
+| [#26 — spec CI](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/26) | Aprobado | Sus commits están incluidos en #28, que contiene la spec corregida. Coordinar su integración mediante #28 y cerrar #26 como reemplazado si permanece abierto después. |
+| [#27 — correcciones salón](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/27) | Requiere aprobación | Detalles de JSDoc y test de actividad corregidos en `3bc0dbb`; 42 tests específicos y ESLint aprobados localmente. Esperar checks del nuevo head y revisión de un compañero. Sigue fuera de `main`. |
+| [#28 — PostgreSQL en CI](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/28) | Requiere aprobación | Facundo atendió las observaciones con autorización de Federico en `87eb9f3` y `00f2e5b`: JWT compartido con `spec`, equivalencia Compose/service container y documentación. CI/Cubic verdes; pedir revisión independiente, preferentemente a Matías. |
+| [#29 — roadmap](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/29) | Requiere aprobación | Este PR corrige la verificación de protección y las referencias horarias observadas por Cubic. Verificar checks del último commit y obtener revisión ajena. |
 
 En #25, los logs de CI muestran 60 unitarios y un e2e, pero no ejecutan la suite de
 integración de auth. En #28 sí se ejecutan migraciones, seed y 21 tests de integración
@@ -47,15 +49,16 @@ Después de integrar el workflow, actualizar las ramas y verificar sus suites co
 
 ### Orden recomendado y trabajo disponible
 
-1. **Fede:** corregir y coordinar #26/#28. La configuración ficticia de JWT debe contemplar
-   también `spec`, que instancia `AppModule` al generar OpenAPI, antes de registrar auth.
+1. **Matías:** revisar #28 ya corregido; coordinar con Fede la integración de #26/#28.
+   JWT ya contempla `spec`; el workflow todavía debe mergearse para llegar a `main`.
 2. **Compañero revisor:** revisar #27; puede avanzar independientemente de #28.
 3. **Fede:** atender pendientes de #25 y probar auth contra PostgreSQL en CI. Su merge como
    módulo aislado no habilita login: quedan registro en la app y contrato OpenAPI.
 4. **Matías:** abrir/revisar disponibilidad y después implementar `reservas-crear`.
 5. **Facundo:** completar la API de salón cuando estén los guards; implementar cancelación
    y VIP solo tras cumplir sus prerrequisitos. Mientras tanto, revisar disponibilidad,
-   preparar matrices de pruebas y mantener documentación, sin modificar PRs ajenos.
+   preparar matrices de pruebas y mantener documentación; modificar PRs ajenos solo con
+   autorización del responsable, como se acordó para #28.
 
 ### Fundación y protección de main
 
@@ -105,8 +108,9 @@ Después de integrar el workflow, actualizar las ramas y verificar sus suites co
    dependen de la zona horaria del proceso (la máquina de desarrollo está en Buenos Aires y CI
    en UTC): hay que usar siempre `getUTC*` y `Date.UTC`. **Decisión vigente: offset fijo
    UTC−3**, no una zona configurable. #12 incorporó `backend/src/common/timezone.ts`:
-   reutilizar `inicioTurnoUtc` y `finTurnoUtc`, incluido el cruce de medianoche. Las specs
-   de disponibilidad (#21) y cancelación (#23) ya están alineadas con esa decisión.
+   reutilizar `inicioTurnoUtc` y `finTurnoUtc`, incluido el cruce de medianoche. La spec de
+   disponibilidad se incorporó en #19 y se alineó en #21; la de cancelación se incorporó
+   en #16 y se alineó en #23. Ambos ajustes adoptan el offset fijo UTC−3.
 
 ## 1. Punto de partida (histórico)
 
@@ -428,10 +432,15 @@ Fase 6  entrega-final (facundo)
 
 ```bash
 gh pr list --state open                                # PR #3 ya no aparece
-gh api repos/<owner>/<repo>/branches/main/protection   # 200, no 404
+gh api repos/portalmatias/Restaurante-MVP-Trabajo-Practico/branches/main --jq '{protected, protection}'
 openspec list                                          # revisar activos; no exigir lista vacía
 ls docs/requerimientos-mvp.docx .gitignore
 ```
+
+Confirmar `protected: true` y los checks requeridos en la respuesta de la rama.
+El endpoint detallado `branches/main/protection` puede devolver `404` según los permisos
+o el mecanismo de reglas: no interpretarlo por sí solo como ausencia de protección.
+Portalmatias debe reconfirmar las opciones detalladas de aprobación indicadas al inicio.
 
 **Fase 1** — el PR debe mostrar los tres jobs de CI en verde, y en limpio:
 
