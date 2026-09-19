@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsString, IsUUID, Min } from 'class-validator';
+import { IsInt, IsString, Matches, IsUUID, Min } from 'class-validator';
 
 export class CrearMesaDto {
   @IsUUID()
@@ -8,7 +8,14 @@ export class CrearMesaDto {
   @Min(1)
   capacidad!: number;
 
+  /**
+   * `@Matches(/\S/)` en vez de (o además de) `@IsNotEmpty()`: `IsNotEmpty` solo rechaza
+   * el string vacío `''`, no una etiqueta de solo espacios (`'   '`), que se persistía tal
+   * cual.
+   */
   @IsString()
-  @IsNotEmpty()
+  @Matches(/\S/, {
+    message: 'La etiqueta no puede estar vacía ni contener solo espacios.',
+  })
   etiqueta!: string;
 }

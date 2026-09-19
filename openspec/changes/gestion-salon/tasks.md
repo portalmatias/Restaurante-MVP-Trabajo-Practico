@@ -13,6 +13,36 @@
 > Para correr los tests de integración acá, remapear el contenedor a otro puerto local
 > (ej. `5433:5432` en `docker-compose.yml`, sin commitear ese cambio) y apuntar
 > `DATABASE_URL`/`DATABASE_URL_TEST` del `.env` a ese puerto.
+>
+> **Corrección tras el review de cubic sobre PR #24 (2026-09-18, PR de fix):** el #24 se
+> mergeó sin atender los hallazgos de cubic (14 + 2 en la segunda revisión). Los reales se
+> corrigieron en este PR de fix: `ZonasService.actualizar` y `MesasService.actualizar` ahora
+> corren en una transacción `Serializable` (evita que dos escrituras concurrentes dejen
+> `minComensales > maxComensales`, o una Reserva activa inconsistente con una edición de
+> capacidad/zona — verificado con tests de integración nuevos contra Postgres real, no solo
+> mocks); `HorariosService.actualizar` ahora persiste `activo`; Mesas traduce `P2002` a `409`
+> y `P2025` a `404`, y distingue `P2003` por operación (zona inexistente al crear/editar:
+> `404`; reservas que impiden eliminar: `409`). Zonas traduce `P2025` al actualizar a `404`;
+> Horarios traduce `P2002` al crear/actualizar a `409` y `P2025` al actualizar o cambiar
+> actividad a `404`. Zonas no tiene operación de alta. Los DTOs con campos opcionales usan
+> `@ValidateIf` en vez de `@IsOptional()`
+> (un `null` explícito ya no se cuela como "campo ausente"); `CrearTurnoDto`/
+> `ActualizarTurnoDto` transforman `HH:mm`/`HH:mm:ss` a `Date` en vez de exigir un ISO
+> completo; la etiqueta de Mesa rechaza strings de solo espacios; y la carrera de `upsert`
+> de Zona en los tests de integración (que el primer fix solo trasladó a
+> `reservas-invariantes.integration-spec.ts`, no la eliminó) ahora usa un helper compartido
+> (`test/helpers/upsert-seguro.ts`) en los dos archivos.
+
+> **Seguimiento del PR #27 (2026-09-19):** las suites de integración comparten las filas
+> STANDARD/VIP, por lo que `jest-integration.json` fija `maxWorkers: 1`. El helper de upsert
+> no evita que una suite sobrescriba los valores de otra; ejecutar las suites en serie sí
+> impide esa interferencia dentro de una ejecución de Jest. Las operaciones concurrentes
+> dentro de cada test siguen usando `Promise.allSettled`. No correr dos ejecuciones de
+> integración simultáneas contra la misma base; usar bases separadas para ello. Los unitarios
+> verifican el aislamiento `Serializable`, exactamente tres intentos al agotarse `P2034`
+> y los errores de fila/relación eliminada entre la consulta y la escritura. La prueba de
+> capacidad concurrente verifica un valor final solicitado, sin afirmar que solo una escritura
+> pueda persistir.
 
 ## 1. Prerrequisitos (bloqueante)
 
@@ -44,8 +74,14 @@
 - [x] 2.2 Implementar `ZonasService.listar()` y `ZonasService.actualizar(id, dto)`, este
       último lanzando `BadRequestException` si el `dto` deja `minComensales > maxComensales`.
       Verificar con tests unitarios: actualización válida persiste los valores, rango inválido
-      se rechaza. **Hecho** — `zonas.service.spec.ts`, 7 tests (incluye el caso de rango
+      se rechaza. **Hecho** — `zonas.service.spec.ts`, 9 tests (incluye el caso de rango
       inválido combinando un campo del `dto` con el persistido, y el borde `min === max`).
+      **Corrección (PR de fix):** la lectura y la escritura corren dentro de una
+      transacción `Serializable` (P1 de cubic — dos `PATCH` concurrentes con bordes
+      opuestos podían dejar el rango inválido persistido); verificado también con un test
+      de integración contra Postgres real (`zonas.integration-spec.ts`) que dispara dos
+      actualizaciones en simultáneo y confirma que el resultado final nunca queda
+      corrupto.
 - [ ] 2.3 Implementar `ZonasController` con `GET /admin/zonas` y `PATCH /admin/zonas/:id`,
       protegidos por `JwtAuthGuard` + `RolesGuard(ADMIN)`. Verificar con Supertest contra las
       Zonas sembradas por el seed de `modelo-dominio`. **Bloqueado:** necesita `JwtAuthGuard`/
@@ -62,13 +98,19 @@
       como casos de capacidad no positiva.
 - [x] 3.3 Implementar `MesasService.listar(zonaId?)` con filtro opcional por Zona. Verificar
       con un test unitario que el filtro devuelve solo las Mesas de la Zona pedida. **Hecho.**
-- [x] 3.4 Implementar `MesasService.actualizar(id, dto)`: si el `dto` cambia `zonaId` o reduce
-      `capacidad`, consultar `prisma.reserva.count` por Reservas activas (`PENDIENTE` o
-      `CONFIRMADA`) de esa Mesa y lanzar `ConflictException` si el cambio las dejaría
-      inválidas (capacidad insuficiente para alguna, o Zona distinta a la de alguna). Verificar
-      con tests unitarios de los tres escenarios de la spec: edición libre de etiqueta/aumento
-      de capacidad, reducción de capacidad rechazada, cambio de Zona rechazado. **Hecho** —
-      `mesas.service.spec.ts`, cubre además zona destino inexistente.
+- [x] 3.4 Implementar `MesasService.actualizar(id, dto)`: si el `dto` trae `capacidad`
+      (no solo si la reduce — el chequeo corre siempre que venga el campo, aumentarla nunca
+      puede invalidar una Reserva ya válida contra la capacidad vieja) o cambia `zonaId`,
+      consultar `prisma.reserva.count` por Reservas activas (`PENDIENTE` o `CONFIRMADA`) de
+      esa Mesa y lanzar `ConflictException` si el cambio las dejaría inválidas (capacidad
+      insuficiente para alguna, o Zona distinta a la de alguna). Verificar con tests
+      unitarios de los tres escenarios de la spec: edición libre de etiqueta/aumento de
+      capacidad, reducción de capacidad rechazada, cambio de Zona rechazado. **Hecho** —
+      `mesas.service.spec.ts`, cubre además zona destino inexistente. **Corrección (PR de
+      fix):** toda la validación y la escritura corren dentro de una transacción
+      `Serializable` (P1 de cubic — sin esto, una Reserva podía crearse entre el `count` y
+      el `update` y quedar inconsistente); verificado también con un test de integración
+      contra Postgres real (`mesas.integration-spec.ts`).
 - [x] 3.5 Implementar `MesasService.eliminar(id)`, lanzando `ConflictException` si la Mesa
       tiene Reservas asociadas de cualquier estado (`count` sin filtro por estado) y
       `NotFoundException` si no existe. Eliminar físicamente solo si no tiene Reservas.
@@ -88,11 +130,16 @@
       `npm run build -w backend` compila. **Hecho.**
 - [x] 4.2 Implementar `HorariosService.crear()`, con `activo = true` por defecto si el `dto`
       no lo especifica. Verificar con un test unitario. **Hecho** — incluye también el caso
-      `activo: false` explícito.
+      `activo: false` explícito. **Corrección (PR de fix):** traduce `P2002`
+      (`@@unique([diaSemana, horaInicio])`) a `ConflictException` en vez de dejarlo escapar
+      como `500`.
 - [x] 4.3 Implementar `HorariosService.listar()`, `HorariosService.actualizar(id, dto)` (día y
       horario) y `HorariosService.cambiarActivo(id, activo)`. Verificar con tests unitarios de
       cada uno, confirmando que desactivar no borra el registro (sigue apareciendo en
-      `listar()`). **Hecho.**
+      `listar()`). **Hecho.** **Corrección (PR de fix, P1 de cubic):** `actualizar` ignoraba
+      silenciosamente `activo` del `PATCH` — el flujo de activar/desactivar en el mismo
+      `PATCH` de edición que documenta la spec no funcionaba. Ahora lo persiste, con tests
+      para `true` y `false`. También traduce `P2002` a `409`.
 - [ ] 4.4 Implementar `HorariosController` con `POST`, `GET` y `PATCH /admin/turnos/:id`
       (aceptando `activo` como parte del mismo `PATCH` de edición, para no multiplicar rutas),
       todos protegidos por los guards. Verificar con Supertest. **Bloqueado:** mismo motivo
