@@ -183,8 +183,9 @@ export class MesasService {
    * Traduce los errores de Prisma que puede dejar escapar cualquier escritura de este
    * service a excepciones HTTP legibles, en vez de un `500` crudo: `P2002` (colisión de
    * `Mesa.etiqueta`, único) a `409`, `P2025` (la fila ya no existe — se borró o dejó de
-   * cumplir el `where` concurrentemente) a `404`, `P2003` (la FK de una Reserva impide el
-   * `DELETE`) a `409`. Cualquier otro error se propaga sin tocar.
+   * cumplir el `where` concurrentemente) a `404`, `P2003` a `404` si la zona no existe al
+   * crear/actualizar, o a `409` si reservas asociadas impiden eliminar la mesa.
+   * Cualquier otro error se propaga sin tocar.
    */
   private traducirErrorDePrisma(
     error: unknown,

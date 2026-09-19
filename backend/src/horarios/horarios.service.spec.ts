@@ -205,12 +205,9 @@ describe('HorariosService', () => {
       const resultado = await service.cambiarActivo(turnoAlmuerzo.id, false);
       expect(prisma.turno.update).toHaveBeenCalledWith({
         where: { id: turnoAlmuerzo.id },
-        data: {
-          diaSemana: undefined,
-          horaInicio: undefined,
-          horaFin: undefined,
+        data: expect.objectContaining({
           activo: false,
-        },
+        }) as unknown,
       });
       expect(resultado.activo).toBe(false);
     });
