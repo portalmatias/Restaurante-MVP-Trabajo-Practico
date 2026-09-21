@@ -17,7 +17,7 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 |---|---|---|---|
 | Fundación | portalmatias | Implementación #10/#11 mergeada; archivada en #13. Consigna y requerimientos incorporados en #4. | Mantener CI y reconfirmar opciones de revisión de `main` (ver abajo). |
 | `modelo-dominio` | FedeWerk | Spec #7 e implementación #12 mergeadas: schema, migraciones, seed, invariantes y helpers horarios. | Verificar DoD antes de archivar; todavía figura como change activo. |
-| `ci-integracion-db` | FedeWerk | Spec #26 e implementación #28 abiertas; PostgreSQL todavía no está en el workflow de `main`. | Atender observaciones, coordinar ambos PRs e integrar el workflow. |
+| `ci-integracion-db` | FedeWerk | Spec #26 aprobada y lista para mergear; implementación #28 abierta, observaciones ya atendidas. PostgreSQL todavía no está en el workflow de `main`. | Obtener revisión independiente de #28 y mergear #26/#28 en ese orden. |
 | `auth-admin` | FedeWerk | Spec #9 mergeada; implementación #25 abierta y aprobada, con pendientes de revisión. | Corregir pendientes y verificar integración con PostgreSQL; registrar el módulo y publicar su contrato para habilitar login. |
 | `disponibilidad` | portalmatias | Specs #19/#21 mergeadas; rama `feature/disponibilidad` con tres commits propios y sin PR abierto. | Revisar y abrir PR de implementación; verificar el validador compartido y el lock que reutilizará creación. |
 | `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. Fix #27 abierto. | Obtener revisión de #27; luego completar controllers, guards y contrato cuando auth esté disponible. |
