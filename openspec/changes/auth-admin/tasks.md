@@ -71,6 +71,14 @@
       fragmento queda en `design.md` (sección "Contrato OpenAPI") y se copia al YAML real en
       el PR que registre `AuthModule` en `AppModule`. `npm run openapi:lint` y
       `npm run openapi:check` pasan sin deriva en este estado.
+      **Actualizado en el PR que registra `AuthModule` en `AppModule`** (apilado sobre
+      `ci-integracion-db`, que le da Postgres al job `test`): el fragmento de `design.md` ya se
+      copió a `openapi/openapi.yaml` (`POST /auth/login`, `LoginDto`, `LoginResponseDto` y los
+      tags `Auth`/`Estado`; el `securityScheme` `bearerAuth` ya existía) y
+      `npm run openapi:lint` y `npm run openapi:check` pasan. En ese mismo PR las rutas de
+      prueba `GET /auth/test-protected` y `GET /auth/test-admin-only` salieron de
+      `AuthController` y pasaron a `backend/test/support/guards-probe.controller.ts`, que solo
+      montan los tests: registrado el módulo, seguían expuestas en la API real.
 - [x] 5.3 Confirmar que no hicieron falta variables de entorno nuevas (`JWT_SECRET` y
       `JWT_EXPIRES_IN` ya están en `.env.example` desde `fundacion-repo`). Si alguna
       implementación concreta necesitó una variable adicional, agregarla y documentarla en

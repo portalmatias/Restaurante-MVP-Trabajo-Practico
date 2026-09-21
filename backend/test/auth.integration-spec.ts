@@ -8,19 +8,20 @@ import { App } from 'supertest/types';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { AuthModule } from '../src/auth/auth.module';
+import { GuardsProbeController } from './support/guards-probe.controller';
 
 interface LoginResponseBody {
   accessToken: string;
 }
 
-// Necesita Postgres real (login contra el admin del seed, vía PrismaService) — por eso es
-// `.integration-spec.ts` y no `.e2e-spec.ts`. `AppModule` todavía no registra `AuthModule`
-// (ver el comentario en `app.module.ts`: el job `test` de CI corre sin PostgreSQL hasta
-// `ci-integracion-db`), así que este test arma su propio módulo mínimo con lo que
-// `AuthModule` necesita, igual que ya hacen `reservas-invariantes.integration-spec.ts` y
-// `mesas.integration-spec.ts`. Replica también el `ThrottlerModule`/`APP_GUARD` de
-// `AppModule` — sin eso, `@Throttle()` en `AuthController` queda decorado pero sin ningún
-// guard que lo haga cumplir.
+// Necesita Postgres real (login contra el admin del seed, vía PrismaService). Arma un módulo
+// mínimo con lo que `AuthModule` necesita, en vez de levantar `AppModule`, porque además de
+// `AuthModule` monta `GuardsProbeController`: rutas de prueba para ejercitar
+// `JwtAuthGuard`/`RolesGuard` que NO deben existir en la app real (ver ese archivo). Que
+// `AppModule` registre `AuthModule` y exponga `POST /auth/login` lo verifica
+// `auth.e2e-spec.ts`. Replica también el `ThrottlerModule`/`APP_GUARD` de `AppModule` — sin
+// eso, `@Throttle()` en `AuthController` queda decorado pero sin ningún guard que lo haga
+// cumplir.
 async function crearAppDeTest(): Promise<INestApplication<App>> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [
@@ -40,6 +41,7 @@ async function crearAppDeTest(): Promise<INestApplication<App>> {
       PrismaModule,
       AuthModule,
     ],
+    controllers: [GuardsProbeController],
     providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
   }).compile();
 
