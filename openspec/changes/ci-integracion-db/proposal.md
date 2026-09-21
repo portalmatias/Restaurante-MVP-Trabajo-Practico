@@ -21,8 +21,9 @@ backend`) que cubre:
 
 Ninguno de esos tests corre en CI hoy. `config.yaml` §12 exige explícitamente que el job de
 tests corra "las pruebas unitarias **y de integración**", y §9 exige que las de integración
-corran "contra una base de datos real de test levantada por docker-compose, no contra mocks de
-Prisma". Mientras esto no se resuelva, la Definition of Done de §13 ("CI en verde" cubriendo lo
+corran contra una base real, no contra mocks de Prisma. Este change explicita en §9 que el
+service container de PostgreSQL en CI es equivalente a Docker Compose local.
+Mientras esto no se resuelva, la Definition of Done de §13 ("CI en verde" cubriendo lo
 que pide §9) no se cumple para ningún change que dependa de esas reglas de negocio —
 `disponibilidad`, `reservas-crear`, `cancelacion-turnos` y `reserva-vip` las heredan todas.
 
@@ -32,10 +33,13 @@ Este change es exactamente la contrapartida que `fundacion-repo` prometió: cone
 ## What Changes
 
 - **`.github/workflows/ci.yml`**, job `test`: se agrega un `services: postgres` (mismo tag de
-  imagen que `docker-compose.yml`, `postgres:16.4-alpine`, con healthcheck) y dos pasos nuevos
-  después de "Tests e2e del backend": aplicar las migraciones contra la base del service
-  container (`prisma migrate deploy`, no `migrate dev` — ver D2) y correr `npm run
-  test:integration -w backend`.
+  imagen que `docker-compose.yml`, `postgres:16.4-alpine`, con healthcheck) y tres pasos nuevos:
+  migraciones (`prisma migrate deploy`, no `migrate dev`) y seed antes de cualquier test;
+  `npm run test:integration -w backend` después de unitarios y e2e, antes de tests de scripts.
+  Las URLs de base quedan en el job `test`; JWT y throttling se declaran a nivel workflow
+  para cubrir también la construcción de la aplicación en el job `spec`.
+- **`openspec/config.yaml` §9:** admite explícitamente el service container equivalente.
+- **`docs/roadmap-mvp.md`:** actualiza el riesgo de cobertura de integración en CI.
 - **Ningún cambio de aplicación.** No se toca `backend/src/`, `schema.prisma` ni
   `openapi/openapi.yaml`. Es un change de infraestructura de CI, igual en naturaleza a
   `fundacion-repo` (que también fijó `skip_specs: true`).
@@ -55,10 +59,12 @@ _Ninguna._ No declara requisitos ni escenarios nuevos — por eso fija `skip_spe
 ## Impact
 
 **Archivo modificado:** `.github/workflows/ci.yml` (único archivo de comportamiento real).
-**Archivo modificado (doc):** `README.md` (la nota de CI que ya quedó desactualizada una vez,
-ver PR #12).
+**Archivos modificados (doc):** `README.md`, `docs/roadmap-mvp.md` y
+`openspec/config.yaml` (§9: equivalencia de infraestructura de test).
+**Artefactos del change:** `.openspec.yaml`, `proposal.md`, `design.md` y `tasks.md`
+en `openspec/changes/ci-integracion-db/` (también propuestos en #26).
 
-**Ningún archivo nuevo, ninguna dependencia nueva.** `test:integration` y su config de Jest
+**Ningún archivo de aplicación ni dependencia nueva.** `test:integration` y su config de Jest
 (`backend/test/jest-integration.json`) ya existen desde `modelo-dominio`.
 
 **Cierra:** la deuda deliberada de `fundacion-repo` (D8) y la ventana de riesgo que
