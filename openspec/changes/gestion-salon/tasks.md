@@ -44,6 +44,28 @@
 > capacidad concurrente verifica un valor final solicitado, sin afirmar que solo una escritura
 > pueda persistir.
 
+> **Seguimiento del PR #27 (2026-09-21):** una vez mergeados `auth-admin` (#25) y la spec de
+> `ci-integracion-db` (#26), se desbloquearon 2.3/3.6/4.4/5.1: los tres controllers
+> (`ZonasController`, `MesasController`, `HorariosController`) ya existen, protegidos por
+> `JwtAuthGuard` + `RolesGuard(ADMIN)`, y cada módulo de dominio ahora importa `AuthModule`
+> (trae los guards y registra `JwtStrategy`). Cobertura: tests unitarios de cada controller
+> (`*.controller.spec.ts`, mockeando el service) más un test de integración HTTP nuevo,
+> `backend/test/gestion-salon-admin.integration-spec.ts` (Supertest contra Postgres real,
+> arma su propio módulo mínimo igual que `auth.integration-spec.ts` — `AppModule` todavía no
+> registra estos módulos, ver la nota de 2.1), con 401 sin token, 403 con rol incorrecto y
+> flujo feliz completo (CRUD de Mesa, PATCH de Zona, alta/edición de Turno con `activo`) para
+> las tres rutas — 16 tests, más los 4 existentes de `zonas`/`mesas.integration-spec.ts` que
+> pasaron a necesitar `ConfigModule` en su `TestingModule` (antes no hacía falta: sus módulos
+> no importaban `AuthModule`, que necesita `ConfigService` para `JwtModule.registerAsync`).
+> Verificado: `typecheck`, `build`, `test` (85/85), `test:e2e` (1/1), `lint` y
+> `test:integration` (53/53, 6 suites) todos en verde contra Postgres real (workaround del
+> puerto 5433 de esta máquina, revertido al terminar). **6.2 (openapi.yaml) y el registro de
+> estos módulos en `AppModule` siguen deliberadamente pendientes** hasta que se mergee la
+> implementación de `ci-integracion-db` (#28, ya aprobada): recién ahí el job "Tests
+> (backend)" de CI corre con PostgreSQL disponible durante `test:e2e`, que es lo que hoy
+> impide registrar estos módulos sin romper `app.e2e-spec.ts` (mismo motivo documentado en
+> 2.1 para `auth-admin`).
+
 ## 1. Prerrequisitos (bloqueante)
 
 - [x] 1.1 Confirmar que la implementación de `modelo-dominio` está mergeada a `main` y que
@@ -82,10 +104,13 @@
       de integración contra Postgres real (`zonas.integration-spec.ts`) que dispara dos
       actualizaciones en simultáneo y confirma que el resultado final nunca queda
       corrupto.
-- [ ] 2.3 Implementar `ZonasController` con `GET /admin/zonas` y `PATCH /admin/zonas/:id`,
+- [x] 2.3 Implementar `ZonasController` con `GET /admin/zonas` y `PATCH /admin/zonas/:id`,
       protegidos por `JwtAuthGuard` + `RolesGuard(ADMIN)`. Verificar con Supertest contra las
-      Zonas sembradas por el seed de `modelo-dominio`. **Bloqueado:** necesita `JwtAuthGuard`/
-      `RolesGuard` de `auth-admin`, que todavía no existe.
+      Zonas sembradas por el seed de `modelo-dominio`. **Hecho** — `zonas.controller.ts` +
+      `zonas.controller.spec.ts` (unitario) + cobertura HTTP en
+      `gestion-salon-admin.integration-spec.ts` (401/403/200, incluido `400` con id no-UUID).
+      `ZonasModule` ahora importa `AuthModule`. El módulo sigue sin registrarse en
+      `AppModule` — ver nota de seguimiento de arriba.
 
 ## 3. Módulo Mesas (`backend/src/mesas/`)
 
@@ -118,10 +143,16 @@
       Verificar con tests unitarios los rechazos por cada estado, la baja exitosa, la Mesa
       inexistente y ambos errores concurrentes; no borrar ni desvincular Reservas. **Hecho**
       (unitario, con Prisma mockeado) — ver 5.6 para la verificación contra Postgres real.
-- [ ] 3.6 Implementar `MesasController` con `POST`, `GET`, `PATCH /admin/mesas/:id` y
+- [x] 3.6 Implementar `MesasController` con `POST`, `GET`, `PATCH /admin/mesas/:id` y
       `DELETE /admin/mesas/:id`, todos protegidos por los guards. Verificar con Supertest
       contra datos del seed. El DELETE responde `204` sin cuerpo al eliminar, `404` si la
-      Mesa no existe y `409` si tiene Reservas asociadas. **Bloqueado:** mismo motivo que 2.3.
+      Mesa no existe y `409` si tiene Reservas asociadas. **Hecho** — `mesas.controller.ts`
+      (incluye `ListarMesasQueryDto` para el filtro `zonaId` por query param) +
+      `mesas.controller.spec.ts` (unitario) + cobertura HTTP en
+      `gestion-salon-admin.integration-spec.ts` (401/403, alta `201`, listado filtrado,
+      edición `200`, baja `204` con verificación de que la fila desaparece). `MesasModule`
+      ahora importa `AuthModule`. Sigue sin registrarse en `AppModule` — ver nota de
+      seguimiento de arriba.
 
 ## 4. Módulo Turnos (`backend/src/horarios/`)
 
@@ -140,16 +171,25 @@
       silenciosamente `activo` del `PATCH` — el flujo de activar/desactivar en el mismo
       `PATCH` de edición que documenta la spec no funcionaba. Ahora lo persiste, con tests
       para `true` y `false`. También traduce `P2002` a `409`.
-- [ ] 4.4 Implementar `HorariosController` con `POST`, `GET` y `PATCH /admin/turnos/:id`
+- [x] 4.4 Implementar `HorariosController` con `POST`, `GET` y `PATCH /admin/turnos/:id`
       (aceptando `activo` como parte del mismo `PATCH` de edición, para no multiplicar rutas),
-      todos protegidos por los guards. Verificar con Supertest. **Bloqueado:** mismo motivo
-      que 2.3.
+      todos protegidos por los guards. Verificar con Supertest. **Hecho** — rutas bajo
+      `/admin/turnos` (nombre de dominio, no `/admin/horarios`) en `horarios.controller.ts` +
+      `horarios.controller.spec.ts` (unitario) + cobertura HTTP en
+      `gestion-salon-admin.integration-spec.ts` (401, alta `201` con `horaInicio`/`horaFin`
+      en formato `HH:mm`, listado, `PATCH` con `activo` en el mismo `200`). `HorariosModule`
+      ahora importa `AuthModule`. Sigue sin registrarse en `AppModule` — ver nota de
+      seguimiento de arriba.
 
 ## 5. Tests de los requisitos de la spec
 
-- [ ] 5.1 Test e2e: `GET /admin/zonas` sin token responde `401` (spec: "Rutas de gestión de
-      salón protegidas por autenticación de administrador"). **Bloqueado:** mismo motivo
-      que 2.3.
+- [x] 5.1 Test e2e: `GET /admin/zonas` sin token responde `401` (spec: "Rutas de gestión de
+      salón protegidas por autenticación de administrador"). **Hecho, como test de
+      integración en vez de e2e:** `AppModule` todavía no registra estos módulos (ver nota de
+      seguimiento de arriba), así que no hay una app e2e real contra la que pegarle todavía;
+      cubierto en `gestion-salon-admin.integration-spec.ts` contra un módulo mínimo (mismo
+      patrón que `auth.integration-spec.ts`), con 401 sin token en las tres rutas
+      (`/admin/zonas`, `/admin/mesas`, `/admin/turnos`), no solo `/admin/zonas`.
 - [x] 5.2 Test: actualización de Zona con `minComensales > maxComensales` rechazada (spec:
       "Actualización de configuración de Zona"). **Cubierto** por `zonas.service.spec.ts`
       (2.2) — no se duplicó en un archivo aparte.
@@ -173,8 +213,10 @@
       expuso y corrigió un bug genuino en el `beforeAll` del test: dos
       `*.integration-spec.ts` corriendo en paralelo (workers de Jest) hacían `upsert` de la
       misma fila `Zona.nombre = 'STANDARD'` — se resolvió reintentando con `findUniqueOrThrow`
-      ante un `P2002`. El HTTP real (`204`/`404`/`409` vía Supertest) sigue pendiente hasta
-      que exista el controller.
+      ante un `P2002`. El `204` vía Supertest (con el controller ya implementado, ver 3.6)
+      se agregó en `gestion-salon-admin.integration-spec.ts`; `404`/`409` vía HTTP no se
+      duplicaron ahí porque ya están cubiertos a nivel de service en este mismo archivo y en
+      `mesas.service.spec.ts`.
 - [ ] 5.6.1 Test de integración de la carrera entre consulta y DELETE: sincronizar la
       inserción de una Reserva después del `count` y antes del DELETE siguiendo la sección
       "Prueba determinística de la carrera entre consulta y DELETE" del diseño. Usar un spy
@@ -208,9 +250,12 @@
       [bearerAuth]` en cada una, y los schemas de request/response), en el mismo PR
       (Definition of Done, `config.yaml` §13). Documentar en el DELETE de Mesa las respuestas
       `204` sin cuerpo, `404` y `409` por Reservas asociadas de cualquier estado.
-      **Bloqueado:** sin controllers todavía (2.3/3.6/4.4), agregar estos paths al YAML
-      committeado haría fallar `openapi:check` (compara contra los controllers reales —
-      convención fijada en el PR #18). Se agrega junto con los controllers.
+      **Bloqueado, con los controllers ya implementados (2.3/3.6/4.4):** el motivo ahora es
+      que esos módulos todavía no están registrados en `AppModule` (ver nota de seguimiento
+      de arriba) — agregar estos paths al YAML committeado haría fallar `openapi:check`
+      (compara contra lo que `@nestjs/swagger` genera de los controllers realmente
+      registrados en la app que arranca — convención fijada en el PR #18). Se agrega junto
+      con el registro en `AppModule`, cuando se mergee `ci-integracion-db` (#28).
 - [x] 6.3 Confirmar que no hicieron falta variables de entorno nuevas ni migraciones de
       Prisma — este change no agrega campos a `Zona`, `Mesa` ni `Turno`. **Hecho** — no se
       tocó `schema.prisma` ni `.env.example`.

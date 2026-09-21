@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ConfigModule } from '@nestjs/config';
 
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -30,7 +31,14 @@ describe('ZonasService.actualizar — integración con Postgres real', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, ZonasModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        ZonasModule,
+      ],
     }).compile();
 
     prisma = moduleRef.get(PrismaService);

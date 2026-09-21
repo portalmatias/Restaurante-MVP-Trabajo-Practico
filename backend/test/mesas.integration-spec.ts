@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ConfigModule } from '@nestjs/config';
 import { DiaSemana, EstadoReserva } from '@prisma/client';
 
 import { MesasModule } from '../src/mesas/mesas.module';
@@ -87,7 +88,14 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, MesasModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        MesasModule,
+      ],
     }).compile();
 
     prisma = moduleRef.get(PrismaService);
