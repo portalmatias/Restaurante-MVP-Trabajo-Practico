@@ -14,6 +14,17 @@ info:
 servers:
   - url: http://localhost:3001
     description: Backend local de desarrollo
+tags:
+  - name: Estado
+    description: Estado operativo del backend.
+  - name: Auth
+    description: Autenticación y autorización del administrador (openspec/config.yaml §5).
+  - name: Zonas
+    description: Configuración de Zonas del salón (change gestion-salon).
+  - name: Mesas
+    description: Alta, listado, edición y baja de Mesas (change gestion-salon).
+  - name: Turnos
+    description: Alta, listado, edición y activación/desactivación de Turnos (change gestion-salon).
 components:
   securitySchemes:
     bearerAuth:
@@ -25,6 +36,257 @@ components:
         el header `Authorization: Bearer <token>`. Las rutas públicas del cliente
         (disponibilidad, creación, consulta y cancelación de reservas sin cuenta) no
         requieren autenticación.
+  schemas:
+    LoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Email del usuario administrador.
+          example: admin@restaurante-mvp.local
+        password:
+          type: string
+          description: Contraseña del usuario administrador.
+          example: AdminMVP2026!
+      required:
+        - email
+        - password
+    LoginResponseDto:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT de acceso del administrador (ver openspec/config.yaml §5).
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.abc123
+      required:
+        - accessToken
+    ZonaRespuestaDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        nombre:
+          type: string
+          enum:
+            - STANDARD
+            - VIP
+          example: VIP
+        minComensales:
+          type: number
+          example: 2
+        maxComensales:
+          type: number
+          example: 12
+        anticipacionMinHoras:
+          type: number
+          example: 24
+        anticipacionMaxDias:
+          type: number
+          example: 60
+        ventanaCancelacionHoras:
+          type: number
+          example: 24
+        requiereConfirmacionAdmin:
+          type: boolean
+          example: true
+        aforoMaximo:
+          type: number
+          example: 20
+      required:
+        - id
+        - nombre
+        - minComensales
+        - maxComensales
+        - anticipacionMinHoras
+        - anticipacionMaxDias
+        - ventanaCancelacionHoras
+        - requiereConfirmacionAdmin
+        - aforoMaximo
+    ActualizarZonaDto:
+      type: object
+      properties:
+        minComensales:
+          type: number
+          description: Mínimo de comensales permitido en una Reserva de esta Zona.
+          example: 2
+        maxComensales:
+          type: number
+          description: Máximo de comensales permitido en una Reserva de esta Zona.
+          example: 12
+        anticipacionMinHoras:
+          type: number
+          description: Anticipación mínima, en horas, para reservar en esta Zona.
+          example: 24
+        anticipacionMaxDias:
+          type: number
+          description: Anticipación máxima, en días, para reservar en esta Zona.
+          example: 60
+        ventanaCancelacionHoras:
+          type: number
+          description: Ventana de cancelación, en horas, antes del turno reservado.
+          example: 24
+        requiereConfirmacionAdmin:
+          type: boolean
+          description: Si una Reserva en esta Zona requiere confirmación manual del admin.
+          example: true
+        aforoMaximo:
+          type: number
+          description: Aforo máximo simultáneo de esta Zona.
+          example: 20
+    CrearMesaDto:
+      type: object
+      properties:
+        zonaId:
+          type: string
+          description: Id de la Zona a la que pertenece la Mesa.
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        capacidad:
+          type: number
+          description: Capacidad de comensales de la Mesa.
+          example: 4
+        etiqueta:
+          type: string
+          description: Etiqueta identificatoria de la Mesa, única en todo el salón.
+          example: M1
+      required:
+        - zonaId
+        - capacidad
+        - etiqueta
+    MesaRespuestaDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        zonaId:
+          type: string
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        capacidad:
+          type: number
+          example: 4
+        etiqueta:
+          type: string
+          example: M1
+      required:
+        - id
+        - zonaId
+        - capacidad
+        - etiqueta
+    ActualizarMesaDto:
+      type: object
+      properties:
+        zonaId:
+          type: string
+          description: Id de la nueva Zona a la que pasa a pertenecer la Mesa.
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        capacidad:
+          type: number
+          description: Nueva capacidad de comensales de la Mesa.
+          example: 6
+        etiqueta:
+          type: string
+          description: Nueva etiqueta identificatoria de la Mesa, única en todo el salón.
+          example: M1
+    CrearTurnoDto:
+      type: object
+      properties:
+        diaSemana:
+          type: string
+          enum:
+            - LUNES
+            - MARTES
+            - MIERCOLES
+            - JUEVES
+            - VIERNES
+            - SABADO
+            - DOMINGO
+          description: Día de la semana en que rige este Turno.
+          example: VIERNES
+        horaInicio:
+          type: string
+          description: >-
+            Hora local del restaurante en que empieza el Turno, formato `HH:mm` o
+            `HH:mm:ss`.
+          example: '20:00'
+        horaFin:
+          type: string
+          description: >-
+            Hora local del restaurante en que termina el Turno, formato `HH:mm` o
+            `HH:mm:ss`. Puede ser menor a `horaInicio`: se interpreta como cruce de
+            medianoche.
+          example: '23:30'
+        activo:
+          type: boolean
+          default: true
+          description: Si el Turno queda activo al crearse.
+          example: true
+      required:
+        - diaSemana
+        - horaInicio
+        - horaFin
+    TurnoRespuestaDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        diaSemana:
+          type: string
+          enum:
+            - LUNES
+            - MARTES
+            - MIERCOLES
+            - JUEVES
+            - VIERNES
+            - SABADO
+            - DOMINGO
+          example: VIERNES
+        horaInicio:
+          type: string
+          example: '1970-01-01T20:00:00.000Z'
+        horaFin:
+          type: string
+          example: '1970-01-01T23:30:00.000Z'
+        activo:
+          type: boolean
+          example: true
+      required:
+        - id
+        - diaSemana
+        - horaInicio
+        - horaFin
+        - activo
+    ActualizarTurnoDto:
+      type: object
+      properties:
+        diaSemana:
+          type: string
+          enum:
+            - LUNES
+            - MARTES
+            - MIERCOLES
+            - JUEVES
+            - VIERNES
+            - SABADO
+            - DOMINGO
+          description: Nuevo día de la semana en que rige este Turno.
+          example: VIERNES
+        horaInicio:
+          type: string
+          description: >-
+            Nueva hora local de inicio del Turno, formato `HH:mm` o `HH:mm:ss`.
+          example: '20:00'
+        horaFin:
+          type: string
+          description: >-
+            Nueva hora local de fin del Turno, formato `HH:mm` o `HH:mm:ss`. Puede ser
+            menor a `horaInicio`: se interpreta como cruce de medianoche.
+          example: '23:30'
+        activo:
+          type: boolean
+          description: Activa o desactiva el Turno sin eliminarlo.
+          example: false
 paths:
   /:
     get:
@@ -43,3 +305,281 @@ paths:
             application/json:
               schema:
                 type: string
+  /auth/login:
+    post:
+      summary: Login de administrador
+      description: >-
+        Autentica a un usuario administrador con email y contraseña, y devuelve un JWT
+        de acceso (openspec/config.yaml §5).
+      operationId: AuthController_login
+      tags:
+        - Auth
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: 'Login exitoso: devuelve el JWT de acceso.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponseDto'
+        '401':
+          description: >-
+            Credenciales inválidas: email inexistente o contraseña incorrecta. El
+            mensaje es genérico y no distingue cuál dato falló.
+        '429':
+          description: >-
+            Se superó el límite de intentos de login permitidos en la ventana
+            configurada (rate limiting).
+  /admin/zonas:
+    get:
+      operationId: ZonasController_listar
+      summary: Listado de Zonas
+      description: >-
+        Lista las Zonas del salón — spec: "Alta y baja de Zona no soportadas", solo hay
+        lectura y actualización de configuración.
+      tags:
+        - Zonas
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Listado de Zonas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ZonaRespuestaDto'
+  /admin/zonas/{id}:
+    patch:
+      operationId: ZonasController_actualizar
+      summary: Actualizar configuración de una Zona
+      description: >-
+        Rechaza con 400 si, combinando los campos del body con los ya persistidos, el
+        mínimo de comensales resultante queda por encima del máximo.
+      tags:
+        - Zonas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarZonaDto'
+      responses:
+        '200':
+          description: La zona se actualizó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZonaRespuestaDto'
+        '404':
+          description: La zona indicada no existe.
+        '409':
+          description: >-
+            No se pudo actualizar la zona por una edición concurrente (conflicto de
+            serialización agotando los reintentos).
+  /admin/mesas:
+    post:
+      operationId: MesasController_crear
+      summary: Alta de Mesa
+      description: Rechaza con 404 si la Zona indicada no existe.
+      tags:
+        - Mesas
+      security:
+        - bearerAuth: []
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearMesaDto'
+      responses:
+        '201':
+          description: La mesa se creó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MesaRespuestaDto'
+        '404':
+          description: La zona indicada no existe.
+    get:
+      operationId: MesasController_listar
+      summary: Listado de Mesas
+      description: Sin `zonaId` devuelve todas las Mesas de todas las Zonas.
+      tags:
+        - Mesas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: zonaId
+          in: query
+          required: false
+          description: Filtra las Mesas devueltas por Zona.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Listado de Mesas, opcionalmente filtrado por Zona.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MesaRespuestaDto'
+  /admin/mesas/{id}:
+    patch:
+      operationId: MesasController_actualizar
+      summary: Edición de Mesa
+      description: >-
+        Rechaza con 409 si el cambio dejaría inválida una Reserva activa existente
+        (capacidad insuficiente o Zona distinta) — spec: "Edición de Mesa preserva las
+        Reservas activas".
+      tags:
+        - Mesas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarMesaDto'
+      responses:
+        '200':
+          description: La mesa se actualizó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MesaRespuestaDto'
+        '404':
+          description: La mesa o la zona indicada no existe.
+        '409':
+          description: >-
+            La mesa tiene una reserva activa con más comensales que la nueva
+            capacidad, o reservas activas que impiden cambiarla de zona.
+    delete:
+      operationId: MesasController_eliminar
+      summary: Baja de Mesa
+      description: >-
+        Elimina físicamente la Mesa solo si no tiene ninguna Reserva asociada, de
+        ningún estado — spec: "Baja de Mesa preserva las Reservas activas e
+        históricas".
+      tags:
+        - Mesas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: La mesa se eliminó, sin cuerpo en la respuesta.
+        '404':
+          description: La mesa indicada no existe.
+        '409':
+          description: >-
+            La mesa tiene reservas asociadas de cualquier estado (PENDIENTE,
+            CONFIRMADA, CANCELADA o NO_SHOW): no se puede eliminar.
+  /admin/turnos:
+    post:
+      operationId: HorariosController_crear
+      summary: Alta de Turno
+      description: >-
+        Si el body no especifica `activo`, el Turno queda `activo: true` por defecto.
+      tags:
+        - Turnos
+      security:
+        - bearerAuth: []
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearTurnoDto'
+      responses:
+        '201':
+          description: El turno se creó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnoRespuestaDto'
+        '409':
+          description: Ya existe un turno para ese día y esa hora de inicio.
+    get:
+      operationId: HorariosController_listar
+      summary: Listado de Turnos
+      description: Incluye los Turnos inactivos.
+      tags:
+        - Turnos
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Listado de Turnos, incluidos los inactivos.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TurnoRespuestaDto'
+  /admin/turnos/{id}:
+    patch:
+      operationId: HorariosController_actualizar
+      summary: Edición y activación/desactivación de Turno
+      description: >-
+        `activo` viaja en el mismo PATCH de edición que día/horario, sin una ruta
+        aparte de activar/desactivar.
+      tags:
+        - Turnos
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarTurnoDto'
+      responses:
+        '200':
+          description: El turno se actualizó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnoRespuestaDto'
+        '404':
+          description: El turno indicado no existe.
+        '409':
+          description: Ya existe un turno para ese día y esa hora de inicio.

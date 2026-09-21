@@ -5,6 +5,10 @@ import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
+import { ZonasModule } from './zonas/zonas.module';
+import { MesasModule } from './mesas/mesas.module';
+import { HorariosModule } from './horarios/horarios.module';
 
 @Module({
   imports: [
@@ -27,19 +31,24 @@ import { AppService } from './app.service';
         },
       ],
     }),
-    // change `gestion-salon`: ZonasModule, MesasModule y HorariosModule (services, sin
-    // controller todavía — ver tasks.md, prerrequisito 1.2) NO se registran acá a
-    // propósito. Importan PrismaModule (@Global()), y AppModule es lo que arranca
-    // `test/app.e2e-spec.ts`, que corre en el job de CI "Tests (backend)" **sin**
-    // PostgreSQL disponible (esa base llega con `ci-integracion-db`) — registrarlos acá
-    // hace que `PrismaService.onModuleInit` intente `$connect()` y ese smoke test falle en
-    // CI. Mismo motivo por el que `ReservasModule` (de `modelo-dominio`, PR #12) y
-    // `AuthModule` (de `auth-admin`, este change) tampoco están registrados: los tests que
-    // ejercitan estos módulos los instancian directo con
-    // `Test.createTestingModule({ imports: [PrismaModule, AuthModule] })`, como ya hacen
-    // `reservas-invariantes.integration-spec.ts` y `mesas.integration-spec.ts`. Se
-    // registran en `AppModule` recién cuando `ci-integracion-db` le dé al job `test` una
-    // base de Postgres disponible.
+    // `AuthModule` (auth-admin, PR #25) y `ZonasModule`/`MesasModule`/`HorariosModule`
+    // (gestion-salon) importan `PrismaModule` (`@Global()`), así que registrarlos acá hace
+    // que `PrismaService.onModuleInit` llame `$connect()` al arrancar la app — incluido
+    // `test/app.e2e-spec.ts`, que instancia `AppModule` completo. Hasta que se mergeó
+    // `ci-integracion-db` (PR #28), el job "Tests (backend)" de CI corría sin PostgreSQL
+    // disponible durante ese paso, así que se dejaban deliberadamente afuera (los tests que
+    // los ejercitan armaban su propio módulo mínimo con
+    // `Test.createTestingModule({ imports: [PrismaModule, AuthModule] })`, como todavía
+    // hacen `auth.integration-spec.ts` y `gestion-salon-admin.integration-spec.ts` para no
+    // depender de que `AppModule` los registre). Con #28 en `main`, el job migra y seedea
+    // Postgres antes de correr ningún test — ya no aplica esa razón, así que se registran
+    // acá. `ReservasModule` (`modelo-dominio`, PR #12) sigue sin controller propio (nace en
+    // el change `reservas-crear`, todavía no implementado) y por eso no se registra todavía
+    // — no es el mismo motivo que los de arriba.
+    AuthModule,
+    ZonasModule,
+    MesasModule,
+    HorariosModule,
   ],
   controllers: [AppController],
   providers: [

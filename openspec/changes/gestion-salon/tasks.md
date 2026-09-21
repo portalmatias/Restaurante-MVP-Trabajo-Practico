@@ -66,6 +66,40 @@
 > impide registrar estos módulos sin romper `app.e2e-spec.ts` (mismo motivo documentado en
 > 2.1 para `auth-admin`).
 
+> **Seguimiento del PR #27 (2026-09-22):** `ci-integracion-db` (#28) mergeó a `main`. Con
+> Postgres ya disponible en el job "Tests (backend)" durante todos sus pasos, se registraron
+> `AuthModule`, `ZonasModule`, `MesasModule` y `HorariosModule` en `AppModule` (ver el
+> comentario reescrito ahí; `ReservasModule` sigue sin registrar por un motivo distinto — no
+> tiene controller propio todavía, nace en `reservas-crear`). Consecuencia inmediata: las
+> rutas `/admin/zonas`, `/admin/mesas`, `/admin/turnos` y `/auth/login` pasaron a ser
+> alcanzables en la app real (antes solo existían dentro de módulos de test armados a mano) —
+> confirmado con un smoke test real (`node dist/src/main.js` + `curl`, login y las tres rutas
+> admin con token). `backend/test/jest-e2e.json` necesitó el mismo `transformIgnorePatterns`
+> que ya tenía `jest-integration.json` (ESM de `passport-jwt`/`@nestjs/jwt`): `app.e2e-spec.ts`
+> ahora arranca `AppModule` completo, que importa `AuthModule` por primera vez.
+>
+> **6.2 (openapi.yaml) hecho** en el mismo commit: se agregaron `/admin/zonas`,
+> `/admin/zonas/{id}`, `/admin/mesas`, `/admin/mesas/{id}`, `/admin/turnos` y
+> `/admin/turnos/{id}` — y también `/auth/login` (pendiente desde `auth-admin`, tasks.md 5.2:
+> "se copia al YAML real en el PR que registre `AuthModule` en `AppModule`", que terminó
+> siendo este). Dos hallazgos reales corregidos antes de escribir el YAML, verificados
+> generando el documento real con `@nestjs/swagger` (no a mano): (1) `@ApiBearerAuth()` sin
+> argumento en los tres controllers emitía `security: [{bearer: []}]`, un nombre de esquema
+> que no existe en `components.securitySchemes` (solo está `bearerAuth`) — corregido a
+> `@ApiBearerAuth('bearerAuth')`; (2) ninguno de los DTOs de `gestion-salon` tenía
+> `@ApiProperty()` (el proyecto no usa el plugin CLI de swagger que infiere metadata por
+> reflection), así que publicaban como `{}` vacío — se agregaron a los 5 DTOs, más
+> `@ApiQuery` explícito para `zonaId` en `GET /admin/mesas` (tampoco se infiere solo) y DTOs
+> de respuesta nuevos (`ZonaRespuestaDto`, `MesaRespuestaDto`, `TurnoRespuestaDto`) para
+> documentar los schemas de respuesta que pedía esta tarea. `openapi:lint` sin errores (se
+> sumó un `tags:` global que también resolvió los warnings preexistentes de
+> `operation-tag-defined`) y `openapi:check` sin deriva.
+>
+> Verificado de nuevo end-to-end contra Postgres real (mismo workaround de puerto 5433,
+> revertido al terminar): `typecheck`, `build`, `lint`, `test` (85/85), `test:e2e` (1/1, ahora
+> contra `AppModule` completo con Prisma real), `test:integration` (53/53, 6 suites),
+> `test:scripts` (20/20), `openapi:lint` y `openapi:check` todos en verde.
+
 ## 1. Prerrequisitos (bloqueante)
 
 - [x] 1.1 Confirmar que la implementación de `modelo-dominio` está mergeada a `main` y que
@@ -109,8 +143,8 @@
       Zonas sembradas por el seed de `modelo-dominio`. **Hecho** — `zonas.controller.ts` +
       `zonas.controller.spec.ts` (unitario) + cobertura HTTP en
       `gestion-salon-admin.integration-spec.ts` (401/403/200, incluido `400` con id no-UUID).
-      `ZonasModule` ahora importa `AuthModule`. El módulo sigue sin registrarse en
-      `AppModule` — ver nota de seguimiento de arriba.
+      `ZonasModule` ahora importa `AuthModule` y está registrado en `AppModule`
+      (seguimiento 2026-09-22, arriba) — la ruta es alcanzable en la app real.
 
 ## 3. Módulo Mesas (`backend/src/mesas/`)
 
@@ -151,8 +185,8 @@
       `mesas.controller.spec.ts` (unitario) + cobertura HTTP en
       `gestion-salon-admin.integration-spec.ts` (401/403, alta `201`, listado filtrado,
       edición `200`, baja `204` con verificación de que la fila desaparece). `MesasModule`
-      ahora importa `AuthModule`. Sigue sin registrarse en `AppModule` — ver nota de
-      seguimiento de arriba.
+      ahora importa `AuthModule` y está registrado en `AppModule` (seguimiento
+      2026-09-22, arriba) — la ruta es alcanzable en la app real.
 
 ## 4. Módulo Turnos (`backend/src/horarios/`)
 
@@ -178,18 +212,20 @@
       `horarios.controller.spec.ts` (unitario) + cobertura HTTP en
       `gestion-salon-admin.integration-spec.ts` (401, alta `201` con `horaInicio`/`horaFin`
       en formato `HH:mm`, listado, `PATCH` con `activo` en el mismo `200`). `HorariosModule`
-      ahora importa `AuthModule`. Sigue sin registrarse en `AppModule` — ver nota de
-      seguimiento de arriba.
+      ahora importa `AuthModule` y está registrado en `AppModule` (seguimiento
+      2026-09-22, arriba) — la ruta es alcanzable en la app real.
 
 ## 5. Tests de los requisitos de la spec
 
 - [x] 5.1 Test e2e: `GET /admin/zonas` sin token responde `401` (spec: "Rutas de gestión de
-      salón protegidas por autenticación de administrador"). **Hecho, como test de
-      integración en vez de e2e:** `AppModule` todavía no registra estos módulos (ver nota de
-      seguimiento de arriba), así que no hay una app e2e real contra la que pegarle todavía;
-      cubierto en `gestion-salon-admin.integration-spec.ts` contra un módulo mínimo (mismo
-      patrón que `auth.integration-spec.ts`), con 401 sin token en las tres rutas
-      (`/admin/zonas`, `/admin/mesas`, `/admin/turnos`), no solo `/admin/zonas`.
+      salón protegidas por autenticación de administrador"). **Hecho**, como test de
+      integración en vez de e2e (mismo patrón que `auth.integration-spec.ts`, para no
+      duplicar la app entre archivos): `gestion-salon-admin.integration-spec.ts` arma su
+      propio módulo mínimo y cubre 401 sin token en las tres rutas (`/admin/zonas`,
+      `/admin/mesas`, `/admin/turnos`), no solo `/admin/zonas`. Confirmado además contra la
+      app real (`AppModule` ya registra estos módulos, seguimiento 2026-09-22 arriba): un
+      smoke test manual (`node dist/src/main.js` + `curl`) verificó `401` real sin token en
+      `/admin/zonas`.
 - [x] 5.2 Test: actualización de Zona con `minComensales > maxComensales` rechazada (spec:
       "Actualización de configuración de Zona"). **Cubierto** por `zonas.service.spec.ts`
       (2.2) — no se duplicó en un archivo aparte.
@@ -245,17 +281,23 @@
 
 - [x] 6.1 Correr `openspec validate gestion-salon --strict` y confirmar que el change es
       válido. **Hecho.**
-- [ ] 6.2 Agregar a `openapi/openapi.yaml` los paths `/admin/zonas`, `/admin/mesas` y
+- [x] 6.2 Agregar a `openapi/openapi.yaml` los paths `/admin/zonas`, `/admin/mesas` y
       `/admin/turnos` (operaciones GET/POST/PATCH/DELETE según corresponda, `security:
       [bearerAuth]` en cada una, y los schemas de request/response), en el mismo PR
       (Definition of Done, `config.yaml` §13). Documentar en el DELETE de Mesa las respuestas
-      `204` sin cuerpo, `404` y `409` por Reservas asociadas de cualquier estado.
-      **Bloqueado, con los controllers ya implementados (2.3/3.6/4.4):** el motivo ahora es
-      que esos módulos todavía no están registrados en `AppModule` (ver nota de seguimiento
-      de arriba) — agregar estos paths al YAML committeado haría fallar `openapi:check`
-      (compara contra lo que `@nestjs/swagger` genera de los controllers realmente
-      registrados en la app que arranca — convención fijada en el PR #18). Se agrega junto
-      con el registro en `AppModule`, cuando se mergee `ci-integracion-db` (#28).
+      `204` sin cuerpo, `404` y `409` por Reservas asociadas de cualquier estado. **Hecho**
+      (seguimiento 2026-09-22, arriba) — junto con `/auth/login`, pendiente desde
+      `auth-admin`. Los seis paths, `security: [bearerAuth]` en cada operación protegida y
+      los schemas de request/response se generaron con `@nestjs/swagger` desde la app real
+      (no se escribieron a mano sin verificar) y se copiaron al YAML committeado;
+      `openapi:check` confirma cero deriva. Dos hallazgos reales corregidos en el camino:
+      `@ApiBearerAuth()` sin argumento generaba un requisito de seguridad `bearer` que no
+      coincide con el esquema `bearerAuth` ya definido (corregido pasando el nombre
+      explícito), y los DTOs de este change no tenían `@ApiProperty()` (el proyecto no usa
+      el plugin CLI de swagger), así que publicaban schemas vacíos — se agregaron a los 5
+      DTOs existentes más 3 DTOs de respuesta nuevos (`ZonaRespuestaDto`,
+      `MesaRespuestaDto`, `TurnoRespuestaDto`) y un `@ApiQuery` explícito para el filtro
+      `zonaId` de `GET /admin/mesas` (tampoco se infiere sin el plugin).
 - [x] 6.3 Confirmar que no hicieron falta variables de entorno nuevas ni migraciones de
       Prisma — este change no agrega campos a `Zona`, `Mesa` ni `Turno`. **Hecho** — no se
       tocó `schema.prisma` ni `.env.example`.

@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsInt, Min, ValidateIf } from 'class-validator';
 
 /**
@@ -14,35 +15,71 @@ import { IsBoolean, IsInt, Min, ValidateIf } from 'class-validator';
  * body) se considera "no cambiar este valor".
  */
 export class ActualizarZonaDto {
+  @ApiProperty({
+    required: false,
+    description: 'Mínimo de comensales permitido en una Reserva de esta Zona.',
+    example: 2,
+  })
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(1)
   minComensales?: number;
 
+  @ApiProperty({
+    required: false,
+    description: 'Máximo de comensales permitido en una Reserva de esta Zona.',
+    example: 12,
+  })
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(1)
   maxComensales?: number;
 
+  @ApiProperty({
+    required: false,
+    description: 'Anticipación mínima, en horas, para reservar en esta Zona.',
+    example: 24,
+  })
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   anticipacionMinHoras?: number;
 
+  @ApiProperty({
+    required: false,
+    description: 'Anticipación máxima, en días, para reservar en esta Zona.',
+    example: 60,
+  })
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   anticipacionMaxDias?: number;
 
+  @ApiProperty({
+    required: false,
+    description: 'Ventana de cancelación, en horas, antes del turno reservado.',
+    example: 24,
+  })
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   ventanaCancelacionHoras?: number;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Si una Reserva en esta Zona requiere confirmación manual del admin.',
+    example: true,
+  })
   @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   requiereConfirmacionAdmin?: boolean;
 
+  @ApiProperty({
+    required: false,
+    description: 'Aforo máximo simultáneo de esta Zona.',
+    example: 20,
+  })
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)

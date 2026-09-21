@@ -71,6 +71,12 @@
       fragmento queda en `design.md` (sección "Contrato OpenAPI") y se copia al YAML real en
       el PR que registre `AuthModule` en `AppModule`. `npm run openapi:lint` y
       `npm run openapi:check` pasan sin deriva en este estado.
+      **Seguimiento (2026-09-22, PR #27 de `gestion-salon`):** ese PR terminó siendo el que
+      registró `AuthModule` en `AppModule` (junto con sus propios módulos, ya desbloqueado
+      por `ci-integracion-db` #28) — copió `POST /auth/login` a `openapi/openapi.yaml` como
+      preveía esta nota, generándolo desde la app real con `@nestjs/swagger` (no a mano) para
+      confirmar que coincide exactamente con lo que expone el controller. `openapi:check`
+      sin deriva.
 - [x] 5.3 Confirmar que no hicieron falta variables de entorno nuevas (`JWT_SECRET` y
       `JWT_EXPIRES_IN` ya están en `.env.example` desde `fundacion-repo`). Si alguna
       implementación concreta necesitó una variable adicional, agregarla y documentarla en
