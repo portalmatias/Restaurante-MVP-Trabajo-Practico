@@ -44,13 +44,16 @@ export class MesasController {
 
   @ApiOperation({
     summary: 'Alta de Mesa',
-    description: 'Rechaza con 404 si la Zona indicada no existe.',
+    description:
+      'Rechaza con 404 si la Zona indicada no existe, con 409 si ya existe una mesa ' +
+      'con esa etiqueta.',
   })
   @ApiCreatedResponse({
     type: MesaRespuestaDto,
     description: 'La mesa se creó.',
   })
   @ApiNotFoundResponse({ description: 'La zona indicada no existe.' })
+  @ApiConflictResponse({ description: 'Ya existe una mesa con esa etiqueta.' })
   @Post()
   crear(@Body() dto: CrearMesaDto) {
     return this.mesasService.crear(dto);
@@ -94,8 +97,10 @@ export class MesasController {
   @ApiNotFoundResponse({ description: 'La mesa o la zona indicada no existe.' })
   @ApiConflictResponse({
     description:
-      'La mesa tiene una reserva activa con más comensales que la nueva capacidad, o ' +
-      'reservas activas que impiden cambiarla de zona.',
+      'La mesa tiene una reserva activa con más comensales que la nueva capacidad, ' +
+      'reservas activas que impiden cambiarla de zona, ya existe otra mesa con la ' +
+      'etiqueta indicada, o no se pudo actualizar por una edición concurrente ' +
+      '(conflicto de serialización agotando los reintentos).',
   })
   @Patch(':id')
   actualizar(

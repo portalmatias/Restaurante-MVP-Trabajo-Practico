@@ -397,7 +397,9 @@ paths:
     post:
       operationId: MesasController_crear
       summary: Alta de Mesa
-      description: Rechaza con 404 si la Zona indicada no existe.
+      description: >-
+        Rechaza con 404 si la Zona indicada no existe, con 409 si ya existe una mesa
+        con esa etiqueta.
       tags:
         - Mesas
       security:
@@ -418,6 +420,8 @@ paths:
                 $ref: '#/components/schemas/MesaRespuestaDto'
         '404':
           description: La zona indicada no existe.
+        '409':
+          description: Ya existe una mesa con esa etiqueta.
     get:
       operationId: MesasController_listar
       summary: Listado de Mesas
@@ -478,7 +482,9 @@ paths:
         '409':
           description: >-
             La mesa tiene una reserva activa con más comensales que la nueva
-            capacidad, o reservas activas que impiden cambiarla de zona.
+            capacidad, reservas activas que impiden cambiarla de zona, ya existe otra
+            mesa con la etiqueta indicada, o no se pudo actualizar por una edición
+            concurrente (conflicto de serialización agotando los reintentos).
     delete:
       operationId: MesasController_eliminar
       summary: Baja de Mesa
