@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
+import { PrismaModule } from '../prisma/prisma.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -11,6 +12,7 @@ import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
+    PrismaModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -30,10 +32,12 @@ import { RolesGuard } from './guards/roles.guard';
     }),
   ],
   controllers: [AuthController],
-  // `PrismaService` (el que usa AuthService) lo provee `PrismaModule`, que es `@Global()`
-  // y ya se registra desde `ReservasModule` dentro de `AppModule`. No hace falta proveer
-  // acá un `PrismaClient` propio: crear uno nuevo sin gestionar su ciclo de vida (sin
-  // `onModuleInit`/`onModuleDestroy`) dejaba una conexión a la base sin cerrar nunca.
+  // `PrismaService` (el que usa AuthService) lo provee `PrismaModule`, que se importa
+  // explícito arriba como hacen `MesasModule`/`ReservasModule`: aunque sea `@Global()`, un
+  // módulo global solo existe si alguien lo importa, y `ReservasModule` no está registrado
+  // en `AppModule`. No hace falta proveer acá un `PrismaClient` propio: crear uno nuevo sin
+  // gestionar su ciclo de vida (sin `onModuleInit`/`onModuleDestroy`) dejaba una conexión a
+  // la base sin cerrar nunca.
   providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
   exports: [AuthService, JwtModule, PassportModule, JwtAuthGuard, RolesGuard],
 })
