@@ -152,19 +152,22 @@ describe('Controllers admin de gestión de salón (integration)', () => {
     });
 
     it('200 con token admin, persiste el cambio', async () => {
-      const response = await request(app.getHttpServer())
-        .patch(`/admin/zonas/${zonaStandardId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ aforoMaximo: 45 })
-        .expect(200);
+      try {
+        const response = await request(app.getHttpServer())
+          .patch(`/admin/zonas/${zonaStandardId}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ aforoMaximo: 45 })
+          .expect(200);
 
-      expect((response.body as { aforoMaximo: number }).aforoMaximo).toBe(45);
-
-      // Deja el valor conocido para no interferir con otros archivos de test.
-      await prisma.zona.update({
-        where: { id: zonaStandardId },
-        data: { aforoMaximo: 40 },
-      });
+        expect((response.body as { aforoMaximo: number }).aforoMaximo).toBe(45);
+      } finally {
+        // Deja el valor conocido para no interferir con otros archivos de test, incluso
+        // si el `expect` de arriba falla (cubic: la fila STANDARD es compartida).
+        await prisma.zona.update({
+          where: { id: zonaStandardId },
+          data: { aforoMaximo: 40 },
+        });
+      }
     });
 
     it('400 con id que no es UUID', async () => {
@@ -178,6 +181,16 @@ describe('Controllers admin de gestión de salón (integration)', () => {
 
   describe('/admin/mesas', () => {
     let mesaId: string;
+
+    beforeAll(async () => {
+      // Limpieza defensiva: si una corrida anterior se interrumpió antes del DELETE
+      // final, no dejar que la fila residual con la misma etiqueta rompa el POST de más
+      // abajo con un 409 inesperado (cubic: los identificadores fijos son únicos en la
+      // base y el afterAll descarta errores de limpieza).
+      await prisma.mesa.deleteMany({
+        where: { etiqueta: 'HTTP-1', zonaId: zonaStandardId },
+      });
+    });
 
     afterAll(async () => {
       if (mesaId) {
@@ -252,6 +265,16 @@ describe('Controllers admin de gestión de salón (integration)', () => {
 
   describe('/admin/turnos', () => {
     let turnoId: string;
+    const turnoHoraInicio = new Date(Date.UTC(1970, 0, 1, 11, 30, 0));
+
+    beforeAll(async () => {
+      // Misma limpieza defensiva que en '/admin/mesas' de arriba: `diaSemana` + hora de
+      // inicio son la clave única real (`@@unique([diaSemana, horaInicio])`), así que una
+      // fila residual de una corrida interrumpida rompería el POST de más abajo con 409.
+      await prisma.turno.deleteMany({
+        where: { diaSemana: 'LUNES', horaInicio: turnoHoraInicio },
+      });
+    });
 
     afterAll(async () => {
       if (turnoId) {
