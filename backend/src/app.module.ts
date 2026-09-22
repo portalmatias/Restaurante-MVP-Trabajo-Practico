@@ -6,6 +6,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { DisponibilidadModule } from './disponibilidad/disponibilidad.module';
 import { ZonasModule } from './zonas/zonas.module';
 import { MesasModule } from './mesas/mesas.module';
 import { HorariosModule } from './horarios/horarios.module';
@@ -51,6 +52,9 @@ import { HorariosModule } from './horarios/horarios.module';
     ZonasModule,
     MesasModule,
     HorariosModule,
+    // `DisponibilidadModule` (change `disponibilidad`) expone `GET /disponibilidad`,
+    // público y sin auth, e importa `PrismaModule` igual que los de arriba.
+    DisponibilidadModule,
   ],
   controllers: [AppController],
   providers: [
