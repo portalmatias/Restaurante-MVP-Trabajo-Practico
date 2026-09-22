@@ -153,17 +153,17 @@
 
 - [ ] 9.1 `openspec validate disponibilidad --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
-- [ ] 9.2 El change no agrega migraciones ni toca `schema.prisma` (D5, Migration Plan).
+- [x] 9.2 El change no agrega migraciones ni toca `schema.prisma` (D5, Migration Plan).
       Verificar con `git diff main --stat -- backend/prisma` vacío.
-- [ ] 9.3 `openapi/openapi.yaml` actualizado en el mismo PR. Verificar con
+- [x] 9.3 `openapi/openapi.yaml` actualizado en el mismo PR. Verificar con
       `npm run openapi:lint` y `npm run openapi:check` en verde.
-- [ ] 9.4 No se agregaron variables de entorno (la zona horaria es UTC-3 fijo por decisión
+- [x] 9.4 No se agregaron variables de entorno (la zona horaria es UTC-3 fijo por decisión
       del equipo en #12, no se configura por `.env`). Verificar con `git diff main -- .env.example`
       vacío. Si alguna hizo falta, sumarla ahí.
-- [ ] 9.5 Tests de las reglas del §6 que toca el change: `npm test -w backend` en verde con
+- [x] 9.5 Tests de las reglas del §6 que toca el change: `npm test -w backend` en verde con
       `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`, y `npm run test:e2e -w backend` en
       verde localmente.
-- [ ] 9.6 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con
+- [x] 9.6 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con
       los dos comandos desde la raíz.
 - [ ] 9.7 CI en verde en el PR `feature/disponibilidad`. Verificar en la pestaña Checks.
 - [ ] 9.8 PR con descripción en español, enlazado a `openspec/changes/disponibilidad/`, con la
