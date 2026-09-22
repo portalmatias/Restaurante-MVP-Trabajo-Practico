@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ActualizarTurnoDto } from './dto/actualizar-turno.dto';
@@ -15,9 +20,23 @@ export class HorariosService {
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(dto: CrearTurnoDto) {
-    return this.prisma.turno.create({
-      data: { ...dto, activo: dto.activo ?? true },
-    });
+    try {
+      return await this.prisma.turno.create({
+        data: { ...dto, activo: dto.activo ?? true },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // Colisión contra @@unique([diaSemana, horaInicio]) — ya existe un turno que
+        // arranca a esa hora, ese día.
+        throw new ConflictException(
+          'Ya existe un turno para ese día y esa hora de inicio.',
+        );
+      }
+      throw error;
+    }
   }
 
   async listar() {
@@ -32,17 +51,39 @@ export class HorariosService {
     return turno;
   }
 
-  /** Edita día de la semana y/o horario de un Turno existente. */
+  /**
+   * Edita día de la semana, horario y/o `activo` de un Turno existente — `activo` viaja
+   * en el mismo `PATCH` de edición (design.md, tasks.md 4.4), no en una ruta aparte.
+   */
   async actualizar(id: string, dto: ActualizarTurnoDto) {
     await this.obtenerOFallar(id);
-    return this.prisma.turno.update({
-      where: { id },
-      data: {
-        diaSemana: dto.diaSemana,
-        horaInicio: dto.horaInicio,
-        horaFin: dto.horaFin,
-      },
-    });
+    try {
+      return await this.prisma.turno.update({
+        where: { id },
+        data: {
+          diaSemana: dto.diaSemana,
+          horaInicio: dto.horaInicio,
+          horaFin: dto.horaFin,
+          activo: dto.activo,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('El turno indicado no existe.');
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Ya existe un turno para ese día y esa hora de inicio.',
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -50,7 +91,6 @@ export class HorariosService {
    * (spec: "Activación y desactivación de Turno").
    */
   async cambiarActivo(id: string, activo: boolean) {
-    await this.obtenerOFallar(id);
-    return this.prisma.turno.update({ where: { id }, data: { activo } });
+    return this.actualizar(id, { activo });
   }
 }

@@ -1,21 +1,32 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { DiaSemana, EstadoReserva, Prisma } from '@prisma/client';
+import { ConfigModule } from '@nestjs/config';
+import { DiaSemana, EstadoReserva } from '@prisma/client';
 
 import { MesasModule } from '../src/mesas/mesas.module';
 import { MesasService } from '../src/mesas/mesas.service';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { upsertSeguro } from './helpers/upsert-seguro';
 
 /**
- * Tests de integración de `MesasService.eliminar` contra la base de TEST real
- * (`reservas_test`), no contra mocks de Prisma: la garantía de que no queden Reservas
- * huérfanas la da la FK restrictiva `Reserva.mesaId` (`ON DELETE RESTRICT`), no el `count`
- * previo del service — spec: "Baja de Mesa preserva las Reservas activas e históricas".
+ * Tests de integración de `MesasService` contra la base de TEST real (`reservas_test`),
+ * no contra mocks de Prisma.
  *
- * No cubre la carrera de promesas entre el `count` y el `DELETE` (tasks.md 5.6.1,
- * "Prueba determinística de la carrera entre consulta y DELETE") — ver la nota en
- * `openspec/changes/gestion-salon/tasks.md` sobre por qué queda pendiente.
+ * `eliminar`: la garantía de que no queden Reservas huérfanas la da la FK restrictiva
+ * `Reserva.mesaId` (`ON DELETE RESTRICT`), no el `count` previo del service — spec: "Baja
+ * de Mesa preserva las Reservas activas e históricas". No cubre la carrera de promesas
+ * entre el `count` y el `DELETE` (tasks.md 5.6.1, "Prueba determinística de la carrera
+ * entre consulta y DELETE") — ver la nota en `openspec/changes/gestion-salon/tasks.md`
+ * sobre por qué queda pendiente.
+ *
+ * `actualizar`: confirma que la llamada a
+ * `prisma.$transaction(..., { isolationLevel: Serializable })` es válida contra Postgres
+ * real (los tests unitarios de `mesas.service.spec.ts` mockean `$transaction`) y que dos
+ * ediciones concurrentes sobre la misma Mesa no corrompen el valor final — hallazgo P1 de
+ * cubic sobre PR #24. No repite la carrera específica contra
+ * `ReservasService.crearReserva` (que ya corre en `Serializable`, mismo mecanismo) porque
+ * `reservas-crear` todavía no existe como capability con su propio flujo de creación.
  */
 describe('MesasService.eliminar — integración con Postgres real', () => {
   let prisma: PrismaService;
@@ -77,50 +88,46 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, MesasModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        MesasModule,
+      ],
     }).compile();
 
     prisma = moduleRef.get(PrismaService);
     service = moduleRef.get(MesasService);
     await prisma.$connect();
 
-    // `upsert` no es atómico contra otro proceso haciendo lo mismo: Jest corre cada
-    // *.integration-spec.ts en su propio worker, y este archivo corre en paralelo con
+    // Este archivo corre en paralelo (worker propio de Jest) con
     // reservas-invariantes.integration-spec.ts, que hace su propio upsert de la misma fila
-    // (Zona.nombre = 'STANDARD' es un valor de enum, efectivamente singleton). Si el otro
-    // proceso gana la carrera y crea la fila primero, este upsert puede chocar contra el
-    // `@unique` — se resuelve re-leyendo en vez de fallar (mismo problema de fondo que la
-    // colisión de Mesa.etiqueta documentada en schema.prisma).
-    const standard = await obtenerOCrearZonaStandard();
+    // Zona.nombre = 'STANDARD' (es un valor de enum, efectivamente singleton) — ver
+    // `helpers/upsert-seguro.ts`. A este archivo no le importan los valores de
+    // configuración de la Zona (ningún test usa `aforoMaximo`/etc.), así que si pierde la
+    // carrera de creación alcanza con releer la fila.
+    const standard = await upsertSeguro(
+      () =>
+        prisma.zona.upsert({
+          where: { nombre: 'STANDARD' },
+          update: {},
+          create: {
+            nombre: 'STANDARD',
+            minComensales: 1,
+            maxComensales: 8,
+            anticipacionMinHoras: 2,
+            anticipacionMaxDias: 30,
+            ventanaCancelacionHoras: 2,
+            requiereConfirmacionAdmin: false,
+            aforoMaximo: 40,
+          },
+        }),
+      () => prisma.zona.findUniqueOrThrow({ where: { nombre: 'STANDARD' } }),
+    );
     zonaStandardId = standard.id;
   });
-
-  async function obtenerOCrearZonaStandard() {
-    try {
-      return await prisma.zona.upsert({
-        where: { nombre: 'STANDARD' },
-        update: {},
-        create: {
-          nombre: 'STANDARD',
-          minComensales: 1,
-          maxComensales: 8,
-          anticipacionMinHoras: 2,
-          anticipacionMaxDias: 30,
-          ventanaCancelacionHoras: 2,
-          requiereConfirmacionAdmin: false,
-          aforoMaximo: 40,
-        },
-      });
-    } catch (error) {
-      const esColisionDeNombre =
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002';
-      if (!esColisionDeNombre) {
-        throw error;
-      }
-      return prisma.zona.findUniqueOrThrow({ where: { nombre: 'STANDARD' } });
-    }
-  }
 
   afterEach(async () => {
     if (reservaIds.length > 0) {
@@ -150,6 +157,10 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
       where: { id: mesa.id },
     });
     expect(encontrada).toBeNull();
+
+    const listado = await service.listar();
+    expect(listado.find((m) => m.id === mesa.id)).toBeUndefined();
+
     // Ya no hace falta borrarla en afterEach.
     mesaIds = mesaIds.filter((id) => id !== mesa.id);
   });
@@ -187,4 +198,44 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
       expect(reservaIntacta?.mesaId).toBe(mesa.id);
     },
   );
+
+  describe('actualizar', () => {
+    it('persiste una actualización válida', async () => {
+      const mesa = await crearMesa('INT-ACT-1');
+
+      const resultado = await service.actualizar(mesa.id, { capacidad: 9 });
+      expect(resultado.capacidad).toBe(9);
+
+      const persistida = await prisma.mesa.findUniqueOrThrow({
+        where: { id: mesa.id },
+      });
+      expect(persistida.capacidad).toBe(9);
+    });
+
+    it('dos cambios concurrentes de capacidad dejan uno de los valores solicitados', async () => {
+      const mesa = await crearMesa('INT-ACT-2');
+
+      const resultados = await Promise.allSettled([
+        service.actualizar(mesa.id, { capacidad: 3 }),
+        service.actualizar(mesa.id, { capacidad: 5 }),
+      ]);
+
+      const cumplidas = resultados.filter(
+        (resultado) => resultado.status === 'fulfilled',
+      );
+      expect(cumplidas.length).toBeGreaterThanOrEqual(1);
+      for (const resultado of resultados) {
+        if (resultado.status === 'fulfilled') {
+          expect([3, 5]).toContain(resultado.value.capacidad);
+        } else {
+          expect(resultado.reason).toBeInstanceOf(ConflictException);
+        }
+      }
+
+      const final = await prisma.mesa.findUniqueOrThrow({
+        where: { id: mesa.id },
+      });
+      expect([3, 5]).toContain(final.capacidad);
+    });
+  });
 });

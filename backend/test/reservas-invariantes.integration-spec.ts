@@ -7,6 +7,7 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReservasModule } from '../src/reservas/reservas.module';
 import { ReservasService } from '../src/reservas/reservas.service';
+import { upsertSeguro } from './helpers/upsert-seguro';
 
 /**
  * Tests de integración de los cinco invariantes de negocio (config.yaml §6, sección
@@ -121,50 +122,54 @@ describe('ReservasService — invariantes de negocio (e2e)', () => {
     service = moduleRef.get(ReservasService);
     await prisma.$connect();
 
-    const standard = await prisma.zona.upsert({
-      where: { nombre: 'STANDARD' },
-      update: {
-        minComensales: 1,
-        maxComensales: 8,
-        anticipacionMinHoras: 2,
-        anticipacionMaxDias: 30,
-        ventanaCancelacionHoras: 2,
-        requiereConfirmacionAdmin: false,
-        aforoMaximo: 10,
-      },
-      create: {
-        nombre: 'STANDARD',
-        minComensales: 1,
-        maxComensales: 8,
-        anticipacionMinHoras: 2,
-        anticipacionMaxDias: 30,
-        ventanaCancelacionHoras: 2,
-        requiereConfirmacionAdmin: false,
-        aforoMaximo: 10,
-      },
-    });
-    const vip = await prisma.zona.upsert({
-      where: { nombre: 'VIP' },
-      update: {
-        minComensales: 2,
-        maxComensales: 12,
-        anticipacionMinHoras: 24,
-        anticipacionMaxDias: 60,
-        ventanaCancelacionHoras: 24,
-        requiereConfirmacionAdmin: true,
-        aforoMaximo: 10,
-      },
-      create: {
-        nombre: 'VIP',
-        minComensales: 2,
-        maxComensales: 12,
-        anticipacionMinHoras: 24,
-        anticipacionMaxDias: 60,
-        ventanaCancelacionHoras: 24,
-        requiereConfirmacionAdmin: true,
-        aforoMaximo: 10,
-      },
-    });
+    // Ver `helpers/upsert-seguro.ts`: este archivo corre en paralelo (worker propio de
+    // Jest) con otros *.integration-spec.ts que también hacen upsert de las mismas Zonas
+    // STANDARD/VIP. A diferencia de mesas.integration-spec.ts, acá sí importan los valores
+    // exactos (los usan los tests de invariantes de aforo) — por eso el fallback ante una
+    // colisión de creación es un `update` con esos mismos valores, no un simple re-fetch:
+    // así este archivo termina con la configuración que necesita sin importar cuál de los
+    // dos procesos ganó el `create`.
+    const valoresStandard = {
+      minComensales: 1,
+      maxComensales: 8,
+      anticipacionMinHoras: 2,
+      anticipacionMaxDias: 30,
+      ventanaCancelacionHoras: 2,
+      requiereConfirmacionAdmin: false,
+      aforoMaximo: 10,
+    };
+    const standard = await upsertSeguro(
+      () =>
+        prisma.zona.upsert({
+          where: { nombre: 'STANDARD' },
+          update: valoresStandard,
+          create: { nombre: 'STANDARD', ...valoresStandard },
+        }),
+      () =>
+        prisma.zona.update({
+          where: { nombre: 'STANDARD' },
+          data: valoresStandard,
+        }),
+    );
+
+    const valoresVip = {
+      minComensales: 2,
+      maxComensales: 12,
+      anticipacionMinHoras: 24,
+      anticipacionMaxDias: 60,
+      ventanaCancelacionHoras: 24,
+      requiereConfirmacionAdmin: true,
+      aforoMaximo: 10,
+    };
+    const vip = await upsertSeguro(
+      () =>
+        prisma.zona.upsert({
+          where: { nombre: 'VIP' },
+          update: valoresVip,
+          create: { nombre: 'VIP', ...valoresVip },
+        }),
+      () => prisma.zona.update({ where: { nombre: 'VIP' }, data: valoresVip }),
+    );
     zonaStandardId = standard.id;
     zonaVipId = vip.id;
 
