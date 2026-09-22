@@ -4,15 +4,73 @@
 > deja asentados los huecos que hoy bloquean la Definition of Done de `openspec/config.yaml` §13.
 > Las referencias con "§" apuntan a secciones del campo `context:` de `openspec/config.yaml`.
 
-## Estado al 2026-09-14
+## Estado al 2026-09-22
 
-Esta sección se agrega arriba para que se lea primero. El resto del documento es el plan
-original y se deja como estaba, salvo las marcas de las tareas ya cerradas.
+Foto de GitHub al 2026-09-22 (actualizada por última vez ese día; el resto del documento
+puede tener fecha de redacción anterior). Distingue código mergeado, PRs abiertos y trabajo pendiente;
+un check verde o una aprobación no significa que una funcionalidad esté habilitada.
+Las secciones siguientes conservan la secuencia y el reparto original, con sus estados
+actualizados. Los estados de los PRs deben volver a consultarse antes de integrar cambios.
 
-**Fase 0 y Fase 1: cerradas.**
+### Entregas y dependencias
+
+| Change / etapa | Responsable | Estado comprobado | Próximo paso |
+|---|---|---|---|
+| Fundación | portalmatias | Implementación #10/#11 mergeada; archivada en #13. Consigna y requerimientos incorporados en #4. | Mantener CI y reconfirmar opciones de revisión de `main` (ver abajo). |
+| `modelo-dominio` | FedeWerk | Spec #7 e implementación #12 mergeadas: schema, migraciones, seed, invariantes y helpers horarios. | Verificar DoD antes de archivar; todavía figura como change activo. |
+| `ci-integracion-db` | FedeWerk | Spec #26 e implementación #28 mergeadas (2026-09-21). PostgreSQL corre en el job `test` de `main`: migra, seedea y ejecuta unitarios, e2e e integración. | Cerrado. Verificar DoD antes de archivar. |
+| `auth-admin` | FedeWerk | Spec #9 e implementación #25 mergeadas (2026-09-21). El registro en `AppModule` y el contrato OpenAPI de `/auth/login`, pendientes de ese PR, los completó #33 (`feature/auth-registro-contrato`, mergeado 2026-09-21): `main` ya tiene `AuthModule` importado en `app.module.ts` y `/auth/login` en `openapi/openapi.yaml`. Cerrado. | Verificar DoD antes de archivar. |
+| `disponibilidad` | portalmatias | Specs #19/#21 mergeadas; rama `feature/disponibilidad` con tres commits propios y sin PR abierto. | Revisar y abrir PR de implementación; verificar el validador compartido y el lock que reutilizará creación. |
+| `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. #27 (abierto) agrega los tres controllers y registra `ZonasModule`/`MesasModule`/`HorariosModule` en `AppModule` (ya no bloqueado, con Postgres en CI) y su contrato OpenAPI. **Nota de coordinación:** #27 y #33 tocaron el registro de `AuthModule` en paralelo sin saberlo — #33 mergeó primero; #27 se rebaseó sobre `main` después y no duplica ese trabajo, solo agrega sus propios módulos. | Obtener revisión de #27 y mergear. |
+| `reservas-crear` | portalmatias | Spec #22 mergeada; implementación no mergeada. | Integrar disponibilidad y luego implementar creación transaccional. |
+| `reserva-consultar` | FedeWerk | Spec #32 mergeada (2026-09-21): define `POST /reservas/consultar` (código + email en el body, no `GET`, para no exponer el email en la URL ni en logs de acceso) y `GET /admin/reservas`. #35 (borrador) adelanta la búsqueda y la consulta a nivel de `ReservasService`; el controller sigue bloqueado por `reservas-crear`. | Esperar `reservas-crear` para el controller, el listado de admin y el contrato OpenAPI. |
+| `cancelacion-turnos` | lussofacundo-iresm | Spec #16 y ajuste UTC−3 #23 mergeados; implementación pendiente. | Esperar el merge de `reservas-crear` antes de la sección 2 de sus tareas. |
+| `reserva-vip` | lussofacundo-iresm | Spec #17 mergeada; implementación pendiente. | Esperar el merge de `reservas-crear`; endpoints admin requieren auth. |
+| Frontend funcional | FedeWerk / portalmatias | Solo base generada de Next.js; sin PRs abiertos de pantallas. | Preparar `frontend-base` y contratos/tipos según §9. |
+| `entrega-final` | lussofacundo-iresm | Pendiente. | Preparar checklist; no cerrar hasta completar los flujos y la DoD. |
+
+### PRs abiertos y revisión
+
+**Nota de mantenimiento (agregada 2026-09-22, a pedido de portalmatias):** esta sección
+detallaba el estado individual de cada PR abierto, y se desactualizó sola en cuestión de
+horas — #25/#26/#28 pasaron de "abiertos, pedir revisión" a mergeados entre que se escribió
+y que se revisó. GitHub es la fuente de verdad para qué PR está abierto, aprobado o
+mergeado; esta sección ya no intenta duplicarla en detalle, solo linkea:
+
+```bash
+gh pr list --state open
+gh pr checks <numero>       # el estado del check de Cubic no implica que sus observaciones estén resueltas
+```
+
+Quedan abiertos: [#27 — controllers y contrato de `gestion-salon`](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/27)
+(esperando revisión de un compañero) y este mismo roadmap
+([#29](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/29)).
+
+### Orden recomendado y trabajo disponible
+
+1. ~~**Matías:** revisar #28 ya corregido; coordinar con Fede la integración de #26/#28.~~
+   **Cerrado el 2026-09-21:** #26 y #28 mergeados a `main`.
+2. **Compañero revisor:** revisar #27 (controllers y contrato de `gestion-salon`, ya
+   desbloqueado por el merge de #28).
+3. ~~**Fede:** atender pendientes de #25 y probar auth contra PostgreSQL en CI.~~
+   **Cerrado el 2026-09-21:** #25 mergeado. El registro en `AppModule` y el contrato
+   OpenAPI de `/auth/login`, que quedaban pendientes de ese PR, los completó #33.
+4. **Matías:** abrir/revisar disponibilidad y después implementar `reservas-crear`.
+5. **Facundo:** implementar cancelación y VIP en cuanto #27 mergee y se cumplan sus
+   prerrequisitos (`reservas-crear`). Mientras tanto, revisar disponibilidad, preparar
+   matrices de pruebas y mantener documentación; modificar PRs ajenos solo con
+   autorización del responsable, como se acordó para #28.
+
+### Fundación y protección de main
 
 - `fundacion-repo` mergeado (#10, #11) y archivado (#13).
-- `main` protegida (tareas 0.2 y 0.4). La configuración aplicada:
+- La protección de `main` se documentó como aplicada el 2026-09-14 (0.2 y 0.4).
+  El 2026-09-19 el endpoint de la rama confirmó `protected: true` y los tres checks
+  requeridos con enforcement para todos. **Pendiente de reconfirmación por portalmatias:**
+  las opciones detalladas de aprobación, descarte de reviews y force-push; la consulta de
+  protección clásica devolvió `404` con este acceso y la de reglas aplicables una lista
+  vacía. Eso no demuestra ausencia de protección. No se cambiaron permisos.
+  Configuración documentada/esperada:
 
   | Regla | Valor |
   |---|---|
@@ -23,9 +81,9 @@ original y se deja como estaba, salvo las marcas de las tareas ya cerradas.
   | Se aplica también a admins | **sí** |
   | Force-push y borrado de `main` | prohibidos |
 
-  Consecuencia práctica: **nadie mergea su propio PR**, tampoco quien es admin del repo. Para
-  aprobar: pestaña *Files changed* → *Review changes* (o *Submit review*) → *Approve*. El
-  botón de merge aparece recién después.
+  Política del equipo: exigir revisión de un compañero; el autor no puede autoaprobarse.
+  Una aprobación ajena y los checks requeridos habilitan el merge, sujeto a las reglas
+  efectivamente configuradas. Esto no prohíbe que el autor ejecute el merge tras la aprobación.
 
 **Tres cosas que aprendimos y afectan a todos los changes que vienen:**
 
@@ -49,15 +107,17 @@ original y se deja como estaba, salvo las marcas de las tareas ya cerradas.
    `fecha + hora` local a un instante UTC usando la zona horaria del restaurante. Si se toman
    como UTC, todas las ventanas quedan corridas 3 horas. Además, `getDay()`/`getHours()`
    dependen de la zona horaria del proceso (la máquina de desarrollo está en Buenos Aires y CI
-   en UTC): hay que usar siempre `getUTC*` y `Date.UTC`. Dónde se guarda la zona horaria está
-   pedido en el PR #12 (`modelo-dominio`). La propuesta de conversión sin librerías está en el
-   `design.md` de `disponibilidad` (D5), para que la reusen `cancelacion-turnos` y
-   `reserva-consultar`.
+   en UTC): hay que usar siempre `getUTC*` y `Date.UTC`. **Decisión vigente: offset fijo
+   UTC−3**, no una zona configurable. #12 incorporó `backend/src/common/timezone.ts`:
+   reutilizar `inicioTurnoUtc` y `finTurnoUtc`, incluido el cruce de medianoche. La spec de
+   disponibilidad se incorporó en #19 y se alineó en #21; la de cancelación se incorporó
+   en #16 y se alineó en #23. Ambos ajustes adoptan el offset fijo UTC−3.
 
-## 1. Punto de partida
+## 1. Punto de partida (histórico)
 
-El repositorio tiene **cinco archivos y cero líneas de código**: solo `.claude/` y `openspec/`.
-El único change, [`diseno-general-app`](../openspec/changes/diseno-general-app/), está completo:
+Al redactar el plan original, el repositorio tenía **cinco archivos y cero líneas de código**:
+solo `.claude/` y `openspec/`. El único change,
+[`diseno-general-app`](../openspec/changes/archive/2026-09-07-diseno-general-app/), estaba completo:
 fijó las cuatro decisiones que estaban en conflicto entre `config.yaml` y `requerimientos-mvp.docx`
 (cliente sin cuenta, enum de estados, rango VIP 2-12, asignación *best fit*) y dejó el mapa de
 arquitectura general. No agregó comportamiento.
@@ -65,9 +125,14 @@ arquitectura general. No agregó comportamiento.
 El problema ahora no es *qué* construir —eso ya está en §6 y en el docx— sino **en qué orden y
 quién**.
 
-## 2. Huecos de proceso detectados
+## 2. Huecos de proceso detectados (histórico)
 
-Tres restricciones que la consigna evalúa y que hoy **no se cumplen**:
+Los siguientes hallazgos motivaron el plan inicial; **no describen el estado actual**.
+La documentación, CI, contrato y participación de los tres integrantes ya existen; #3 está
+mergeado. Las opciones detalladas de revisión de `main` requieren la reconfirmación indicada
+al inicio; la rama sí figura protegida.
+
+Tres restricciones que entonces no se cumplían:
 
 ```
 +----------------------------------------------------------------+
@@ -112,8 +177,9 @@ en dos changes.
 - **`gestion-salon` es un solo change** que cubre zonas + mesas + turnos. Los módulos NestJS
   siguen separados como pide el `design.md`; lo que no se separa es la ceremonia de OpenSpec —
   serían tres PRs casi idénticos sobre CRUDs que comparten schema, guards y sección de OpenAPI.
-- **El frontend entra completo**, arrancando contra `openapi.yaml` apenas la spec del endpoint
-  está mergeada; no espera a que el backend esté implementado.
+- **El frontend puede prepararse en paralelo**, leyendo el contrato planeado en `design.md`.
+  Los tipos HTTP se generan desde el contrato, no se escriben a mano; los paths se incorporan
+  al YAML ejecutable junto con los controllers (ver §9).
 
 ## 4. Fase 0 — Destrabar (sin código)
 
@@ -121,16 +187,15 @@ Nada de esto necesita un change de OpenSpec: no son features y no cambian compor
 
 | # | Acción | Dueño |
 |---|---|---|
-| 0.1 | Revisar y mergear **PR #3** (`chore/archive-diseno-general-app`). | FedeWerk (review) |
+| 0.1 | ✅ PR #3 mergeado: `diseno-general-app` archivado. | FedeWerk (review) |
 | 0.2 | ✅ Activar **branch protection** en `main`: require PR, 1 approval, prohibir force-push. Los *required status checks* se agregan recién en 0.4. | portalmatias |
-| 0.3 | PR `docs:` — agregar `docs/requerimientos-mvp.docx` y crear `.gitignore` (`node_modules/`, `.env`, `dist/`, `.next/`, `coverage/`). | **lussofacundo-iresm** |
+| 0.3 | ✅ Documentos incorporados en #4; `.gitignore` presente y ampliado en #14. | FedeWerk (documentos); mantenimiento compartido |
 | 0.4 | ✅ *(tras Fase 1)* Marcar los jobs de `ci.yml` como required status checks. | portalmatias |
 
-**0.3 va deliberadamente al integrante sin commits**: es chico, sin dependencias, y le abre el
-historial antes de que empiece lo grande. El docx además es *input* de las specs de la Fase 3 —
-sin él nadie puede citar RF/RN con confianza.
-
-`.gitignore` es urgente: el primer `npm install` de la Fase 1 crea `node_modules/`.
+El reparto inicial asignaba 0.3 a Facundo; los documentos los incorporó Fede en #4.
+Facundo ya contribuyó las specs de salón, cancelación y VIP y la implementación de salón.
+Las tareas 0.2/0.4 constan como cerradas: protección y checks confirmados actualmente;
+opciones detalladas de aprobación pendientes de reconfirmación.
 
 ## 5. Fase 1 — Fundación (secuencial, bloquea todo)
 
@@ -149,12 +214,12 @@ sin él nadie puede citar RF/RN con confianza.
   - `.github/workflows/ci.yml` con los cuatro pasos de §12.
   - `README.md` inicial con el bloque "Primer arranque" de §10.
 
-Contenido de `ci.yml` (dispara en `pull_request` y en push a `main`):
+Resumen del workflow en `main` (dispara en `pull_request` y en push a `main`):
 
 ```
-job: spec   -> openspec validate --strict  +  lint del openapi.yaml
+job: spec   -> openspec validate --all --strict + lint OpenAPI + build + openapi:check
 job: lint   -> npm run lint  +  tsc --noEmit (ambos workspaces)
-job: test   -> npm run test -w backend  (los specs que genera `nest new`; SIN base de datos)
+job: test   -> unitarios backend + e2e de arranque + tests de scripts (SIN base de datos)
 ```
 
 > **Por qué el job `test` no toca la base todavía.** En la Fase 1 no existen `schema.prisma`,
@@ -179,14 +244,14 @@ Hay una tensión real dentro de la constitución: §2 describe el contrato como
 valga depende que el paralelismo de la Fase 5 funcione: si el YAML se genera desde los
 controllers, no existe hasta que el backend exista, y el frontend no puede arrancar antes.
 
-**Propuesta: contract-first.** El `openapi/openapi.yaml` escrito a mano es la fuente de verdad.
+**Decisión adoptada: contract-first.** El `openapi/openapi.yaml` escrito a mano es la fuente de verdad.
 Es lo que habilita que el frontend arranque en paralelo, y es como lo describe §3. Para no
 perder lo que §2 pide, **CI genera el spec desde `@nestjs/swagger` y lo diffea contra el YAML
 commiteado**: si la implementación se desvía del contrato, el job falla. Así el contrato se
 escribe primero *y* queda validado contra el backend.
 
-Si el equipo adopta esto, hay que ajustar la redacción de §2 de `config.yaml`. Entra en el
-alcance de este mismo change, igual que `diseno-general-app` editó §5 y §6.
+La redacción de §2/§3 de `config.yaml` ya refleja esta decisión. Los contratos planeados
+quedan en `design.md` hasta que sus controllers se incorporen a la aplicación.
 
 > **Tradeoff asumido.** Este PR es más grande de lo que le gustaría a §14 ("cambios chicos y
 > revisables"). Casi todo es output de generadores. Mitigación: el `tasks.md` lo parte en tareas
@@ -198,6 +263,8 @@ alcance de este mismo change, igual que `diseno-general-app` editó §5 y §6.
 ## 6. Fase 2 — Modelo de dominio (secuencial, bloquea todo el backend)
 
 **Change `modelo-dominio`** — dueño: **FedeWerk**
+
+**Estado:** spec #7 e implementación #12 mergeadas; archivado pendiente de verificar DoD.
 
 - `feature/spec-modelo-dominio`: primera spec de capability real del proyecto. Entidades
   `Usuario`, `Zona`, `Mesa`, `Turno`, `Reserva`, `Configuracion`; el enum `EstadoReserva`; y **los
@@ -217,14 +284,17 @@ aunque solo uno apruebe formalmente.
 
 ### 6.1. Change `ci-integracion-db` — inmediatamente después
 
-**Dueño: FedeWerk** (viene de hacer `modelo-dominio`). Change chico, ~30 minutos.
+**Dueño: FedeWerk. Estado:** #26 (spec) y #28 (implementación) mergeados (2026-09-21).
 
-Único contenido: agregar al `ci.yml` el service container de Postgres y los pasos de
-`db:migrate`, `db:seed` y los tests e2e, que recién ahora existen. Va en un change propio y no
-dentro de `modelo-dominio` porque §14 prohíbe tocar `.github/workflows/` en un PR de feature.
+Alcance: agregar al `ci.yml` un service container PostgreSQL, ejecutar `prisma migrate deploy`
+y `db:seed` antes de los tests, y agregar `test:integration` después de los e2e existentes.
+También actualizar README, roadmap y artefactos del change. Resolver la equivalencia con
+Docker Compose exigida por §9 y la configuración de arranque para los jobs que instancian
+la app. Fue en un change propio porque §14 prohíbe tocar workflows en un PR de feature.
 
-Es la contrapartida directa de haber dejado el job `test` sin base de datos en la Fase 1: a
-partir de acá, los tests de integración contra base real que exige §9 corren en CI.
+Es la contrapartida directa de haber dejado el job `test` sin base de datos en la Fase 1: con
+el merge, los tests de integración contra base real que exige §9 corren en CI en `main` —
+ya no es solo verificación local del PR.
 
 ## 7. Fase 3 — Backend en paralelo (tres tracks)
 
@@ -234,8 +304,12 @@ partir de acá, los tests de integración contra base real que exige §9 corren 
 | `disponibilidad` | portalmatias | modelo-dominio | `GET /disponibilidad` + **el validador de reglas compartido** (turno activo, ventanas de anticipación, rango de comensales por zona, aforo). El `design.md` es explícito: `reservas` lo reutiliza, no lo reimplementa. |
 | `gestion-salon` | lussofacundo-iresm | auth-admin (impl) | CRUD de zonas, mesas y turnos bajo `/admin`, protegido por guard. Módulos NestJS `zonas/`, `mesas/`, `horarios/` separados. |
 
-`gestion-salon` necesita el guard mergeado para su implementación, pero **su spec PR se puede
-escribir y mergear antes**, así que el track no queda bloqueado.
+`gestion-salon` ya tiene services, DTOs y tests mergeados (#24). #27 (abierto, esperando
+revisión) agrega los tres controllers, registra `ZonasModule`/`MesasModule`/`HorariosModule`
+en `AppModule` (ya no bloqueado: `ci-integracion-db` #28 le dio a CI Postgres para todo el
+job `test`) y publica su propio contrato OpenAPI. `AuthModule` y `/auth/login` — que
+quedaban pendientes desde `auth-admin` (#25) por el mismo motivo — los registró y publicó
+#33 en paralelo, ya mergeado; #27 se rebaseó sobre eso sin duplicarlo.
 
 El **validador compartido de `disponibilidad` es la pieza de mayor riesgo del proyecto**: si su
 interfaz no queda bien pensada, `reservas-crear` termina duplicando reglas y se rompe la garantía
@@ -246,7 +320,7 @@ de §6 de que consulta y creación validan lo mismo. Merece revisión de los tre
 | Change | Dueño | Depende de | Alcance |
 |---|---|---|---|
 | `reservas-crear` | portalmatias | disponibilidad | `POST /reservas`. Transacción Prisma, best fit (query ordenada por capacidad ascendente), validación de aforo con el comensal nuevo ya sumado, generación del código de 8 caracteres, `PENDIENTE` si VIP / `CONFIRMADA` si no. |
-| `reserva-consultar` | FedeWerk | reservas-crear | `GET` público con **código + email** (ambos deben coincidir) + `@nestjs/throttler` contra enumeración. Listado y filtros para admin. |
+| `reserva-consultar` | FedeWerk | reservas-crear | `POST /reservas/consultar` público con **código + email** en el body (ambos deben coincidir, sin distinguir mayúsculas) + `@nestjs/throttler` contra enumeración. `GET /admin/reservas`: listado y filtros para admin (spec #32, mergeada). |
 | `cancelacion-turnos` | lussofacundo-iresm | reservas-crear | Cancelación con ventana por zona (2h STANDARD / 24h VIP) + endpoint admin de `NO_SHOW`, con guard que verifique que el turno ya pasó. Tests de los bordes exactos de la ventana (§9). |
 | `reserva-vip` | lussofacundo-iresm | reservas-crear | Flujo `PENDIENTE` → confirmar/rechazar por admin. Transiciones inválidas → `409 Conflict`. |
 
@@ -255,13 +329,14 @@ de §6 de que consulta y creación validan lo mismo. Merece revisión de los tre
 
 ## 9. Fase 5 — Frontend
 
-Arranca en paralelo al backend: cada pantalla solo necesita que **la spec del endpoint y su
-entrada en `openapi.yaml` estén mergeadas**, no la implementación.
+Puede prepararse en paralelo al backend leyendo las specs y sus contratos planeados.
 
 > **Corrección (2026-09-14):** la entrada en `openapi.yaml` no puede mergearse antes que el
-> controller, porque el chequeo de deriva de CI lo impide (ver "Estado al 2026-09-14"). Lo que
+> controller, porque el chequeo de deriva de CI lo impide (ver el estado al inicio). Lo que
 > se mergea con la spec es el fragmento OpenAPI dentro del `design.md` del change. Mientras
-> un endpoint no esté implementado, el frontend toma sus tipos de ahí.
+> un endpoint no esté implementado, el frontend usa ese diseño para preparar pantallas.
+> La generación de tipos desde fragmentos planeados requiere definir el mecanismo en
+> `frontend-base`; no autoriza escribir tipos HTTP a mano ni agregar paths ficticios al YAML.
 
 | Change | Dueño | Alcance |
 |---|---|---|
@@ -298,8 +373,8 @@ nombre de otro.
 > queda desbalanceado: mover `frontend-admin` a Facundo, o `ci-integracion-db` a Matías.
 >
 > Nota: la tarea 0.3 (docx + `.gitignore`) estaba pensada para abrirle el historial a Facundo,
-> pero la resolvió Fede en el PR #4. Su primer aporte pasa a ser la spec de `gestion-salon`, que
-> puede escribir ya — no necesita que exista código.
+> pero los documentos los incorporó Fede en el PR #4. Facundo ya aportó las specs de
+> `gestion-salon`, `cancelacion-turnos`, `reserva-vip` y los services de salón.
 
 ```
 Fase 0  [destrabar]     ---- todos, en paralelo, sin codigo
@@ -331,29 +406,33 @@ Fase 6  entrega-final (facundo)
 
 ## 12. Riesgos
 
-- **Las Fases 1 y 2 son un cuello de botella real.** Dos personas dependen de una durante dos
-  changes seguidos. Único mitigante: que escriban spec PRs en paralelo. Si eso no se respeta, se
-  pierde una semana.
+- **Cuello de botella actual:** revisión y merge de #27 (controllers de `gestion-salon`,
+  registro de sus propios módulos en `AppModule` y su contrato OpenAPI); disponibilidad y
+  creación para implementar cancelación/VIP. Fundación, modelo, auth (login y su registro
+  en `AppModule`, completados por #25/#33) y PostgreSQL en CI ya están mergeados. Avanzar
+  revisiones, specs y preparación de pruebas sin saltar prerrequisitos.
 - **Librerías nuevas que §2 obliga a justificar en su `design.md`:** el linter de OpenAPI y la CLI
   de OpenSpec en CI (Fase 1), y el generador de tipos desde OpenAPI (Fase 5). `@nestjs/jwt`,
   Passport, bcrypt y `@nestjs/throttler` ya están avaladas por §5.
-- **§2 y §3 de la constitución se contradicen sobre el contrato OpenAPI** ("generado desde el
-  backend" vs "versionado en el repo"). Todo el paralelismo de la Fase 5 depende de resolverlo a
-  favor de *contract-first*; si el equipo prefiere generar desde los controllers, el frontend no
-  puede arrancar antes que el backend y hay que rehacer la Fase 5 como secuencial. Se decide en
-  el `design.md` de `fundacion-repo` (§5) y **es la decisión más cara de cambiar después**.
+- **Contrato OpenAPI:** resuelto como contract-first en §2/§3 de la constitución. Sigue
+  pendiente integrar y verificar el fix de normalización de enums que está en la rama de
+  disponibilidad, no en `main`.
 - ~~**La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
   corre lint, tipos y unitarios, pero **no** tests contra base real. Es una ventana corta y
   deliberada; el riesgo es olvidarse de cerrarla y dejar los e2e de §9 fuera del pipeline.~~
-  **Cerrado el 2026-09-17:** `ci-integracion-db` conectó un service container de Postgres al
-  job `test`, con migración, seed y `test:integration` corriendo en cada PR.
+  **Cerrado el 2026-09-21:** `ci-integracion-db` (#28) mergeó a `main`, con un service
+  container de Postgres en el job `test`, migración, seed y `test:integration` corriendo en
+  cada PR. #27 serializa las suites de integración que comparten datos
+  (`maxWorkers: 1`) — no ejecutar dos suites completas de `test:integration` contra la misma
+  base simultáneamente.
 - ~~**Los required status checks (0.4) no se pueden configurar antes de la Fase 1** — GitHub solo los
   ofrece después de que el check corrió al menos una vez. Es fácil olvidarse y dejar `main` a medio
   proteger.~~ **Cerrado el 2026-09-14:** configurados junto con la protección de `main`.
 - **El repositorio es público.** Ningún `.env`, credencial ni URL real de base entra en ningún
   commit; el `.gitignore` de 0.3 es la primera línea de defensa (ya existe desde el PR #4).
-- **`openspec/specs/` va a seguir vacío hasta la Fase 2**, porque `diseno-general-app` usa
-  `skip_specs`. Es esperable, no un error.
+- **Archivado pendiente:** solo diseño general y fundación están archivados. Mergear una
+  implementación no publica automáticamente sus specs en `openspec/specs/`; verificar DoD
+  y ejecutar el flujo de archivado cuando corresponda, sin cerrar funcionalidades parciales.
 
 ## 13. Verificación por fase
 
@@ -361,10 +440,15 @@ Fase 6  entrega-final (facundo)
 
 ```bash
 gh pr list --state open                                # PR #3 ya no aparece
-gh api repos/<owner>/<repo>/branches/main/protection   # 200, no 404
-openspec list                                          # sin changes activos
+gh api repos/portalmatias/Restaurante-MVP-Trabajo-Practico/branches/main --jq '{protected, protection}'
+openspec list                                          # revisar activos; no exigir lista vacía
 ls docs/requerimientos-mvp.docx .gitignore
 ```
+
+Confirmar `protected: true` y los checks requeridos en la respuesta de la rama.
+El endpoint detallado `branches/main/protection` puede devolver `404` según los permisos
+o el mecanismo de reglas: no interpretarlo por sí solo como ausencia de protección.
+Portalmatias debe reconfirmar las opciones detalladas de aprobación indicadas al inicio.
 
 **Fase 1** — el PR debe mostrar los tres jobs de CI en verde, y en limpio:
 
@@ -378,11 +462,13 @@ openspec validate --strict
 ```bash
 npm run db:migrate -w backend && npm run db:seed -w backend
 npm run db:seed -w backend                             # segunda corrida: sin duplicados
-npm run test -w backend                                # un test por invariante, todos pasan
+npm run test -w backend
+npm run test:integration -w backend                    # invariantes contra base de test
 ```
 
 **`ci-integracion-db` (§6.1)** — el PR tiene que mostrar el job `test` levantando Postgres y
-corriendo los e2e. Compuerta: que un test de integración que falle a propósito **ponga el PR en
+corriendo migraciones, seed, unitarios, e2e e integración. Compuerta: que un test de integración
+que falle a propósito **ponga el PR en
 rojo**; si pasa igual, el service container no se está usando.
 
 **Fases 3 y 4** — por cada change, la Definition of Done completa de §13, con foco en: migración
