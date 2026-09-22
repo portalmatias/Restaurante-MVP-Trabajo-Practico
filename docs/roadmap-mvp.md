@@ -17,10 +17,10 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 |---|---|---|---|
 | Fundación | portalmatias | Implementación #10/#11 mergeada; archivada en #13. Consigna y requerimientos incorporados en #4. | Mantener CI y reconfirmar opciones de revisión de `main` (ver abajo). |
 | `modelo-dominio` | FedeWerk | Spec #7 e implementación #12 mergeadas: schema, migraciones, seed, invariantes y helpers horarios. | Verificar DoD antes de archivar; todavía figura como change activo. |
-| `ci-integracion-db` | FedeWerk | Spec #26 aprobada y lista para mergear; implementación #28 abierta, observaciones ya atendidas. PostgreSQL todavía no está en el workflow de `main`. | Obtener revisión independiente de #28 y mergear #26/#28 en ese orden. |
-| `auth-admin` | FedeWerk | Spec #9 mergeada; implementación #25 abierta y aprobada, con pendientes de revisión. | Corregir pendientes y verificar integración con PostgreSQL; registrar el módulo y publicar su contrato para habilitar login. |
+| `ci-integracion-db` | FedeWerk | Spec #26 e implementación #28 mergeadas (2026-09-21). PostgreSQL corre en el job `test` de `main`: migra, seedea y ejecuta unitarios, e2e e integración. | Cerrado. Verificar DoD antes de archivar. |
+| `auth-admin` | FedeWerk | Spec #9 e implementación #25 mergeadas (2026-09-21). | Cerrado en cuanto a login; el registro en `AppModule` y el contrato OpenAPI de `/auth/login` los completó `gestion-salon` (#27, ver abajo) al ser el PR que terminó registrando el módulo. Verificar DoD antes de archivar. |
 | `disponibilidad` | portalmatias | Specs #19/#21 mergeadas; rama `feature/disponibilidad` con tres commits propios y sin PR abierto. | Revisar y abrir PR de implementación; verificar el validador compartido y el lock que reutilizará creación. |
-| `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. Fix #27 abierto. | Obtener revisión de #27; luego completar controllers, guards y contrato cuando auth esté disponible. |
+| `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. #27 (abierto) agregó los tres controllers, registró `AuthModule`/`ZonasModule`/`MesasModule`/`HorariosModule` en `AppModule` (ya no bloqueado, con Postgres en CI) y publicó el contrato OpenAPI completo (`/auth/login` incluido). | Obtener revisión de #27 y mergear. |
 | `reservas-crear` | portalmatias | Spec #22 mergeada; implementación no mergeada. | Integrar disponibilidad y luego implementar creación transaccional. |
 | `reserva-consultar` | FedeWerk | Sin change propio en `main` ni PR abierto. | Preparar spec; implementación después de creación. |
 | `cancelacion-turnos` | lussofacundo-iresm | Spec #16 y ajuste UTC−3 #23 mergeados; implementación pendiente. | Esperar el merge de `reservas-crear` antes de la sección 2 de sus tareas. |
@@ -30,34 +30,34 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 
 ### PRs abiertos y revisión
 
-Hay cinco PRs abiertos, incluido este roadmap (#29). Los checks se vuelven a ejecutar
-después de cada push: verificar siempre el último commit. El estado del check de Cubic
-**no implica que sus observaciones estén resueltas**.
+**Nota de mantenimiento (agregada 2026-09-22, a pedido de portalmatias):** esta sección
+detallaba el estado individual de cada PR abierto, y se desactualizó sola en cuestión de
+horas — #25/#26/#28 pasaron de "abiertos, pedir revisión" a mergeados entre que se escribió
+y que se revisó. GitHub es la fuente de verdad para qué PR está abierto, aprobado o
+mergeado; esta sección ya no intenta duplicarla en detalle, solo linkea:
 
-| PR | Estado de aprobación | Pendiente |
-|---|---|---|
-| [#25 — auth](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/25) | Aprobado | Persisten rutas de prueba en el controller, diferencias de tiempo al validar credenciales, cobertura insuficiente del umbral de rate limiting y de firma JWT alterada, y observaciones de documentación/configuración. `ValidationPipe` ya está incorporado. Auth no está registrado en `AppModule`. |
-| [#26 — spec CI](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/26) | Aprobado | Sus commits están incluidos en #28, que contiene la spec corregida. Coordinar su integración mediante #28 y cerrar #26 como reemplazado si permanece abierto después. |
-| [#27 — correcciones salón](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/27) | Requiere aprobación | Detalles de JSDoc y test de actividad corregidos en `3bc0dbb`; 42 tests específicos y ESLint aprobados localmente. Esperar checks del nuevo head y revisión de un compañero. Sigue fuera de `main`. |
-| [#28 — PostgreSQL en CI](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/28) | Requiere aprobación | Facundo atendió las observaciones con autorización de Federico en `87eb9f3` y `00f2e5b`: JWT compartido con `spec`, equivalencia Compose/service container y documentación. CI/Cubic verdes; pedir revisión independiente, preferentemente a Matías. |
-| [#29 — roadmap](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/29) | Requiere aprobación | Este PR corrige la verificación de protección y las referencias horarias observadas por Cubic. Verificar checks del último commit y obtener revisión ajena. |
+```bash
+gh pr list --state open
+gh pr checks <numero>       # el estado del check de Cubic no implica que sus observaciones estén resueltas
+```
 
-En #25, los logs de CI muestran 60 unitarios y un e2e, pero no ejecutan la suite de
-integración de auth. En #28 sí se ejecutan migraciones, seed y 21 tests de integración
-(tres suites), además de 47 unitarios y un e2e; eso no prueba la combinación con #25/#27.
-Después de integrar el workflow, actualizar las ramas y verificar sus suites combinadas.
+Quedan abiertos: [#27 — controllers y contrato de `gestion-salon`](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/27)
+(esperando revisión de un compañero) y este mismo roadmap
+([#29](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/29)).
 
 ### Orden recomendado y trabajo disponible
 
-1. **Matías:** revisar #28 ya corregido; coordinar con Fede la integración de #26/#28.
-   JWT ya contempla `spec`; el workflow todavía debe mergearse para llegar a `main`.
-2. **Compañero revisor:** revisar #27; puede avanzar independientemente de #28.
-3. **Fede:** atender pendientes de #25 y probar auth contra PostgreSQL en CI. Su merge como
-   módulo aislado no habilita login: quedan registro en la app y contrato OpenAPI.
+1. ~~**Matías:** revisar #28 ya corregido; coordinar con Fede la integración de #26/#28.~~
+   **Cerrado el 2026-09-21:** #26 y #28 mergeados a `main`.
+2. **Compañero revisor:** revisar #27 (controllers y contrato de `gestion-salon`, ya
+   desbloqueado por el merge de #28).
+3. ~~**Fede:** atender pendientes de #25 y probar auth contra PostgreSQL en CI.~~
+   **Cerrado el 2026-09-21:** #25 mergeado. El registro en `AppModule` y el contrato
+   OpenAPI de `/auth/login`, que quedaban pendientes de ese PR, los completó #27.
 4. **Matías:** abrir/revisar disponibilidad y después implementar `reservas-crear`.
-5. **Facundo:** completar la API de salón cuando estén los guards; implementar cancelación
-   y VIP solo tras cumplir sus prerrequisitos. Mientras tanto, revisar disponibilidad,
-   preparar matrices de pruebas y mantener documentación; modificar PRs ajenos solo con
+5. **Facundo:** implementar cancelación y VIP en cuanto #27 mergee y se cumplan sus
+   prerrequisitos (`reservas-crear`). Mientras tanto, revisar disponibilidad, preparar
+   matrices de pruebas y mantener documentación; modificar PRs ajenos solo con
    autorización del responsable, como se acordó para #28.
 
 ### Fundación y protección de main
@@ -283,17 +283,17 @@ aunque solo uno apruebe formalmente.
 
 ### 6.1. Change `ci-integracion-db` — inmediatamente después
 
-**Dueño: FedeWerk. Estado:** #26 (spec) y #28 (implementación) abiertos.
+**Dueño: FedeWerk. Estado:** #26 (spec) y #28 (implementación) mergeados (2026-09-21).
 
 Alcance: agregar al `ci.yml` un service container PostgreSQL, ejecutar `prisma migrate deploy`
 y `db:seed` antes de los tests, y agregar `test:integration` después de los e2e existentes.
 También actualizar README, roadmap y artefactos del change. Resolver la equivalencia con
 Docker Compose exigida por §9 y la configuración de arranque para los jobs que instancian
-la app. Va en un change propio porque §14 prohíbe tocar workflows en un PR de feature.
+la app. Fue en un change propio porque §14 prohíbe tocar workflows en un PR de feature.
 
-Es la contrapartida directa de haber dejado el job `test` sin base de datos en la Fase 1: a
-partir de su merge, los tests de integración contra base real que exige §9 correrán en CI
-en `main`; por ahora solo está verificado en el PR #28.
+Es la contrapartida directa de haber dejado el job `test` sin base de datos en la Fase 1: con
+el merge, los tests de integración contra base real que exige §9 corren en CI en `main` —
+ya no es solo verificación local del PR.
 
 ## 7. Fase 3 — Backend en paralelo (tres tracks)
 
@@ -303,10 +303,11 @@ en `main`; por ahora solo está verificado en el PR #28.
 | `disponibilidad` | portalmatias | modelo-dominio | `GET /disponibilidad` + **el validador de reglas compartido** (turno activo, ventanas de anticipación, rango de comensales por zona, aforo). El `design.md` es explícito: `reservas` lo reutiliza, no lo reimplementa. |
 | `gestion-salon` | lussofacundo-iresm | auth-admin (impl) | CRUD de zonas, mesas y turnos bajo `/admin`, protegido por guard. Módulos NestJS `zonas/`, `mesas/`, `horarios/` separados. |
 
-`gestion-salon` ya tiene services, DTOs y tests mergeados (#24), sin controllers. El guard
-mergeado es prerrequisito de sus endpoints admin, no de esa lógica interna. #27 corrige
-los services/tests y todavía requiere aprobación. Completar controllers y contrato después
-de integrar auth y la infraestructura de CI necesaria.
+`gestion-salon` ya tiene services, DTOs y tests mergeados (#24). #27 (abierto, esperando
+revisión) agrega los tres controllers, registra `AuthModule`/`ZonasModule`/`MesasModule`/
+`HorariosModule` en `AppModule` (ya no bloqueado: `ci-integracion-db` #28 le dio a CI
+Postgres para todo el job `test`) y publica el contrato OpenAPI completo, incluido
+`/auth/login` — que quedaba pendiente desde `auth-admin` (#25) por el mismo motivo.
 
 El **validador compartido de `disponibilidad` es la pieza de mayor riesgo del proyecto**: si su
 interfaz no queda bien pensada, `reservas-crear` termina duplicando reglas y se rompe la garantía
@@ -403,9 +404,10 @@ Fase 6  entrega-final (facundo)
 
 ## 12. Riesgos
 
-- **Cuello de botella actual:** PostgreSQL en CI y auth para habilitar endpoints admin;
-  disponibilidad y creación para implementar cancelación/VIP. Fundación y modelo ya están
-  mergeados. Avanzar revisiones, specs y preparación de pruebas sin saltar prerrequisitos.
+- **Cuello de botella actual:** revisión y merge de #27 (controllers de `gestion-salon`,
+  registro en `AppModule` y contrato OpenAPI); disponibilidad y creación para implementar
+  cancelación/VIP. Fundación, modelo, auth y PostgreSQL en CI ya están mergeados. Avanzar
+  revisiones, specs y preparación de pruebas sin saltar prerrequisitos.
 - **Librerías nuevas que §2 obliga a justificar en su `design.md`:** el linter de OpenAPI y la CLI
   de OpenSpec en CI (Fase 1), y el generador de tipos desde OpenAPI (Fase 5). `@nestjs/jwt`,
   Passport, bcrypt y `@nestjs/throttler` ya están avaladas por §5.
