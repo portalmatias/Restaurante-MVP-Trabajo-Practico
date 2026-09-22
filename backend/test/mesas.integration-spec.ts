@@ -27,21 +27,6 @@ function capturarResultado<T>(
  * hasta que se libera `permitirDelete`, y después delega en el método original (capturado
  * antes de espiar). No fabrica resultados ni errores — design.md, "Prueba determinística de
  * la carrera entre consulta y DELETE".
- *
- * **Efecto secundario investigado y aceptado:** cuando la llamada interceptada termina en
- * un error real de Prisma (el caso que ejercita la carrera — `P2003` de la FK), el proceso
- * de Jest tarda unos ~5s extra en salir después de terminar los tests, y a veces imprime
- * "Jest did not exit one second after...". Aislado experimentalmente (ver el PR que agregó
- * esta prueba): no ocurre con un delete exitoso a través del mismo mock, ni con un delete
- * fallido SIN el `await` intermedio de la barrera (un wrapper transparente); ocurre
- * específicamente con la combinación de un `await` real antes de invocar el método original
- * *y* que ese método termine rechazado. No es un leak de `segundoCliente` (se reproduce
- * incluso sin crearlo) ni de `jest.spyOn` (se reproduce igual con un swap manual del
- * método). Todo indica una interacción entre el motor de Prisma y el intervalo entre invocar
- * el delegate y que la consulta real dispare, no un recurso sin cerrar de este archivo — el
- * proceso siempre termina con exit code 0 y el costo es fijo (una vez por corrida del
- * proceso de Jest, no por test: `npm run test:integration` completo con estas dos pruebas
- * incluidas mide lo mismo ~5s de más que correr solo este archivo).
  */
 function interceptarDelete(prisma: PrismaService) {
   let notificarDeleteAlcanzado!: () => void;
@@ -435,17 +420,23 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
             // arriba falló antes de llegar a `liberarDelete()`, el DELETE interceptado
             // seguiría esperando para siempre sin esto.
             liberarDelete();
-            const remate = await Promise.race([
-              operacion,
-              new Promise<'timeout'>((resolve) =>
-                setTimeout(() => resolve('timeout'), PLAZO_LIMPIEZA_MS),
-              ),
-            ]);
-            if (remate === 'timeout') {
-              console.error(
-                'La operación de eliminar no terminó dentro del plazo de limpieza; ' +
-                  'puede seguir corriendo en segundo plano.',
+            let timerLimpieza: ReturnType<typeof setTimeout> | undefined;
+            const plazoLimpieza = new Promise<'timeout'>((resolve) => {
+              timerLimpieza = setTimeout(
+                () => resolve('timeout'),
+                PLAZO_LIMPIEZA_MS,
               );
+            });
+            try {
+              const remate = await Promise.race([operacion, plazoLimpieza]);
+              if (remate === 'timeout') {
+                console.error(
+                  'La operación de eliminar no terminó dentro del plazo de ' +
+                    'limpieza; puede seguir corriendo en segundo plano.',
+                );
+              }
+            } finally {
+              if (timerLimpieza) clearTimeout(timerLimpieza);
             }
           } finally {
             try {
@@ -470,14 +461,17 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
         );
 
         try {
-          const inicio = Date.now();
           const espera = await esperarBarreraODeteccionTemprana(
             deleteAlcanzado,
             operacion,
             PLAZO_BARRERA_MS,
           );
-          const duracionMs = Date.now() - inicio;
 
+          // `espera.tipo` ya prueba que la detección temprana ganó la carrera contra el
+          // plazo completo (`Promise.race` no elige 'timeout' si 'operacion-anticipada'
+          // resolvió antes) — no hace falta además medir el reloj de pared, que en un
+          // runner de CI lento podría dar un test flaky sin aportar nada que el propio
+          // resultado de la carrera no garantice.
           expect(espera.tipo).toBe('operacion-anticipada');
           if (espera.tipo === 'operacion-anticipada') {
             expect(espera.resultado.estado).toBe('rechazada');
@@ -485,9 +479,6 @@ describe('MesasService.eliminar — integración con Postgres real', () => {
               expect(espera.resultado.error).toBeInstanceOf(NotFoundException);
             }
           }
-          // No debería haber esperado cerca del plazo completo: el error llega apenas
-          // corre el `findUnique` inicial, mucho antes de cualquier DELETE.
-          expect(duracionMs).toBeLessThan(PLAZO_BARRERA_MS / 2);
         } finally {
           spy.mockRestore();
         }

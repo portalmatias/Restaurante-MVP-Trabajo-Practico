@@ -284,16 +284,18 @@
       dentro de la barrera) y la verificación del propio mecanismo con una Mesa inexistente
       (confirma detección temprana, muy por debajo del plazo completo). Corrida repetida
       contra Postgres real (4 corridas seguidas de la suite completa, 55/55 cada vez) sin
-      fallos. **Hallazgo documentado, no un bug del test:** el proceso de Jest tarda ~5s
-      extra en salir después de que el DELETE interceptado termina en un error real de
-      Prisma (`P2003`) — aislado experimentalmente a la combinación específica de un `await`
-      real antes de invocar el método original *y* que ese método rechace; no reproduce con
-      un delete exitoso por el mismo mock, ni con un delete fallido sin ese `await`
-      intermedio, ni depende de `jest.spyOn` en particular (se reprodujo igual con un swap
-      manual del método) ni de `segundoCliente` (se reprodujo sin crearlo). Costo fijo, una
-      vez por corrida del proceso de Jest — no por test, no compone con más pruebas — y
-      siempre termina con exit code `0`. Detalle completo en el comentario de
-      `interceptarDelete`.
+      fallos. **Corrección tras el review de cubic sobre el PR que agregó esta prueba:**
+      la primera versión tenía un timer de limpieza (`setTimeout` del `Promise.race` que
+      espera a `operacion` con un plazo, en el `finally` de la prueba de la carrera real)
+      sin cancelar — quedaba corriendo los `PLAZO_LIMPIEZA_MS` completos (5s) aunque
+      `operacion` ya hubiera resuelto, atrasando la salida del proceso de Jest. Antes de
+      esa corrección lo atribuí (mal) a una interacción del motor de Prisma con el `await`
+      de la barrera; cubic identificó la causa real en minutos. Corregido cancelando el
+      timer igual que ya hacía `esperarBarreraODeteccionTemprana`; confirmado que el
+      atraso desaparece por completo (4 corridas más, ~1s cada una en vez de ~6s, sin el
+      aviso "Jest did not exit..."). También se simplificó la prueba del mecanismo con
+      Mesa inexistente, sacando una cota de reloj de pared redundante con el resultado de
+      la propia carrera (podía dar flaky en un runner de CI lento).
 - [x] 5.7 Test: alta de Turno sin indicar `activo` queda `activo = true` (spec: "Alta de
       Turno"). **Cubierto** por `horarios.service.spec.ts` (4.2).
 - [x] 5.8 Test: desactivar un Turno lo marca `activo = false` sin eliminarlo y sigue
