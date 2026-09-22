@@ -10,6 +10,6 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(.pnpm/)?(@nestjs|passport-jwt|passport)/)"
+    "node_modules/(?!(@nestjs|passport-jwt|passport)/)"
   ]
 }
