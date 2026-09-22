@@ -4,9 +4,10 @@
 > deja asentados los huecos que hoy bloquean la Definition of Done de `openspec/config.yaml` §13.
 > Las referencias con "§" apuntan a secciones del campo `context:` de `openspec/config.yaml`.
 
-## Estado al 2026-09-19
+## Estado al 2026-09-22
 
-Foto de GitHub al 2026-09-19. Distingue código mergeado, PRs abiertos y trabajo pendiente;
+Foto de GitHub al 2026-09-22 (actualizada por última vez ese día; el resto del documento
+puede tener fecha de redacción anterior). Distingue código mergeado, PRs abiertos y trabajo pendiente;
 un check verde o una aprobación no significa que una funcionalidad esté habilitada.
 Las secciones siguientes conservan la secuencia y el reparto original, con sus estados
 actualizados. Los estados de los PRs deben volver a consultarse antes de integrar cambios.
@@ -18,9 +19,9 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 | Fundación | portalmatias | Implementación #10/#11 mergeada; archivada en #13. Consigna y requerimientos incorporados en #4. | Mantener CI y reconfirmar opciones de revisión de `main` (ver abajo). |
 | `modelo-dominio` | FedeWerk | Spec #7 e implementación #12 mergeadas: schema, migraciones, seed, invariantes y helpers horarios. | Verificar DoD antes de archivar; todavía figura como change activo. |
 | `ci-integracion-db` | FedeWerk | Spec #26 e implementación #28 mergeadas (2026-09-21). PostgreSQL corre en el job `test` de `main`: migra, seedea y ejecuta unitarios, e2e e integración. | Cerrado. Verificar DoD antes de archivar. |
-| `auth-admin` | FedeWerk | Spec #9 e implementación #25 mergeadas (2026-09-21). | Cerrado en cuanto a login; el registro en `AppModule` y el contrato OpenAPI de `/auth/login` los completó `gestion-salon` (#27, ver abajo) al ser el PR que terminó registrando el módulo. Verificar DoD antes de archivar. |
+| `auth-admin` | FedeWerk | Spec #9 e implementación #25 mergeadas (2026-09-21). El registro en `AppModule` y el contrato OpenAPI de `/auth/login`, pendientes de ese PR, los completó #33 (`feature/auth-registro-contrato`, mergeado 2026-09-21): `main` ya tiene `AuthModule` importado en `app.module.ts` y `/auth/login` en `openapi/openapi.yaml`. Cerrado. | Verificar DoD antes de archivar. |
 | `disponibilidad` | portalmatias | Specs #19/#21 mergeadas; rama `feature/disponibilidad` con tres commits propios y sin PR abierto. | Revisar y abrir PR de implementación; verificar el validador compartido y el lock que reutilizará creación. |
-| `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. #27 (abierto) agregó los tres controllers, registró `AuthModule`/`ZonasModule`/`MesasModule`/`HorariosModule` en `AppModule` (ya no bloqueado, con Postgres en CI) y publicó el contrato OpenAPI completo (`/auth/login` incluido). | Obtener revisión de #27 y mergear. |
+| `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. #27 (abierto) agrega los tres controllers y registra `ZonasModule`/`MesasModule`/`HorariosModule` en `AppModule` (ya no bloqueado, con Postgres en CI) y su contrato OpenAPI. **Nota de coordinación:** #27 y #33 tocaron el registro de `AuthModule` en paralelo sin saberlo — #33 mergeó primero; #27 se rebaseó sobre `main` después y no duplica ese trabajo, solo agrega sus propios módulos. | Obtener revisión de #27 y mergear. |
 | `reservas-crear` | portalmatias | Spec #22 mergeada; implementación no mergeada. | Integrar disponibilidad y luego implementar creación transaccional. |
 | `reserva-consultar` | FedeWerk | Sin change propio en `main` ni PR abierto. | Preparar spec; implementación después de creación. |
 | `cancelacion-turnos` | lussofacundo-iresm | Spec #16 y ajuste UTC−3 #23 mergeados; implementación pendiente. | Esperar el merge de `reservas-crear` antes de la sección 2 de sus tareas. |
@@ -53,7 +54,7 @@ Quedan abiertos: [#27 — controllers y contrato de `gestion-salon`](https://git
    desbloqueado por el merge de #28).
 3. ~~**Fede:** atender pendientes de #25 y probar auth contra PostgreSQL en CI.~~
    **Cerrado el 2026-09-21:** #25 mergeado. El registro en `AppModule` y el contrato
-   OpenAPI de `/auth/login`, que quedaban pendientes de ese PR, los completó #27.
+   OpenAPI de `/auth/login`, que quedaban pendientes de ese PR, los completó #33.
 4. **Matías:** abrir/revisar disponibilidad y después implementar `reservas-crear`.
 5. **Facundo:** implementar cancelación y VIP en cuanto #27 mergee y se cumplan sus
    prerrequisitos (`reservas-crear`). Mientras tanto, revisar disponibilidad, preparar
@@ -304,10 +305,11 @@ ya no es solo verificación local del PR.
 | `gestion-salon` | lussofacundo-iresm | auth-admin (impl) | CRUD de zonas, mesas y turnos bajo `/admin`, protegido por guard. Módulos NestJS `zonas/`, `mesas/`, `horarios/` separados. |
 
 `gestion-salon` ya tiene services, DTOs y tests mergeados (#24). #27 (abierto, esperando
-revisión) agrega los tres controllers, registra `AuthModule`/`ZonasModule`/`MesasModule`/
-`HorariosModule` en `AppModule` (ya no bloqueado: `ci-integracion-db` #28 le dio a CI
-Postgres para todo el job `test`) y publica el contrato OpenAPI completo, incluido
-`/auth/login` — que quedaba pendiente desde `auth-admin` (#25) por el mismo motivo.
+revisión) agrega los tres controllers, registra `ZonasModule`/`MesasModule`/`HorariosModule`
+en `AppModule` (ya no bloqueado: `ci-integracion-db` #28 le dio a CI Postgres para todo el
+job `test`) y publica su propio contrato OpenAPI. `AuthModule` y `/auth/login` — que
+quedaban pendientes desde `auth-admin` (#25) por el mismo motivo — los registró y publicó
+#33 en paralelo, ya mergeado; #27 se rebaseó sobre eso sin duplicarlo.
 
 El **validador compartido de `disponibilidad` es la pieza de mayor riesgo del proyecto**: si su
 interfaz no queda bien pensada, `reservas-crear` termina duplicando reglas y se rompe la garantía
@@ -405,8 +407,9 @@ Fase 6  entrega-final (facundo)
 ## 12. Riesgos
 
 - **Cuello de botella actual:** revisión y merge de #27 (controllers de `gestion-salon`,
-  registro en `AppModule` y contrato OpenAPI); disponibilidad y creación para implementar
-  cancelación/VIP. Fundación, modelo, auth y PostgreSQL en CI ya están mergeados. Avanzar
+  registro de sus propios módulos en `AppModule` y su contrato OpenAPI); disponibilidad y
+  creación para implementar cancelación/VIP. Fundación, modelo, auth (login y su registro
+  en `AppModule`, completados por #25/#33) y PostgreSQL en CI ya están mergeados. Avanzar
   revisiones, specs y preparación de pruebas sin saltar prerrequisitos.
 - **Librerías nuevas que §2 obliga a justificar en su `design.md`:** el linter de OpenAPI y la CLI
   de OpenSpec en CI (Fase 1), y el generador de tipos desde OpenAPI (Fase 5). `@nestjs/jwt`,
