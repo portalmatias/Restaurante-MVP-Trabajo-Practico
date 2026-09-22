@@ -56,8 +56,8 @@ Todo se corre desde la raíz del repo.
 | `npm run lint` | ESLint sobre los dos workspaces |
 | `npm run typecheck` | `tsc --noEmit` sobre los dos workspaces |
 | `npm run test -w backend` | Tests unitarios del backend (Jest) |
-| `npm run test:e2e` | Tests e2e del backend (`backend/test/*.e2e-spec.ts`) |
-| `npm run test:integration -w backend` | Tests de integración contra PostgreSQL real (`backend/test/*.integration-spec.ts`). Requiere tener PostgreSQL levantado (`docker compose up -d`) |
+| `npm run test:e2e` | Tests e2e del backend (`backend/test/*.e2e-spec.ts`) contra la `AppModule` real. Requiere PostgreSQL levantado, con la base de test migrada y con el seed aplicado, y `JWT_SECRET` (ver [Tests que usan la base](#tests-que-usan-la-base-e2e-e-integración)) |
+| `npm run test:integration -w backend` | Tests de integración contra PostgreSQL real (`backend/test/*.integration-spec.ts`). Requiere PostgreSQL levantado (`docker compose up -d`) con la base de test migrada |
 | `npm run test:scripts` | Tests de las utilidades de `scripts/` (`node --test`) |
 | `npm run build -w backend` | Compila el backend |
 | `npm run db:migrate -w backend` | Aplica las migraciones de Prisma (`prisma migrate dev`) |
@@ -66,6 +66,32 @@ Todo se corre desde la raíz del repo.
 | `npm run openapi:check` | Verifica que el backend no se desvíe del contrato |
 
 Para correr un script de un solo workspace: `npm run <script> -w backend` (o `-w frontend`).
+
+### Tests que usan la base (e2e e integración)
+
+`test:e2e` levanta la `AppModule` real (`backend/test/auth.e2e-spec.ts` hace login de admin
+contra ella), así que, igual que `test:integration`, necesita una base de PostgreSQL real.
+Los dos leen la base de **test**, nunca la de desarrollo:
+
+- **PostgreSQL con `reservas_test` migrada y con el seed aplicado.** `docker compose up -d`
+  crea la base vacía; las migraciones y el seed no se aplican solos. `db:migrate` y `db:seed`
+  apuntan a la `DATABASE_URL` de tu `.env` (la de `reservas_dev`), así que para la de test se
+  la pisa con una variable exportada, que tiene prioridad sobre el `.env`:
+
+  ```bash
+  export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/reservas_test
+  npx prisma migrate deploy --schema backend/prisma/schema.prisma
+  npm run db:seed -w backend
+  ```
+
+  (En PowerShell: `$env:DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/reservas_test"`.)
+  El seed hace falta porque el admin con el que loguea el e2e sale de `backend/prisma/seed.ts`.
+- **`JWT_SECRET`** (y `JWT_EXPIRES_IN`, `THROTTLE_TTL` y `THROTTLE_LIMIT`). En local salen de tu
+  `.env`: los `setup` de Jest de e2e e integración cargan el `.env` de la raíz y el de
+  `backend/`, y lo que ya esté exportado en tu terminal tiene prioridad. En CI llegan como
+  variables del workflow.
+- **`DATABASE_URL_TEST`** (opcional). La base que usan los tests: si no está definida, cae a
+  `postgresql://postgres:postgres@localhost:5432/reservas_test`. Se puede definir en el `.env`.
 
 ## Estructura
 
@@ -109,11 +135,17 @@ Un PR con CI en rojo no se mergea, aunque funcione localmente.
 > El job `test` levanta un service container de PostgreSQL (`postgres:16.4-alpine`, una sola
 > base `reservas_test` — no hace falta separar dev de test en CI), aplica las migraciones
 > (`prisma migrate deploy`) y el seed, y recién ahí corre las cuatro categorías de tests.
-> Las URLs de base quedan en `test`; JWT y throttling se comparten a nivel workflow para
-> que `spec` también pueda construir la app al generar OpenAPI cuando se registre auth.
-> Todos los valores son ficticios de CI (config.yaml §10), nunca secretos de producción.
-> Esto prepara las variables conocidas; módulos que agreguen configuración o conexiones
-> durante su construcción requerirán revisar nuevamente el entorno de CI.
+> Los e2e también dependen de esa base migrada y con seed: el login de admin que prueban sale
+> del seed.
+> Las URLs de base (`DATABASE_URL` y `DATABASE_URL_TEST`) quedan en `test`; `JWT_SECRET`,
+> `JWT_EXPIRES_IN` y el throttling se definen a nivel workflow. `AuthModule` ya está registrado
+> en `AppModule`, así que tanto los e2e de `test` como la generación de OpenAPI de `spec`
+> necesitan `JWT_SECRET` para construir la app (sin él, `JwtStrategy` falla).
+> `spec` no define `DATABASE_URL` ni levanta PostgreSQL: `openapi:check` construye la app con
+> `NestFactory.create` sin llamar a `app.init()`, y `PrismaService` recién conecta en
+> `onModuleInit`. Todos los valores son ficticios de CI (config.yaml §10), nunca secretos de
+> producción. Un módulo que abra conexiones al construirse, o un cambio de `openapi:check`
+> que inicialice la app, requeriría revisar de nuevo el entorno del job `spec`.
 
 ## Cómo se trabaja acá
 
