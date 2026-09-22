@@ -57,7 +57,7 @@ Todo se corre desde la raíz del repo.
 | `npm run typecheck` | `tsc --noEmit` sobre los dos workspaces |
 | `npm run test -w backend` | Tests unitarios del backend (Jest) |
 | `npm run test:e2e` | Tests e2e del backend (`backend/test/*.e2e-spec.ts`) contra la `AppModule` real. Requiere PostgreSQL levantado, con la base de test migrada y con el seed aplicado, y `JWT_SECRET` (ver [Tests que usan la base](#tests-que-usan-la-base-e2e-e-integración)) |
-| `npm run test:integration -w backend` | Tests de integración contra PostgreSQL real (`backend/test/*.integration-spec.ts`). Requiere PostgreSQL levantado (`docker compose up -d`) con la base de test migrada |
+| `npm run test:integration -w backend` | Tests de integración contra PostgreSQL real (`backend/test/*.integration-spec.ts`). Requiere PostgreSQL levantado (`docker compose up -d`), con la base de test migrada y con el seed aplicado, y `JWT_SECRET` (ver [Tests que usan la base](#tests-que-usan-la-base-e2e-e-integración)) |
 | `npm run test:scripts` | Tests de las utilidades de `scripts/` (`node --test`) |
 | `npm run build -w backend` | Compila el backend |
 | `npm run db:migrate -w backend` | Aplica las migraciones de Prisma (`prisma migrate dev`) |
@@ -85,7 +85,8 @@ Los dos leen la base de **test**, nunca la de desarrollo:
   ```
 
   (En PowerShell: `$env:DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/reservas_test"`.)
-  El seed hace falta porque el admin con el que loguea el e2e sale de `backend/prisma/seed.ts`.
+  El seed hace falta porque el admin con el que loguean `auth.e2e-spec.ts` y
+  `auth.integration-spec.ts` sale de `backend/prisma/seed.ts`.
 - **`JWT_SECRET`** (y `JWT_EXPIRES_IN`, `THROTTLE_TTL` y `THROTTLE_LIMIT`). En local salen de tu
   `.env`: los `setup` de Jest de e2e e integración cargan el `.env` de la raíz y el de
   `backend/`, y lo que ya esté exportado en tu terminal tiene prioridad. En CI llegan como
