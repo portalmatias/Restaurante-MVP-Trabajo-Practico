@@ -412,11 +412,14 @@ Fase 6  entrega-final (facundo)
 - **Contrato OpenAPI:** resuelto como contract-first en §2/§3 de la constitución. Sigue
   pendiente integrar y verificar el fix de normalización de enums que está en la rama de
   disponibilidad, no en `main`.
-- **La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
-  corre lint, tipos, unitarios, e2e de arranque y tests de scripts, pero **no** tests contra
-  base real. #28 cierra esa brecha en su rama; no marcarla cerrada en `main` hasta su merge.
-  #27 serializa las suites de integración que comparten datos: verificar esa configuración
-  al combinar los PRs y no ejecutar dos suites completas contra la misma base simultáneamente.
+- ~~**La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
+  corre lint, tipos y unitarios, pero **no** tests contra base real. Es una ventana corta y
+  deliberada; el riesgo es olvidarse de cerrarla y dejar los e2e de §9 fuera del pipeline.~~
+  **Cerrado el 2026-09-21:** `ci-integracion-db` (#28) mergeó a `main`, con un service
+  container de Postgres en el job `test`, migración, seed y `test:integration` corriendo en
+  cada PR. #27 serializa las suites de integración que comparten datos
+  (`maxWorkers: 1`) — no ejecutar dos suites completas de `test:integration` contra la misma
+  base simultáneamente.
 - ~~**Los required status checks (0.4) no se pueden configurar antes de la Fase 1** — GitHub solo los
   ofrece después de que el check corrió al menos una vez. Es fácil olvidarse y dejar `main` a medio
   proteger.~~ **Cerrado el 2026-09-14:** configurados junto con la protección de `main`.

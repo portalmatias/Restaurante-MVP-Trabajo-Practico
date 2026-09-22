@@ -102,16 +102,18 @@ Si agregás o cambiás un endpoint: **primero el YAML, después el código.**
 |---|---|
 | `spec` | `openspec validate --all --strict`, Spectral, y el chequeo de deriva del contrato |
 | `lint` | ESLint y chequeo de tipos |
-| `test` | Tests unitarios y e2e del backend, más los de `scripts/` |
+| `test` | Tests unitarios, e2e, de integración (contra Postgres real) y los de `scripts/` |
 
 Un PR con CI en rojo no se mergea, aunque funcione localmente.
 
-> Las migraciones y el seed ya existen (change `modelo-dominio`), pero el job `test` de CI
-> **todavía no levanta PostgreSQL**: `npm run test:integration -w backend` (los tests contra
-> base real, como `reservas-invariantes.integration-spec.ts`) hoy corre solo localmente, no en
-> CI. Conectar ese comando a CI con un service container de Postgres es exactamente el
-> alcance completo del próximo change, `ci-integracion-db` — no puede ir en este PR porque
-> tocaría `.github/workflows/`, prohibido para un PR de feature (`openspec/config.yaml` §14).
+> El job `test` levanta un service container de PostgreSQL (`postgres:16.4-alpine`, una sola
+> base `reservas_test` — no hace falta separar dev de test en CI), aplica las migraciones
+> (`prisma migrate deploy`) y el seed, y recién ahí corre las cuatro categorías de tests.
+> Las URLs de base quedan en `test`; JWT y throttling se comparten a nivel workflow para
+> que `spec` también pueda construir la app al generar OpenAPI cuando se registre auth.
+> Todos los valores son ficticios de CI (config.yaml §10), nunca secretos de producción.
+> Esto prepara las variables conocidas; módulos que agreguen configuración o conexiones
+> durante su construcción requerirán revisar nuevamente el entorno de CI.
 
 ## Cómo se trabaja acá
 

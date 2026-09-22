@@ -1,12 +1,16 @@
 name: CI
 
-# Fase 1 (fundacion-repo, D8): sin PostgreSQL en el job `test` todavía. No existen
-# schema.prisma ni seed.ts; eso llega con `ci-integracion-db` (después de `modelo-dominio`).
 on:
   pull_request:
   push:
     branches:
       - main
+
+env:
+  JWT_SECRET: secreto-de-ci-no-es-real
+  JWT_EXPIRES_IN: 60m
+  THROTTLE_TTL: 60
+  THROTTLE_LIMIT: 10
 
 jobs:
   spec:
@@ -74,6 +78,29 @@ jobs:
   test:
     name: Tests (backend)
     runs-on: ubuntu-latest
+    # ci-integracion-db (roadmap §6.1): un solo service container de Postgres para todo
+    # el job. Alcanza con una base (reservas_test) porque en CI no existe un "desarrollo"
+    # separado del testing — a diferencia de docker-compose.yml local (D5 de
+    # fundacion-repo), que sí separa reservas_dev de reservas_test.
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: reservas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    # Ningún valor de acá es secreto (config.yaml §10): son las mismas credenciales de
+    # juguete que ya documentan .env.example y docker-compose.yml para desarrollo local.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reservas_test
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/reservas_test
     steps:
       - uses: actions/checkout@v4
 
@@ -91,17 +118,31 @@ jobs:
 
       - run: npm ci
 
-      # D8: sin service container de PostgreSQL, sin db:migrate ni db:seed. Todavía no
-      # existen schema.prisma ni seed.ts — llegan con `ci-integracion-db`.
+      # migrate deploy (no migrate dev): aplica las migraciones commiteadas sin pedir
+      # input, apto para CI. migrate dev es interactivo y falla con "the environment is
+      # non-interactive" en un runner sin TTY (comprobado a mano durante modelo-dominio).
+      - name: Migrar la base de datos de test
+        run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+
+      - name: Seed de la base de datos de test
+        run: npm run db:seed -w backend
+
       - name: Tests unitarios del backend
         run: npm run test -w backend
 
       # El jest del backend usa rootDir "src" y testRegex ".*\.spec\.ts$", asi que los
       # archivos de backend/test/*.e2e-spec.ts NO los corre `npm run test`. Sin este paso
-      # existirian tests que nadie ejecuta. Todavia no necesitan PostgreSQL; los que si lo
-      # necesiten llegan con el change ci-integracion-db.
-      - name: Tests e2e del backend (todavia sin PostgreSQL)
+      # existirian tests que nadie ejecuta.
+      - name: Tests e2e del backend
         run: npm run test:e2e
+
+      # ci-integracion-db: la contrapartida de haber dejado sin PostgreSQL el job test
+      # desde fundacion-repo (D8). Corre backend/test/*.integration-spec.ts contra la
+      # base real de arriba — los invariantes de negocio de modelo-dominio, el guard del
+      # índice parcial de Reserva, y cualquier suite de integración que sumen los changes
+      # siguientes.
+      - name: Tests de integracion del backend (contra Postgres real)
+        run: npm run test:integration -w backend
 
       # La comparacion de contratos de scripts/openapi-diff.mjs es logica pura y sutil
       # (que diferencias de orden son deriva y cuales no). Se testea aparte, sin build.
