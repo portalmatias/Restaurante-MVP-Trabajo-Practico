@@ -5,10 +5,15 @@
       `ReservasService` con `crearReserva`. No continuar con la sección 2 hasta que esto sea
       cierto. Verificar con `git log origin/main --oneline -- backend/src/reservas` y
       `ls backend/src/reservas`.
-- [ ] 1.2 Confirmar que `AuthModule` está registrado en `AppModule` y que `JwtAuthGuard`,
+      **Estado al 2026-09-21:** sigue sin cumplirse (`reservas-crear` solo tiene spec; en
+      `backend/src/reservas/` no hay controller). Por decisión de FedeWerk se adelanta
+      **únicamente** la parte del service y sus tests (2.1 a 2.3), que no dependen del
+      controller. Las tareas 2.4 en adelante siguen bloqueadas por esta.
+- [x] 1.2 Confirmar que `AuthModule` está registrado en `AppModule` y que `JwtAuthGuard`,
       `RolesGuard` y `@Roles` están disponibles (el listado los usa). Si el PR de registro
       todavía no está mergeado, esperarlo: las secciones 3 y 4 no se pueden probar sin él.
-      Verificar con `grep AuthModule backend/src/app.module.ts`.
+      Verificar con `grep AuthModule backend/src/app.module.ts`. Verificado el 2026-09-21:
+      #33 está en `main` (`f44ea33`) y `AppModule` importa `AuthModule`.
 - [x] 1.3 Confirmar que `ci-integracion-db` (#28) está mergeado y que el job `Tests
       (backend)` corre `test:integration` contra PostgreSQL. Los tests de la sección 2
       dependen de una base real. Verificado el 2026-09-21: #28 está en `main` (`c419074`) y
@@ -24,32 +29,47 @@
       todavía no, coordinar con quien implementa `disponibilidad` (extraerlo a `common/` o
       esperar su merge) en vez de duplicarlos. Verificar con `grep` en `backend/src` y en
       `openapi/openapi.yaml`.
-- [ ] 1.6 Confirmar que las Reservas de ejemplo del seed tienen código de exactamente 8
+- [x] 1.6 Confirmar que las Reservas de ejemplo del seed tienen código de exactamente 8
       caracteres (`^[A-Za-z0-9]{8}$`), porque la consulta valida ese formato. Verificar con
-      `npm run db:seed -w backend` y una consulta a `Reserva.codigoReserva`.
-- [ ] 1.7 Confirmar si `cancelacion-turnos` ya agregó su propia búsqueda por código + email.
+      `npm run db:seed -w backend` y una consulta a `Reserva.codigoReserva`. Verificado el
+      2026-09-21 en `backend/prisma/seed.ts`: `SEEDPND2`, `SEEDCNF2`, `SEEDCAN2` y
+      `SEEDNSW2` tienen 8 caracteres alfanuméricos.
+- [x] 1.7 Confirmar si `cancelacion-turnos` ya agregó su propia búsqueda por código + email.
       Si existe, reemplazarla por `buscarPorCodigoYEmail` (D3) o coordinar con su dueño en
-      vez de dejar dos criterios de comparación.
+      vez de dejar dos criterios de comparación. Verificado el 2026-09-21: `main` no tiene
+      ninguna búsqueda por código + email (`cancelacion-turnos` no tiene código todavía).
 
 ## 2. Consulta pública
 
-- [ ] 2.1 Crear `dto/consultar-reserva.dto.ts` (`codigo`: `@Matches(/^[A-Za-z0-9]{8}$/)`;
+- [x] 2.1 Crear `dto/consultar-reserva.dto.ts` (`codigo`: `@Matches(/^[A-Za-z0-9]{8}$/)`;
       `email`: `@IsEmail()`, `@MaxLength(254)`) y `dto/reserva-consultada-respuesta.dto.ts`
       con los `@ApiProperty` de D4 y del contrato. Verificar que `npm run build -w backend`
       compila.
-- [ ] 2.2 Implementar `ReservasService.buscarPorCodigoYEmail(codigo, email, db)` con la
-      consulta única de D2 (`toUpperCase()` en el código, `mode: 'insensitive'` en el email)
+      Hecho: `dto/consultar-reserva.dto.ts` y `dto/reserva-consultada-respuesta.dto.ts`, con
+      su test de validación (`consultar-reserva.dto.spec.ts`). `npm run build -w backend` y
+      `tsc --noEmit` compilan.
+- [x] 2.2 Implementar `ReservasService.buscarPorCodigoYEmail(codigo, email, db)` con la
+      búsqueda de D2 (`toUpperCase()` en el código y comparación del email en la aplicación)
       y el helper del `404` con texto fijo. Verificar con un test de **integración** contra
       PostgreSQL que cubra: coincidencia exacta, código en minúsculas, email con otras
       mayúsculas, email incorrecto, código inexistente, y el email con `_` y `%`
-      (`ana_perez@example.com` no se encuentra con `anaXperez@example.com` ni con
+      (`ana.perez@example.com` no se encuentra con `ana_perez@example.com` ni con
       `%@example.com`). Si el último falla, aplicar el plan B de D2 y ajustar `design.md`.
-- [ ] 2.3 Implementar `ReservasService.consultar(codigo, email)`: llama a
+      **Resultado (2026-09-21):** el test del `%` falló con la implementación de `mode:
+      'insensitive'`: Prisma la traduce a un `ILIKE` sin escapar y `%@example.com` encontró la
+      Reserva ajena. Se aplicó el plan B (comparación del email en la aplicación) y se ajustó
+      `design.md` (D2 y Riesgos) y un ejemplo de la spec. Con la implementación anterior
+      fallan justo los dos tests de comodín (`%` y `_`); con la actual pasan los 17 de
+      `test/reserva-consultar.integration-spec.ts`.
+- [x] 2.3 Implementar `ReservasService.consultar(codigo, email)`: llama a
       `buscarPorCodigoYEmail`, lanza el `404` genérico si es `null` y mapea a la vista mínima
       de D4 (`fecha` con `getUTC*`, horas `HH:mm` con `getUTCHours`/`getUTCMinutes`, sin
       `id`, mesa, contacto ni marcas de tiempo). Verificar con tests unitarios del mapeo,
       incluida una Reserva `CANCELADA` y una `PENDIENTE`, corriendo la suite con `TZ=UTC` y
       con `TZ=America/Argentina/Buenos_Aires`.
+      Hecho: `consultar` y el mapeo puro `aReservaConsultadaRespuesta`
+      (`reserva-consultada.mapper.ts`), con tests unitarios que pasan con `TZ=UTC`,
+      `America/Argentina/Buenos_Aires` y `Pacific/Auckland`.
 - [ ] 2.4 Implementar `POST /reservas/consultar` en `ReservasController` (`200`, sin guard,
       `@ApiOperation`/`@ApiResponse` iguales al contrato). Verificar con Supertest contra una
       Reserva de prueba: `200` con código y email correctos.
@@ -61,9 +81,11 @@
       una consulta con código y email **correctos** hecha después de superar el límite
       también devuelve `429` sin la Reserva. Verificar que el test crea su propia app para no
       compartir el contador con otras suites.
-- [ ] 2.7 Test de que la consulta es de solo lectura: consultar dos veces devuelve respuestas
+- [x] 2.7 Test de que la consulta es de solo lectura: consultar dos veces devuelve respuestas
       iguales y `estado`, `mesaId` y `updatedAt` de la Reserva no cambian. Verificar con la
       Reserva releída de la base.
+      Hecho a nivel de service, en `test/reserva-consultar.integration-spec.ts` ("es de solo
+      lectura"); falta repetirlo por HTTP cuando exista el endpoint (2.4).
 
 ## 3. Listado de administrador
 

@@ -10,6 +10,12 @@ import { DiaSemana, EstadoReserva, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { diaSemanaDeFecha } from '../common/timezone';
+import type { ReservaConsultadaRespuesta } from './dto/reserva-consultada-respuesta.dto';
+import {
+  aReservaConsultadaRespuesta,
+  type ReservaParaConsulta,
+} from './reserva-consultada.mapper';
+import { reservaNoEncontrada } from './reserva-no-encontrada';
 
 const CODIGO_RESERVA_LONGITUD = 8;
 // Sin caracteres ambiguos (0/O, 1/I/L) para que sea legible por teléfono/email.
@@ -36,6 +42,15 @@ export interface CrearReservaInput {
   nombreCliente: string;
   emailCliente: string;
   telefonoCliente: string;
+}
+
+/**
+ * Compara dos emails sin distinguir mayúsculas y minúsculas y como texto literal: ningún
+ * carácter funciona como comodín. `toLowerCase()` no depende del idioma del proceso (a
+ * diferencia de `toLocaleLowerCase()`).
+ */
+function emailsIguales(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
 }
 
 /**
@@ -333,5 +348,60 @@ export class ReservasService {
 
       return tx.reserva.findUniqueOrThrow({ where: { id: reservaId } });
     });
+  }
+
+  /**
+   * Búsqueda por código + email, **el único punto** donde el sistema compara esas dos
+   * credenciales (design.md D2 y D3): la usan la consulta pública y, cuando exista, la
+   * cancelación por código y email de `cancelacion-turnos`. Devuelve la Reserva con su turno
+   * y la zona de su mesa, o `null` si no hay una que coincida con las dos cosas.
+   *
+   * El código se normaliza a mayúsculas (se genera siempre en mayúsculas, así que la
+   * búsqueda usa el índice único) y el email se compara **en la aplicación**, sin distinguir
+   * mayúsculas. No se compara en la consulta con `mode: 'insensitive'` porque Prisma lo
+   * traduce a `ILIKE` sin escapar: un `%` o un `_` en el email funcionaría como comodín y
+   * `%@dominio.com` encontraría la Reserva sin conocer el email real (comprobado en
+   * `test/reserva-consultar.integration-spec.ts`).
+   *
+   * "Código inexistente" y "email incorrecto" siguen el mismo camino: una sola lectura por el
+   * índice único que trae solo `id` y `emailCliente`, y `null` si no hay fila o el email no
+   * coincide. Las relaciones (turno, mesa y zona) se leen recién cuando ya coincidieron los
+   * dos datos, así que las dos fallas cuestan lo mismo y no hay diferencia de tiempo
+   * atribuible a la aplicación.
+   *
+   * `db` permite llamarla dentro de una transacción ajena (`tx`) sin abrir otra.
+   */
+  async buscarPorCodigoYEmail(
+    codigo: string,
+    email: string,
+    db: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<ReservaParaConsulta | null> {
+    const candidata = await db.reserva.findUnique({
+      where: { codigoReserva: codigo.toUpperCase() },
+      select: { id: true, emailCliente: true },
+    });
+    if (!candidata || !emailsIguales(candidata.emailCliente, email)) {
+      return null;
+    }
+    return db.reserva.findUnique({
+      where: { id: candidata.id },
+      include: { turno: true, mesa: { include: { zona: true } } },
+    });
+  }
+
+  /**
+   * Consulta pública de una Reserva por código + email (capability `reserva-consultar`).
+   * Devuelve la vista mínima de la Reserva en cualquier estado, o el `404` genérico si el
+   * código no existe o el email no coincide, sin distinguir cuál falló. Es de solo lectura.
+   */
+  async consultar(
+    codigo: string,
+    email: string,
+  ): Promise<ReservaConsultadaRespuesta> {
+    const reserva = await this.buscarPorCodigoYEmail(codigo, email);
+    if (!reserva) {
+      throw reservaNoEncontrada();
+    }
+    return aReservaConsultadaRespuesta(reserva);
   }
 }
