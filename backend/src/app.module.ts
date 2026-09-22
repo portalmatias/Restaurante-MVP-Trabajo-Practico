@@ -31,20 +31,22 @@ import { HorariosModule } from './horarios/horarios.module';
         },
       ],
     }),
-    // `AuthModule` (auth-admin, PR #25) y `ZonasModule`/`MesasModule`/`HorariosModule`
+    // `AuthModule` (auth-admin, PR #25/#33) y `ZonasModule`/`MesasModule`/`HorariosModule`
     // (gestion-salon) importan `PrismaModule` (`@Global()`), así que registrarlos acá hace
     // que `PrismaService.onModuleInit` llame `$connect()` al arrancar la app — incluido
-    // `test/app.e2e-spec.ts`, que instancia `AppModule` completo. Hasta que se mergeó
-    // `ci-integracion-db` (PR #28), el job "Tests (backend)" de CI corría sin PostgreSQL
-    // disponible durante ese paso, así que se dejaban deliberadamente afuera (los tests que
-    // los ejercitan armaban su propio módulo mínimo con
-    // `Test.createTestingModule({ imports: [PrismaModule, AuthModule] })`, como todavía
-    // hacen `auth.integration-spec.ts` y `gestion-salon-admin.integration-spec.ts` para no
-    // depender de que `AppModule` los registre). Con #28 en `main`, el job migra y seedea
-    // Postgres antes de correr ningún test — ya no aplica esa razón, así que se registran
-    // acá. `ReservasModule` (`modelo-dominio`, PR #12) sigue sin controller propio (nace en
-    // el change `reservas-crear`, todavía no implementado) y por eso no se registra todavía
-    // — no es el mismo motivo que los de arriba.
+    // `test/app.e2e-spec.ts` y `test/auth.e2e-spec.ts`, que instancian `AppModule` completo.
+    // Hasta que se mergeó `ci-integracion-db` (PR #28), el job "Tests (backend)" de CI corría
+    // sin PostgreSQL disponible durante ese paso, así que se dejaban deliberadamente afuera
+    // (los tests que los ejercitan armaban su propio módulo mínimo con
+    // `Test.createTestingModule({ imports: [PrismaModule, AuthModule] })`, como todavía hacen
+    // `auth.integration-spec.ts` y `gestion-salon-admin.integration-spec.ts` para no depender
+    // de que `AppModule` los registre). Con #28 en `main`, el job migra y seedea Postgres
+    // antes de correr ningún test — ya no aplica esa razón, así que se registran acá. El job
+    // `spec` (`openapi:check`) también construye esta app con `NestFactory.create`, pero sin
+    // `app.init()`, así que no abre ninguna conexión. `ReservasModule` (`modelo-dominio`,
+    // PR #12) sigue sin controller propio (nace en el change `reservas-crear`, todavía no
+    // implementado) y por eso no se registra todavía — no es el mismo motivo que los de
+    // arriba.
     AuthModule,
     ZonasModule,
     MesasModule,

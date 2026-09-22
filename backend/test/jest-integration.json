@@ -5,6 +5,7 @@
   "maxWorkers": 1,
   "testRegex": ".integration-spec.ts$",
   "setupFiles": ["<rootDir>/jest-integration.setup.ts"],
+  "testTimeout": 30000,
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },

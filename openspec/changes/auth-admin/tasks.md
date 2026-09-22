@@ -71,12 +71,19 @@
       fragmento queda en `design.md` (sección "Contrato OpenAPI") y se copia al YAML real en
       el PR que registre `AuthModule` en `AppModule`. `npm run openapi:lint` y
       `npm run openapi:check` pasan sin deriva en este estado.
-      **Seguimiento (2026-09-22, PR #27 de `gestion-salon`):** ese PR terminó siendo el que
-      registró `AuthModule` en `AppModule` (junto con sus propios módulos, ya desbloqueado
-      por `ci-integracion-db` #28) — copió `POST /auth/login` a `openapi/openapi.yaml` como
-      preveía esta nota, generándolo desde la app real con `@nestjs/swagger` (no a mano) para
-      confirmar que coincide exactamente con lo que expone el controller. `openapi:check`
-      sin deriva.
+      **Actualizado en PR #33 (`feature/auth-registro-contrato`, mergeado 2026-09-21):** el
+      fragmento de `design.md` se copió a `openapi/openapi.yaml` (`POST /auth/login`,
+      `LoginDto`, `LoginResponseDto` y los tags `Auth`/`Estado`; el `securityScheme`
+      `bearerAuth` ya existía) y `npm run openapi:lint` y `npm run openapi:check` pasan. Ese
+      PR también sacó las rutas de prueba `GET /auth/test-protected` y
+      `GET /auth/test-admin-only` de `AuthController` a
+      `backend/test/support/guards-probe.controller.ts` (solo las montan los tests: registrado
+      el módulo, seguían expuestas en la API real). **Nota de coordinación:** el PR #27 de
+      `gestion-salon` llegó a la misma tarea en paralelo, sin que ninguno de los dos supiera
+      del otro hasta después — ambos registraban `AuthModule` en `AppModule` y publicaban
+      `/auth/login`. #33 mergeó primero; #27 se rebaseó sobre `main` después de ese merge y
+      quedó sin duplicar el trabajo (solo agrega `ZonasModule`/`MesasModule`/`HorariosModule`
+      encima). Vale la pena coordinar quién toma una tarea compartida antes de empezarla.
 - [x] 5.3 Confirmar que no hicieron falta variables de entorno nuevas (`JWT_SECRET` y
       `JWT_EXPIRES_IN` ya están en `.env.example` desde `fundacion-repo`). Si alguna
       implementación concreta necesitó una variable adicional, agregarla y documentarla en
