@@ -113,17 +113,6 @@ components:
         - statusCode
         - message
         - error
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: >-
-        JWT de acceso del administrador (ver §5 de openspec/config.yaml). Se envía en
-        el header `Authorization: Bearer <token>`. Las rutas públicas del cliente
-        (disponibilidad, creación, consulta y cancelación de reservas sin cuenta) no
-        requieren autenticación.
-  schemas:
     LoginDto:
       type: object
       properties:
@@ -147,7 +136,19 @@ components:
           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.abc123
       required:
         - accessToken
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        JWT de acceso del administrador (ver §5 de openspec/config.yaml). Se envía en
+        el header `Authorization: Bearer <token>`. Las rutas públicas del cliente
+        (disponibilidad, creación, consulta y cancelación de reservas sin cuenta) no
+        requieren autenticación.
 tags:
+  - name: disponibilidad
+    description: Consulta pública de disponibilidad de mesas (openspec/config.yaml §6).
   - name: Estado
     description: Estado del servicio.
   - name: Auth
