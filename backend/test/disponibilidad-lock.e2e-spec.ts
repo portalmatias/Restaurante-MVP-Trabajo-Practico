@@ -53,6 +53,9 @@ describe('lock advisory de (turno, fecha) bajo concurrencia (e2e)', () => {
   let prisma: PrismaService;
   let zonaVipId: string;
   let aforoVipOriginal = 20;
+  let vipOriginal: Awaited<
+    ReturnType<PrismaService['zona']['findUnique']>
+  > | null = null;
 
   /** Aforo de la zona VIP durante el test: entran dos reservas de 3 y no una tercera. */
   const AFORO_VIP_TEST = 8;
@@ -241,6 +244,11 @@ describe('lock advisory de (turno, fecha) bajo concurrencia (e2e)', () => {
       where: { nombre: 'VIP' },
     });
     aforoVipOriginal = vipPrevia?.aforoMaximo ?? 20;
+    // El `upsert` de abajo reescribe siete campos de la fila VIP, que es compartida. Se
+    // guardan todos para devolverlos tal cual en `afterAll`: seis coinciden con el seed,
+    // pero si otra suite los dejó en otro valor, restaurar solo `aforoMaximo` los pisaría
+    // en silencio para las suites que sigan.
+    vipOriginal = vipPrevia;
 
     const vip = await prisma.zona.upsert({
       where: { nombre: 'VIP' },
@@ -283,7 +291,17 @@ describe('lock advisory de (turno, fecha) bajo concurrencia (e2e)', () => {
     // Se restaura aunque el test haya fallado: `afterAll` corre igual.
     await prisma.zona.update({
       where: { nombre: 'VIP' },
-      data: { aforoMaximo: aforoVipOriginal },
+      data: vipOriginal
+        ? {
+            minComensales: vipOriginal.minComensales,
+            maxComensales: vipOriginal.maxComensales,
+            anticipacionMinHoras: vipOriginal.anticipacionMinHoras,
+            anticipacionMaxDias: vipOriginal.anticipacionMaxDias,
+            ventanaCancelacionHoras: vipOriginal.ventanaCancelacionHoras,
+            requiereConfirmacionAdmin: vipOriginal.requiereConfirmacionAdmin,
+            aforoMaximo: vipOriginal.aforoMaximo,
+          }
+        : { aforoMaximo: aforoVipOriginal },
     });
     await prisma.$disconnect();
   });

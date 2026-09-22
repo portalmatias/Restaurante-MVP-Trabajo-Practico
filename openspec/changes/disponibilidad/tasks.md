@@ -165,7 +165,7 @@
       verde localmente.
 - [x] 9.6 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con
       los dos comandos desde la raíz.
-- [ ] 9.7 CI en verde en el PR `feature/disponibilidad`. Verificar en la pestaña Checks.
+- [x] 9.7 CI en verde en el PR `feature/disponibilidad`. Verificar en la pestaña Checks.
 - [ ] 9.8 PR con descripción en español, enlazado a `openspec/changes/disponibilidad/`, con la
       nota de 8.2 si corresponde, y aprobado por un compañero distinto del autor. Verificar en
       GitHub.

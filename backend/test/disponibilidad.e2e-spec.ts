@@ -259,7 +259,17 @@ describe('GET /disponibilidad (e2e)', () => {
 
     app = moduleRef.createNestApplication<INestApplication<App>>();
     // 7.1: el mismo pipe global que main.ts, o el 400 de `comensales` no se reproduce (D8).
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
+    // Las tres opciones tienen que coincidir con las de main.ts: `transform` es la que
+    // convierte la query (siempre strings) a los tipos del DTO, y `whitelist` +
+    // `forbidNonWhitelisted` llegaron con auth-admin. Si acá quedaran menos opciones, la
+    // suite dejaría de reproducir la validación real de producción.
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
 
     prisma = app.get(PrismaService);
@@ -365,6 +375,21 @@ describe('GET /disponibilidad (e2e)', () => {
     it('fecha con formato válido pero inexistente (2026-02-30)', async () => {
       const mensajes = await mensajesDel400(
         queryValida({ fecha: '2026-02-30' }),
+      );
+
+      expect(mensajes).toEqual([
+        'fecha debe ser una fecha de calendario que exista',
+      ]);
+    });
+
+    // Decisión documentada en design.md ("Trampas de fechas"): `Date.UTC(99, 0, 1)` devuelve
+    // 1999, así que la comparación de ida y vuelta del validador rechaza los años de dos
+    // dígitos. Para un sistema de reservas de restaurante el año 99 es entrada basura y 400
+    // es la respuesta correcta; el test fija el comportamiento para que no se "arregle" por
+    // error al leer el código sin el design.
+    it('fecha con año de dos dígitos (0099-01-01), que Date.UTC reinterpretaría como 1999', async () => {
+      const mensajes = await mensajesDel400(
+        queryValida({ fecha: '0099-01-01' }),
       );
 
       expect(mensajes).toEqual([
