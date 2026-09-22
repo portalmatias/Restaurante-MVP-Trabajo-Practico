@@ -69,6 +69,18 @@ describe('cargarContexto y bloquearTurnoFecha (e2e)', () => {
     return mesa;
   }
 
+  /**
+   * Las zonas STANDARD y VIP son singleton (el enum `NombreZona` solo tiene esos dos
+   * valores) y el seed de `modelo-dominio` ya les carga mesas: S1-S5 y V1-V4. Desde que
+   * `ci-integracion-db` corre `db:seed` antes de los tests, esas mesas aparecen en
+   * `mesasLibres` junto con las de este archivo. Las aserciones de exclusividad se hacen
+   * entonces sobre las mesas propias, que `crearMesa` prefija con `CTX-`; las del seed no
+   * se tocan ni se borran.
+   */
+  function soloDelTest<T extends { etiqueta: string }>(mesas: T[]): T[] {
+    return mesas.filter((mesa) => mesa.etiqueta.startsWith('CTX-'));
+  }
+
   async function crearTurno(
     diaSemana: DiaSemana = DiaSemana.SABADO,
     activo = true,
@@ -255,7 +267,7 @@ describe('cargarContexto y bloquearTurnoFecha (e2e)', () => {
         { id: mesaGrande.id, etiqueta: mesaGrande.etiqueta, capacidad: 12 },
       ]),
     );
-    expect(contexto.mesasLibres).toHaveLength(2);
+    expect(soloDelTest(contexto.mesasLibres)).toHaveLength(2);
   });
 
   it('refleja un turno inactivo sin lanzar error (la regla la evalúa evaluarReglas)', async () => {
@@ -389,9 +401,11 @@ describe('cargarContexto y bloquearTurnoFecha (e2e)', () => {
     });
     expect(delSabado.ocupadosZona).toBe(0);
     expect(delSabado.ocupadosGlobal).toBe(0);
-    expect(delSabado.mesasLibres.map((mesa) => mesa.id).sort()).toEqual(
-      [mesaOtraFecha.id, mesaOtroTurno.id].sort(),
-    );
+    expect(
+      soloDelTest(delSabado.mesasLibres)
+        .map((mesa) => mesa.id)
+        .sort(),
+    ).toEqual([mesaOtraFecha.id, mesaOtroTurno.id].sort());
 
     // La misma reserva sí cuenta para su propia fecha.
     const delDomingo = await cargarContexto(prisma, {
@@ -445,7 +459,7 @@ describe('cargarContexto y bloquearTurnoFecha (e2e)', () => {
       comensales: 2,
     });
 
-    const idsLibres = contexto.mesasLibres.map((mesa) => mesa.id);
+    const idsLibres = soloDelTest(contexto.mesasLibres).map((mesa) => mesa.id);
     expect(idsLibres).not.toContain(mesaOcupada.id);
     expect(idsLibres.sort()).toEqual(
       [mesaConCancelada.id, mesaConNoShow.id, mesaLibre.id].sort(),
@@ -506,7 +520,7 @@ describe('cargarContexto y bloquearTurnoFecha (e2e)', () => {
 
     expect(dentroDeTransaccion).toEqual(fueraDeTransaccion);
     expect(dentroDeTransaccion.ocupadosZona).toBe(5);
-    expect(dentroDeTransaccion.mesasLibres).toEqual([]);
+    expect(soloDelTest(dentroDeTransaccion.mesasLibres)).toEqual([]);
   });
 
   // --- Lock advisory (tarea 4.3) ---------------------------------------------------------
@@ -525,7 +539,7 @@ describe('cargarContexto y bloquearTurnoFecha (e2e)', () => {
         });
       });
 
-      expect(contexto.mesasLibres).toEqual([
+      expect(soloDelTest(contexto.mesasLibres)).toEqual([
         { id: mesa.id, etiqueta: mesa.etiqueta, capacidad: 4 },
       ]);
     });

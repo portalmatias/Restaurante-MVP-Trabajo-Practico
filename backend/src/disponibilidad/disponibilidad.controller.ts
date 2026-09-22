@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
@@ -20,6 +21,16 @@ import { ErrorRespuesta } from './dto/error-respuesta.dto';
  * `npm run openapi:check` compara literalmente los dos documentos (D2 de `fundacion-repo`),
  * así que cualquier cambio de texto acá tiene que ir también al YAML.
  */
+/**
+ * `@SkipThrottle()`: `auth-admin` registró `ThrottlerGuard` como `APP_GUARD` global, así que
+ * sin esto la consulta queda limitada a `THROTTLE_LIMIT` peticiones por ventana. El
+ * `design.md` de este change lo descarta explícitamente en Non-Goals: `config.yaml` §5 pide
+ * throttling para las rutas que reciben un código de reserva, como defensa contra la
+ * enumeración por fuerza bruta, y esta consulta no recibe ninguno ni expone datos
+ * personales. Un límite de 10 por minuto además rompe el uso normal: mirar varias fechas
+ * seguidas son varias consultas.
+ */
+@SkipThrottle()
 @ApiTags('disponibilidad')
 @Controller('disponibilidad')
 export class DisponibilidadController {
