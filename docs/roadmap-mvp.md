@@ -23,7 +23,7 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 | `disponibilidad` | portalmatias | Specs #19/#21 mergeadas; rama `feature/disponibilidad` con tres commits propios y sin PR abierto. | Revisar y abrir PR de implementación; verificar el validador compartido y el lock que reutilizará creación. |
 | `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. #27 (abierto) agrega los tres controllers y registra `ZonasModule`/`MesasModule`/`HorariosModule` en `AppModule` (ya no bloqueado, con Postgres en CI) y su contrato OpenAPI. **Nota de coordinación:** #27 y #33 tocaron el registro de `AuthModule` en paralelo sin saberlo — #33 mergeó primero; #27 se rebaseó sobre `main` después y no duplica ese trabajo, solo agrega sus propios módulos. | Obtener revisión de #27 y mergear. |
 | `reservas-crear` | portalmatias | Spec #22 mergeada; implementación no mergeada. | Integrar disponibilidad y luego implementar creación transaccional. |
-| `reserva-consultar` | FedeWerk | Sin change propio en `main` ni PR abierto. | Preparar spec; implementación después de creación. |
+| `reserva-consultar` | FedeWerk | Spec #32 mergeada (2026-09-21): define `POST /reservas/consultar` (código + email en el body, no `GET`, para no exponer el email en la URL ni en logs de acceso) y `GET /admin/reservas`. #35 (borrador) adelanta la búsqueda y la consulta a nivel de `ReservasService`; el controller sigue bloqueado por `reservas-crear`. | Esperar `reservas-crear` para el controller, el listado de admin y el contrato OpenAPI. |
 | `cancelacion-turnos` | lussofacundo-iresm | Spec #16 y ajuste UTC−3 #23 mergeados; implementación pendiente. | Esperar el merge de `reservas-crear` antes de la sección 2 de sus tareas. |
 | `reserva-vip` | lussofacundo-iresm | Spec #17 mergeada; implementación pendiente. | Esperar el merge de `reservas-crear`; endpoints admin requieren auth. |
 | Frontend funcional | FedeWerk / portalmatias | Solo base generada de Next.js; sin PRs abiertos de pantallas. | Preparar `frontend-base` y contratos/tipos según §9. |
@@ -320,7 +320,7 @@ de §6 de que consulta y creación validan lo mismo. Merece revisión de los tre
 | Change | Dueño | Depende de | Alcance |
 |---|---|---|---|
 | `reservas-crear` | portalmatias | disponibilidad | `POST /reservas`. Transacción Prisma, best fit (query ordenada por capacidad ascendente), validación de aforo con el comensal nuevo ya sumado, generación del código de 8 caracteres, `PENDIENTE` si VIP / `CONFIRMADA` si no. |
-| `reserva-consultar` | FedeWerk | reservas-crear | `GET` público con **código + email** (ambos deben coincidir) + `@nestjs/throttler` contra enumeración. Listado y filtros para admin. |
+| `reserva-consultar` | FedeWerk | reservas-crear | `POST /reservas/consultar` público con **código + email** en el body (ambos deben coincidir, sin distinguir mayúsculas) + `@nestjs/throttler` contra enumeración. `GET /admin/reservas`: listado y filtros para admin (spec #32, mergeada). |
 | `cancelacion-turnos` | lussofacundo-iresm | reservas-crear | Cancelación con ventana por zona (2h STANDARD / 24h VIP) + endpoint admin de `NO_SHOW`, con guard que verifique que el turno ya pasó. Tests de los bordes exactos de la ventana (§9). |
 | `reserva-vip` | lussofacundo-iresm | reservas-crear | Flujo `PENDIENTE` → confirmar/rechazar por admin. Transiciones inválidas → `409 Conflict`. |
 
