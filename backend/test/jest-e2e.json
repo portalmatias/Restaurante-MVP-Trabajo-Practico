@@ -6,7 +6,11 @@
   "//maxWorkers": "Las suites e2e comparten una única base de datos y algunas afirman sobre estado global (locks advisory vivos, aforo de una zona, mesas de una zona). En paralelo se pisan entre sí y dan rojos que no son del código.",
   "maxWorkers": 1,
   "setupFiles": ["<rootDir>/jest-e2e.setup.ts"],
+  "testTimeout": 30000,
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(.pnpm/)?(@nestjs|passport-jwt|passport)/)"
+  ]
 }
