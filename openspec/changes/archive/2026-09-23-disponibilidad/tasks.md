@@ -151,7 +151,7 @@
 
 ## 9. Cierre (Definition of Done, `config.yaml` §13)
 
-- [ ] 9.1 `openspec validate disponibilidad --strict` pasa y todas las tareas de este archivo
+- [x] 9.1 `openspec validate disponibilidad --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
 - [x] 9.2 El change no agrega migraciones ni toca `schema.prisma` (D5, Migration Plan).
       Verificar con `git diff main --stat -- backend/prisma` vacío.
@@ -166,8 +166,8 @@
 - [x] 9.6 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con
       los dos comandos desde la raíz.
 - [x] 9.7 CI en verde en el PR `feature/disponibilidad`. Verificar en la pestaña Checks.
-- [ ] 9.8 PR con descripción en español, enlazado a `openspec/changes/disponibilidad/`, con la
+- [x] 9.8 PR con descripción en español, enlazado a `openspec/changes/disponibilidad/`, con la
       nota de 8.2 si corresponde, y aprobado por un compañero distinto del autor. Verificar en
       GitHub.
-- [ ] 9.9 Después del merge, archivar el change con `openspec archive disponibilidad` en su
+- [x] 9.9 Después del merge, archivar el change con `openspec archive disponibilidad` en su
       propio PR. Verificar que `openspec/specs/disponibilidad/spec.md` existe en `main`.
