@@ -9,6 +9,7 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReservasModule } from '../src/reservas/reservas.module';
 import { ReservasService } from '../src/reservas/reservas.service';
+import { ocuparMesasAjenas as ocuparMesasAjenasCompartido } from './helpers/ocupar-mesas-ajenas';
 import { upsertSeguro } from './helpers/upsert-seguro';
 
 /**
@@ -120,17 +121,14 @@ describe('ReservasService — invariantes de negocio (integración)', () => {
     return turno;
   }
 
-  let ocupacionContador = 0;
   /**
-   * Ocupa, con una Reserva `CONFIRMADA` propia (1 comensal, no cuenta casi nada para el
-   * aforo), todas las mesas que YA existan en `zonaId` para ese turno/fecha y no estén en
-   * `propias` — en la práctica, las mesas del seed (`S1..S5`, `V1..V4`), que son filas
-   * compartidas y por lo tanto siempre "libres" para un turno nuevo creado por un test.
-   *
-   * Varios tests de este archivo necesitan que la ÚNICA mesa candidata de la zona sea la que
-   * el test controla (para poder afirmar `SIN_MESA_DISPONIBLE` o la identidad exacta de la
-   * mesa asignada); sin esto, el best fit real compite contra el seed completo, no contra la
-   * mesa que arma el test.
+   * Ocupa las mesas ajenas de una zona/turno/fecha (helper compartido con
+   * `reservas-concurrencia.integration-spec.ts`, ver `helpers/ocupar-mesas-ajenas.ts`). Varios
+   * tests de este archivo necesitan que la ÚNICA mesa candidata de la zona sea la que el test
+   * controla (para poder afirmar `SIN_MESA_DISPONIBLE` o la identidad exacta de la mesa
+   * asignada); sin esto, el best fit real compite contra el seed completo, no contra la mesa
+   * que arma el test. Este archivo limpia por id individual, así que empuja cada id creado a
+   * `reservaIds`.
    */
   async function ocuparMesasAjenas(
     zonaId: string,
@@ -138,25 +136,15 @@ describe('ReservasService — invariantes de negocio (integración)', () => {
     fecha: Date,
     propias: string[],
   ) {
-    const ajenas = await prisma.mesa.findMany({
-      where: { zonaId, id: { notIn: propias } },
-      select: { id: true },
+    const idsCreados = await ocuparMesasAjenasCompartido({
+      prisma,
+      zonaId,
+      turnoId,
+      fecha,
+      propias,
+      datosCliente: datosClienteBase,
     });
-    for (const ajena of ajenas) {
-      ocupacionContador += 1;
-      const dummy = await prisma.reserva.create({
-        data: {
-          mesaId: ajena.id,
-          turnoId,
-          fecha,
-          comensales: 1,
-          estado: 'CONFIRMADA',
-          codigoReserva: `OCP${String(ocupacionContador).padStart(5, '0')}`,
-          ...datosClienteBase(`ocupacion-${ocupacionContador}`),
-        },
-      });
-      reservaIds.push(dummy.id);
-    }
+    reservaIds.push(...idsCreados);
   }
 
   beforeAll(async () => {
@@ -295,8 +283,20 @@ describe('ReservasService — invariantes de negocio (integración)', () => {
         'Se esperaba que la promesa rechazara con un ConflictException y no rechazó.',
       );
     }
-    expect(capturado).toBeInstanceOf(ConflictException);
-    const conflictError = capturado as ConflictException;
+    // Si rechazó con otra cosa, se relanza el error original en vez de dejar que
+    // `toBeInstanceOf` lo enmascare con un mensaje genérico: así la causa real queda visible
+    // en el test que falla (cubic, PR #40, hallazgo P3). `only-throw-error` exige tirar un
+    // `Error`; en la práctica `capturado` siempre lo es (viene de un `catch` sobre una
+    // promesa rechazada por código nuestro), pero se cubre el caso raro de un rechazo con un
+    // valor no-Error envolviéndolo, en vez de asumirlo con un cast.
+    if (!(capturado instanceof ConflictException)) {
+      throw capturado instanceof Error
+        ? capturado
+        : new Error(
+            `Rechazo inesperado (no ConflictException), tipo: ${typeof capturado}`,
+          );
+    }
+    const conflictError = capturado;
     expect(conflictError.getStatus()).toBe(409);
     const respuesta = conflictError.getResponse() as {
       statusCode: number;

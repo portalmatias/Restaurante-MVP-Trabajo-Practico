@@ -12,6 +12,7 @@ import {
   CrearReservaInput,
   ReservasService,
 } from '../src/reservas/reservas.service';
+import { ocuparMesasAjenas as ocuparMesasAjenasCompartido } from './helpers/ocupar-mesas-ajenas';
 
 /**
  * Tests de concurrencia de `ReservasService.crearReserva` (tasks.md 4.1 y 4.2, design.md D2 y
@@ -115,13 +116,11 @@ describe('ReservasService — concurrencia (integración)', () => {
     }
   }
 
-  let ocupacionContador = 0;
   /**
-   * Ocupa, con una Reserva `CONFIRMADA` propia (1 comensal), todas las mesas que YA existan
-   * en `zonaId` para ese turno/fecha y no estén en `propias` — en la práctica, las mesas del
-   * seed (`S1..S5`, `V1..V4`), que son filas compartidas y por lo tanto siempre "libres" para
-   * un turno nuevo creado por un test (mismo problema y mismo fix que en
-   * `reservas-invariantes.integration-spec.ts`).
+   * Ocupa las mesas ajenas de una zona/turno/fecha (helper compartido con
+   * `reservas-invariantes.integration-spec.ts`, ver `helpers/ocupar-mesas-ajenas.ts`). Este
+   * archivo limpia por `turnoId` en `limpiarFixtures`, así que no necesita los ids que
+   * devuelve.
    */
   async function ocuparMesasAjenas(
     zonaId: string,
@@ -129,24 +128,14 @@ describe('ReservasService — concurrencia (integración)', () => {
     fecha: Date,
     propias: string[],
   ) {
-    const ajenas = await prisma.mesa.findMany({
-      where: { zonaId, id: { notIn: propias } },
-      select: { id: true },
+    await ocuparMesasAjenasCompartido({
+      prisma,
+      zonaId,
+      turnoId,
+      fecha,
+      propias,
+      datosCliente,
     });
-    for (const ajena of ajenas) {
-      ocupacionContador += 1;
-      await prisma.reserva.create({
-        data: {
-          mesaId: ajena.id,
-          turnoId,
-          fecha,
-          comensales: 1,
-          estado: 'CONFIRMADA',
-          codigoReserva: `OCP${String(ocupacionContador).padStart(5, '0')}`,
-          ...datosCliente(`ocupacion-${ocupacionContador}`),
-        },
-      });
-    }
   }
 
   function datosCliente(sufijo: string) {
@@ -268,74 +257,86 @@ describe('ReservasService — concurrencia (integración)', () => {
     const COMENSALES_ESPERADOS = RESERVAS_ESPERADAS * COMENSALES;
 
     it('con aforo VIP en 8, cuatro creaciones simultáneas de 3 comensales dan exactamente 2 resueltas y 2 rechazadas por AFORO_ZONA, con suma activa 6 — repetido 10 veces', async () => {
-      for (let ronda = 1; ronda <= RONDAS; ronda++) {
-        await prisma.zona.update({
-          where: { id: zonaVipId },
-          data: { aforoMaximo: AFORO_VIP_TEST },
-        });
+      try {
+        for (let ronda = 1; ronda <= RONDAS; ronda++) {
+          await prisma.zona.update({
+            where: { id: zonaVipId },
+            data: { aforoMaximo: AFORO_VIP_TEST },
+          });
 
-        const turno = await crearTurno();
-        // Cuatro mesas con lugar de sobra para 3: lo único que puede frenar a dos de las
-        // cuatro creaciones es el aforo, no la falta de mesa.
-        for (const [indice, capacidad] of [3, 4, 5, 6].entries()) {
-          await crearMesa(zonaVipId, capacidad, `AFORO-R${ronda}-M${indice}`);
-        }
+          const turno = await crearTurno();
+          // Cuatro mesas con lugar de sobra para 3: lo único que puede frenar a dos de las
+          // cuatro creaciones es el aforo, no la falta de mesa.
+          for (const [indice, capacidad] of [3, 4, 5, 6].entries()) {
+            await crearMesa(zonaVipId, capacidad, `AFORO-R${ronda}-M${indice}`);
+          }
 
-        const resultados = await Promise.allSettled(
-          Array.from({ length: CREACIONES }, (_, i) =>
-            service.crearReserva(
-              solicitud(
-                turno.id,
-                zonaVipId,
-                COMENSALES,
-                `aforo-r${ronda}-${i}`,
+          const resultados = await Promise.allSettled(
+            Array.from({ length: CREACIONES }, (_, i) =>
+              service.crearReserva(
+                solicitud(
+                  turno.id,
+                  zonaVipId,
+                  COMENSALES,
+                  `aforo-r${ronda}-${i}`,
+                ),
               ),
             ),
-          ),
-        );
+          );
 
-        esperarSoloConflictException(resultados);
+          esperarSoloConflictException(resultados);
 
-        const creadas = resultados.filter((r) => r.status === 'fulfilled');
-        const rechazadas = resultados.filter((r) => r.status === 'rejected');
+          const creadas = resultados.filter((r) => r.status === 'fulfilled');
+          const rechazadas = resultados.filter((r) => r.status === 'rejected');
 
-        expect({ ronda, creadas: creadas.length }).toEqual({
-          ronda,
-          creadas: RESERVAS_ESPERADAS,
-        });
-        expect({ ronda, rechazadas: rechazadas.length }).toEqual({
-          ronda,
-          rechazadas: CREACIONES - RESERVAS_ESPERADAS,
-        });
-        for (const rechazada of rechazadas) {
-          expect({ ronda, motivos: motivosDe(rechazada) }).toEqual({
+          expect({ ronda, creadas: creadas.length }).toEqual({
             ronda,
-            motivos: [CodigoMotivo.AFORO_ZONA],
+            creadas: RESERVAS_ESPERADAS,
           });
+          expect({ ronda, rechazadas: rechazadas.length }).toEqual({
+            ronda,
+            rechazadas: CREACIONES - RESERVAS_ESPERADAS,
+          });
+          for (const rechazada of rechazadas) {
+            expect({ ronda, motivos: motivosDe(rechazada) }).toEqual({
+              ronda,
+              motivos: [CodigoMotivo.AFORO_ZONA],
+            });
+          }
+
+          const persistidas = await prisma.reserva.findMany({
+            where: {
+              turnoId: turno.id,
+              fecha: FECHA,
+              estado: { in: ['PENDIENTE', 'CONFIRMADA'] },
+            },
+            select: { comensales: true },
+          });
+          expect({ ronda, persistidas: persistidas.length }).toEqual({
+            ronda,
+            persistidas: RESERVAS_ESPERADAS,
+          });
+          const comensalesActivos = persistidas.reduce(
+            (total, r) => total + r.comensales,
+            0,
+          );
+          expect({ ronda, comensalesActivos }).toEqual({
+            ronda,
+            comensalesActivos: COMENSALES_ESPERADOS,
+          });
+
+          await limpiarFixtures();
         }
-
-        const persistidas = await prisma.reserva.findMany({
-          where: {
-            turnoId: turno.id,
-            fecha: FECHA,
-            estado: { in: ['PENDIENTE', 'CONFIRMADA'] },
-          },
-          select: { comensales: true },
+      } finally {
+        // El loop deja `aforoMaximo` de VIP en `AFORO_VIP_TEST` (8): se restaura acá al valor
+        // que fija el `beforeAll` de la suite (100), siguiendo la política de aislamiento del
+        // encabezado del archivo (cada test dueño de un valor lo restaura en su propio
+        // `finally`/`afterEach`), sin depender de que `afterAll` corra para dejarlo consistente
+        // para el resto de los tests de este archivo.
+        await prisma.zona.update({
+          where: { id: zonaVipId },
+          data: { aforoMaximo: 100 },
         });
-        expect({ ronda, persistidas: persistidas.length }).toEqual({
-          ronda,
-          persistidas: RESERVAS_ESPERADAS,
-        });
-        const comensalesActivos = persistidas.reduce(
-          (total, r) => total + r.comensales,
-          0,
-        );
-        expect({ ronda, comensalesActivos }).toEqual({
-          ronda,
-          comensalesActivos: COMENSALES_ESPERADOS,
-        });
-
-        await limpiarFixtures();
       }
     }, 120_000);
 

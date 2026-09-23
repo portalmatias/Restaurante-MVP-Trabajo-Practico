@@ -48,10 +48,19 @@ describe('elegirMesaBestFit', () => {
       ordenAscendente[0],
       ordenAscendente[1],
     ];
+    // Snapshots de valor y de orden, tomados ANTES de llamar: `elegirMesaBestFit` es una
+    // función pura (design.md D3) y su `filter().sort()` interno tiene que operar sobre una
+    // copia, nunca mutar la lista que le pasó el caller (que en `reservas-crear` es
+    // `ContextoReserva.mesasLibres`, compartida con otras validaciones del mismo flujo).
+    const ordenAscendenteAntes = [...ordenAscendente];
+    const desordenadaAntes = [...desordenada];
 
     expect(elegirMesaBestFit(desordenada, 3)).toEqual(
       elegirMesaBestFit(ordenAscendente, 3),
     );
+
+    expect(ordenAscendente).toEqual(ordenAscendenteAntes);
+    expect(desordenada).toEqual(desordenadaAntes);
   });
 
   it('devuelve undefined si ninguna mesa alcanza para la cantidad de comensales', () => {

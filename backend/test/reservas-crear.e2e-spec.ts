@@ -5,9 +5,14 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 
 import { AppModule } from '../src/app.module';
-import { ARGENTINA_OFFSET_MS } from '../src/common/timezone';
-import { CodigoMotivo, DIAS } from '../src/disponibilidad/reglas/tipos';
+import { CodigoMotivo } from '../src/disponibilidad/reglas/tipos';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { diaDe, FECHA, FECHA_LUNES, fechaISO } from './support/fechas-e2e';
+import {
+  configurarZonasYConfiguracionDeSeed,
+  TURNO_UUID_INEXISTENTE,
+  ZONA_UUID_INEXISTENTE,
+} from './support/zonas-seed-e2e';
 
 /**
  * Tareas 7.1–7.5 de `reservas-crear`: `POST /reservas` por HTTP con Supertest, contra la base
@@ -46,71 +51,25 @@ describe('POST /reservas (e2e)', () => {
   let turnoIds: string[] = [];
   let reservaIds: string[] = [];
 
-  /** UUIDs bien formados que no existen en la base: sirven para los 404. */
-  const TURNO_UUID_INEXISTENTE = '3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73';
-  const ZONA_UUID_INEXISTENTE = 'b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19';
-
-  // --- Fechas ---------------------------------------------------------------------------
-
-  /** Fecha de calendario (medianoche UTC), la forma en que viaja una `@db.Date` (D4). */
-  function fechaCalendario(anio: number, mes: number, dia: number): Date {
-    return new Date(Date.UTC(anio, mes - 1, dia));
-  }
-
-  /** Hoy según el calendario local del restaurante (UTC-3), no según el del proceso. */
-  function hoyLocal(): Date {
-    const ahoraLocal = new Date(Date.now() + ARGENTINA_OFFSET_MS);
-    return fechaCalendario(
-      ahoraLocal.getUTCFullYear(),
-      ahoraLocal.getUTCMonth() + 1,
-      ahoraLocal.getUTCDate(),
-    );
-  }
-
-  function sumarDias(fecha: Date, dias: number): Date {
-    return new Date(
-      Date.UTC(
-        fecha.getUTCFullYear(),
-        fecha.getUTCMonth(),
-        fecha.getUTCDate() + dias,
-      ),
-    );
-  }
-
-  /** `YYYY-MM-DD`, que es como viaja `fecha` en el body. */
-  function fechaISO(fecha: Date): string {
-    const anio = String(fecha.getUTCFullYear()).padStart(4, '0');
-    const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-    const dia = String(fecha.getUTCDate()).padStart(2, '0');
-    return `${anio}-${mes}-${dia}`;
-  }
-
-  /** El `DiaSemana` que le corresponde a una fecha de calendario. */
-  function diaDe(fecha: Date): DiaSemana {
-    return DIAS[fecha.getUTCDay()];
-  }
-
-  /** Primer lunes que cae a `minimoDias` días o más de hoy. Los turnos del lunes son inactivos. */
-  function proximoLunes(minimoDias: number): Date {
-    let candidata = sumarDias(hoyLocal(), minimoDias);
-    while (diaDe(candidata) !== DiaSemana.LUNES) {
-      candidata = sumarDias(candidata, 1);
-    }
-    return candidata;
-  }
-
-  /** Fecha de trabajo: 10 días adelante, lejos de toda anticipación mínima y máxima. */
-  const FECHA = sumarDias(hoyLocal(), 10);
-  const FECHA_LUNES = proximoLunes(8);
-
   // --- Fixtures --------------------------------------------------------------------------
 
   // Banda 10:00–10:59: no la usa ninguna otra suite e2e (`disponibilidad-contexto` usa 05:xx,
-  // `disponibilidad` 06:xx y `disponibilidad-lock` 07:xx).
+  // `disponibilidad` 06:xx y `disponibilidad-lock` 07:xx). El contador cuenta segundos, no
+  // minutos: con solo minutos, el turno 60 desbordaba a 11:00:00 y quedaba fuera de la banda
+  // `[10:00, 11:00)` que filtra `limpiarResiduos()` (cubic, PR #40, hallazgo P3). Contando
+  // segundos hay 3600 valores únicos posibles antes de desbordar, y si igual se agotan, se
+  // lanza un error explícito en vez de generar silenciosamente una hora fuera de la banda.
   let horaContador = 0;
   function horaDeTestUnica(): Date {
     horaContador += 1;
-    return new Date(Date.UTC(1970, 0, 1, 10, horaContador, 0));
+    const minuto = Math.floor(horaContador / 60);
+    const segundo = horaContador % 60;
+    if (minuto >= 60) {
+      throw new Error(
+        'horaDeTestUnica() agotó la banda horaria 10:00–10:59 de esta suite (más de 3600 turnos en una misma corrida)',
+      );
+    }
+    return new Date(Date.UTC(1970, 0, 1, 10, minuto, segundo));
   }
 
   function datosContacto(sufijo = 'cliente') {
@@ -250,58 +209,9 @@ describe('POST /reservas (e2e)', () => {
     // Valores del seed (backend/prisma/seed.ts), igual que disponibilidad.e2e-spec.ts: la
     // suite deja la base como la encontró. `NombreZona` es un enum de dos valores, así que no
     // se pueden crear zonas propias.
-    const standard = await prisma.zona.upsert({
-      where: { nombre: 'STANDARD' },
-      update: {
-        minComensales: 1,
-        maxComensales: 8,
-        anticipacionMinHoras: 2,
-        anticipacionMaxDias: 30,
-        ventanaCancelacionHoras: 2,
-        requiereConfirmacionAdmin: false,
-        aforoMaximo: 40,
-      },
-      create: {
-        nombre: 'STANDARD',
-        minComensales: 1,
-        maxComensales: 8,
-        anticipacionMinHoras: 2,
-        anticipacionMaxDias: 30,
-        ventanaCancelacionHoras: 2,
-        requiereConfirmacionAdmin: false,
-        aforoMaximo: 40,
-      },
-    });
-    const vip = await prisma.zona.upsert({
-      where: { nombre: 'VIP' },
-      update: {
-        minComensales: 2,
-        maxComensales: 12,
-        anticipacionMinHoras: 24,
-        anticipacionMaxDias: 60,
-        ventanaCancelacionHoras: 24,
-        requiereConfirmacionAdmin: true,
-        aforoMaximo: 20,
-      },
-      create: {
-        nombre: 'VIP',
-        minComensales: 2,
-        maxComensales: 12,
-        anticipacionMinHoras: 24,
-        anticipacionMaxDias: 60,
-        ventanaCancelacionHoras: 24,
-        requiereConfirmacionAdmin: true,
-        aforoMaximo: 20,
-      },
-    });
-    zonaStandardId = standard.id;
-    zonaVipId = vip.id;
-
-    await prisma.configuracionNegocio.upsert({
-      where: { id: 1 },
-      update: { aforoGlobal: 60 },
-      create: { id: 1, aforoGlobal: 60 },
-    });
+    const zonas = await configurarZonasYConfiguracionDeSeed(prisma);
+    zonaStandardId = zonas.zonaStandardId;
+    zonaVipId = zonas.zonaVipId;
 
     await limpiarResiduos();
   });
