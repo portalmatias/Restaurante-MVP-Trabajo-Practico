@@ -132,19 +132,30 @@
 
 ## 5. Rutas: layout compartido y esqueletos
 
-- [ ] 5.1 Reescribir `frontend/app/page.tsx`: quitar el contenido de ejemplo de
+- [x] 5.1 Reescribir `frontend/app/page.tsx`: quitar el contenido de ejemplo de
       `create-next-app` y dejar una landing mínima en español que usa las primitivas de la
       sección 4 y enlaza a `/reservas` y a `/admin` con `next/link`. Mobile-first: los enlaces
       son de ancho completo o fácilmente alcanzables a 375px (D1). Verificar con
       `npm run dev -w frontend` que `/` renderiza sin errores y los dos enlaces navegan.
-- [ ] 5.2 Crear `frontend/app/reservas/page.tsx` y `frontend/app/admin/page.tsx` como páginas
+      Verificado con `npm run build -w frontend` (prerenderizada como estática) y sirviendo el
+      build de producción (`next start`) en un puerto temporal: `curl` a `/` devuelve `200`,
+      contiene `href="/reservas"` y `href="/admin"`, y usa `Card`/`buttonVariants` de la
+      sección 4. No se abrió un navegador real para hacer clic en los enlaces.
+- [x] 5.2 Crear `frontend/app/reservas/page.tsx` y `frontend/app/admin/page.tsx` como páginas
       placeholder (Server Components, sin `"use client"`: no tienen interactividad todavía)
       que usan el layout compartido y muestran un texto que indica que la pantalla real llega
       con `frontend-cliente`/`frontend-admin` respectivamente. Sin lógica de negocio, sin
       auth. Verificar que ambas rutas cargan con `npm run dev -w frontend` y comparten el
       mismo header/footer que `/`.
+      Verificado sirviendo el build de producción: `curl` a `/reservas` y `/admin` devuelve
+      `200` en ambas, y las dos incluyen el título del header compartido ("Reservas del
+      Restaurante"), confirmando el mismo layout que `/`.
 - [ ] 5.3 Verificar sin scroll horizontal en `/`, `/admin` y `/reservas` a 375/768/1024/1440
       (D9, manual). Dejar la constancia en la descripción del PR.
+      No se pudo verificar: requiere un navegador real con viewport controlable. Revisión
+      estática de indicios (`grep` de anchos fijos en px y `overflow-x` en `frontend/app` y
+      `frontend/src/components/ui`) no encontró resultados, pero no reemplaza la comprobación
+      visual. Queda pendiente para el humano en los 4 anchos.
 
 ## 6. Cliente HTTP tipado
 
