@@ -48,13 +48,13 @@
       `NotFoundException`; un rechazo por reglas no persiste nada (se cuenta `Reserva` antes y
       después); la reserva persistida tiene `fecha` igual al `Date.UTC` enviado para un turno
       configurado a las 22:00 local. Verificar que falla (rojo).
-- [ ] 3.3 Crear `backend/src/reservas/elegir-mesa-best-fit.ts` con una función que solo lanza
+- [x] 3.3 Crear `backend/src/reservas/elegir-mesa-best-fit.ts` con una función que solo lanza
       un error y escribir `elegir-mesa-best-fit.spec.ts`: 3 comensales con mesas 2, 2, 4, 6 y 8
       elige la de 4; capacidad exacta; empate de capacidad elige la menor `etiqueta`
       (`S1` antes que `S2`, y `S10` antes que `S2`); lista desordenada da el mismo resultado;
       ninguna alcanza devuelve `undefined`; lista vacía devuelve `undefined`. Verificar que la
       suite falla (rojo) con `npm test -w backend -- elegir-mesa-best-fit`.
-- [ ] 3.4 Implementar `elegirMesaBestFit` como función pura (D3). Verificar que la suite de
+- [x] 3.4 Implementar `elegirMesaBestFit` como función pura (D3). Verificar que la suite de
       3.3 pasa con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
 
 ## 4. Tests primero: concurrencia y choques
