@@ -72,30 +72,36 @@ el resto de la paleta):
 
 ```css
 :root {
-  --color-primary: #171717;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #404040;
-  --color-secondary-foreground: #ffffff;
-  --color-accent: #a16207;
-  --color-accent-foreground: #ffffff;
-  --color-background: #ffffff;
-  --color-foreground: #171717;
-  --color-card: #ffffff;
-  --color-card-foreground: #171717;
-  --color-muted: #e8ecf0;
-  --color-muted-foreground: #475569;
-  --color-border: #e5e5e5;
-  --color-destructive: #dc2626;
-  --color-destructive-foreground: #ffffff;
-  --color-ring: #171717;
+  --primary: #171717;
+  --primary-foreground: #ffffff;
+  --secondary: #404040;
+  --secondary-foreground: #ffffff;
+  --accent: #a16207;
+  --accent-foreground: #ffffff;
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --muted: #e8ecf0;
+  --muted-foreground: #475569;
+  --border: #e5e5e5;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --ring: #171717;
 }
 
 @theme inline {
-  --color-primary: var(--color-primary);
-  --color-primary-foreground: var(--color-primary-foreground);
-  /* ...resto igual, uno por token */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  /* ...resto igual, uno por token: --color-<nombre>: var(--<nombre>) */
 }
 ```
+
+Las variables fuente de `:root` (`--primary`) tienen un nombre distinto del token de
+Tailwind (`--color-primary`), igual que en el scaffold (`--background` y
+`--color-background`): si se llamaran igual, `@theme inline` declararía cada token en
+función de sí mismo, una referencia circular. Además, así un tema futuro (por ejemplo modo
+oscuro) solo sobreescribe las variables fuente.
 
 Con esto, los componentes usan clases como `bg-primary`, `text-primary-foreground`,
 `border-border` o `ring-ring`, nunca `bg-[#171717]` ni un `style={{ color: '#171717' }}`. Se
@@ -199,12 +205,17 @@ repo y, si faltara, agregarla en este mismo PR (§13 de la Definition of Done).
 ### D7: Resultado tipado y mapeo de errores
 **Decisión:** un tipo `ApiResult<T>` (discriminado por la presencia de `data` o de `error`)
 envuelve toda llamada. Cuando `openapi-fetch` devuelve `error`, una función de mapeo lo
-traduce a un tipo `ErrorApi` con una de estas formas, según la forma de `ErrorRespuesta` que
-ya define `openapi/openapi.yaml`:
+traduce a un tipo `ErrorApi` con una de estas formas. Se apoya solo en lo que ya define
+`openapi/openapi.yaml` en `main`: `ErrorRespuesta` (`statusCode`, `message`, `error`) y el
+schema `MotivoNoDisponible` de `disponibilidad`:
 - `{ tipo: 'validacion', mensajes: string[] }` — `400` con `message` como lista.
 - `{ tipo: 'no-encontrado', mensaje: string }` — `404` con `message` como texto único.
-- `{ tipo: 'conflicto', motivos: MotivoNoDisponible[] }` — `409` con `motivos` (reusa el
-  schema `MotivoNoDisponible`/`CodigoMotivo` que `disponibilidad` ya define en el contrato).
+- `{ tipo: 'conflicto', mensaje: string, motivos: MotivoNoDisponible[] }` — cualquier `409`.
+  Los `409` que hoy tiene el contrato (las rutas de admin de `gestion-salon`) son
+  `ErrorRespuesta` con `message` de texto y sin `motivos`: mapean con `motivos: []`. Si el
+  cuerpo trae además `motivos` (lo que va a agregar `POST /reservas` de `reservas-crear`), el
+  mapeo los conserva en orden. El campo se lee con un chequeo en tiempo de ejecución sobre el
+  cuerpo, no con tipos de un contrato todavía no mergeado, así que D5 se sigue cumpliendo.
 - `{ tipo: 'desconocido', mensaje: string }` — cualquier otro caso (por ejemplo `500`), para
   no forzar a la UI a manejar un caso que no puede interpretar de forma específica.
 

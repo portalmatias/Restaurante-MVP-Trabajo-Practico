@@ -46,8 +46,9 @@
       completos de D2 (`primary`, `secondary`, `accent`, `background`, `foreground`, `card`,
       `card-foreground`, `muted`, `muted-foreground`, `border`, `destructive`, `ring`) como
       variables CSS y `@theme inline`. Verificar visualmente con `npm run dev -w frontend` que
-      `body` usa `bg-background`/`text-foreground` y no queda ningún hexadecimal del scaffold
-      original en el archivo: `grep -in "0a0a0a\|ededed" frontend/app/globals.css` sin
+      `body` usa `bg-background`/`text-foreground` y que desapareció el bloque
+      `prefers-color-scheme: dark` del scaffold (solo modo claro en el MVP):
+      `grep -in "0a0a0a\|ededed\|prefers-color-scheme" frontend/app/globals.css` sin
       resultados.
 - [ ] 3.2 Reescribir `frontend/app/layout.tsx`: quitar Geist, cargar Inter (400–700) con
       `next/font/google` (D3), mantener `lang="es"` en `<html>` (ya está en el scaffold) y
@@ -125,7 +126,9 @@
       `npm ls openapi-typescript openapi-fetch -w frontend`.
 - [ ] 6.2 Agregar el script `"api:types": "openapi-typescript ../openapi/openapi.yaml -o
       src/lib/api/schema.d.ts"` a `frontend/package.json` y un alias
-      `"api:types": "npm run api:types -w frontend"` en la raíz. Correrlo una vez y commitear
+      `"api:types": "npm run api:types -w frontend"` en la raíz. Crear antes el directorio de
+      salida (`mkdir -p frontend/src/lib/api`: hoy `frontend/` no tiene `src/`). Correrlo una
+      vez y commitear
       `frontend/src/lib/api/schema.d.ts`. Verificar que el archivo generado contiene un tipo
       `paths` con las claves `"/disponibilidad"`, `"/auth/login"`, `"/admin/zonas"`, etc., y
       que **no** contiene `"/reservas"` (todavía no está en el YAML) con
@@ -148,9 +151,10 @@
 - [ ] 7.1 Escribir `frontend/test/lib/api/errors.test.ts` **antes** de implementar (D7): un
       `ErrorRespuesta` de `400` con `message` como lista de strings mapea a
       `{ tipo: 'validacion', mensajes: [...] }`; uno de `404` con `message` string mapea a
-      `{ tipo: 'no-encontrado', mensaje }`; un cuerpo `409` con `motivos` mapea a
-      `{ tipo: 'conflicto', motivos }` preservando `codigo` y `mensaje` de cada motivo y su
-      orden; cualquier otro caso mapea a `{ tipo: 'desconocido', mensaje }`. Verificar que la
+      `{ tipo: 'no-encontrado', mensaje }`; un `409` con `message` string y sin `motivos` (la
+      forma actual de los `409` de admin) mapea a `{ tipo: 'conflicto', mensaje, motivos: [] }`;
+      un `409` que además trae `motivos` los conserva con `codigo`, `mensaje` y su orden;
+      cualquier otro caso mapea a `{ tipo: 'desconocido', mensaje }`. Verificar que la
       suite falla (rojo) con `npm run test -w frontend -- errors`.
 - [ ] 7.2 Implementar `frontend/src/lib/api/errors.ts` con el tipo `ApiResult<T>` y la función
       de mapeo de D7, usando los tipos de `MotivoNoDisponible`/`CodigoMotivo` generados en
@@ -158,8 +162,9 @@
 - [ ] 7.3 Envolver el cliente de 6.4 para que sus métodos devuelvan `ApiResult<T>` en vez del
       `{ data, error }` crudo de `openapi-fetch`, aplicando el mapeo de 7.2 cuando `error` está
       presente. Verificar con un test de integración liviano en
-      `frontend/test/lib/api/client.test.ts` que mockea `fetch` para devolver un `409` con
-      `motivos` y comprueba que el resultado tiene `tipo: 'conflicto'`.
+      `frontend/test/lib/api/client.test.ts` que mockea `fetch` para devolver un `409` de una
+      ruta de admin (con `message` y sin `motivos`) y comprueba que el resultado tiene
+      `tipo: 'conflicto'` y `motivos: []`.
 
 ## 8. Cierre (Definition of Done, `config.yaml` §13)
 

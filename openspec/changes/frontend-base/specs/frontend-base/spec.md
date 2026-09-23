@@ -179,8 +179,14 @@ forma de error.
 - **WHEN** la API responde `404` con `ErrorRespuesta` cuyo `message` es un único texto
 - **THEN** el resultado tipado del cliente expone ese texto
 
+#### Scenario: Error 409 con mensaje único
+- **WHEN** la API responde `409` con `ErrorRespuesta` cuyo `message` es un único texto y sin
+  `motivos` (la forma de los `409` que hoy tiene el contrato, por ejemplo en `/admin/mesas`)
+- **THEN** el resultado tipado del cliente expone ese texto y una lista de motivos vacía
+
 #### Scenario: Error 409 con motivos de negocio
-- **WHEN** la API responde `409` con un cuerpo que incluye `motivos` (`MotivoNoDisponible[]`)
+- **WHEN** la API responde `409` con un cuerpo que además incluye `motivos`
+  (`MotivoNoDisponible[]`)
 - **THEN** el resultado tipado del cliente expone cada motivo con su `codigo` y su `mensaje`,
   en el mismo orden en que la API los envió
 

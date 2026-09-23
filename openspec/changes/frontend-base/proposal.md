@@ -34,11 +34,11 @@ alto riesgo de que cada uno tome una decisión distinta.
 - **Cliente HTTP tipado**, con tipos **generados** desde `openapi/openapi.yaml` (nunca escritos
   a mano, §7): `openapi-typescript` genera un `.d.ts` con un script `api:types`, y
   `openapi-fetch` es el cliente que consume esos tipos. Solo existen tipos para los paths que
-  ya están en el YAML (`/`, `/disponibilidad`, `/auth/login`, `/admin/zonas`, `/admin/mesas`,
-  `/admin/turnos`); `POST /reservas` (PR #40, todavía no mergeado a `main`) no genera tipos
+  ya están en el YAML (`/`, `/disponibilidad`, `/auth/login`, `/admin/zonas`, `/admin/zonas/{id}`,
+  `/admin/mesas`, `/admin/mesas/{id}`, `/admin/turnos` y `/admin/turnos/{id}`); `POST /reservas` (PR #40, todavía no mergeado a `main`) no genera tipos
   hasta que esté en el contrato.
 - **Mapeo de errores** del cliente: traduce las formas de error de la API (`ErrorRespuesta` de
-  400/404, y 409 con `motivos: MotivoNoDisponible[]`) a un resultado tipado que la UI puede
+  400/404/409, con los `motivos: MotivoNoDisponible[]` del `409` cuando la API los envía) a un resultado tipado que la UI puede
   renderizar sin volver a parsear `unknown`.
 - **Testing mínimo** (§9): se suma Jest (vía `next/jest`, coherente con que el backend ya usa
   Jest) + React Testing Library para las primitivas (asociación de label, foco visible, texto
