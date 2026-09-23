@@ -1,21 +1,23 @@
 ## 1. Prerrequisitos (bloqueante)
 
-- [ ] 1.1 Confirmar que `frontend/` sigue siendo el scaffold sin tocar de `fundacion-repo`
+- [x] 1.1 Confirmar que `frontend/` sigue siendo el scaffold sin tocar de `fundacion-repo`
       (Next 16.3.4, React 19.2.8, Tailwind v4, sin `src/`, sin `frontend/test/`) y crear
       `feature/frontend-base` desde `main`. Verificar con
       `git log origin/main --oneline -- frontend` y `cat frontend/package.json` (sin `jest`,
       `openapi-typescript` ni `openapi-fetch` todavía).
-- [ ] 1.2 Confirmar en `.env.example` si `NEXT_PUBLIC_API_URL` ya está declarada (D6 de
+- [x] 1.2 Confirmar en `.env.example` si `NEXT_PUBLIC_API_URL` ya está declarada (D6 de
       `design.md`: `openspec/config.yaml` §10 la lista como variable mínima existente, pero no
       se pudo verificar el archivo durante el planning). Si falta, agregarla en este PR con un
       valor de ejemplo (`http://localhost:3001`) y anotarlo en la descripción del PR (DoD,
       `config.yaml` §13). Verificar con `grep -n NEXT_PUBLIC_API_URL .env.example`.
-- [ ] 1.3 Confirmar los paths que hoy tiene `openapi/openapi.yaml` (`/`, `/disponibilidad`,
+      Confirmado por portalmatias el 2026-09-23 (el archivo no es legible para el agente); no
+      hace falta agregar la variable.
+- [x] 1.3 Confirmar los paths que hoy tiene `openapi/openapi.yaml` (`/`, `/disponibilidad`,
       `/auth/login`, `/admin/zonas(/{id})`, `/admin/mesas(/{id})`, `/admin/turnos(/{id})`) y
       que `POST /reservas` **no** está mergeado todavía (PR #40). Si ya se mergeó al arrancar
       este change, no cambia nada de este `tasks.md`: ese path simplemente aparece tipado
       también. Verificar con `grep -n "^  /" openapi/openapi.yaml`.
-- [ ] 1.4 Leer `frontend/AGENTS.md` y, antes de tocar cualquier API de Next.js en las
+- [x] 1.4 Leer `frontend/AGENTS.md` y, antes de tocar cualquier API de Next.js en las
       secciones siguientes (fuentes, App Router, testing), consultar la guía correspondiente en
       `node_modules/next/dist/docs/` de este checkout — la versión de Next puede diferir de lo
       esperado. Verificar que existen `node_modules/next/dist/docs/01-app/01-getting-started/13-fonts.md`
@@ -24,18 +26,18 @@
 
 ## 2. Testing: instalar y configurar Jest + React Testing Library
 
-- [ ] 2.1 Agregar a `frontend/package.json` las devDependencies `jest`,
+- [x] 2.1 Agregar a `frontend/package.json` las devDependencies `jest`,
       `jest-environment-jsdom`, `@testing-library/react`, `@testing-library/dom`,
       `@testing-library/jest-dom`, `ts-node` y `@types/jest` (D8). Verificar con
       `npm ls jest @testing-library/react -w frontend`.
-- [ ] 2.2 Crear `frontend/jest.config.ts` con `next/jest`, `testEnvironment: 'jsdom'` y
+- [x] 2.2 Crear `frontend/jest.config.ts` con `next/jest`, `testEnvironment: 'jsdom'` y
       `roots`/`testMatch` apuntando a `frontend/test/` (no al `__tests__/` por defecto de la
       guía de Next, para seguir `config.yaml` §9). Crear `frontend/jest.setup.ts` con
       `import '@testing-library/jest-dom'` y conectarlo con `setupFilesAfterEnv`. Agregar el
       script `"test": "jest"` a `frontend/package.json`. Verificar con
       `npm run test -w frontend -- --listTests` (debe correr sin error y sin listar tests
       todavía).
-- [ ] 2.3 Agregar `"test:frontend": "npm run test -w frontend"` a los scripts de la raíz,
+- [x] 2.3 Agregar `"test:frontend": "npm run test -w frontend"` a los scripts de la raíz,
       como proxy (sin tocar `.github/workflows/ci.yml`: correrlo en CI es un change aparte,
       Open Questions de `design.md`). Verificar con `npm run test:frontend` desde la raíz.
 
