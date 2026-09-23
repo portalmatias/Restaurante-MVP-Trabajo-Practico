@@ -26,7 +26,7 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 | `reserva-consultar` | FedeWerk | Spec #32 mergeada (2026-09-21): define `POST /reservas/consultar` (código + email en el body, no `GET`, para no exponer el email en la URL ni en logs de acceso) y `GET /admin/reservas`. #35 (borrador) adelanta la búsqueda y la consulta a nivel de `ReservasService`; el controller sigue bloqueado por `reservas-crear`. | Esperar `reservas-crear` para el controller, el listado de admin y el contrato OpenAPI. |
 | `cancelacion-turnos` | lussofacundo-iresm | Spec #16 y ajuste UTC−3 #23 mergeados; implementación pendiente. | Esperar el merge de `reservas-crear` antes de la sección 2 de sus tareas. |
 | `reserva-vip` | lussofacundo-iresm | Spec #17 mergeada; implementación pendiente. | Esperar el merge de `reservas-crear`; endpoints admin requieren auth. |
-| Frontend funcional | FedeWerk / portalmatias | Solo base generada de Next.js; sin PRs abiertos de pantallas. | Preparar `frontend-base` y contratos/tipos según §9. |
+| Frontend funcional | portalmatias (`frontend-base`, `frontend-cliente`) / FedeWerk (`frontend-admin`) | Solo base generada de Next.js; sin PRs abiertos de pantallas. | Preparar `frontend-base` y contratos/tipos según §9. |
 | `entrega-final` | lussofacundo-iresm | Pendiente. | Preparar checklist; no cerrar hasta completar los flujos y la DoD. |
 
 ### PRs abiertos y revisión
@@ -340,7 +340,7 @@ Puede prepararse en paralelo al backend leyendo las specs y sus contratos planea
 
 | Change | Dueño | Alcance |
 |---|---|---|
-| `frontend-base` | FedeWerk | Layout, rutas `/admin` y `/reservas`, y el cliente HTTP con **tipos derivados de `openapi.yaml`** (§7 lo exige: no se escriben a mano). La herramienta de generación es una dependencia nueva → justificarla en su `design.md`. |
+| `frontend-base` | portalmatias | Layout, rutas `/admin` y `/reservas`, y el cliente HTTP con **tipos derivados de `openapi.yaml`** (§7 lo exige: no se escriben a mano). La herramienta de generación es una dependencia nueva → justificarla en su `design.md`. |
 | `frontend-cliente` | portalmatias | Reservar, consultar por código+email, cancelar. Conversión UTC → hora local (§7: es responsabilidad del front). |
 | `frontend-admin` | FedeWerk | Login, dashboard de aforo, CRUD del salón, confirmar VIP, marcar NO_SHOW. |
 
@@ -356,10 +356,10 @@ por punto de la Definition of Done de §13 sobre cada change archivado**.
 
 ```
 portalmatias        fundacion-repo, disponibilidad, reservas-crear,
-                    frontend-cliente                                  -> 4 changes
+                    frontend-base (chico), frontend-cliente           -> 5 changes
 FedeWerk            modelo-dominio, ci-integracion-db (chico),
                     auth-admin, reserva-consultar,
-                    frontend-base (chico), frontend-admin             -> 6 changes
+                    frontend-admin                                    -> 5 changes
 lussofacundo-iresm  gestion-salon, cancelacion-turnos, reserva-vip,
                     entrega-final                                     -> 4 changes
 ```
@@ -368,9 +368,11 @@ lussofacundo-iresm  gestion-salon, cancelacion-turnos, reserva-vip,
 sesiones de su propio módulo y commitee bajo su propia autoría: nadie mergea trabajo generado en
 nombre de otro.
 
-> **El recuento son items, no esfuerzo.** `ci-integracion-db` y `frontend-base` son chicos, así
-> que los 6 de Fede pesan parecido a los 4 de los demás. Dos ajustes fáciles si al equipo le
-> queda desbalanceado: mover `frontend-admin` a Facundo, o `ci-integracion-db` a Matías.
+> **El recuento son items, no esfuerzo.** `ci-integracion-db` y `frontend-base` son chicos.
+> **Cambio de responsable (2026-09-23):** `frontend-base` pasó de FedeWerk a portalmatias, que
+> ya tiene `frontend-cliente`; así el mismo integrante arma la base y las pantallas del cliente
+> sobre ella. Quedan 5, 5 y 4 changes. Si al equipo le queda desbalanceado, el ajuste fácil
+> sigue siendo mover `frontend-admin` a Facundo.
 >
 > Nota: la tarea 0.3 (docx + `.gitignore`) estaba pensada para abrirle el historial a Facundo,
 > pero los documentos los incorporó Fede en el PR #4. Facundo ya aportó las specs de
