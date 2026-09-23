@@ -80,10 +80,11 @@ de la zona y no según su nombre. El estado inicial SHALL NOT tomarse del body.
   `comensales=6`
 - **THEN** la respuesta y la reserva persistida tienen `estado: PENDIENTE`
 
-#### Scenario: El estado enviado por el cliente se ignora
+#### Scenario: El estado enviado por el cliente se rechaza
 - **WHEN** se envía `POST /reservas` para la cena del sábado 2026-09-19 en zona VIP con
   `comensales=6` y además `estado: "CONFIRMADA"` en el body
-- **THEN** el sistema responde `201 Created` con `estado: PENDIENTE`
+- **THEN** el sistema responde `400 Bad Request`
+- **AND** la cantidad de reservas en la base no cambia
 
 #### Scenario: El estado sigue a la configuración y no al nombre
 - **WHEN** la zona STANDARD está configurada para requerir confirmación del admin
@@ -130,10 +131,11 @@ etiqueta en orden lexicográfico. No se combinan mesas. La mesa SHALL NOT tomars
   `comensales=3`
 - **THEN** la reserva queda asignada a la mesa `S3`
 
-#### Scenario: La mesa enviada por el cliente se ignora
+#### Scenario: La mesa enviada por el cliente se rechaza
 - **WHEN** se envía `POST /reservas` para la cena del sábado 2026-09-19 en zona STANDARD con
   `comensales=2` y además el `mesaId` de `S5` en el body
-- **THEN** la reserva queda asignada a la mesa `S1`
+- **THEN** el sistema responde `400 Bad Request`
+- **AND** la cantidad de reservas en la base no cambia
 
 ### Requirement: Mismas reglas que la consulta de disponibilidad
 Al crear, el sistema SHALL evaluar las ocho reglas de la capability `disponibilidad` (turno
@@ -301,8 +303,9 @@ El sistema SHALL responder `400 Bad Request`, sin evaluar reglas y sin persistir
 falta alguno de los siete campos, cuando `fecha` no tiene el formato `YYYY-MM-DD` o no es una
 fecha de calendario válida (incluido un valor con hora), cuando `turnoId` o `zonaId` no son
 UUID, cuando `comensales` no es un entero mayor o igual a 1, cuando `emailCliente` no es un
-email válido o cuando `nombreCliente` o `telefonoCliente` están vacíos o solo tienen espacios.
-El cuerpo SHALL tener la forma `{ statusCode: 400, message: string[], error: "Bad Request" }`.
+email válido, cuando `nombreCliente` o `telefonoCliente` están vacíos o solo tienen espacios,
+o cuando el body trae algún campo distinto de los siete (por ejemplo `mesaId`, `estado` o
+`codigoReserva`). El cuerpo SHALL tener la forma `{ statusCode: 400, message: string[], error: "Bad Request" }`.
 
 #### Scenario: Falta un dato de contacto
 - **WHEN** se envía `POST /reservas` sin `telefonoCliente`
