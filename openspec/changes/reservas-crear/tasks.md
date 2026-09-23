@@ -35,14 +35,14 @@
 
 ## 3. Tests primero: invariantes, best fit y estado inicial
 
-- [ ] 3.1 Adaptar `backend/test/reservas-invariantes.integration-spec.ts` de #12 a la nueva
+- [x] 3.1 Adaptar `backend/test/reservas-invariantes.integration-spec.ts` de #12 a la nueva
       entrada de `crearReserva` (sin `mesaId` ni `zonaSolicitadaId`, con `zonaId`), **antes**
       de tocar el service. Usar zonas y mesas propias para controlar qué mesa elige best fit.
       Cada invariante (1 a 4) sigue con al menos un test que intenta violarlo, y los rechazos
       se afirman como `ConflictException` con el `CodigoMotivo` que corresponde. Conservar el
       test de colisión de código que espía `generarCodigoReserva`. Verificar que la suite
       falla (rojo) con `npm run test:integration -w backend -- reservas-invariantes`.
-- [ ] 3.2 Sumar a esa suite: estado `CONFIRMADA` en una zona con
+- [x] 3.2 Sumar a esa suite: estado `CONFIRMADA` en una zona con
       `requiereConfirmacionAdmin = false` y `PENDIENTE` con `true`, incluida una zona
       STANDARD configurada en `true` (D4); un turno o una zona inexistentes lanzan
       `NotFoundException`; un rechazo por reglas no persiste nada (se cuenta `Reserva` antes y
@@ -59,7 +59,7 @@
 
 ## 4. Tests primero: concurrencia y choques
 
-- [ ] 4.1 Escribir `backend/test/reservas-concurrencia.integration-spec.ts` **antes** de
+- [x] 4.1 Escribir `backend/test/reservas-concurrencia.integration-spec.ts` **antes** de
       reescribir el service, contra la base de test de `docker-compose`, con datos propios y
       `Reserva` limpia en cada test (D10). Casos con `Promise.allSettled` sobre
       `crearReserva`: aforo VIP 8 y 4 creaciones de 3 comensales dan exactamente 2 resueltas y
@@ -70,7 +70,7 @@
       `ConflictException`. Verificar que falla (rojo) con
       `npm run test:integration -w backend -- reservas-concurrencia`: con el service de #12
       tiene que fallar al menos por la entrada nueva y por los `P2034`.
-- [ ] 4.2 Sumar a la misma suite los choques que devuelven `409` y no `500`, con errores
+- [x] 4.2 Sumar a la misma suite los choques que devuelven `409` y no `500`, con errores
       reales de la base y sin mocks de Prisma (D10): se inserta a mano una reserva activa en la
       mesa `S1`, se espía `elegirMesaBestFit` para que devuelva `S1` y se espera
       `ConflictException` con `motivos` exactamente `SIN_MESA_DISPONIBLE` (el índice parcial
@@ -80,7 +80,7 @@
 
 ## 5. Service
 
-- [ ] 5.1 Reescribir `ReservasService.crearReserva(input)` con el flujo de D1: `$transaction`
+- [x] 5.1 Reescribir `ReservasService.crearReserva(input)` con el flujo de D1: `$transaction`
       sin `isolationLevel` (READ COMMITTED), `bloquearTurnoFecha(tx, ...)` como primera
       sentencia, `cargarContexto(tx, ...)`, `evaluarReglas(contexto, solicitud, new Date())`
       con `ahora` tomado después del lock, `409` con todos los motivos (D8),
@@ -91,7 +91,7 @@
       3.2, 4.1 y 4.2 pasan, y que
       `grep -n "Serializable\|P2034\|aforoMaximo\|anticipacion\|capacidad >" backend/src/reservas/reservas.service.ts`
       no devuelve nada.
-- [ ] 5.2 Implementar la traducción de errores de D9: `P2002` sobre `mesaId` a `409` con
+- [x] 5.2 Implementar la traducción de errores de D9: `P2002` sobre `mesaId` a `409` con
       `SIN_MESA_DISPONIBLE`, códigos agotados a `409` con `motivos: []`, y `P2028`/`P2024` de
       `$transaction` a `409` con `motivos: []` y un mensaje que pide reintentar. Cualquier otro
       error se propaga. Si el test de `P2002` de 4.2 muestra que `meta.target` trae el nombre
