@@ -470,16 +470,22 @@ describe('ReservasService — concurrencia (integración)', () => {
       // P2028 sin bajar el timeout de `crearReserva` (que usa el default de Prisma, sin
       // override — D9 no lo cambia salvo que la concurrencia real lo exija).
       const RETENCION_MS = 6500;
+      let avisarLockTomado!: () => void;
+      const lockTomado = new Promise<void>((resolve) => {
+        avisarLockTomado = resolve;
+      });
       const bloqueo = prisma.$transaction(
         async (tx) => {
           await bloquearTurnoFecha(tx, turno.id, FECHA);
+          avisarLockTomado();
           await new Promise((resolve) => setTimeout(resolve, RETENCION_MS));
         },
         { timeout: RETENCION_MS + 5000, maxWait: 5000 },
       );
 
-      // Da tiempo a que la transacción auxiliar tome el lock antes de intentar crear.
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Se crea recién cuando la transacción auxiliar ya tiene el lock, sin depender de una
+      // espera fija que en una base lenta podría no alcanzar.
+      await lockTomado;
 
       const intento = service.crearReserva(
         solicitud(turno.id, zonaStandardId, 2, 'p2028-intento'),

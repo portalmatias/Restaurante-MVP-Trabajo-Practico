@@ -168,10 +168,11 @@ describe('ReservasService — invariantes de negocio (integración)', () => {
     service = moduleRef.get(ReservasService);
     await prisma.$connect();
 
-    // Ver `helpers/upsert-seguro.ts`: este archivo corre en paralelo (worker propio de
-    // Jest) con otros *.integration-spec.ts que también hacen upsert de las mismas Zonas
-    // STANDARD/VIP. Los valores importan (los usan los tests de aforo y anticipación), por
-    // eso el fallback ante una colisión de creación es un `update` con esos mismos valores.
+    // Ver `helpers/upsert-seguro.ts`. `jest-integration.json` usa `maxWorkers: 1`, así que los
+    // *.integration-spec.ts corren uno por vez, pero varios hacen upsert de las mismas Zonas
+    // STANDARD/VIP y alguno las deja modificadas. Los valores importan (los usan los tests de
+    // aforo y anticipación), por eso se vuelven a fijar acá y el fallback ante una colisión
+    // de creación es un `update` con esos mismos valores.
     const valoresStandard = {
       minComensales: 1,
       maxComensales: 8,
@@ -883,8 +884,10 @@ describe('ReservasService — invariantes de negocio (integración)', () => {
 
     it('genera códigos de reserva distintos entre sí para reservas creadas en secuencia', async () => {
       const cantidad = 15;
-      const turno = await crearTurno(diaSemanaParaOffset(30));
-      const fecha = fechaFutura(30);
+      // 20 días: lejos del borde de anticipación máxima de STANDARD (30 días), que se evalúa
+      // contra el reloj real y haría depender el test de la hora en que corre.
+      const turno = await crearTurno(diaSemanaParaOffset(20));
+      const fecha = fechaFutura(20);
       // Una mesa por reserva, mismo turno y misma fecha: cada llamada secuencial ocupa una
       // mesa distinta de `contexto.mesasLibres` (las propias ordenan alfabéticamente antes
       // que las del seed: 'I' < 'S', así que best fit las agota primero), sin chocar contra
