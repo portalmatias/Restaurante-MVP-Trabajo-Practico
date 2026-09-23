@@ -82,38 +82,49 @@
 
 ## 4. Primitivas de UI (TDD: tests primero)
 
-- [ ] 4.1 Escribir `frontend/test/components/ui/field.test.tsx` **antes** de crear el
+- [x] 4.1 Escribir `frontend/test/components/ui/field.test.tsx` **antes** de crear el
       componente: un caso donde `Field` con `label="Email"` expone un control accesible por
       `getByRole('textbox', { name: 'Email' })`, y otro donde `Field` con `error="Requerido"`
       expone un control cuyo `aria-describedby` apunta al `id` del nodo que muestra el texto
       "Requerido" junto al campo. Verificar que la suite falla (rojo) con
       `npm run test -w frontend -- field`.
-- [ ] 4.2 Implementar `frontend/src/components/ui/label.tsx`, `input.tsx` y `field.tsx` (D4,
+      RED observado: `Cannot find module '../../../src/components/ui/field'` (módulo
+      inexistente antes de implementar).
+- [x] 4.2 Implementar `frontend/src/components/ui/label.tsx`, `input.tsx` y `field.tsx` (D4,
       D2: solo clases con tokens, sin hex), con `Field` asociando `<label htmlFor>` al control
       y renderizando el error con `id` + `aria-describedby` cuando existe. Tamaño del control
       con altura mínima 44px. Verificar que la suite de 4.1 pasa.
-- [ ] 4.3 Escribir `frontend/test/components/ui/button.test.tsx` **antes** de implementar:
+      GREEN observado: `Test Suites: 1 passed, 1 total` / `Tests: 2 passed, 2 total`.
+- [x] 4.3 Escribir `frontend/test/components/ui/button.test.tsx` **antes** de implementar:
       `Button` renderiza su `children` con rol `button`, expone un anillo de foco visible al
       recibir foco por teclado (clase `focus-visible:*` presente en el DOM), y su variante
       primaria mide al menos 44px de alto (verificable vía la clase de altura aplicada, ya que
       `jsdom` no calcula layout real — D9). Verificar que falla (rojo) con
       `npm run test -w frontend -- button`.
-- [ ] 4.4 Implementar `frontend/src/components/ui/button.tsx` con variantes `primary`,
+      RED observado: `Cannot find module '../../../src/components/ui/button'` (módulo
+      inexistente antes de implementar).
+- [x] 4.4 Implementar `frontend/src/components/ui/button.tsx` con variantes `primary`,
       `secondary` y `destructive` sobre los tokens de D2, `focus-visible:ring-2
       focus-visible:ring-ring`, transición de 150–250ms en `hover`/`focus` respetando
       `prefers-reduced-motion` (`motion-reduce:transition-none` o equivalente), y ancho
       completo en mobile por defecto (`w-full`) con `sm:w-auto` para pantallas más anchas
       (D1). Verificar que la suite de 4.3 pasa.
-- [ ] 4.5 Escribir `frontend/test/components/ui/card-select-alert.test.tsx` **antes** de
+      GREEN observado: `Test Suites: 1 passed, 1 total` / `Tests: 3 passed, 3 total`.
+- [x] 4.5 Escribir `frontend/test/components/ui/card-select-alert.test.tsx` **antes** de
       implementar, cubriendo: `Card` renderiza su contenido dentro de un contenedor con
       `role="region"` o similar cuando recibe un título accesible; `Select` asocia su `label`
       igual que `Field`; `Alert` con `variant="error"` usa el token `destructive` y expone su
       texto sin depender de un ícono para transmitir el estado (texto por sí solo alcanza,
       D-Iconografía de la spec). Verificar que falla (rojo).
-- [ ] 4.6 Implementar `Card`, `Select` y `Alert` en `frontend/src/components/ui/`. Verificar
+      RED observado: `Cannot find module '../../../src/components/ui/alert'` (módulo
+      inexistente antes de implementar).
+- [x] 4.6 Implementar `Card`, `Select` y `Alert` en `frontend/src/components/ui/`. Verificar
       que la suite de 4.5 pasa y que ningún archivo de `frontend/src/components/ui/` tiene un
       literal de color: `grep -rniE "#[0-9a-f]{3,6}" frontend/src/components/ui` sin
       resultados fuera de comentarios.
+      GREEN observado: `Test Suites: 1 passed, 1 total` / `Tests: 3 passed, 3 total`. Suite
+      completa de la sección: `Test Suites: 3 passed, 3 total` / `Tests: 8 passed, 8 total`.
+      El grep de hex queda sin resultados.
 - [ ] 4.7 Verificar manualmente en el navegador, a 375px primero y luego a 768/1024/1440
       (D1, D9), que cada primitiva se ve y se usa correctamente: `Button` de ancho completo en
       mobile, `Field`/`Select` con su error visible sin recortarse, `Card` sin desbordar el
