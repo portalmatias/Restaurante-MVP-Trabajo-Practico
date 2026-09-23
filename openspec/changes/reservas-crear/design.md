@@ -227,13 +227,19 @@ allá de "alfanumérico de 8 caracteres": ver Open Questions.
 
 Los nombres de campo son los del modelo de #12, para no tener un mapeo campo a campo entre el
 DTO y el `create`. El service arma el `data` del `INSERT` campo por campo desde el input, así
-que `mesaId`, `estado`, `codigoReserva` o `id` que vengan en el body **no llegan nunca** a la
-base, sin depender de `whitelist` en el `ValidationPipe` global.
+que `mesaId`, `estado`, `codigoReserva` o `id` **no llegan nunca** a la base aunque el pipe
+global cambie.
 
-**Alternativa considerada:** `forbidNonWhitelisted: true` para responder `400` ante campos de
-más. Se descarta porque es una opción del pipe global que también afecta a `disponibilidad` y
-a los changes de admin. Ignorar el campo es suficiente para la garantía que importa, que el
-cliente no pueda elegir mesa ni estado.
+**Campos de más: `400`.** El `ValidationPipe` global de `main.ts` ya tiene `whitelist: true` y
+`forbidNonWhitelisted: true` (los incorporó `auth-admin`, y `disponibilidad` los usa en sus
+tests). Por eso un body con `mesaId`, `estado`, `codigoReserva` o cualquier otro campo fuera de
+los siete del DTO se rechaza con `400` antes de llegar al controller. La garantía que importa
+(el cliente no elige mesa, estado ni código) se cumple con más fuerza que ignorando el campo.
+
+**Alternativa descartada:** ignorar los campos de más y responder `201`, como proponía la
+primera versión de este diseño. Obligaría a quitar `forbidNonWhitelisted` del pipe global, que
+es una decisión de `auth-admin` y cambia el comportamiento de `disponibilidad` y de las rutas
+de admin. Un pipe por ruta no alcanza: el global corre antes y ya rechaza el body.
 
 ### D7: Respuesta `201` mínima
 
@@ -312,8 +318,8 @@ es el mismo que cualquier `409`: mostrar el mensaje y dejar reintentar.
     y lo retiene más que el `timeout` de la creación. El resultado tiene que ser
     `ConflictException` y no un error de Prisma.
 - **e2e HTTP** (`backend/test/reservas-crear.e2e-spec.ts`, Supertest): `201` sin
-  `Authorization` con la forma de la respuesta, `400`, `404`, `409` con `motivos`, campos
-  `mesaId`/`estado` ignorados y un `Promise.all` HTTP donde todos los status están en
+  `Authorization` con la forma de la respuesta, `400` (incluidos `mesaId`/`estado` en el
+  body), `404`, `409` con `motivos` y un `Promise.all` HTTP donde todos los status están en
   `{201, 409}`. Usa el reloj real con fechas lejos de los bordes (D9 de `disponibilidad`).
 
 Los unitarios corren con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`, igual que en
@@ -369,7 +375,7 @@ paths:
         comensales. Evalúa las mismas reglas que la consulta de disponibilidad en el momento de
         crear, asigna automáticamente la mesa libre más chica que alcance y genera el código de
         reserva. Queda `PENDIENTE` si la zona requiere confirmación del admin y `CONFIRMADA` si
-        no. El cliente no elige mesa, estado ni código: si los manda, se ignoran. Es una ruta
+        no. El cliente no elige mesa, estado ni código: si los manda, se responde 400. Es una ruta
         pública, sin autenticación.
       operationId: ReservasController_crear
       tags:
@@ -411,7 +417,8 @@ paths:
           description: >-
             El body está mal formado: falta un campo, la fecha no es `YYYY-MM-DD` o no existe, un
             id no es UUID, `comensales` no es un entero mayor o igual a 1, el email no es válido
-            o el nombre o el teléfono están vacíos o son demasiado largos.
+            o el nombre o el teléfono están vacíos o son demasiado largos, o el body trae un campo
+            que no es de los siete (por ejemplo `mesaId` o `estado`).
           content:
             application/json:
               schema:

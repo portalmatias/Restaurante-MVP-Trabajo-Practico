@@ -5,15 +5,15 @@
       hasta que sea cierto. Verificar con `git log origin/main --oneline` y confirmando que
       existen `backend/src/reservas/reservas.service.ts` y `backend/src/disponibilidad/`, y que
       `npm run db:migrate -w backend` y `npm run db:seed -w backend` corren sin errores.
-- [ ] 1.2 Confirmar que `DisponibilidadModule` exporta `cargarContexto`, `evaluarReglas`,
+- [x] 1.2 Confirmar que `DisponibilidadModule` exporta `cargarContexto`, `evaluarReglas`,
       `bloquearTurnoFecha`, `CodigoMotivo`, `MotivoNoDisponible` y el validador de `fecha` del
       DTO de la consulta, con esos nombres y firmas (D1). Si algún nombre cambió al
       implementarse, usar el real y anotarlo en la descripción del PR, sin renombrar nada.
       Verificar con `grep -rn "export" backend/src/disponibilidad`.
-- [ ] 1.3 Confirmar si `ContextoReserva` ya expone `mesasLibres` con `id`, `etiqueta` y
+- [x] 1.3 Confirmar si `ContextoReserva` ya expone `mesasLibres` con `id`, `etiqueta` y
       `capacidad`, y `zona.requiereConfirmacionAdmin` (D3, D4). Anotar el resultado: define si
       la sección 2 hace falta. Verificar leyendo el tipo en `backend/src/disponibilidad/`.
-- [ ] 1.4 Confirmar que el `ValidationPipe` global está registrado con `transform: true` y
+- [x] 1.4 Confirmar que el `ValidationPipe` global está registrado con `transform: true` y
       **sin** `enableImplicitConversion` (si no, `comensales: "4"` pasaría la validación del
       body). Verificar con `grep -n "ValidationPipe" -A3 backend/src/main.ts`.
 
@@ -129,12 +129,11 @@
 - [ ] 7.2 Tests `201`: sin header `Authorization`; forma exacta del cuerpo (tiene
       `codigoReserva` de 8 alfanuméricos, `estado`, `fecha` igual a la enviada, `turnoId`,
       `zonaId` y `comensales`, y **no** tiene `id`, `mesaId`, `mesa` ni datos de contacto);
-      STANDARD `CONFIRMADA` y VIP `PENDIENTE`; body con `estado: "CONFIRMADA"` en VIP queda
-      `PENDIENTE`; body con `mesaId` de la mesa de 8 y 2 comensales queda en la mesa de 2 más
-      chica. Verificar con el mismo comando.
+      STANDARD `CONFIRMADA` y VIP `PENDIENTE`. Verificar con el mismo comando.
 - [ ] 7.3 Tests `400` (falta `telefonoCliente`; `emailCliente: "ana.perez"`;
       `nombreCliente: "   "`; `fecha` con hora y `2026-02-30`; `zonaId: "vip"`; `comensales`
-      `0`, `2.5` y `"4"`), `404` (turno y zona inexistentes), y que en todos la cantidad de
+      `0`, `2.5` y `"4"`; body con `estado: "CONFIRMADA"`; body con `mesaId`; los dos por
+      `forbidNonWhitelisted` del pipe global, D6), `404` (turno y zona inexistentes), y que en todos la cantidad de
       reservas no cambia y el cuerpo tiene la forma de la spec. Verificar con el mismo comando.
 - [ ] 7.4 Tests `409`: turno del lunes con `motivos` exactamente `TURNO_INACTIVO` y cuerpo
       `{ statusCode, message, error: "Conflict", motivos }`; con reservas VIP de 12 y 6, crear
