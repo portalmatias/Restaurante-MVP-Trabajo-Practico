@@ -161,10 +161,35 @@ paths presentes en el contrato en el momento de generarlos.
 - **THEN** el chequeo de tipos (`tsc --noEmit`) falla para ese código, antes de llegar a
   ejecutarse
 
-#### Scenario: La URL base sale de configuración
-- **WHEN** el cliente HTTP arma una petición
-- **THEN** usa como URL base el valor de la variable de entorno `NEXT_PUBLIC_API_URL`, sin una
-  URL fija escrita en el código
+#### Scenario: La URL del backend sale de configuración
+- **WHEN** el cliente HTTP arma una petición desde el servidor, o el proxy de `/api` reenvía
+  una petición del navegador
+- **THEN** la URL del backend es el valor de la variable de entorno `NEXT_PUBLIC_API_URL`, sin
+  una URL fija escrita en el código
+
+### Requirement: Llamadas desde el navegador por el mismo origen
+El frontend SHALL exponer bajo su propio origen un proxy `/api/*` que reenvía cada petición al
+backend conservando el método, el path, la query, el body y el código de respuesta. El cliente
+HTTP SHALL usar `/api` como URL base cuando se ejecuta en el navegador, de modo que ninguna
+llamada del navegador vaya a un origen distinto del frontend y el backend no necesite
+habilitar CORS.
+
+#### Scenario: Llamada desde un componente cliente
+- **WHEN** un componente que se ejecuta en el navegador invoca al cliente HTTP para
+  `GET /disponibilidad`
+- **THEN** la petición sale hacia `/api/disponibilidad` del mismo origen del frontend
+- **AND** no sale ninguna petición del navegador hacia la URL de `NEXT_PUBLIC_API_URL`
+
+#### Scenario: El proxy reenvía al backend sin alterar la respuesta
+- **WHEN** el navegador envía una petición a `/api/<path>` del frontend
+- **THEN** el frontend la reenvía a `<NEXT_PUBLIC_API_URL>/<path>` con el mismo método, query y
+  body
+- **AND** devuelve al navegador el mismo código de estado y el mismo cuerpo que respondió el
+  backend, incluidos los errores `400`, `404` y `409`
+
+#### Scenario: Llamada desde un Server Component
+- **WHEN** un Server Component invoca al cliente HTTP
+- **THEN** la petición va directo a la URL de `NEXT_PUBLIC_API_URL`, sin pasar por el proxy
 
 ### Requirement: Mapeo tipado de errores de la API
 El cliente HTTP SHALL traducir toda respuesta de error de la API a un resultado tipado y

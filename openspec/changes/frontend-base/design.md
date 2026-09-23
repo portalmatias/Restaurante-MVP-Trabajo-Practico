@@ -188,19 +188,46 @@ paths ficticios al YAML para adelantar tipos.
 - *`@nestjs/swagger` client generation (mismo mecanismo que usa el backend para el chequeo de
   deriva)*: genera el spec, no un cliente frontend; no resuelve este problema.
 
-### D6: URL base del cliente HTTP: `NEXT_PUBLIC_API_URL`
-**Decisión:** el cliente HTTP toma la URL base de `process.env.NEXT_PUBLIC_API_URL` (prefijo
-`NEXT_PUBLIC_` porque el valor debe llegar también a componentes cliente, no solo a Server
-Components). `openspec/config.yaml` §10 ya lista `NEXT_PUBLIC_API_URL` entre las "Variables
-mínimas" existentes del proyecto, así que **no se agrega una variable de entorno nueva**.
+### D6: URL del backend y proxy `/api` en Next para evitar CORS
+**Problema:** el frontend corre en `localhost:3000` y el backend en `localhost:3001` (README y
+default de `backend/src/main.ts`). Son orígenes distintos y `main.ts` no llama a
+`enableCors()`, así que el navegador bloquearía cualquier `fetch` de un componente cliente al
+backend. Las llamadas desde Server Components no tienen el problema, porque corren en el
+servidor.
 
-**Nota de verificación:** en este entorno de trabajo, la lectura directa de `.env.example`
-está bloqueada por los permisos del sandbox (`Permission to use Bash/Read ... has been
-denied` al intentar leerlo con `cat`, `bat`, `rg` o la herramienta `Read`), así que no se
-pudo confirmar byte a byte que la variable ya está en el archivo. La fuente usada es
-`openspec/config.yaml` §10, que es la constitución del proyecto y ya la documenta como
-variable mínima existente. `tasks.md` incluye un paso para confirmarlo con acceso normal al
-repo y, si faltara, agregarla en este mismo PR (§13 de la Definition of Done).
+**Decisión:** un proxy de mismo origen con `rewrites` de `next.config.ts`:
+
+```ts
+async rewrites() {
+  return [
+    { source: '/api/:path*', destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*` },
+  ];
+}
+```
+
+- En el **navegador**, el cliente HTTP usa `baseUrl: '/api'`: toda llamada va al mismo origen
+  del frontend y Next la reenvía al backend. No hay CORS que configurar.
+- En el **servidor** (Server Components), el cliente usa `baseUrl: NEXT_PUBLIC_API_URL`
+  directo: una URL relativa no sirve fuera del navegador y el salto por el proxy no aporta
+  nada.
+- Una función `urlBaseApi()` en `frontend/src/lib/api/` elige el valor según
+  `typeof window`, y es lo único que decide la URL base; no hay otra URL escrita en el código.
+- Verificado contra la guía de esta versión
+  (`node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/rewrites.md`,
+  sección "Rewriting to an external URL"): los rewrites admiten un destino externo y
+  conservan método, query y body.
+
+**Variable de entorno:** se sigue usando `NEXT_PUBLIC_API_URL`, que ya está en
+`.env.example` (confirmado por portalmatias el 2026-09-23; el archivo no es legible para el
+agente) y en `openspec/config.yaml` §10. **No se agrega ninguna variable nueva.** Los
+`rewrites` se evalúan al construir (`next build`), así que en producción la variable tiene
+que estar definida en ese momento.
+
+**Alternativa considerada (`app.enableCors()` en el backend):** es el mecanismo estándar,
+pero toca `backend/` (fuera del alcance de un change de frontend, iría en uno propio) y
+necesita una variable nueva para el origen permitido. El proxy resuelve lo mismo sin tocar el
+backend. Si más adelante el frontend y el backend se despliegan en dominios distintos sin
+Next de por medio, CORS se puede agregar en ese momento.
 
 ### D7: Resultado tipado y mapeo de errores
 **Decisión:** un tipo `ApiResult<T>` (discriminado por la presencia de `data` o de `error`)
