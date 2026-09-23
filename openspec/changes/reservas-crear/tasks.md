@@ -102,25 +102,38 @@
 
 ## 6. Contrato OpenAPI y controller (orden D2 de `fundacion-repo`)
 
-- [ ] 6.1 Copiar el fragmento de la sección "Contrato OpenAPI" de `design.md` a
+- [x] 6.1 Copiar el fragmento de la sección "Contrato OpenAPI" de `design.md` a
       `openapi/openapi.yaml`, sin cambiar nombres, reusando `MotivoNoDisponible`,
       `CodigoMotivo` y `ErrorRespuesta` ya presentes. Verificar que `npm run openapi:lint` pasa
       y que `npm run openapi:check` **falla** porque el path todavía no tiene controller.
-- [ ] 6.2 Crear `CrearReservaDto` (D6, reusando el validador de `fecha` de `disponibilidad`),
+      Verificado: `openapi:lint` → "No results with a severity of 'error' found!"; antes de
+      crear el controller, `openapi:check` fallaba con
+      `el YAML declara "paths./reservas" y el backend no lo expone` (y los tres schemas).
+- [x] 6.2 Crear `CrearReservaDto` (D6, reusando el validador de `fecha` de `disponibilidad`),
       `ReservaCreadaRespuesta` y `ReservaRechazadaRespuesta` con esos nombres exactos, y
       `ReservasController` con `@ApiTags('Reservas')` y el método `crear`
       (`operationId` `ReservasController_crear`, `@HttpCode(201)`, respuestas
       201/400/404/409 con `summary` y `description` idénticos al YAML), con el handler sin
       implementar. Sin guard. Si `cancelacion-turnos` ya creó el controller, agregar el método
       ahí. Ajustar decoradores hasta que `npm run build -w backend && npm run openapi:check`
-      pase sin diferencias.
-- [ ] 6.3 Implementar el handler: convertir `fecha` con `Date.UTC`, armar el input campo por
+      pase sin diferencias. No existía ningún controller de reservas en `main`, así que se creó
+      `reservas.controller.ts` nuevo. Se agregó `@ApiSchema({ description })` a los tres DTOs y
+      `parameters: []` al path en el YAML (lo que ya usa `/auth/login`) para que
+      `openapi:check` cierre en verde sin diferencias.
+- [x] 6.3 Implementar el handler: convertir `fecha` con `Date.UTC`, armar el input campo por
       campo desde el DTO (así `mesaId`, `estado` o `codigoReserva` del body no llegan al
       service, D6), delegar en `crearReserva` y mapear la reserva a `ReservaCreadaRespuesta`
       con `fecha` armada con `getUTC*` (D7). Sin lógica de negocio en el controller (§7).
       Verificar que `npm run openapi:check` sigue pasando y que, con la base sembrada y el
       backend levantado, un `curl -X POST` a `/reservas` con la cena de un sábado futuro en
-      STANDARD devuelve `201` con `estado: CONFIRMADA`.
+      STANDARD devuelve `201` con `estado: CONFIRMADA`. Verificado contra `reservas_dev`
+      (turno cena sábado, zona STANDARD, `fecha=2026-10-03`, `comensales=4`): `HTTP 201` con
+      `estado: CONFIRMADA`; la reserva de prueba se borró después. Se agregó `@SkipThrottle()`
+      al controller (mismo criterio que `DisponibilidadController`): config.yaml §5 solo exige
+      throttling para las rutas que reciben un código de baja entropía (consulta y
+      cancelación), no para crear, y sin él el `ThrottlerGuard` global (`THROTTLE_LIMIT`
+      peticiones por `THROTTLE_TTL`) habría limitado los tests de 7.5. No estaba escrito en
+      `design.md`; queda anotado acá como decisión de esta tarea.
 
 ## 7. Tests e2e del endpoint (Supertest)
 
