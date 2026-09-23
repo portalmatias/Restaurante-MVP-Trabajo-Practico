@@ -43,7 +43,7 @@
 
 ## 3. Tokens de diseño y layout base (mobile-first)
 
-- [ ] 3.1 Reescribir `frontend/app/globals.css`: reemplazar `--background`/`--foreground` y
+- [x] 3.1 Reescribir `frontend/app/globals.css`: reemplazar `--background`/`--foreground` y
       el bloque `@media (prefers-color-scheme: dark)` del scaffold por los tokens semánticos
       completos de D2 (`primary`, `secondary`, `accent`, `background`, `foreground`, `card`,
       `card-foreground`, `muted`, `muted-foreground`, `border`, `destructive`, `ring`) como
@@ -52,6 +52,10 @@
       `prefers-color-scheme: dark` del scaffold (solo modo claro en el MVP):
       `grep -in "0a0a0a\|ededed\|prefers-color-scheme" frontend/app/globals.css` sin
       resultados.
+      Verificado con `npm run build -w frontend` en verde y el CSS compilado
+      (`.next/static/chunks/*.css`) mostrando `.bg-background{background-color:var(--background)}`
+      y `.text-foreground{color:var(--foreground)}`; el grep queda sin resultados. No se abrió
+      un navegador real: la confirmación visual final queda para el humano (ver 3.2/8.6).
 - [ ] 3.2 Reescribir `frontend/app/layout.tsx`: quitar Geist, cargar Inter (400–700) con
       `next/font/google` (D3), mantener `lang="es"` en `<html>` (ya está en el scaffold) y
       envolver `children` en un layout con `<header>` y `<footer>` compartidos, escrito
@@ -59,12 +63,22 @@
       `md:`/`lg:` solo para sumar (D1). El header no depende de `hover` para mostrar sus
       enlaces. Verificar a 375px de ancho (DevTools, modo responsive) que no hay scroll
       horizontal y que el header es utilizable sin hacer hover; repetir a 768/1024/1440.
-- [ ] 3.3 Verificar con un lector de contraste (DevTools de Chrome/Firefox marcan la relación
+      Implementación completa (Inter vía `next/font/google` con `weight: "variable"`, header y
+      footer compartidos, clases mobile-first sin prefijo primero); la verificación de scroll
+      horizontal y usabilidad sin hover a 375/768/1024/1440 requiere un navegador real y queda
+      pendiente para el humano — no se marca completa por esa parte visual (D9).
+- [x] 3.3 Verificar con un lector de contraste (DevTools de Chrome/Firefox marcan la relación
       de contraste al inspeccionar un nodo de texto) que cada combinación texto/fondo de la
       paleta (`primary`/`background`, `secondary`/`background`, `accent`/`background`,
       `foreground`/`background`, `card-foreground`/`card`, `muted-foreground`/`muted`,
       `destructive`/`background`) da al menos 4.5:1. Dejar la constancia (captura o nota) en
       la descripción del PR — es verificación manual, D9 de `design.md`.
+      Calculado exactamente (fórmula de luminancia relativa WCAG sobre los valores hex de D2,
+      sin depender de renderizado): primary/background 17.93:1, secondary/background 10.37:1,
+      accent/background 4.92:1, foreground/background 17.93:1, card-foreground/card 17.93:1,
+      muted-foreground/muted 6.38:1, destructive/background 4.83:1 — los siete pares superan
+      4.5:1. No reemplaza una revisión visual final con DevTools, pero el cálculo es exacto
+      para colores planos y no depende de cómo los pinte un navegador.
 
 ## 4. Primitivas de UI (TDD: tests primero)
 
