@@ -172,19 +172,19 @@
 
 - [ ] 9.1 `openspec validate reservas-crear --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
-- [ ] 9.2 El change no agrega migraciones ni toca `schema.prisma` (Migration Plan). Verificar
+- [x] 9.2 El change no agrega migraciones ni toca `schema.prisma` (Migration Plan). Verificar
       con `git diff main --stat -- backend/prisma` vacío.
-- [ ] 9.3 `openapi/openapi.yaml` actualizado en el mismo PR. Verificar con
+- [x] 9.3 `openapi/openapi.yaml` actualizado en el mismo PR. Verificar con
       `npm run openapi:lint` y `npm run openapi:check` en verde.
-- [ ] 9.4 No se agregaron variables de entorno. Verificar con `git diff main -- .env.example`
+- [x] 9.4 No se agregaron variables de entorno. Verificar con `git diff main -- .env.example`
       vacío. Si alguna hizo falta (por ejemplo un `timeout` configurable), sumarla ahí.
-- [ ] 9.5 Tests de las reglas e invariantes que toca el change: `npm test -w backend` en verde
+- [x] 9.5 Tests de las reglas e invariantes que toca el change: `npm test -w backend` en verde
       con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`, y `npm run test:integration` y
       `npm run test:e2e -w backend` en verde localmente.
-- [ ] 9.6 Ninguna regla de disponibilidad quedó duplicada en `reservas/`. Verificar con
+- [x] 9.6 Ninguna regla de disponibilidad quedó duplicada en `reservas/`. Verificar con
       `grep -rn "anticipacion\|aforoMaximo\|aforoGlobal\|minComensales\|maxComensales\|activo" backend/src/reservas --include=*.ts`
       sin resultados fuera de tests.
-- [ ] 9.7 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con los
+- [x] 9.7 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con los
       dos comandos desde la raíz.
 - [ ] 9.8 CI en verde en el PR `feature/reservas-crear`. Verificar en la pestaña Checks.
 - [ ] 9.9 PR con descripción en español, enlazado a `openspec/changes/reservas-crear/`, con la
