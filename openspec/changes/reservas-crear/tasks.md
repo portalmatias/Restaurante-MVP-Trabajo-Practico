@@ -137,26 +137,26 @@
 
 ## 7. Tests e2e del endpoint (Supertest)
 
-- [ ] 7.1 Crear `backend/test/reservas-crear.e2e-spec.ts` levantando la app con el mismo
+- [x] 7.1 Crear `backend/test/reservas-crear.e2e-spec.ts` levantando la app con el mismo
       `ValidationPipe` que `main.ts`, con datos propios y `Reserva` limpia antes de cada test.
       No usar las reservas de ejemplo del seed. Fechas calculadas desde el reloj real y lejos
       de los bordes. Verificar que la suite arranca y termina con
       `npm run test:e2e -w backend -- reservas-crear`.
-- [ ] 7.2 Tests `201`: sin header `Authorization`; forma exacta del cuerpo (tiene
+- [x] 7.2 Tests `201`: sin header `Authorization`; forma exacta del cuerpo (tiene
       `codigoReserva` de 8 alfanuméricos, `estado`, `fecha` igual a la enviada, `turnoId`,
       `zonaId` y `comensales`, y **no** tiene `id`, `mesaId`, `mesa` ni datos de contacto);
       STANDARD `CONFIRMADA` y VIP `PENDIENTE`. Verificar con el mismo comando.
-- [ ] 7.3 Tests `400` (falta `telefonoCliente`; `emailCliente: "ana.perez"`;
+- [x] 7.3 Tests `400` (falta `telefonoCliente`; `emailCliente: "ana.perez"`;
       `nombreCliente: "   "`; `fecha` con hora y `2026-02-30`; `zonaId: "vip"`; `comensales`
       `0`, `2.5` y `"4"`; body con `estado: "CONFIRMADA"`; body con `mesaId`; los dos por
       `forbidNonWhitelisted` del pipe global, D6), `404` (turno y zona inexistentes), y que en todos la cantidad de
       reservas no cambia y el cuerpo tiene la forma de la spec. Verificar con el mismo comando.
-- [ ] 7.4 Tests `409`: turno del lunes con `motivos` exactamente `TURNO_INACTIVO` y cuerpo
+- [x] 7.4 Tests `409`: turno del lunes con `motivos` exactamente `TURNO_INACTIVO` y cuerpo
       `{ statusCode, message, error: "Conflict", motivos }`; con reservas VIP de 12 y 6, crear
       4 da `AFORO_ZONA` y crear 2 da `201`; y para la misma solicitud rechazada,
       `GET /disponibilidad` devuelve los mismos `motivos` en el mismo orden que el `409`.
       Verificar con el mismo comando.
-- [ ] 7.5 Test concurrente por HTTP: `Promise.all` de 8 `POST /reservas` de 4 comensales para
+- [x] 7.5 Test concurrente por HTTP: `Promise.all` de 8 `POST /reservas` de 4 comensales para
       la misma cena en VIP. Afirmar que todos los status están en `{201, 409}`, que ninguno es
       `500` y que la suma de comensales activos de VIP no supera el aforo. Verificar con el
       mismo comando, repitiéndolo 5 veces.
