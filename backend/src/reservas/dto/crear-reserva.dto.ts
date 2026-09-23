@@ -105,7 +105,7 @@ export class CrearReservaDto {
       'Email de quien reserva. Junto con el código, sirve para consultar o cancelar.',
     example: 'ana.perez@example.com',
   })
-  @IsEmail()
+  @IsEmail({}, { message: 'emailCliente debe ser un email válido' })
   @MaxLength(254)
   emailCliente!: string;
 

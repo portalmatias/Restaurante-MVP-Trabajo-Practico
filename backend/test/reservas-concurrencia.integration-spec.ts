@@ -484,8 +484,10 @@ describe('ReservasService — concurrencia (integración)', () => {
       );
 
       // Se crea recién cuando la transacción auxiliar ya tiene el lock, sin depender de una
-      // espera fija que en una base lenta podría no alcanzar.
-      await lockTomado;
+      // espera fija que en una base lenta podría no alcanzar. Si la transacción auxiliar falla
+      // antes de tomar el lock, `bloqueo` rechaza primero y el test falla con ese error en vez
+      // de quedar colgado hasta el timeout de Jest.
+      await Promise.race([lockTomado, bloqueo]);
 
       const intento = service.crearReserva(
         solicitud(turno.id, zonaStandardId, 2, 'p2028-intento'),

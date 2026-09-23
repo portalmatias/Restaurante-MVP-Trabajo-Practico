@@ -382,11 +382,15 @@ describe('POST /reservas (e2e)', () => {
       // una reserva").
       const persistida = await prisma.reserva.findUnique({
         where: { codigoReserva: cuerpo.codigoReserva as string },
+        include: { mesa: { select: { zonaId: true } } },
       });
       expect(persistida).not.toBeNull();
       expect(persistida?.fecha).toEqual(FECHA);
       expect(persistida?.comensales).toBe(4);
       expect(persistida?.estado).toBe(EstadoReserva.CONFIRMADA);
+      // El `zonaId` de la respuesta sale del pedido: se comprueba que la mesa asignada es
+      // de esa zona, que es lo que hace válido devolverlo así.
+      expect(persistida?.mesa.zonaId).toBe(zonaStandardId);
     });
 
     it('VIP queda PENDIENTE', async () => {
@@ -449,9 +453,11 @@ describe('POST /reservas (e2e)', () => {
     it('emailCliente inválido ("ana.perez")', async () => {
       const turno = await crearTurno(diaDe(FECHA));
 
-      await esperar400SinPersistir(
+      const mensajes = await esperar400SinPersistir(
         bodyValido({ turnoId: turno.id, emailCliente: 'ana.perez' }),
       );
+      // El mismo texto que el ejemplo de `400` publicado en openapi.yaml.
+      expect(mensajes).toContain('emailCliente debe ser un email válido');
     });
 
     it('nombreCliente en blanco ("   ")', async () => {
@@ -654,11 +660,13 @@ describe('POST /reservas (e2e)', () => {
     it('la misma solicitud rechazada: GET /disponibilidad da los mismos motivos en el mismo orden que el 409', async () => {
       const turno = await crearTurno(DiaSemana.LUNES, false);
 
+      // Turno inactivo y 9 comensales en STANDARD (1 a 8): varios motivos a la vez, para que
+      // la comparación pruebe también el orden y no solo un único código.
       const query = {
         fecha: fechaISO(FECHA_LUNES),
         turnoId: turno.id,
         zonaId: zonaStandardId,
-        comensales: '2',
+        comensales: '9',
       };
 
       const rechazo409 = await crear(
@@ -666,7 +674,7 @@ describe('POST /reservas (e2e)', () => {
           fecha: query.fecha,
           turnoId: query.turnoId,
           zonaId: query.zonaId,
-          comensales: 2,
+          comensales: 9,
         }),
       );
       expect(rechazo409.status).toBe(409);
@@ -681,6 +689,7 @@ describe('POST /reservas (e2e)', () => {
       const motivosConsulta = (
         consulta.body as { motivos: { codigo: string }[] }
       ).motivos.map((motivo) => motivo.codigo);
+      expect(motivos409.length).toBeGreaterThanOrEqual(2);
       expect(motivos409).toEqual(motivosConsulta);
     });
   });
@@ -721,7 +730,15 @@ describe('POST /reservas (e2e)', () => {
         },
         _sum: { comensales: true },
       });
-      expect(ocupacion._sum.comensales ?? 0).toBeLessThanOrEqual(20);
+      const suma = ocupacion._sum.comensales ?? 0;
+      expect(suma).toBeLessThanOrEqual(20);
+
+      // Que el endpoint acepte pedidos bajo concurrencia (no alcanza con que todos den 409) y
+      // que cada 201 corresponda a una reserva guardada y cada 409 a ninguna.
+      const exitosas = respuestas.filter((r) => r.status === 201).length;
+      expect(exitosas).toBeGreaterThanOrEqual(1);
+      expect(exitosas).toBeLessThanOrEqual(5);
+      expect(suma).toBe(exitosas * 4);
     });
   });
 });
