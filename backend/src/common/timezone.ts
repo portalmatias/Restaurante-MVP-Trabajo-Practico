@@ -128,8 +128,10 @@ export function diaSemanaDeFecha(fecha: Date): number {
 
 /**
  * Parsea una fecha de calendario `YYYY-MM-DD` (la forma en que viaja una `@db.Date` en la
- * API, config.yaml §7) a la medianoche UTC de ese día. Nunca usar `new Date(fechaIso)`: el
- * parseo nativo de una fecha sin hora depende del motor de JS y puede no ser UTC.
+ * API, config.yaml §7) a la medianoche UTC de ese día. Se arma con `Date.UTC` explícito y no
+ * con `new Date(fechaIso)`: aunque el estándar interpreta como UTC una fecha sin hora, el mismo
+ * constructor toma como hora local un texto con hora y sin offset, y es fácil confundir los dos
+ * casos.
  *
  * Antes vivía duplicada como `fechaDeCalendario` en `reservas.controller.ts` y en
  * `disponibilidad.service.ts` (cubic, PR #40, hallazgo P3).

@@ -136,15 +136,17 @@ describe('ReservasService — invariantes de negocio (integración)', () => {
     fecha: Date,
     propias: string[],
   ) {
-    const idsCreados = await ocuparMesasAjenasCompartido({
+    await ocuparMesasAjenasCompartido({
       prisma,
       zonaId,
       turnoId,
       fecha,
       propias,
       datosCliente: datosClienteBase,
+      // Cada id se registra apenas se crea: si un `create` falla a mitad del loop, las filas
+      // anteriores ya están en `reservaIds` y la limpieza por id las borra igual.
+      registrarId: (id) => reservaIds.push(id),
     });
-    reservaIds.push(...idsCreados);
   }
 
   beforeAll(async () => {

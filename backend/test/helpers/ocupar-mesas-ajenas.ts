@@ -1,21 +1,7 @@
+import { randomInt } from 'node:crypto';
+
 import { PrismaService } from '../../src/prisma/prisma.service';
 
-/**
- * Ocupa, con una Reserva `CONFIRMADA` propia (1 comensal), todas las mesas que YA existan en
- * `zonaId` para ese turno/fecha y no estén en `propias` — en la práctica, las mesas del seed
- * (`S1..S5`, `V1..V4`), que son filas compartidas y por lo tanto siempre "libres" para un
- * turno nuevo creado por un test.
- *
- * Compartido entre `reservas-concurrencia.integration-spec.ts` y
- * `reservas-invariantes.integration-spec.ts` (mismo problema, mismo fix; cubic, PR #40,
- * hallazgo P3). Cada archivo llamante tiene su propia política de limpieza (uno limpia por
- * `turnoId` en un `limpiarFixtures` global, el otro acumula cada id en un array `reservaIds`
- * propio), así que la función no impone ninguna: devuelve los ids de las reservas que creó y
- * deja que quien llama decida qué hacer con ellos.
- *
- * `datosCliente` queda a cargo de quien llama porque cada archivo usa su propio prefijo de
- * nombre/email/teléfono para distinguir estas filas "ajenas" del resto de sus fixtures.
- */
 export interface OcuparMesasAjenasParams {
   prisma: PrismaService;
   zonaId: string;
@@ -27,10 +13,45 @@ export interface OcuparMesasAjenasParams {
     emailCliente: string;
     telefonoCliente: string;
   };
+  /**
+   * Se llama con el id de cada reserva apenas se crea, antes de crear la siguiente. Así, si
+   * un `create` falla a mitad del loop, quien llama ya registró las filas creadas hasta ese
+   * momento y su limpieza por id las borra igual.
+   */
+  registrarId?: (id: string) => void;
 }
+
+const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 let contadorOcupacion = 0;
 
+/**
+ * `OCP` + 5 caracteres al azar: 8 alfanuméricos como cualquier `codigoReserva`. El azar evita
+ * que dos archivos (cada uno con su propio registro de módulos de Jest y, por lo tanto, su
+ * propio contador) o una corrida anterior interrumpida generen el mismo código.
+ */
+function codigoOcupacion(): string {
+  let sufijo = '';
+  for (let i = 0; i < 5; i++) {
+    sufijo += ALFABETO_CODIGO[randomInt(ALFABETO_CODIGO.length)];
+  }
+  return `OCP${sufijo}`;
+}
+
+/**
+ * Ocupa, con una Reserva `CONFIRMADA` propia (1 comensal) para `turnoId` y `fecha`, todas las
+ * mesas de `zonaId` que no estén en `propias` — en la práctica, las mesas del seed
+ * (`S1..S5`, `V1..V4`), que son filas compartidas y por lo tanto siempre "libres" para un
+ * turno nuevo creado por un test.
+ *
+ * Compartido entre `reservas-concurrencia.integration-spec.ts` y
+ * `reservas-invariantes.integration-spec.ts`. Cada archivo tiene su propia política de
+ * limpieza (uno limpia por `turnoId`, el otro por id individual), así que la función no impone
+ * ninguna: devuelve los ids creados y, si se pasa `registrarId`, los informa uno por uno.
+ *
+ * `datosCliente` queda a cargo de quien llama porque cada archivo usa su propio prefijo de
+ * nombre, email y teléfono para distinguir estas filas del resto de sus fixtures.
+ */
 export async function ocuparMesasAjenas({
   prisma,
   zonaId,
@@ -38,6 +59,7 @@ export async function ocuparMesasAjenas({
   fecha,
   propias,
   datosCliente,
+  registrarId,
 }: OcuparMesasAjenasParams): Promise<string[]> {
   const ajenas = await prisma.mesa.findMany({
     where: { zonaId, id: { notIn: propias } },
@@ -53,11 +75,12 @@ export async function ocuparMesasAjenas({
         fecha,
         comensales: 1,
         estado: 'CONFIRMADA',
-        codigoReserva: `OCP${String(contadorOcupacion).padStart(5, '0')}`,
+        codigoReserva: codigoOcupacion(),
         ...datosCliente(`ocupacion-${contadorOcupacion}`),
       },
     });
     idsCreados.push(creada.id);
+    registrarId?.(creada.id);
   }
   return idsCreados;
 }

@@ -93,7 +93,7 @@ describe('timezone', () => {
       expect(resultado.toISOString()).toBe('2026-03-15T00:00:00.000Z');
     });
 
-    it('no depende de la zona horaria del proceso (usa Date.UTC, no `new Date(string)`)', () => {
+    it('devuelve el día pedido leído con getters UTC (la independencia de la zona horaria del proceso la cubre la corrida con TZ=UTC y TZ=America/Argentina/Buenos_Aires)', () => {
       const resultado = fechaCalendarioDesdeIso('2026-01-01');
       expect(resultado.getUTCFullYear()).toBe(2026);
       expect(resultado.getUTCMonth()).toBe(0);

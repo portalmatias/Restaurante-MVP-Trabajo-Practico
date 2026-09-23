@@ -615,14 +615,19 @@ describe('POST /reservas (e2e)', () => {
         await crearMesa(zonaVipId, 4, `CONC-M${i}`);
       }
 
+      const PEDIDOS = 8;
+      const COMENSALES_POR_PEDIDO = 4;
+      const AFORO_VIP = 20;
+      const MAXIMO_EXITOSAS = Math.floor(AFORO_VIP / COMENSALES_POR_PEDIDO);
+
       const body = bodyValido({
         turnoId: turno.id,
         zonaId: zonaVipId,
-        comensales: 4,
+        comensales: COMENSALES_POR_PEDIDO,
       });
 
       const respuestas = await Promise.all(
-        Array.from({ length: 8 }, () => crear(body)),
+        Array.from({ length: PEDIDOS }, () => crear(body)),
       );
 
       for (const respuesta of respuestas) {
@@ -641,14 +646,14 @@ describe('POST /reservas (e2e)', () => {
         _sum: { comensales: true },
       });
       const suma = ocupacion._sum.comensales ?? 0;
-      expect(suma).toBeLessThanOrEqual(20);
+      expect(suma).toBeLessThanOrEqual(AFORO_VIP);
 
       // Que el endpoint acepte pedidos bajo concurrencia (no alcanza con que todos den 409) y
       // que cada 201 corresponda a una reserva guardada y cada 409 a ninguna.
       const exitosas = respuestas.filter((r) => r.status === 201).length;
       expect(exitosas).toBeGreaterThanOrEqual(1);
-      expect(exitosas).toBeLessThanOrEqual(5);
-      expect(suma).toBe(exitosas * 4);
+      expect(exitosas).toBeLessThanOrEqual(MAXIMO_EXITOSAS);
+      expect(suma).toBe(exitosas * COMENSALES_POR_PEDIDO);
     });
   });
 });

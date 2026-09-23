@@ -72,6 +72,12 @@ describe('ReservasService — concurrencia (integración)', () => {
   /** Sábado futuro: coincide con el `diaSemana` de los turnos que crea el archivo. */
   const FECHA = proximoSabado(7);
 
+  /**
+   * `aforoMaximo` con que el `beforeAll` deja STANDARD y VIP: alto, para que ningún test choque
+   * contra el aforo salvo el que lo baja a propósito, que lo vuelve a este valor al terminar.
+   */
+  const AFORO_ZONA_BASE = 100;
+
   async function crearMesa(
     zonaId: string,
     capacidad: number,
@@ -177,7 +183,7 @@ describe('ReservasService — concurrencia (integración)', () => {
       anticipacionMaxDias: 30,
       ventanaCancelacionHoras: 2,
       requiereConfirmacionAdmin: false,
-      aforoMaximo: 100,
+      aforoMaximo: AFORO_ZONA_BASE,
     };
     const standard = await prisma.zona.upsert({
       where: { nombre: 'STANDARD' },
@@ -191,7 +197,7 @@ describe('ReservasService — concurrencia (integración)', () => {
       anticipacionMaxDias: 60,
       ventanaCancelacionHoras: 24,
       requiereConfirmacionAdmin: true,
-      aforoMaximo: 100,
+      aforoMaximo: AFORO_ZONA_BASE,
     };
     const vip = await prisma.zona.upsert({
       where: { nombre: 'VIP' },
@@ -329,13 +335,13 @@ describe('ReservasService — concurrencia (integración)', () => {
         }
       } finally {
         // El loop deja `aforoMaximo` de VIP en `AFORO_VIP_TEST` (8): se restaura acá al valor
-        // que fija el `beforeAll` de la suite (100), siguiendo la política de aislamiento del
+        // que fija el `beforeAll` de la suite (`AFORO_ZONA_BASE`), siguiendo la política de aislamiento del
         // encabezado del archivo (cada test dueño de un valor lo restaura en su propio
         // `finally`/`afterEach`), sin depender de que `afterAll` corra para dejarlo consistente
         // para el resto de los tests de este archivo.
         await prisma.zona.update({
           where: { id: zonaVipId },
-          data: { aforoMaximo: 100 },
+          data: { aforoMaximo: AFORO_ZONA_BASE },
         });
       }
     }, 120_000);
