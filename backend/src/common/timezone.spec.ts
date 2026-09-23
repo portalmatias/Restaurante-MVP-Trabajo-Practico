@@ -2,8 +2,11 @@ import {
   ARGENTINA_OFFSET_MS,
   combinarFechaYHoraLocalEnUtc,
   diaSemanaDeFecha,
+  fechaCalendarioAIso,
+  fechaCalendarioDesdeIso,
   finTurnoUtc,
   inicioTurnoUtc,
+  normalizarFechaCalendarioUtc,
 } from './timezone';
 
 /**
@@ -81,6 +84,45 @@ describe('timezone', () => {
     it('devuelve el día de la semana en UTC', () => {
       // 2026-03-15 es domingo.
       expect(diaSemanaDeFecha(fecha)).toBe(0);
+    });
+  });
+
+  describe('fechaCalendarioDesdeIso', () => {
+    it('parsea "YYYY-MM-DD" a medianoche UTC de ese día', () => {
+      const resultado = fechaCalendarioDesdeIso('2026-03-15');
+      expect(resultado.toISOString()).toBe('2026-03-15T00:00:00.000Z');
+    });
+
+    it('no depende de la zona horaria del proceso (usa Date.UTC, no `new Date(string)`)', () => {
+      const resultado = fechaCalendarioDesdeIso('2026-01-01');
+      expect(resultado.getUTCFullYear()).toBe(2026);
+      expect(resultado.getUTCMonth()).toBe(0);
+      expect(resultado.getUTCDate()).toBe(1);
+      expect(resultado.getUTCHours()).toBe(0);
+    });
+  });
+
+  describe('fechaCalendarioAIso', () => {
+    it('formatea una fecha calendario como "YYYY-MM-DD" con getters getUTC*', () => {
+      expect(fechaCalendarioAIso(fecha)).toBe('2026-03-15');
+    });
+
+    it('rellena con ceros mes y día de un solo dígito', () => {
+      const resultado = fechaCalendarioAIso(new Date(Date.UTC(2026, 0, 5)));
+      expect(resultado).toBe('2026-01-05');
+    });
+  });
+
+  describe('normalizarFechaCalendarioUtc', () => {
+    it('trunca un instante con hora a la medianoche UTC del mismo día calendario', () => {
+      const instante = new Date(Date.UTC(2026, 2, 15, 23, 30));
+      const resultado = normalizarFechaCalendarioUtc(instante);
+      expect(resultado.toISOString()).toBe('2026-03-15T00:00:00.000Z');
+    });
+
+    it('no modifica una fecha que ya está a medianoche UTC', () => {
+      const resultado = normalizarFechaCalendarioUtc(fecha);
+      expect(resultado.toISOString()).toBe(fecha.toISOString());
     });
   });
 });

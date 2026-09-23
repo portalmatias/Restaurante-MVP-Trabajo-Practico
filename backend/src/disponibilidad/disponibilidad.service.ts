@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { fechaCalendarioDesdeIso } from '../common/timezone';
 import { PrismaService } from '../prisma/prisma.service';
 import { cargarContexto } from './contexto/cargar-contexto';
 import { ConsultarDisponibilidadDto } from './dto/consultar-disponibilidad.dto';
@@ -29,7 +30,7 @@ export class DisponibilidadService {
     const solicitud: SolicitudDisponibilidad = {
       // `fecha` ya pasó el DTO: es `YYYY-MM-DD` y existe como día del calendario. Se arma
       // con `Date.UTC` para que coincida con lo que Prisma devuelve para `@db.Date` (D4).
-      fecha: fechaDeCalendario(query.fecha),
+      fecha: fechaCalendarioDesdeIso(query.fecha),
       turnoId: query.turnoId,
       zonaId: query.zonaId,
       comensales: query.comensales,
@@ -46,10 +47,4 @@ export class DisponibilidadService {
       motivos,
     };
   }
-}
-
-/** `YYYY-MM-DD` → medianoche UTC de ese día, la forma en que viaja una `@db.Date` (D4). */
-function fechaDeCalendario(fecha: string): Date {
-  const [anio, mes, dia] = fecha.split('-').map(Number);
-  return new Date(Date.UTC(anio, mes - 1, dia));
 }

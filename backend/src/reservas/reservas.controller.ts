@@ -9,6 +9,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import {
+  fechaCalendarioAIso,
+  fechaCalendarioDesdeIso,
+} from '../common/timezone';
 import { ErrorRespuesta } from '../disponibilidad/dto/error-respuesta.dto';
 import { CrearReservaDto } from './dto/crear-reserva.dto';
 import { ReservaCreadaRespuesta } from './dto/reserva-creada-respuesta.dto';
@@ -154,7 +158,7 @@ export class ReservasController {
     const reserva = await this.reservasService.crearReserva({
       turnoId: dto.turnoId,
       zonaId: dto.zonaId,
-      fecha: fechaDeCalendario(dto.fecha),
+      fecha: fechaCalendarioDesdeIso(dto.fecha),
       comensales: dto.comensales,
       nombreCliente: dto.nombreCliente,
       emailCliente: dto.emailCliente,
@@ -167,24 +171,10 @@ export class ReservasController {
     return {
       codigoReserva: reserva.codigoReserva,
       estado: reserva.estado as 'PENDIENTE' | 'CONFIRMADA',
-      fecha: fechaISO(reserva.fecha),
+      fecha: fechaCalendarioAIso(reserva.fecha),
       turnoId: reserva.turnoId,
       zonaId: dto.zonaId,
       comensales: reserva.comensales,
     };
   }
-}
-
-/** `YYYY-MM-DD` → medianoche UTC de ese día, la forma en que viaja una `@db.Date` (D4/Trampas). */
-function fechaDeCalendario(fecha: string): Date {
-  const [anio, mes, dia] = fecha.split('-').map(Number);
-  return new Date(Date.UTC(anio, mes - 1, dia));
-}
-
-/** Arma `YYYY-MM-DD` con getters `getUTC*`, nunca con `toISOString().slice(0, 10)` (Trampas). */
-function fechaISO(fecha: Date): string {
-  const anio = String(fecha.getUTCFullYear()).padStart(4, '0');
-  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-  const dia = String(fecha.getUTCDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
 }
