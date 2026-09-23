@@ -100,6 +100,14 @@
 > contra `AppModule` completo con Prisma real), `test:integration` (53/53, 6 suites),
 > `test:scripts` (20/20), `openapi:lint` y `openapi:check` todos en verde.
 
+> **Seguimiento (2026-09-22):** con Docker ya disponible en esta máquina para esta sesión,
+> se retomó y cerró **5.6.1** (la última tarea pendiente del change) — ver la nota completa
+> en esa tarea, más abajo. `openspec list` pasa de 26/27 a 27/27. Verificado de nuevo:
+> `typecheck`, `lint`, `build`, `test` (117/117 — el número subió porque en el ínterin se
+> mergeó la implementación de `disponibilidad`, ajena a este change), `test:e2e` (36/36, 5
+> suites), `test:integration` (55/55, 6 suites, repetido 4 veces sin fallos),
+> `test:scripts` (20/20), `openapi:lint` y `openapi:check`.
+
 ## 1. Prerrequisitos (bloqueante)
 
 - [x] 1.1 Confirmar que la implementación de `modelo-dominio` está mergeada a `main` y que
@@ -253,7 +261,7 @@
       se agregó en `gestion-salon-admin.integration-spec.ts`; `404`/`409` vía HTTP no se
       duplicaron ahí porque ya están cubiertos a nivel de service en este mismo archivo y en
       `mesas.service.spec.ts`.
-- [ ] 5.6.1 Test de integración de la carrera entre consulta y DELETE: sincronizar la
+- [x] 5.6.1 Test de integración de la carrera entre consulta y DELETE: sincronizar la
       inserción de una Reserva después del `count` y antes del DELETE siguiendo la sección
       "Prueba determinística de la carrera entre consulta y DELETE" del diseño. Usar un spy
       temporal sobre `prisma.mesa.delete` que espere una barrera y delegue en el método real;
@@ -265,12 +273,29 @@
       Liberar la barrera, consumir el resultado de la operación, restaurar el spy y cerrar
       clientes con `finally` anidados según el diseño, antes de propagar el fallo. Verificar
       también la limpieza con una Mesa inexistente que falle antes del DELETE, sin depender
-      del timeout externo de Jest. **No hecho esta sesión, a propósito:** es la tarea más
-      compleja del change (spy + `Promise.race` + dos clientes Prisma + limpieza anidada) y
-      sin Postgres real para correrla y corregirla iterativamente, escribirla "a ciegas"
-      tiene demasiado riesgo de un bug sutil en el propio test (exactamente el tipo de error
-      que solo se ve corriéndolo). Queda pendiente para quien retome este change con Docker
-      disponible; el diseño ya está completamente especificado en `design.md`.
+      del timeout externo de Jest. **Hecho (2026-09-22, retomado con Docker disponible en
+      esta máquina):** implementado exactamente según el diseño en
+      `backend/test/mesas.integration-spec.ts` — `interceptarDelete` (spy + barrera de
+      promesas, delega en el método original capturado antes de espiar),
+      `esperarBarreraODeteccionTemprana` (`Promise.race` con plazo explícito, cancela su
+      timer siempre) y `capturarResultado` (evita rechazos de promesas sin manejar). Dos
+      pruebas: la carrera real (segundo `PrismaClient`, conexión propia con
+      `connection_limit`/`statement_timeout`/`connect_timeout` acotados, inserta la Reserva
+      dentro de la barrera) y la verificación del propio mecanismo con una Mesa inexistente
+      (confirma detección temprana, muy por debajo del plazo completo). Corrida repetida
+      contra Postgres real (4 corridas seguidas de la suite completa, 55/55 cada vez) sin
+      fallos. **Corrección tras el review de cubic sobre el PR que agregó esta prueba:**
+      la primera versión tenía un timer de limpieza (`setTimeout` del `Promise.race` que
+      espera a `operacion` con un plazo, en el `finally` de la prueba de la carrera real)
+      sin cancelar — quedaba corriendo los `PLAZO_LIMPIEZA_MS` completos (5s) aunque
+      `operacion` ya hubiera resuelto, atrasando la salida del proceso de Jest. Antes de
+      esa corrección lo atribuí (mal) a una interacción del motor de Prisma con el `await`
+      de la barrera; cubic identificó la causa real en minutos. Corregido cancelando el
+      timer igual que ya hacía `esperarBarreraODeteccionTemprana`; confirmado que el
+      atraso desaparece por completo (4 corridas más, ~1s cada una en vez de ~6s, sin el
+      aviso "Jest did not exit..."). También se simplificó la prueba del mecanismo con
+      Mesa inexistente, sacando una cota de reloj de pared redundante con el resultado de
+      la propia carrera (podía dar flaky en un runner de CI lento).
 - [x] 5.7 Test: alta de Turno sin indicar `activo` queda `activo = true` (spec: "Alta de
       Turno"). **Cubierto** por `horarios.service.spec.ts` (4.2).
 - [x] 5.8 Test: desactivar un Turno lo marca `activo = false` sin eliminarlo y sigue
