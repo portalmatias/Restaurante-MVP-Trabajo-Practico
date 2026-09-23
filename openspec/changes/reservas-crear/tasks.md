@@ -1,6 +1,6 @@
 ## 1. Prerrequisitos (bloqueante)
 
-- [ ] 1.1 Confirmar que el PR #12 (`modelo-dominio`) y la implementación de `disponibilidad`
+- [x] 1.1 Confirmar que el PR #12 (`modelo-dominio`) y la implementación de `disponibilidad`
       están mergeados a `main`, y crear `feature/reservas-crear` desde ese `main`. No seguir
       hasta que sea cierto. Verificar con `git log origin/main --oneline` y confirmando que
       existen `backend/src/reservas/reservas.service.ts` y `backend/src/disponibilidad/`, y que
@@ -19,12 +19,15 @@
 
 ## 2. Extensión explícita del contexto (solo si 1.3 encontró que falta)
 
-- [ ] 2.1 Sumar a `backend/test/disponibilidad-contexto.e2e-spec.ts` (o la suite del cargador
+> No aplica: 1.3 confirmó que `ContextoReserva` ya expone `mesasLibres` con `id`, `etiqueta` y
+> `capacidad`, y `zona.requiereConfirmacionAdmin` (`backend/src/disponibilidad/reglas/tipos.ts`).
+
+- [x] 2.1 Sumar a `backend/test/disponibilidad-contexto.e2e-spec.ts` (o la suite del cargador
       que exista) los casos **antes** del cambio: `mesasLibres` trae `id`, `etiqueta` y
       `capacidad` de cada mesa libre de la zona y excluye las que tienen reserva activa;
       `zona.requiereConfirmacionAdmin` es `true` en VIP y `false` en STANDARD. Verificar que
       la suite falla (rojo).
-- [ ] 2.2 Ampliar el `select` de `cargarContexto` y el tipo `ContextoReserva`, sin cambiar el
+- [x] 2.2 Ampliar el `select` de `cargarContexto` y el tipo `ContextoReserva`, sin cambiar el
       nombre ni la firma de la función, ni `evaluarReglas` (que sigue leyendo solo
       capacidades). Verificar que la suite de 2.1 pasa y que toda la suite de
       `disponibilidad` sigue en verde con `npm test -w backend -- disponibilidad` y
