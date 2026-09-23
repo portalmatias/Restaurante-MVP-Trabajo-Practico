@@ -71,8 +71,9 @@ cual lo recibió al crear la Reserva.
 - **THEN** el sistema responde `200 OK` con esa Reserva
 
 #### Scenario: Caracteres de patrón en el email no funcionan como comodín
-- **WHEN** existe una Reserva con email `ana_perez@example.com` y el cliente consulta con el
-  código correcto y el email `anaXperez@example.com`, o con `%@example.com`
+- **WHEN** existe una Reserva con email `ana.perez@example.com` y el cliente consulta con el
+  código correcto y el email `ana_perez@example.com` (un guion bajo donde la Reserva tiene un
+  punto), o con `%@example.com`
 - **THEN** el sistema responde `404 Not Found`
 
 ### Requirement: Formato de la solicitud de consulta validado antes de buscar

@@ -19,9 +19,8 @@ Estado del que se parte (`main` al 2026-09-21):
   de 60 s y 10 solicitudes) y `ThrottlerGuard` como `APP_GUARD` global. Un guard global corre
   antes que los guards de ruta y que los pipes: el `429` llega antes de validar el body y
   antes de tocar la base. `POST /auth/login` lo sobreescribe con un `@Throttle()` propio.
-- `AuthModule` (`JwtAuthGuard`, `RolesGuard`, decorador `@Roles`) está mergeado (#25) pero
-  **no registrado en `AppModule`** hasta que se integre el PR de registro del módulo.
-  `POST /reservas` y la cancelación pública no llevan guard; las rutas de admin se protegen
+- `AuthModule` (`JwtAuthGuard`, `RolesGuard`, decorador `@Roles`) está mergeado (#25) y
+  registrado en `AppModule` desde #33. `POST /reservas` y la cancelación pública no llevan guard; las rutas de admin se protegen
   por ruta con `JwtAuthGuard` + `RolesGuard`, no con un guard global (`reservas-crear`).
 - `main.ts` en `main` construye el `ValidationPipe` global con `whitelist` y
   `forbidNonWhitelisted`, **sin** `transform`. La rama de `disponibilidad` lo construye con
@@ -78,38 +77,55 @@ cancelación. Se descarta porque el par código + email es la credencial complet
 en el body lo trata como una unidad. La ruta no choca con `POST /reservas` ni con
 `POST /reservas/:codigo/cancelar` porque tienen distinta cantidad de segmentos.
 
-### D2: Comparación sin distinguir mayúsculas, en una sola consulta
+### D2: Comparación sin distinguir mayúsculas, en la aplicación y con un solo camino de fallo
 
 **Decisión:** el service normaliza el código con `toUpperCase()` (el alfabeto de
-`reservas-crear` y el del seed son solo mayúsculas, así que sigue usando el índice único) y
-compara el email sin distinguir mayúsculas con Prisma (`mode: 'insensitive'`), en **una sola**
-consulta con ambos criterios:
+`reservas-crear` y el del seed son solo mayúsculas, así que la búsqueda usa el índice único)
+y lee la Reserva por ese índice trayendo solo `id` y `emailCliente`. Compara el email **en
+la aplicación**, con `toLowerCase()` de los dos lados, como texto literal: ningún carácter
+del email funciona como comodín. Recién cuando coinciden el código y el email lee la Reserva
+completa, con su `turno` y `mesa.zona`.
 
 ```
-prisma.reserva.findFirst({
-  where: { codigoReserva: codigo.toUpperCase(), emailCliente: { equals: email, mode: 'insensitive' } },
-  include: { turno: true, mesa: { include: { zona: true } } },
-})
+candidata = findUnique({ where: { codigoReserva: codigo.toUpperCase() },
+                         select: { id, emailCliente } })
+si !candidata o !emailsIguales(candidata.emailCliente, email)  ->  null
+findUnique({ where: { id: candidata.id }, include: { turno, mesa: { include: { zona } } } })
 ```
 
-Con una sola consulta, "código inexistente" y "email incorrecto" son el mismo camino de
-código: ambos devuelven `null` de la misma sentencia, sin una rama que compare el email solo
-cuando el código existe. Así no hay diferencia de tiempo atribuible a la lógica de la
+"Código inexistente" y "email incorrecto" siguen el mismo camino: una sola lectura por el
+índice único, sin relaciones, y `null`. Como las relaciones se leen después de comparar, las
+dos fallas cuestan lo mismo y no hay una diferencia de tiempo atribuible a la lógica de la
 aplicación (`auth-admin` tuvo observaciones de revisión por diferencias de tiempo al validar
 credenciales).
+
+**Corrección del 2026-09-21, durante la implementación:** la primera versión de este
+documento comparaba el email dentro de la consulta con `mode: 'insensitive'`, en una sola
+sentencia. El test de integración contra PostgreSQL real mostró que Prisma traduce eso a un
+`ILIKE` sin escapar: la consulta con el email `%@example.com` **encontró la Reserva de otro
+cliente**, y un `_` en la consulta reemplazaba a cualquier carácter. Es decir, quien conoce
+un código podía saltear el email, el segundo factor de `config.yaml` §5. Con esa
+implementación fallan exactamente los dos tests de comodín (`%` y `_`), y con la actual
+pasan; por eso el escenario "Caracteres de patrón en el email no funcionan como comodín"
+está en la spec. Se aplicó el plan B que este diseño ya tenía previsto.
 
 El email **se sigue guardando tal cual** llegó: este change no toca `reservas-crear` ni migra
 datos. Esto cierra las dos Open Questions de `reservas-crear` y define lo que
 `cancelacion-turnos` debe usar. No hace `trim` del email: `@IsEmail()` rechaza los espacios
 con `400`, y el frontend es quien recorta.
 
+**Alternativa considerada:** comparar en la consulta con `mode: 'insensitive'` (el diseño
+original). Se descarta por el `ILIKE` sin escapar descrito arriba.
+**Alternativa considerada:** escapar `%`, `_` y `\` del email antes de pasarlo a
+`mode: 'insensitive'`. Se descarta: depende de un detalle interno de Prisma. Si una versión
+futura usara `LOWER(...) =`, el escape rompería la coincidencia legítima de los emails que
+tengan esos caracteres.
+**Alternativa considerada:** `$queryRaw` con `lower(email) = lower($1)`. Se descarta: suma SQL
+escrito a mano en un service que hoy no tiene ninguno, para algo que se resuelve en tres
+líneas de TypeScript con la misma garantía.
 **Alternativa considerada:** guardar el email en minúsculas al crear y comparar por igualdad
 exacta. Sería más simple, pero obliga a tocar `reservas-crear` y a migrar reservas
 existentes, y cambia lo que el cliente ve guardado. Se descarta para este MVP.
-**Alternativa considerada:** `findUnique` por código y comparar `email.toLowerCase()` en la
-aplicación. Es el plan B si `mode: 'insensitive'` no se comporta como texto literal (ver
-Riesgos). Tiene la desventaja de dos ramas (código inexistente vs. email incorrecto), que
-habría que igualar con una comparación ficticia.
 **Alternativa considerada:** exigir el código exacto (con mayúsculas). Se descarta: un
 cliente que copia el código de un mensaje y lo tipea en minúsculas no debería recibir un
 `404` que además no le explica por qué.
@@ -117,7 +133,7 @@ cliente que copia el código de un mensaje y lo tipea en minúsculas no debería
 ### D3: Un único punto de búsqueda, compartido con `cancelacion-turnos`
 
 **Decisión:** `ReservasService.buscarPorCodigoYEmail(codigo, email, db = this.prisma)` ejecuta
-la consulta de D2 y devuelve la Reserva con su turno y su mesa/zona, o `null`. Acepta un
+la búsqueda de D2 y devuelve la Reserva con su turno y su mesa/zona, o `null`. Acepta un
 cliente de Prisma o una transacción como tercer parámetro para que `cancelacion-turnos`
 pueda usarla dentro de su propia transacción. El `404` lo arma un helper exportado que usa
 un texto fijo ("No se encontró una reserva con ese código y email"), de modo que consulta y
@@ -723,13 +739,14 @@ los mismos códigos, descripciones y esquemas.
   si falta alguna, la agrega con su test en este PR. Conviene avisarle a quien implementa
   `disponibilidad` y a `reservas-crear`, porque el pipe es global y cambia el comportamiento
   de sus DTOs.
-- **[Riesgo]** No está confirmado cómo traduce Prisma `mode: 'insensitive'` sobre `equals`
-  en PostgreSQL. Si genera un `ILIKE` sin escapar, un `_` o un `%` del email funcionaría
-  como comodín y `%@example.com` encontraría Reservas ajenas → **Mitigación:** un test de
-  integración contra PostgreSQL real que consulta con `anaXperez@example.com` y
-  `%@example.com` sobre una Reserva de `ana_perez@example.com`; es la razón por la que ese
-  escenario está en la spec. Si falla, se pasa al plan B de D2 (`findUnique` y comparación en
-  la aplicación).
+- **[Riesgo, cerrado]** Prisma traduce `mode: 'insensitive'` sobre `equals` a un `ILIKE` sin
+  escapar, así que un `%` o un `_` del email funcionaba como comodín (comprobado el
+  2026-09-21 contra PostgreSQL real: `%@example.com` encontró una Reserva ajena) →
+  **Resolución:** se aplicó el plan B de D2 (comparación en la aplicación). Los tests de
+  integración que consultan con `ana_perez.<sufijo>@example.com` y con `%@example.com`
+  sobre una Reserva de `ana.perez.<sufijo>@example.com` fallan con la implementación
+  anterior y pasan con la actual; quedan como red de seguridad ante un cambio futuro de la
+  búsqueda.
 - **[Riesgo]** La consulta pública devuelve el estado a cualquiera que tenga código + email.
   Eso es lo que pide §5, pero un email conocido reduce el secreto al código de 8 caracteres
   → **Mitigación:** ~2^40 combinaciones por Reserva y el límite de D5; no se agrega un
