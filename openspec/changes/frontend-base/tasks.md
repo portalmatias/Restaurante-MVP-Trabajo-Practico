@@ -175,10 +175,22 @@
 - [ ] 6.3 Agregar el script `"api:types:check"` que regenera a un archivo temporal y compara
       contra el commiteado (D5), fallando si difieren. Verificar corriéndolo dos veces
       seguidas sin tocar el YAML: la segunda corrida no debe reportar diferencias.
-- [ ] 6.4 Crear `frontend/src/lib/api/client.ts` exportando un cliente `openapi-fetch` tipado
-      con `paths` de `schema.d.ts`, con `baseUrl: process.env.NEXT_PUBLIC_API_URL` (D6). Sin
-      URL fija en el código. Verificar con `npm run typecheck -w frontend` en verde.
-- [ ] 6.5 Escribir un test de tipos (o un comentario `// @ts-expect-error` verificado por
+- [ ] 6.4 Escribir `frontend/test/lib/api/url-base.test.ts` **antes** de implementar (D6):
+      `urlBaseApi()` devuelve `'/api'` cuando corre en el navegador (entorno jsdom, con
+      `window`) y el valor de `NEXT_PUBLIC_API_URL` cuando corre sin `window` (simular el
+      servidor, por ejemplo con `@jest-environment node` en un archivo aparte). Verificar que
+      falla (rojo) con `npm run test -w frontend -- url-base`.
+- [ ] 6.5 Implementar `urlBaseApi()` en `frontend/src/lib/api/url-base.ts` y crear
+      `frontend/src/lib/api/client.ts` exportando un cliente `openapi-fetch` tipado con
+      `paths` de `schema.d.ts` y `baseUrl: urlBaseApi()` (D6). Sin URL fija en el código.
+      Verificar que los tests de 6.4 pasan y `npm run typecheck -w frontend` en verde.
+- [ ] 6.6 Agregar en `frontend/next.config.ts` el `rewrite` de `/api/:path*` a
+      `${process.env.NEXT_PUBLIC_API_URL}/:path*` (D6). Verificar con el backend levantado
+      (`npm run start:dev -w backend`) y el frontend (`npm run dev -w frontend`) que
+      `curl -i localhost:3000/api/disponibilidad` devuelve la misma respuesta (código y
+      cuerpo, por ejemplo el `400` por falta de parámetros) que
+      `curl -i localhost:3001/disponibilidad`. Apagar los dos procesos al terminar.
+- [ ] 6.7 Escribir un test de tipos (o un comentario `// @ts-expect-error` verificado por
       `tsc`) que confirme que llamar al cliente con un path inexistente en el contrato (por
       ejemplo `"/reservas"`, mientras no esté mergeado) falla el chequeo de tipos. Verificar
       con `npm run typecheck -w frontend`: debe fallar sin el `@ts-expect-error` y pasar con
