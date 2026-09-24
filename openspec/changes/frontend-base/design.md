@@ -223,6 +223,14 @@ agente) y en `openspec/config.yaml` §10. **No se agrega ninguna variable nueva.
 `rewrites` se evalúan al construir (`next build`), así que en producción la variable tiene
 que estar definida en ese momento.
 
+**Carga del `.env` de la raíz:** Next solo lee los `.env*` de `frontend/`, pero el `.env`
+del proyecto vive en la raíz del monorepo (§10). `next.config.ts` lo carga con
+`process.loadEnvFile` de Node (disponible en Node 20, la versión del proyecto y de CI), sin
+dependencias nuevas; las variables ya exportadas en el entorno tienen prioridad. Si
+`NEXT_PUBLIC_API_URL` sigue sin estar definida, `rewrites()` falla con un mensaje que la
+nombra, en vez de armar un destino `undefined/...`. Se descartó `@next/env`
+(`loadEnvConfig`): la guía de Next pide instalarlo como dependencia propia.
+
 **Alternativa considerada (`app.enableCors()` en el backend):** es el mecanismo estándar,
 pero toca `backend/` (fuera del alcance de un change de frontend, iría en uno propio) y
 necesita una variable nueva para el origen permitido. El proxy resuelve lo mismo sin tocar el
