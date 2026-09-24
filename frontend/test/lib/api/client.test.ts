@@ -31,8 +31,61 @@ describe("toApiResult sobre el cliente HTTP", () => {
   });
 
   afterAll(() => {
-    process.env.NEXT_PUBLIC_API_URL = envOriginal;
+    // Asignar `undefined` a una variable de entorno guarda el texto "undefined": se borra.
+    if (envOriginal === undefined) {
+      delete process.env.NEXT_PUBLIC_API_URL;
+    } else {
+      process.env.NEXT_PUBLIC_API_URL = envOriginal;
+    }
     global.fetch = fetchOriginal;
+  });
+
+  afterEach(() => {
+    fetchMock.mockReset();
+  });
+
+  it("una respuesta 2xx devuelve data y llama a la URL base unida al path", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify("ok"), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const resultado = await toApiResult(apiClient.GET("/"));
+
+    expect(resultado).toEqual({ data: "ok" });
+    const pedido = fetchMock.mock.calls[0][0] as Request;
+    expect(pedido.url).toBe("http://localhost:3001/");
+  });
+
+  it("un error sin cuerpo (404 vacío) no se confunde con un éxito", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(null, { status: 404, headers: { "Content-Length": "0" } }),
+    );
+
+    const resultado = await toApiResult(
+      apiClient.DELETE("/admin/mesas/{id}", {
+        params: { path: { id: "3fa85f64-5717-4562-b3fc-2c963f66afa6" } },
+      }),
+    );
+
+    expect(resultado.data).toBeUndefined();
+    expect(resultado.error).toEqual({
+      tipo: "no-encontrado",
+      mensaje: "Ocurrió un error inesperado.",
+    });
+  });
+
+  it("una falla de red devuelve un error desconocido en vez de lanzar", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    const resultado = await toApiResult(apiClient.GET("/"));
+
+    expect(resultado.error).toEqual({
+      tipo: "desconocido",
+      mensaje: "No se pudo conectar con el servidor.",
+    });
   });
 
   it("un 409 de /admin/mesas (sin motivos) mapea a tipo conflicto con motivos vacío", async () => {

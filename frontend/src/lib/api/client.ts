@@ -29,8 +29,19 @@ export const apiClient = createClient<paths>({ baseUrl: urlBaseApi() });
 export async function toApiResult<T>(
   promise: Promise<{ data?: T; error?: unknown; response: Response }>,
 ): Promise<ApiResult<T>> {
-  const { data, error, response } = await promise;
-  if (error !== undefined) {
+  let resultado: { data?: T; error?: unknown; response: Response };
+  try {
+    resultado = await promise;
+  } catch {
+    // `fetch` rechaza sin respuesta (red caída, proxy inalcanzable, petición abortada): se
+    // informa como error del resultado y no como una excepción que la UI tenga que atrapar.
+    return { error: { tipo: "desconocido", mensaje: "No se pudo conectar con el servidor." } };
+  }
+
+  const { data, error, response } = resultado;
+  // Se decide por `response.ok` y no solo por `error`: con un error sin cuerpo
+  // (`Content-Length: 0`), `openapi-fetch` devuelve `error: undefined`.
+  if (!response.ok || error !== undefined) {
     return { error: mapErrorApi(response.status, error) };
   }
   return { data: data as T };

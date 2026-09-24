@@ -16,6 +16,19 @@ describe("mapErrorApi", () => {
     });
   });
 
+  it("400 con message como texto único (regla de negocio de admin) también mapea a validacion", () => {
+    const resultado = mapErrorApi(400, {
+      statusCode: 400,
+      error: "Bad Request",
+      message: "El mínimo de comensales no puede superar al máximo.",
+    });
+
+    expect(resultado).toEqual({
+      tipo: "validacion",
+      mensajes: ["El mínimo de comensales no puede superar al máximo."],
+    });
+  });
+
   it("404 con message string mapea a no-encontrado", () => {
     const resultado = mapErrorApi(404, {
       statusCode: 404,

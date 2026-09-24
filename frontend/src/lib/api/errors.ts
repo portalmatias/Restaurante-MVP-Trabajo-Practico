@@ -51,11 +51,14 @@ function motivosDe(cuerpo: unknown): MotivoNoDisponible[] {
  * `ErrorApi` correspondiente (D7). Es una función pura: no hace ninguna llamada de red.
  */
 export function mapErrorApi(status: number, body: unknown): ErrorApi {
-  if (status === 400 && esRegistro(body) && Array.isArray(body.message)) {
-    return {
-      tipo: "validacion",
-      mensajes: body.message.filter((mensaje): mensaje is string => typeof mensaje === "string"),
-    };
+  if (status === 400) {
+    // `message` es una lista cuando rechaza el `ValidationPipe` y un texto único cuando lo
+    // rechaza una regla de negocio (por ejemplo en `PATCH /admin/zonas/{id}`).
+    const mensajes =
+      esRegistro(body) && Array.isArray(body.message)
+        ? body.message.filter((mensaje): mensaje is string => typeof mensaje === "string")
+        : [mensajeDe(body)];
+    return { tipo: "validacion", mensajes };
   }
 
   if (status === 404) {
