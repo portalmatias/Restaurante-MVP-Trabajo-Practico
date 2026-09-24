@@ -18,4 +18,16 @@ describe("Field", () => {
 
     expect(control).toHaveAttribute("aria-describedby", errorNode.id);
   });
+
+  it("conserva un aria-describedby existente y agrega el id del error, sin reemplazarlo", () => {
+    render(<Field label="Email" aria-describedby="ayuda" error="Requerido" />);
+
+    const control = screen.getByRole("textbox", { name: "Email" });
+    const errorNode = screen.getByText("Requerido");
+    const describedBy = control.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+
+    expect(describedBy).toContain("ayuda");
+    expect(describedBy).toContain(errorNode.id);
+    expect(control).toHaveAttribute("aria-invalid", "true");
+  });
 });

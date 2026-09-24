@@ -11,6 +11,13 @@ describe("Card", () => {
 
     expect(region).toHaveTextContent("Contenido de la tarjeta");
   });
+
+  it("sin título renderiza un contenedor simple, sin role=region", () => {
+    render(<Card>Contenido sin título</Card>);
+
+    expect(screen.queryByRole("region")).toBeNull();
+    expect(screen.getByText("Contenido sin título")).toBeInTheDocument();
+  });
 });
 
 describe("Select", () => {
@@ -23,6 +30,35 @@ describe("Select", () => {
 
     expect(screen.getByRole("combobox", { name: "Zona" })).toBeInTheDocument();
   });
+
+  it("enlaza el mensaje de error al control mediante aria-describedby y aria-invalid", () => {
+    render(
+      <Select label="Zona" error="Requerido">
+        <option value="standard">Standard</option>
+      </Select>,
+    );
+
+    const control = screen.getByRole("combobox", { name: "Zona" });
+    const errorNode = screen.getByText("Requerido");
+
+    expect(control).toHaveAttribute("aria-describedby", errorNode.id);
+    expect(control).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("conserva un aria-describedby existente y agrega el id del error, sin reemplazarlo", () => {
+    render(
+      <Select label="Zona" aria-describedby="ayuda" error="Requerido">
+        <option value="standard">Standard</option>
+      </Select>,
+    );
+
+    const control = screen.getByRole("combobox", { name: "Zona" });
+    const errorNode = screen.getByText("Requerido");
+    const describedBy = control.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+
+    expect(describedBy).toContain("ayuda");
+    expect(describedBy).toContain(errorNode.id);
+  });
 });
 
 describe("Alert", () => {
@@ -34,5 +70,13 @@ describe("Alert", () => {
     expect(alert).toHaveTextContent("Ocurrió un error al procesar la reserva");
     expect(alert.className).toMatch(/destructive/);
     expect(alert.querySelector("svg")).toBeNull();
+  });
+
+  it("la variante info usa role=status", () => {
+    render(<Alert variant="info">Guardado correctamente</Alert>);
+
+    const alert = screen.getByRole("status");
+
+    expect(alert).toHaveTextContent("Guardado correctamente");
   });
 });

@@ -1,7 +1,10 @@
 import { useId, type SelectHTMLAttributes } from "react";
 import { Label } from "./label";
 
-export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "id"> & {
+export type SelectProps = Omit<
+  SelectHTMLAttributes<HTMLSelectElement>,
+  "id" | "aria-invalid"
+> & {
   /** Texto visible de la etiqueta, asociado al control mediante `htmlFor`/`id`. */
   label: string;
   /** Mensaje de error, mostrado junto al campo y enlazado con `aria-describedby`. */
@@ -10,8 +13,21 @@ export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "id"> & 
 };
 
 /**
+ * Junta ids de `aria-describedby`: el que ya traiga el caller (por ejemplo, el id de un texto
+ * de ayuda) y el del error, sin duplicados ni espacios vacíos.
+ */
+function mergeDescribedBy(...values: Array<string | undefined>): string | undefined {
+  const ids = values
+    .flatMap((value) => (value ? value.split(/\s+/) : []))
+    .filter((value, index, all) => value.length > 0 && all.indexOf(value) === index);
+  return ids.length > 0 ? ids.join(" ") : undefined;
+}
+
+/**
  * Selector accesible con la misma asociación etiqueta/control y el mismo mapeo de error que
- * `Field` (D4, spec "Campos de formulario accesibles").
+ * `Field` (D4, spec "Campos de formulario accesibles"). Un `aria-describedby` que ya traiga el
+ * caller se conserva: el id del error se agrega, nunca lo reemplaza. El estado de `error`, no
+ * un `aria-invalid` del caller, es quien decide la validez del control.
  */
 export function Select({
   label,
@@ -24,6 +40,8 @@ export function Select({
   const generatedId = useId();
   const fieldId = id ?? generatedId;
   const errorId = `${fieldId}-error`;
+  const { "aria-describedby": callerDescribedBy, ...restSelectProps } = selectProps;
+  const describedBy = mergeDescribedBy(callerDescribedBy, error ? errorId : undefined);
   const classes = [
     "min-h-11 w-full rounded-md border bg-background px-3 text-base text-foreground",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -39,10 +57,10 @@ export function Select({
       <Label htmlFor={fieldId}>{label}</Label>
       <select
         id={fieldId}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
         className={classes}
-        {...selectProps}
+        {...restSelectProps}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
       >
         {children}
       </select>
