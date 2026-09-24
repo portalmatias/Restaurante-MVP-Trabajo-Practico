@@ -159,10 +159,12 @@
 
 ## 6. Cliente HTTP tipado
 
-- [ ] 6.1 Agregar a `frontend/package.json` la devDependency `openapi-typescript` y la
+- [x] 6.1 Agregar a `frontend/package.json` la devDependency `openapi-typescript` y la
       dependency `openapi-fetch` (D5). Verificar con
       `npm ls openapi-typescript openapi-fetch -w frontend`.
-- [ ] 6.2 Agregar el script `"api:types": "openapi-typescript ../openapi/openapi.yaml -o
+      Verificado: `openapi-fetch@0.17.0` y `openapi-typescript@7.13.0` listados por
+      `npm ls`, fijados en `package-lock.json`.
+- [x] 6.2 Agregar el script `"api:types": "openapi-typescript ../openapi/openapi.yaml -o
       src/lib/api/schema.d.ts"` a `frontend/package.json` y un alias
       `"api:types": "npm run api:types -w frontend"` en la raíz. Crear antes el directorio de
       salida (`mkdir -p frontend/src/lib/api`: hoy `frontend/` no tiene `src/`). Correrlo una
@@ -172,29 +174,51 @@
       que **no** contiene `"/reservas"` (todavía no está en el YAML) con
       `grep -n '"/reservas"' frontend/src/lib/api/schema.d.ts` sin resultados (a menos que el
       PR #40 ya se haya mergeado — ver 1.3).
-- [ ] 6.3 Agregar el script `"api:types:check"` que regenera a un archivo temporal y compara
+      Verificado: `schema.d.ts` generado contiene `"/disponibilidad"`, `"/auth/login"` y
+      `"/admin/zonas"`; el grep de `"/reservas"` no dio resultados (PR #40 sigue sin
+      mergear).
+- [x] 6.3 Agregar el script `"api:types:check"` que regenera a un archivo temporal y compara
       contra el commiteado (D5), fallando si difieren. Verificar corriéndolo dos veces
       seguidas sin tocar el YAML: la segunda corrida no debe reportar diferencias.
-- [ ] 6.4 Escribir `frontend/test/lib/api/url-base.test.ts` **antes** de implementar (D6):
+      Implementado con `mktemp` + `diff -u` contra un archivo temporal (nunca pisa el
+      commiteado). Verificado corriendo `npm run api:types:check -w frontend` dos veces
+      seguidas: las dos terminan en `exit 0` sin reportar diferencias.
+- [x] 6.4 Escribir `frontend/test/lib/api/url-base.test.ts` **antes** de implementar (D6):
       `urlBaseApi()` devuelve `'/api'` cuando corre en el navegador (entorno jsdom, con
       `window`) y el valor de `NEXT_PUBLIC_API_URL` cuando corre sin `window` (simular el
       servidor, por ejemplo con `@jest-environment node` en un archivo aparte). Verificar que
       falla (rojo) con `npm run test -w frontend -- url-base`.
-- [ ] 6.5 Implementar `urlBaseApi()` en `frontend/src/lib/api/url-base.ts` y crear
+      RED observado: `Cannot find module '../../../src/lib/api/url-base'` en los dos archivos
+      (`url-base.test.ts` en jsdom y `url-base.server.test.ts` con
+      `@jest-environment node`).
+- [x] 6.5 Implementar `urlBaseApi()` en `frontend/src/lib/api/url-base.ts` y crear
       `frontend/src/lib/api/client.ts` exportando un cliente `openapi-fetch` tipado con
       `paths` de `schema.d.ts` y `baseUrl: urlBaseApi()` (D6). Sin URL fija en el código.
       Verificar que los tests de 6.4 pasan y `npm run typecheck -w frontend` en verde.
-- [ ] 6.6 Agregar en `frontend/next.config.ts` el `rewrite` de `/api/:path*` a
+      GREEN observado: `Test Suites: 2 passed, 2 total` / `Tests: 2 passed, 2 total` (filtro
+      `url-base`); `npm run typecheck -w frontend` en verde.
+- [x] 6.6 Agregar en `frontend/next.config.ts` el `rewrite` de `/api/:path*` a
       `${process.env.NEXT_PUBLIC_API_URL}/:path*` (D6). Verificar con el backend levantado
       (`npm run start:dev -w backend`) y el frontend (`npm run dev -w frontend`) que
       `curl -i localhost:3000/api/disponibilidad` devuelve la misma respuesta (código y
       cuerpo, por ejemplo el `400` por falta de parámetros) que
       `curl -i localhost:3001/disponibilidad`. Apagar los dos procesos al terminar.
-- [ ] 6.7 Escribir un test de tipos (o un comentario `// @ts-expect-error` verificado por
+      Verificado con los dos procesos levantados (env de `.env` de la raíz exportado a ambos,
+      ya que `next dev` evalúa `rewrites()` al arrancar y necesita `NEXT_PUBLIC_API_URL`
+      definida — D6): `curl -i localhost:3001/disponibilidad` y
+      `curl -i localhost:3000/api/disponibilidad` devuelven el mismo `400` y el mismo cuerpo
+      JSON. Los dos procesos (`nest start --watch` y `next dev`) se mataron al terminar;
+      confirmado sin procesos `next dev`/`nest start` restantes.
+- [x] 6.7 Escribir un test de tipos (o un comentario `// @ts-expect-error` verificado por
       `tsc`) que confirme que llamar al cliente con un path inexistente en el contrato (por
       ejemplo `"/reservas"`, mientras no esté mergeado) falla el chequeo de tipos. Verificar
       con `npm run typecheck -w frontend`: debe fallar sin el `@ts-expect-error` y pasar con
       él.
+      Implementado en `frontend/test/lib/api/client-paths.types.ts` (nombre sin `.test.`/
+      `.spec.`, para que Jest no lo levante como test de runtime; lo chequea `tsc`). Sin el
+      comentario: `error TS2554: Expected 2 arguments, but got 1` en
+      `apiClient.GET("/reservas")`. Con `// @ts-expect-error`: `npm run typecheck -w frontend`
+      en verde.
 
 ## 7. Mapeo de errores del cliente (TDD: tests primero)
 

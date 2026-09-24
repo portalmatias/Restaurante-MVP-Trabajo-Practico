@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start --port 3000",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.json",
-    "test": "jest"
+    "test": "jest",
+    "api:types": "openapi-typescript ../openapi/openapi.yaml -o src/lib/api/schema.d.ts",
+    "api:types:check": "tmp=\"$(mktemp)\" && npx openapi-typescript ../openapi/openapi.yaml -o \"$tmp\" >/dev/null && diff -u src/lib/api/schema.d.ts \"$tmp\"; rc=$?; rm -f \"$tmp\"; exit $rc"
   },
   "dependencies": {
     "next": "16.3.4",
+    "openapi-fetch": "^0.17.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -25,6 +28,7 @@
     "@types/react-dom": "^19",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "5.9.3"
