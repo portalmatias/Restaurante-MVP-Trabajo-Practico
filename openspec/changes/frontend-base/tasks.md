@@ -222,7 +222,7 @@
 
 ## 7. Mapeo de errores del cliente (TDD: tests primero)
 
-- [ ] 7.1 Escribir `frontend/test/lib/api/errors.test.ts` **antes** de implementar (D7): un
+- [x] 7.1 Escribir `frontend/test/lib/api/errors.test.ts` **antes** de implementar (D7): un
       `ErrorRespuesta` de `400` con `message` como lista de strings mapea a
       `{ tipo: 'validacion', mensajes: [...] }`; uno de `404` con `message` string mapea a
       `{ tipo: 'no-encontrado', mensaje }`; un `409` con `message` string y sin `motivos` (la
@@ -230,15 +230,40 @@
       un `409` que además trae `motivos` los conserva con `codigo`, `mensaje` y su orden;
       cualquier otro caso mapea a `{ tipo: 'desconocido', mensaje }`. Verificar que la
       suite falla (rojo) con `npm run test -w frontend -- errors`.
-- [ ] 7.2 Implementar `frontend/src/lib/api/errors.ts` con el tipo `ApiResult<T>` y la función
+      RED observado: `Cannot find module '../../../src/lib/api/errors'` (módulo inexistente
+      antes de implementar).
+- [x] 7.2 Implementar `frontend/src/lib/api/errors.ts` con el tipo `ApiResult<T>` y la función
       de mapeo de D7, usando los tipos de `MotivoNoDisponible`/`CodigoMotivo` generados en
       `schema.d.ts`. Verificar que la suite de 7.1 pasa.
-- [ ] 7.3 Envolver el cliente de 6.4 para que sus métodos devuelvan `ApiResult<T>` en vez del
+      GREEN observado: `Test Suites: 1 passed, 1 total` / `Tests: 5 passed, 5 total`.
+- [x] 7.3 Envolver el cliente de 6.5 para que sus métodos devuelvan `ApiResult<T>` en vez del
       `{ data, error }` crudo de `openapi-fetch`, aplicando el mapeo de 7.2 cuando `error` está
       presente. Verificar con un test de integración liviano en
       `frontend/test/lib/api/client.test.ts` que mockea `fetch` para devolver un `409` de una
       ruta de admin (con `message` y sin `motivos`) y comprueba que el resultado tiene
       `tipo: 'conflicto'` y `motivos: []`.
+      RED observado: `TypeError: toApiResult is not a function` (la función todavía no estaba
+      exportada de `client.ts`). GREEN observado tras implementarla:
+      `Test Suites: 1 passed, 1 total` / `Tests: 1 passed, 1 total` (mock de `fetch` con un
+      `409` de `POST /admin/mesas`, `message` string sin `motivos`).
+
+      **Desviación de la redacción literal de esta tarea, con evidencia:** no se reconstruyó
+      `apiClient` como un objeto propio con sus métodos `GET`/`POST`/etc. Se implementó en
+      cambio `toApiResult<T>(promise)`, que envuelve la promesa YA invocada
+      (`toApiResult(apiClient.GET("/disponibilidad", {...}))`). Motivo, verificado con un
+      experimento de `tsc` (ver comentario en `client.ts`): envolver los métodos del cliente
+      uno por uno (`api.GET = (...args) => ...`) sólo puede preservar el tipado por-path de
+      `openapi-fetch` (`ClientMethod<Paths, Method, Media>`, en
+      `node_modules/openapi-fetch/dist/index.d.ts:192-199`) importando los helpers internos de
+      `openapi-typescript-helpers` — una dependencia nueva no aprobada en `design.md` (D5 solo
+      aprueba `openapi-typescript`/`openapi-fetch`, §2 exige justificar dependencias nuevas).
+      Sin esos helpers, la reconstrucción colapsa la genericidad: en el experimento, una
+      llamada a `/disponibilidad` sin el parámetro requerido `comensales` no falló el chequeo
+      de tipos, y `data` tipó como `{}` en vez de `DisponibilidadRespuesta`, regresionando la
+      garantía de 6.7. `toApiResult` envolviendo la llamada ya invocada no tiene ese problema
+      (confirmado con el mismo experimento): el chequeo de tipos por path de D5/D6 queda
+      intacto porque `apiClient.GET(...)`/`apiClient.POST(...)` se siguen llamando
+      directamente, sin pasar por una capa genérica intermedia.
 
 ## 8. Cierre (Definition of Done, `config.yaml` §13)
 
