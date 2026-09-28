@@ -137,7 +137,7 @@
       sección 4 y enlaza a `/reservas` con `next/link` (el enlace a `/admin` se quitó en 5.4,
       D11). Mobile-first: los enlaces
       son de ancho completo o fácilmente alcanzables a 375px (D1). Verificar con
-      `npm run dev -w frontend` que `/` renderiza sin errores y los dos enlaces navegan.
+      `npm run dev -w frontend` que `/` renderiza sin errores y el enlace a `/reservas` navega.
       Verificado con `npm run build -w frontend` (prerenderizada como estática) y sirviendo el
       build de producción (`next start`) en un puerto temporal: `curl` a `/` devuelve `200`,
       contiene `href="/reservas"` (y `href="/admin"`, que 5.4 quitó después), y usa `Card`/`buttonVariants` de la
