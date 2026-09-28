@@ -54,12 +54,17 @@ export async function toApiResult<T>(
  * problema de conexión.
  */
 function mensajeDeRechazo(causa: unknown): string {
-  // Por `name` y no por `instanceof`: un `DOMException` puede venir de otro realm.
-  if (typeof causa === "object" && causa !== null && "name" in causa && causa.name === "AbortError") {
+  if (tieneNombre(causa, "AbortError")) {
     return "La solicitud se canceló.";
   }
-  if (causa instanceof TypeError) {
+  // `AbortSignal.timeout()` rechaza con `TimeoutError`: el servidor no respondió a tiempo.
+  if (causa instanceof TypeError || tieneNombre(causa, "TimeoutError")) {
     return "No se pudo conectar con el servidor.";
   }
   return "Ocurrió un error inesperado.";
+}
+
+// Por `name` y no por `instanceof`: un `DOMException` puede venir de otro realm.
+function tieneNombre(causa: unknown, nombre: string): boolean {
+  return typeof causa === "object" && causa !== null && "name" in causa && causa.name === nombre;
 }

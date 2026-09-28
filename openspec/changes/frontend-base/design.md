@@ -227,10 +227,11 @@ que estar definida en ese momento.
 del proyecto vive en la raíz del monorepo (§10). `next.config.ts` lo carga con
 `process.loadEnvFile` de Node (disponible en Node 20, la versión del proyecto y de CI), sin
 dependencias nuevas; las variables ya exportadas en el entorno tienen prioridad. Si
-`NEXT_PUBLIC_API_URL` sigue sin estar definida, `rewrites()` no arma el proxy y avisa por
-consola nombrando la variable, en vez de armar un destino `undefined/...`. No corta la
-ejecución porque `next typegen` (parte de `npm run typecheck`) también evalúa los rewrites, y
-en CI no hay `.env` ni esta variable. Se descartó `@next/env`
+`NEXT_PUBLIC_API_URL` sigue sin estar definida, `rewrites()` falla con un mensaje que la
+nombra, en vez de armar un destino `undefined/...`: un build o un deploy mal configurados no
+compilan. La única excepción es `next typegen` (parte de `npm run typecheck`), que también
+evalúa los rewrites con la misma fase que `next build` y corre en CI sin `.env`: ahí solo se
+avisa y se generan los tipos sin el proxy. Se descartó `@next/env`
 (`loadEnvConfig`): la guía de Next pide instalarlo como dependencia propia.
 
 **Alternativa considerada (`app.enableCors()` en el backend):** es el mecanismo estándar,

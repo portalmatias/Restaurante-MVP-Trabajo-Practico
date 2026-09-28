@@ -21,13 +21,17 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const urlBackend = process.env.NEXT_PUBLIC_API_URL;
     if (!urlBackend) {
-      // No se corta la ejecución: `next typegen` (parte de `npm run typecheck`) también evalúa
-      // los rewrites, y en CI no hay `.env` ni esta variable. Sin la URL no hay proxy, y se
-      // avisa para que en desarrollo se note por qué `/api/*` responde 404.
-      console.warn(
-        "Falta NEXT_PUBLIC_API_URL: no se configura el proxy /api. Debe definirse en el .env de la raíz del proyecto (ver .env.example) o en el entorno.",
-      );
-      return [];
+      const mensaje =
+        "Falta NEXT_PUBLIC_API_URL: debe definirse en el .env de la raíz del proyecto (ver .env.example) o en el entorno.";
+      // `next typegen` (parte de `npm run typecheck`) también evalúa los rewrites, con la misma
+      // fase que `next build` (verificado en node_modules/next/dist/cli/next-typegen.js), y en
+      // CI no hay `.env` ni esta variable. Solo ahí se sigue sin proxy; en build, dev y start
+      // falta la URL del backend y se corta, para que un deploy mal configurado no compile.
+      if (process.argv.includes("typegen")) {
+        console.warn(`${mensaje} Se generan los tipos sin el proxy /api.`);
+        return [];
+      }
+      throw new Error(mensaje);
     }
     return [
       {
