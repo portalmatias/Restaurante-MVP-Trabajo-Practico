@@ -274,9 +274,19 @@ También lee `fecha`, `turnoId`, `zonaId` y `comensales` de `searchParams` para 
 `FormularioSeleccion` cuando se llega con una selección previa: el `Button` "Cambiar fecha,
 turno o zona" de la Pantalla 3 ("no hay lugar") y el `Button` "Volver a elegir" de la Pantalla 4
 (`409` con `motivos`) navegan acá con esos cuatro parámetros para que la persona no tenga que
-volver a elegir todo. Un valor inválido o ya inexistente (por ejemplo, un `turnoId` que ya no
-está en `GET /turnos`, o un `zonaId` que ya no está en `GET /zonas`) se ignora sin romper el
-render: ese campo queda sin seleccionar, como si no se hubiera pasado ningún valor.
+volver a elegir todo. La regla es una sola: **todo valor que no sea coherente se ignora** sin
+romper el render, y ese campo queda sin seleccionar, como si no se hubiera pasado. Se valida en
+este orden, porque cada paso depende del anterior:
+
+1. `fecha`: se ignora si no es `YYYY-MM-DD`, si no existe en el calendario o si queda fuera del
+   rango que admite el selector (antes del día local de hoy).
+2. `zonaId`: se ignora si no está en `GET /zonas`.
+3. `turnoId`: se ignora si no está en `GET /turnos` **o** si su `diaSemana` no coincide con el
+   de la `fecha` ya validada (la misma regla que limpia el turno al cambiar la fecha). Sin
+   `fecha` válida, también se ignora.
+4. `comensales`: se ignora si no es un entero o si queda fuera del rango de la zona ya
+   validada; sin zona válida, se ignora. No se acota al rango: acotar cambiaría en silencio lo
+   que eligió la persona.
 
 1. `<PasosReserva pasoActual={1} total={3} />`.
 2. Título (`h1`, `text-2xl font-semibold`): "¿Cuándo y para cuántos?".

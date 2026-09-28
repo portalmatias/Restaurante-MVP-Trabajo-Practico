@@ -82,7 +82,9 @@
       `HTMLDialogElement.prototype.showModal` y `.close` (jsdom no los implementa) y verificar
       que abrir el diálogo llama a `showModal()` y cerrarlo llama a `close()`; que el diálogo
       expone el nombre accesible/rol esperado; y que los botones de confirmar y cancelar
-      disparan sus callbacks (`onConfirm`/`onCancel`) al hacer click. El atrapado de foco (Tab
+      disparan sus callbacks (`onConfirm`/`onCancel`) al hacer click; y que un evento `cancel`
+      disparado sobre el `<dialog>` (lo que hace el navegador al apretar Escape) llama a
+      `onCancel`. El atrapado de foco (Tab
       no sale del diálogo) y la devolución de foco al elemento que lo abrió NO se prueban acá:
       quedan como verificación manual en un navegador real (7.2). Verificar que falla (rojo).
 - [ ] 3.4 Implementar `frontend/src/components/ui/dialog.tsx` sobre `<dialog>` nativo
@@ -130,7 +132,10 @@
       `comensales` válidos como selección inicial (props que la página arma desde
       `searchParams`, ver D3 Pantalla 2) prellena cada control con esos valores; un `turnoId` o
       un `zonaId` inicial que no está en las fixtures de `GET /turnos`/`GET /zonas` se ignora
-      sin romper el render, dejando ese campo sin seleccionar; enviar arma la URL de
+      sin romper el render, dejando ese campo sin seleccionar; también se ignoran (D3
+      Pantalla 2, orden fecha → zona → turno → comensales) una `fecha` mal formada o anterior
+      al día local de hoy, un `turnoId` existente pero de otro día de la semana que la
+      `fecha`, y un `comensales` no entero o fuera del rango de la zona; enviar arma la URL de
       `/reservas/nueva/resultado` con los cuatro parámetros. Verificar que la suite falla
       (rojo) con `npm test -w frontend -- formulario-seleccion`.
 - [ ] 4.4 Implementar `FormularioSeleccion` (D3, Pantalla 2) y el `Server Component`
@@ -215,7 +220,9 @@
       mi reserva" NO se ofrece y en su lugar aparece un `Alert` `variant="info"` ("No pudimos
       verificar si todavía podés cancelar. Probá de nuevo en unos minutos.") con un `Button`
       "Reintentar" que vuelve a pedir `GET /zonas`; ninguno de los dos casos rompe el render
-      del resto del detalle. Verificar rojo.
+      del resto del detalle. Después del reintento: si responde bien, el `Alert` desaparece y
+      el botón se muestra u oculta según `puedeCancelarSegunVentana`; si vuelve a fallar, el
+      `Alert` sigue visible y el resto del detalle no cambia. Verificar rojo.
 - [ ] 6.3 Conectar la resolución de `GET /zonas` y `puedeCancelarSegunVentana` (2.9/2.10) en
       "detalle" para decidir si se muestra el botón "Cancelar mi reserva", incluido el `Alert`
       informativo con "Reintentar" de 6.2 cuando `GET /zonas` falla o no trae la zona buscada
