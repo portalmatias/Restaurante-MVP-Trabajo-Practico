@@ -82,9 +82,33 @@ describe("toApiResult sobre el cliente HTTP", () => {
 
     const resultado = await toApiResult(apiClient.GET("/"));
 
+    expect(resultado.data).toBeUndefined();
     expect(resultado.error).toEqual({
       tipo: "desconocido",
       mensaje: "No se pudo conectar con el servidor.",
+    });
+  });
+
+  it("una petición cancelada no se informa como falla de conexión", async () => {
+    fetchMock.mockRejectedValue(new DOMException("The operation was aborted.", "AbortError"));
+
+    const resultado = await toApiResult(apiClient.GET("/"));
+
+    expect(resultado.data).toBeUndefined();
+    expect(resultado.error).toEqual({ tipo: "desconocido", mensaje: "La solicitud se canceló." });
+  });
+
+  it("un 2xx con cuerpo mal formado no se informa como falla de conexión", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("{no es json", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+
+    const resultado = await toApiResult(apiClient.GET("/"));
+
+    expect(resultado.data).toBeUndefined();
+    expect(resultado.error).toEqual({
+      tipo: "desconocido",
+      mensaje: "Ocurrió un error inesperado.",
     });
   });
 

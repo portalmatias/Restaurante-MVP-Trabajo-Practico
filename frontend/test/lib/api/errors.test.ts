@@ -29,6 +29,13 @@ describe("mapErrorApi", () => {
     });
   });
 
+  it("400 sin cuerpo mapea a validacion con un mensaje genérico", () => {
+    expect(mapErrorApi(400, undefined)).toEqual({
+      tipo: "validacion",
+      mensajes: ["Ocurrió un error inesperado."],
+    });
+  });
+
   it("404 con message string mapea a no-encontrado", () => {
     const resultado = mapErrorApi(404, {
       statusCode: 404,

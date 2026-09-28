@@ -32,10 +32,10 @@ export async function toApiResult<T>(
   let resultado: { data?: T; error?: unknown; response: Response };
   try {
     resultado = await promise;
-  } catch {
-    // `fetch` rechaza sin respuesta (red caída, proxy inalcanzable, petición abortada): se
-    // informa como error del resultado y no como una excepción que la UI tenga que atrapar.
-    return { error: { tipo: "desconocido", mensaje: "No se pudo conectar con el servidor." } };
+  } catch (causa) {
+    // La promesa rechaza sin respuesta utilizable: se informa como error del resultado y no
+    // como una excepción que la UI tenga que atrapar, distinguiendo el motivo.
+    return { error: { tipo: "desconocido", mensaje: mensajeDeRechazo(causa) } };
   }
 
   const { data, error, response } = resultado;
@@ -45,4 +45,21 @@ export async function toApiResult<T>(
     return { error: mapErrorApi(response.status, error) };
   }
   return { data: data as T };
+}
+
+/**
+ * Mensaje para una llamada que rechazó sin respuesta: `fetch` rechaza con `TypeError` cuando
+ * no llega al servidor (red caída, proxy inalcanzable) y con `AbortError` cuando se cancela a
+ * propósito. Cualquier otro rechazo (por ejemplo un cuerpo JSON mal formado) no es un
+ * problema de conexión.
+ */
+function mensajeDeRechazo(causa: unknown): string {
+  // Por `name` y no por `instanceof`: un `DOMException` puede venir de otro realm.
+  if (typeof causa === "object" && causa !== null && "name" in causa && causa.name === "AbortError") {
+    return "La solicitud se canceló.";
+  }
+  if (causa instanceof TypeError) {
+    return "No se pudo conectar con el servidor.";
+  }
+  return "Ocurrió un error inesperado.";
 }

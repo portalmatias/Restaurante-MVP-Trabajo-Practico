@@ -64,10 +64,8 @@
       enlaces. Verificar a 375px de ancho (DevTools, modo responsive) que no hay scroll
       horizontal y que el header es utilizable sin hacer hover; repetir a 768/1024/1440.
       Confirmado por portalmatias el 2026-09-28 en el navegador (DevTools, modo responsive).
-      Implementación completa (Inter vía `next/font/google` con `weight: "variable"`, header y
-      footer compartidos, clases mobile-first sin prefijo primero); la verificación de scroll
-      horizontal y usabilidad sin hover a 375/768/1024/1440 requiere un navegador real y queda
-      pendiente para el humano — no se marca completa por esa parte visual (D9).
+      Implementación: Inter vía `next/font/google` con `weight: "variable"`, header y footer
+      compartidos, clases mobile-first sin prefijo primero.
 - [x] 3.3 Verificar con un lector de contraste (DevTools de Chrome/Firefox marcan la relación
       de contraste al inspeccionar un nodo de texto) que cada combinación texto/fondo de la
       paleta (`primary`/`background`, `secondary`/`background`, `accent`/`background`,
@@ -275,8 +273,11 @@
 - [x] 8.4 Tests de este change en verde: `npm run test -w frontend`. Verificar también
       `npm run build -w frontend` (incluye el chequeo de que `next/font` y el App Router
       compilan) y `npm run typecheck -w frontend` (incluye `next typegen && tsc --noEmit`).
+      Observado el 2026-09-28: 34/34 tests, typecheck sin errores y build con las rutas `/`,
+      `/admin` y `/reservas` prerenderizadas.
 - [x] 8.5 `npm run lint` (raíz) en limpio, sin warnings nuevos en `frontend/**`. Verificar con
       el comando desde la raíz.
+      Observado el 2026-09-28: `npm run lint` sin errores ni warnings.
 - [ ] 8.6 Checklist manual de accesibilidad y responsive completo y documentado en la
       descripción del PR: contraste (3.3), sin scroll horizontal en los 4 anchos (5.3),
       primitivas usables a 375px primero (4.7), foco visible navegando con teclado en `/`,
