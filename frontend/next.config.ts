@@ -21,9 +21,13 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const urlBackend = process.env.NEXT_PUBLIC_API_URL;
     if (!urlBackend) {
-      throw new Error(
-        "Falta NEXT_PUBLIC_API_URL: debe definirse en el .env de la raíz del proyecto (ver .env.example) o en el entorno.",
+      // No se corta la ejecución: `next typegen` (parte de `npm run typecheck`) también evalúa
+      // los rewrites, y en CI no hay `.env` ni esta variable. Sin la URL no hay proxy, y se
+      // avisa para que en desarrollo se note por qué `/api/*` responde 404.
+      console.warn(
+        "Falta NEXT_PUBLIC_API_URL: no se configura el proxy /api. Debe definirse en el .env de la raíz del proyecto (ver .env.example) o en el entorno.",
       );
+      return [];
     }
     return [
       {
