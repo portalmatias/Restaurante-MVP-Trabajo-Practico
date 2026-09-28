@@ -282,10 +282,13 @@
 - [x] 8.5 `npm run lint` (raíz) en limpio, sin warnings nuevos en `frontend/**`. Verificar con
       el comando desde la raíz.
       Observado el 2026-09-28: `npm run lint` sin errores ni warnings.
-- [ ] 8.6 Checklist manual de accesibilidad y responsive completo y documentado en la
+- [x] 8.6 Checklist manual de accesibilidad y responsive completo y documentado en la
       descripción del PR: contraste (3.3), sin scroll horizontal en los 4 anchos (5.3),
       primitivas usables a 375px primero (4.7), foco visible navegando con teclado en `/`,
       `/admin` y `/reservas`.
+      Confirmado por portalmatias el 2026-09-28: contraste calculado (3.3), sin scroll
+      horizontal y primitivas a 375px (5.3, 4.7), y foco visible navegando con Tab en `/`,
+      `/reservas` y `/admin`. Documentado en la descripción del PR.
 - [ ] 8.7 CI en verde en el PR `feature/frontend-base` (los jobs `spec` y `lint` cubren este
       change; el job `test` no lo toca porque no corre nada de `frontend/` todavía — ver Open
       Questions de `design.md`). Verificar en la pestaña Checks.
