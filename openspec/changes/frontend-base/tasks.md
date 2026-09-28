@@ -153,6 +153,10 @@
 - [x] 5.3 Verificar sin scroll horizontal en `/`, `/admin` y `/reservas` a 375/768/1024/1440
       (D9, manual). Dejar la constancia en la descripción del PR.
       Confirmado por portalmatias el 2026-09-28 en el navegador (DevTools, modo responsive).
+- [x] 5.4 Quitar de la landing y del encabezado todo enlace y mención a `/admin` (D11): el
+      personal entra por URL directa. Verificar con `frontend/test/app/home.test.tsx` en verde
+      y con `grep -n 'href="/admin"' frontend/app/layout.tsx frontend/app/page.tsx` sin
+      resultados.
 
 ## 6. Cliente HTTP tipado
 

@@ -39,15 +39,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             >
               Reservas del Restaurante
             </Link>
+            {/* Sin enlace a `/admin`: el personal entra por URL directa (design.md D11). */}
             <nav
               aria-label="Navegación principal"
               className="-ml-3 flex flex-wrap items-center gap-1 sm:ml-0"
             >
               <Link href="/reservas" className={navLinkClassName}>
                 Reservas
-              </Link>
-              <Link href="/admin" className={navLinkClassName}>
-                Administración
               </Link>
             </nav>
           </div>

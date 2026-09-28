@@ -23,9 +23,16 @@ ese layout. Ninguna de las tres SHALL contener lógica de negocio, autenticació
 pantallas reales de reserva o administración: eso es alcance de `frontend-cliente` y
 `frontend-admin`.
 
-#### Scenario: La landing enlaza a los dos flujos
+#### Scenario: La landing solo muestra el flujo del cliente
 - **WHEN** una persona visita `/`
-- **THEN** la página muestra un enlace a `/reservas` y un enlace a `/admin`
+- **THEN** la página muestra un enlace a `/reservas`
+- **AND** ni la página ni el encabezado muestran un enlace a `/admin` ni mencionan la
+  administración
+
+#### Scenario: El personal entra a la administración por URL directa
+- **WHEN** una persona escribe la dirección `/admin` en el navegador
+- **THEN** la página `/admin` se muestra con el mismo layout, aunque ninguna página pública la
+  enlace
 
 #### Scenario: Las rutas placeholder comparten el layout
 - **WHEN** una persona visita `/admin` o `/reservas`

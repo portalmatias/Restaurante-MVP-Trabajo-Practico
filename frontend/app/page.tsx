@@ -10,16 +10,12 @@ export default function Home() {
           Reservá tu mesa en minutos
         </h1>
         <p className="text-base text-muted-foreground">
-          Consultá disponibilidad y reservá sin necesidad de crear una cuenta, o ingresá como
-          administrador para gestionar el salón.
+          Consultá disponibilidad y reservá sin necesidad de crear una cuenta.
         </p>
       </div>
       <div className="flex w-full max-w-sm flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
         <Link href="/reservas" className={buttonVariants({ variant: "primary" })}>
           Reservar una mesa
-        </Link>
-        <Link href="/admin" className={buttonVariants({ variant: "secondary" })}>
-          Ingresar como administrador
         </Link>
       </div>
       <Card title="Cómo funciona" className="w-full max-w-2xl">

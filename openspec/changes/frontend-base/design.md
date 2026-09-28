@@ -335,6 +335,22 @@ frontend/
     └── lib/api/            # tests del mapeo de errores
 ```
 
+
+### D11: Acceso del personal a `/admin` por URL directa, sin enlaces públicos
+**Decisión:** ni el encabezado ni la landing enlazan a `/admin`. El cliente final solo ve el
+flujo de reservas; el personal del restaurante entra escribiendo la dirección `/admin` (o desde
+un marcador del navegador), donde `frontend-admin` va a mostrar el login.
+
+**Motivo:** al cliente no le sirve ver la entrada de administración y suma ruido visual en una
+interfaz pensada para reservar rápido desde el celular.
+
+**No es una medida de seguridad.** Esconder el enlace solo ordena la interfaz: quien conozca la
+URL llega igual a `/admin`. Lo que protege la administración son los guards de JWT y de rol del
+backend (`auth-admin`), que rechazan cualquier petición sin credenciales válidas.
+
+**Alternativa considerada:** un enlace discreto en el pie ("Acceso del personal"). Se pospone:
+se agrega solo si el personal lo necesita.
+
 ## Risks / Trade-offs
 
 - **Next 16 / React 19 con APIs distintas a lo esperado** → mitigado consultando
