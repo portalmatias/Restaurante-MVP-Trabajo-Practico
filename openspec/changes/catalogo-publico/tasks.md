@@ -45,8 +45,10 @@
       y `TurnoPublicoRespuestaDto`
       (`backend/src/horarios/dto/turno-publico-respuesta.dto.ts`) con `@nestjs/swagger`, más
       `ListarTurnosPublicosDto` (`backend/src/horarios/dto/listar-turnos-publicos.dto.ts`) con
-      `diaSemana?: DiaSemana` opcional validado con `@IsEnum(DiaSemana)` (mismo patrón que
-      `CrearTurnoDto.diaSemana`, `crear-turno.dto.ts:14`). Verificar con
+      `diaSemana?: DiaSemana` opcional validado con `@IsOptional()` **y** `@IsEnum(DiaSemana)`.
+      A diferencia de `CrearTurnoDto.diaSemana` (`crear-turno.dto.ts:14`), acá el campo es
+      opcional: sin `@IsOptional()`, `GET /turnos` sin query respondería `400`. Un valor vacío
+      (`?diaSemana=`) no es `undefined` y responde `400`. Verificar con
       `npm run typecheck -w backend`.
 - [ ] 4.3 Crear `ZonasPublicasController` en `backend/src/zonas/zonas-publicas.controller.ts`
       (`@Controller('zonas')`, `@SkipThrottle()` con el mismo comentario de justificación que
@@ -81,13 +83,18 @@
       disponibilidad, `05:xx` disponibilidad-contexto, `01:xx` reservas-invariantes; usar por
       ejemplo `03:xx`) y borrarlos en `afterEach`/`afterAll`. Casos: sin header `Authorization`
       responde `200`; un Turno con `activo: false` creado por el test no aparece en la
-      respuesta; ningún elemento tiene la propiedad `activo`; con Turnos propios en
+      respuesta; las claves de cada elemento, ordenadas, son exactamente
+      `["diaSemana", "horaFin", "horaInicio", "id"]` (así un campo de más hace fallar el test); con Turnos propios en
       `MARTES` 03:00 y `MARTES` 03:30 más `MIERCOLES` 03:00, todos activos, la respuesta trae
       los dos de `MARTES` antes que el de `MIERCOLES`, y el de `03:00` antes que el de `03:30`
       dentro de `MARTES`; `horaInicio`/`horaFin` llegan como `'1970-01-01T03:00:00.000Z'` /
       `'1970-01-01T03:30:00.000Z'` (mismo formato que `GET /admin/turnos`);
-      `?diaSemana=MARTES` devuelve solo los de `MARTES`; `?diaSemana=FERIADO` responde `400`;
-      un día sin Turnos activos propios ni de otras suites responde `200` con `[]`. Verificar
+      `?diaSemana=MARTES` devuelve solo los de `MARTES`; `?diaSemana=FERIADO` y `?diaSemana=`
+      responden `400`; `?diaSemana=LUNES` responde `200` con `[]`. Para que este último caso sea
+      determinístico, el test primero comprueba en la base que no haya Turnos `LUNES` activos
+      (el seed los deja inactivos y `jest-e2e.json` usa `maxWorkers: 1`, así que las suites no
+      corren a la vez) y, si los hubiera, falla con un mensaje que lo explica en vez de dar un
+      falso rojo en la aserción. Verificar
       con `npm run test:e2e -w backend -- turnos-publicos`.
 - [ ] 5.3 En cualquiera de los dos archivos (o en uno nuevo
       `backend/test/catalogo-publico-regresion.e2e-spec.ts`), agregar dos tests de no

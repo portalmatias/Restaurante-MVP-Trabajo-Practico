@@ -110,6 +110,10 @@ responder `400 Bad Request`.
 - **WHEN** se consulta `GET /turnos?diaSemana=FERIADO`
 - **THEN** el sistema responde `400 Bad Request`
 
+#### Scenario: Filtro vacío es un valor inválido
+- **WHEN** se consulta `GET /turnos?diaSemana=` (parámetro presente pero vacío)
+- **THEN** el sistema responde `400 Bad Request`
+
 ### Requirement: Una lista vacía es 200, no 404
 Si no hay Zonas configuradas, o no hay ningún Turno activo (con o sin el filtro `diaSemana`),
 el sistema SHALL responder `200 OK` con una lista vacía. La ausencia de resultados no SHALL
