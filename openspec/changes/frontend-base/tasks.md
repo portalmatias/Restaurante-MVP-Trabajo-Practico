@@ -56,13 +56,14 @@
       (`.next/static/chunks/*.css`) mostrando `.bg-background{background-color:var(--background)}`
       y `.text-foreground{color:var(--foreground)}`; el grep queda sin resultados. No se abrió
       un navegador real: la confirmación visual final queda para el humano (ver 3.2/8.6).
-- [ ] 3.2 Reescribir `frontend/app/layout.tsx`: quitar Geist, cargar Inter (400–700) con
+- [x] 3.2 Reescribir `frontend/app/layout.tsx`: quitar Geist, cargar Inter (400–700) con
       `next/font/google` (D3), mantener `lang="es"` en `<html>` (ya está en el scaffold) y
       envolver `children` en un layout con `<header>` y `<footer>` compartidos, escrito
       **mobile-first**: primero las clases sin prefijo pensadas para 375px, después `sm:`/
       `md:`/`lg:` solo para sumar (D1). El header no depende de `hover` para mostrar sus
       enlaces. Verificar a 375px de ancho (DevTools, modo responsive) que no hay scroll
       horizontal y que el header es utilizable sin hacer hover; repetir a 768/1024/1440.
+      Confirmado por portalmatias el 2026-09-28 en el navegador (DevTools, modo responsive).
       Implementación completa (Inter vía `next/font/google` con `weight: "variable"`, header y
       footer compartidos, clases mobile-first sin prefijo primero); la verificación de scroll
       horizontal y usabilidad sin hover a 375/768/1024/1440 requiere un navegador real y queda
@@ -125,10 +126,11 @@
       GREEN observado: `Test Suites: 1 passed, 1 total` / `Tests: 3 passed, 3 total`. Suite
       completa de la sección: `Test Suites: 3 passed, 3 total` / `Tests: 8 passed, 8 total`.
       El grep de hex queda sin resultados.
-- [ ] 4.7 Verificar manualmente en el navegador, a 375px primero y luego a 768/1024/1440
+- [x] 4.7 Verificar manualmente en el navegador, a 375px primero y luego a 768/1024/1440
       (D1, D9), que cada primitiva se ve y se usa correctamente: `Button` de ancho completo en
       mobile, `Field`/`Select` con su error visible sin recortarse, `Card` sin desbordar el
       viewport. Dejar la constancia en la descripción del PR.
+      Confirmado por portalmatias el 2026-09-28 en el navegador (DevTools, modo responsive).
 
 ## 5. Rutas: layout compartido y esqueletos
 
@@ -150,12 +152,9 @@
       Verificado sirviendo el build de producción: `curl` a `/reservas` y `/admin` devuelve
       `200` en ambas, y las dos incluyen el título del header compartido ("Reservas del
       Restaurante"), confirmando el mismo layout que `/`.
-- [ ] 5.3 Verificar sin scroll horizontal en `/`, `/admin` y `/reservas` a 375/768/1024/1440
+- [x] 5.3 Verificar sin scroll horizontal en `/`, `/admin` y `/reservas` a 375/768/1024/1440
       (D9, manual). Dejar la constancia en la descripción del PR.
-      No se pudo verificar: requiere un navegador real con viewport controlable. Revisión
-      estática de indicios (`grep` de anchos fijos en px y `overflow-x` en `frontend/app` y
-      `frontend/src/components/ui`) no encontró resultados, pero no reemplaza la comprobación
-      visual. Queda pendiente para el humano en los 4 anchos.
+      Confirmado por portalmatias el 2026-09-28 en el navegador (DevTools, modo responsive).
 
 ## 6. Cliente HTTP tipado
 
@@ -269,14 +268,14 @@
 
 - [ ] 8.1 `openspec validate frontend-base --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
-- [ ] 8.2 El change no agrega migraciones ni toca `backend/` ni `openapi/openapi.yaml`.
+- [x] 8.2 El change no agrega migraciones ni toca `backend/` ni `openapi/openapi.yaml`.
       Verificar con `git diff main --stat -- backend openapi` vacío.
-- [ ] 8.3 Si 1.2 agregó `NEXT_PUBLIC_API_URL` a `.env.example`, queda en este mismo PR;
+- [x] 8.3 Si 1.2 agregó `NEXT_PUBLIC_API_URL` a `.env.example`, queda en este mismo PR;
       si ya existía, no hay diff. Verificar con `git diff main -- .env.example`.
-- [ ] 8.4 Tests de este change en verde: `npm run test -w frontend`. Verificar también
+- [x] 8.4 Tests de este change en verde: `npm run test -w frontend`. Verificar también
       `npm run build -w frontend` (incluye el chequeo de que `next/font` y el App Router
       compilan) y `npm run typecheck -w frontend` (incluye `next typegen && tsc --noEmit`).
-- [ ] 8.5 `npm run lint` (raíz) en limpio, sin warnings nuevos en `frontend/**`. Verificar con
+- [x] 8.5 `npm run lint` (raíz) en limpio, sin warnings nuevos en `frontend/**`. Verificar con
       el comando desde la raíz.
 - [ ] 8.6 Checklist manual de accesibilidad y responsive completo y documentado en la
       descripción del PR: contraste (3.3), sin scroll horizontal en los 4 anchos (5.3),
