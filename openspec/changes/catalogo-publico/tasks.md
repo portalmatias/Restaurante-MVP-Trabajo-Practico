@@ -15,7 +15,7 @@
 
 - [ ] 2.1 En `backend/src/zonas/zonas.service.spec.ts`, agregar un `describe('listarPublicas')`
       que mockea `prisma.zona.findMany` (mismo patrón de mock manual que el resto del archivo,
-      `zonas.service.spec.ts:21-28`) y verifica que `listarPublicas()` llama a `findMany` con
+      `zonas.service.spec.ts:42-52`, el `beforeEach` que arma los `jest.fn()`) y verifica que `listarPublicas()` llama a `findMany` con
       `select: { id, nombre, minComensales, maxComensales, anticipacionMinHoras,
       anticipacionMaxDias, ventanaCancelacionHoras, requiereConfirmacionAdmin }` — sin
       `aforoMaximo` — y que devuelve tal cual lo que responde el mock. Verificar que la suite

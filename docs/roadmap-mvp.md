@@ -413,6 +413,7 @@ Fase 4        reservas-crear (matias)              |
         (fede)             (facundo)            (facundo)
            |
 Fase 5  frontend-base -> frontend-cliente / frontend-admin      <- PARALELO al backend
+        catalogo-publico ---^  (prerrequisito de frontend-cliente)
            |
 Fase 6  entrega-final (facundo)
 ```
