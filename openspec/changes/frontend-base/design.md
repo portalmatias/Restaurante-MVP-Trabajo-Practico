@@ -188,19 +188,64 @@ paths ficticios al YAML para adelantar tipos.
 - *`@nestjs/swagger` client generation (mismo mecanismo que usa el backend para el chequeo de
   deriva)*: genera el spec, no un cliente frontend; no resuelve este problema.
 
-### D6: URL base del cliente HTTP: `NEXT_PUBLIC_API_URL`
-**Decisión:** el cliente HTTP toma la URL base de `process.env.NEXT_PUBLIC_API_URL` (prefijo
-`NEXT_PUBLIC_` porque el valor debe llegar también a componentes cliente, no solo a Server
-Components). `openspec/config.yaml` §10 ya lista `NEXT_PUBLIC_API_URL` entre las "Variables
-mínimas" existentes del proyecto, así que **no se agrega una variable de entorno nueva**.
+### D6: URL del backend y proxy `/api` en Next para evitar CORS
+**Problema:** el frontend corre en `localhost:3000` y el backend en `localhost:3001` (README y
+default de `backend/src/main.ts`). Son orígenes distintos y `main.ts` no llama a
+`enableCors()`, así que el navegador bloquearía cualquier `fetch` de un componente cliente al
+backend. Las llamadas desde Server Components no tienen el problema, porque corren en el
+servidor.
 
-**Nota de verificación:** en este entorno de trabajo, la lectura directa de `.env.example`
-está bloqueada por los permisos del sandbox (`Permission to use Bash/Read ... has been
-denied` al intentar leerlo con `cat`, `bat`, `rg` o la herramienta `Read`), así que no se
-pudo confirmar byte a byte que la variable ya está en el archivo. La fuente usada es
-`openspec/config.yaml` §10, que es la constitución del proyecto y ya la documenta como
-variable mínima existente. `tasks.md` incluye un paso para confirmarlo con acceso normal al
-repo y, si faltara, agregarla en este mismo PR (§13 de la Definition of Done).
+**Decisión:** un proxy de mismo origen con `rewrites` de `next.config.ts`:
+
+```ts
+async rewrites() {
+  return [
+    { source: '/api/:path*', destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*` },
+  ];
+}
+```
+
+- En el **navegador**, el cliente HTTP usa `baseUrl: '/api'`: toda llamada va al mismo origen
+  del frontend y Next la reenvía al backend. No hay CORS que configurar.
+- En el **servidor** (Server Components), el cliente usa `baseUrl: NEXT_PUBLIC_API_URL`
+  directo: una URL relativa no sirve fuera del navegador y el salto por el proxy no aporta
+  nada.
+- Una función `urlBaseApi()` en `frontend/src/lib/api/` elige el valor según
+  `typeof window`, y es lo único que decide la URL base; no hay otra URL escrita en el código.
+- Verificado contra la guía de esta versión
+  (`node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/rewrites.md`,
+  sección "Rewriting to an external URL"): los rewrites admiten un destino externo y
+  conservan método, query y body.
+
+**Variable de entorno:** se sigue usando `NEXT_PUBLIC_API_URL`, que ya está en
+`.env.example` (confirmado por portalmatias el 2026-09-23; el archivo no es legible para el
+agente) y en `openspec/config.yaml` §10. **No se agrega ninguna variable nueva.** Los
+`rewrites` se evalúan al construir (`next build`), así que en producción la variable tiene
+que estar definida en ese momento.
+
+**Carga del `.env` de la raíz:** Next solo lee los `.env*` de `frontend/`, pero el `.env`
+del proyecto vive en la raíz del monorepo (§10). `next.config.ts` lo carga con
+`process.loadEnvFile` de Node, sin dependencias nuevas; las variables ya exportadas en el
+entorno tienen prioridad. Si `NEXT_PUBLIC_API_URL` sigue sin estar definida, `rewrites()` falla
+con un mensaje que la nombra, en vez de armar un destino `undefined/...`: un build o un deploy
+mal configurados no compilan. La única excepción es `next typegen` (parte de `npm run
+typecheck`), que también evalúa los rewrites con la misma fase que `next build` y corre en CI
+sin `.env`: ahí solo se avisa y se generan los tipos sin el proxy. Se descartó `@next/env`
+(`loadEnvConfig`): la guía de Next pide instalarlo como dependencia propia.
+
+`process.loadEnvFile` requiere Node.js 20.12 o superior (no existe en versiones anteriores de
+la serie 20.x); por eso `engines.node` de la raíz queda en `>=20.12` y el README pide "Node.js
+20.12 o superior (20 LTS)". CI usa Node 20 (`actions/setup-node@v4` con `node-version: '20'`,
+que resuelve siempre a la última versión menor de la serie 20.x), así que ya la cubre. Si
+`next.config.ts` detecta `typeof process.loadEnvFile !== "function"` con un `.env` de raíz
+presente, corta con un mensaje en español que nombra la versión mínima requerida, en vez de
+dejar que Node falle con un `TypeError: process.loadEnvFile is not a function` críptico.
+
+**Alternativa considerada (`app.enableCors()` en el backend):** es el mecanismo estándar,
+pero toca `backend/` (fuera del alcance de un change de frontend, iría en uno propio) y
+necesita una variable nueva para el origen permitido. El proxy resuelve lo mismo sin tocar el
+backend. Si más adelante el frontend y el backend se despliegan en dominios distintos sin
+Next de por medio, CORS se puede agregar en ese momento.
 
 ### D7: Resultado tipado y mapeo de errores
 **Decisión:** un tipo `ApiResult<T>` (discriminado por la presencia de `data` o de `error`)
@@ -276,7 +321,7 @@ frontend/
 ├── app/
 │   ├── layout.tsx          # reescrito: header/footer, tokens, Inter
 │   ├── globals.css         # reescrito: tokens D2, sin dark mode
-│   ├── page.tsx            # reescrito: landing con enlaces a /reservas y /admin
+│   ├── page.tsx            # reescrito: landing con enlace a /reservas (sin /admin, D11)
 │   ├── admin/page.tsx      # nuevo: placeholder
 │   └── reservas/page.tsx   # nuevo: placeholder
 ├── src/
@@ -289,6 +334,22 @@ frontend/
     ├── components/ui/      # tests de accesibilidad de las primitivas
     └── lib/api/            # tests del mapeo de errores
 ```
+
+
+### D11: Acceso del personal a `/admin` por URL directa, sin enlaces públicos
+**Decisión:** ni el encabezado ni la landing enlazan a `/admin`. El cliente final solo ve el
+flujo de reservas; el personal del restaurante entra escribiendo la dirección `/admin` (o desde
+un marcador del navegador), donde `frontend-admin` va a mostrar el login.
+
+**Motivo:** al cliente no le sirve ver la entrada de administración y suma ruido visual en una
+interfaz pensada para reservar rápido desde el celular.
+
+**No es una medida de seguridad.** Esconder el enlace solo ordena la interfaz: quien conozca la
+URL llega igual a `/admin`. Lo que protege la administración son los guards de JWT y de rol del
+backend (`auth-admin`), que rechazan cualquier petición sin credenciales válidas.
+
+**Alternativa considerada:** un enlace discreto en el pie ("Acceso del personal"). Se pospone:
+se agrega solo si el personal lo necesita.
 
 ## Risks / Trade-offs
 

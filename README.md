@@ -10,7 +10,7 @@ constitución del repo. El orden de trabajo está en [`docs/roadmap-mvp.md`](doc
 
 ## Requisitos
 
-- Node.js 20 LTS o superior
+- Node.js 20.12 o superior (20 LTS)
 - npm 10 o superior
 - Docker y Docker Compose (solo para PostgreSQL)
 

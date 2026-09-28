@@ -23,9 +23,16 @@ ese layout. Ninguna de las tres SHALL contener lógica de negocio, autenticació
 pantallas reales de reserva o administración: eso es alcance de `frontend-cliente` y
 `frontend-admin`.
 
-#### Scenario: La landing enlaza a los dos flujos
+#### Scenario: La landing solo muestra el flujo del cliente
 - **WHEN** una persona visita `/`
-- **THEN** la página muestra un enlace a `/reservas` y un enlace a `/admin`
+- **THEN** la página muestra un enlace a `/reservas`
+- **AND** ni la página ni el encabezado muestran un enlace a `/admin` ni mencionan la
+  administración
+
+#### Scenario: El personal entra a la administración por URL directa
+- **WHEN** una persona escribe la dirección `/admin` en el navegador
+- **THEN** la página `/admin` se muestra con el mismo layout, aunque ninguna página pública la
+  enlace
 
 #### Scenario: Las rutas placeholder comparten el layout
 - **WHEN** una persona visita `/admin` o `/reservas`
@@ -161,15 +168,42 @@ paths presentes en el contrato en el momento de generarlos.
 - **THEN** el chequeo de tipos (`tsc --noEmit`) falla para ese código, antes de llegar a
   ejecutarse
 
-#### Scenario: La URL base sale de configuración
-- **WHEN** el cliente HTTP arma una petición
-- **THEN** usa como URL base el valor de la variable de entorno `NEXT_PUBLIC_API_URL`, sin una
-  URL fija escrita en el código
+#### Scenario: La URL del backend sale de configuración
+- **WHEN** el cliente HTTP arma una petición desde el servidor, o el proxy de `/api` reenvía
+  una petición del navegador
+- **THEN** la URL del backend es el valor de la variable de entorno `NEXT_PUBLIC_API_URL`, sin
+  una URL fija escrita en el código
+
+### Requirement: Llamadas desde el navegador por el mismo origen
+El frontend SHALL exponer bajo su propio origen un proxy `/api/*` que reenvía cada petición al
+backend conservando el método, el path, la query, el body y el código de respuesta. El cliente
+HTTP SHALL usar `/api` como URL base cuando se ejecuta en el navegador, de modo que ninguna
+llamada del navegador vaya a un origen distinto del frontend y el backend no necesite
+habilitar CORS.
+
+#### Scenario: Llamada desde un componente cliente
+- **WHEN** un componente que se ejecuta en el navegador invoca al cliente HTTP para
+  `GET /disponibilidad`
+- **THEN** la petición sale hacia `/api/disponibilidad` del mismo origen del frontend
+- **AND** no sale ninguna petición del navegador hacia la URL de `NEXT_PUBLIC_API_URL`
+
+#### Scenario: El proxy reenvía al backend sin alterar la respuesta
+- **WHEN** el navegador envía una petición a `/api/<path>` del frontend
+- **THEN** el frontend la reenvía a `<NEXT_PUBLIC_API_URL>/<path>` con el mismo método, query y
+  body
+- **AND** devuelve al navegador el mismo código de estado y el mismo cuerpo que respondió el
+  backend, incluidos los errores `400`, `404` y `409`
+
+#### Scenario: Llamada desde un Server Component
+- **WHEN** un Server Component invoca al cliente HTTP
+- **THEN** la petición va directo a la URL de `NEXT_PUBLIC_API_URL`, sin pasar por el proxy
 
 ### Requirement: Mapeo tipado de errores de la API
 El cliente HTTP SHALL traducir toda respuesta de error de la API a un resultado tipado y
-discriminable de una respuesta exitosa, preservando la información que la API envía en cada
-forma de error.
+discriminable de una respuesta exitosa, preservando la información que la API envía en los
+errores `4xx`. En los errores `5xx` (incluido el backend inalcanzable a través del proxy) y en
+las fallas de red, el cliente SHALL NOT exponer el mensaje del servidor y SHALL usar un
+mensaje genérico.
 
 #### Scenario: Error 400 con lista de mensajes
 - **WHEN** la API responde `400` con `ErrorRespuesta` cuyo `message` es una lista de textos
@@ -189,6 +223,14 @@ forma de error.
   (`MotivoNoDisponible[]`)
 - **THEN** el resultado tipado del cliente expone cada motivo con su `codigo` y su `mensaje`,
   en el mismo orden en que la API los envió
+
+#### Scenario: Error 5xx o backend inalcanzable a través del proxy
+- **WHEN** la API responde con un código igual o mayor a `500`, o el proxy `/api` no puede
+  comunicarse con el backend (por ejemplo, cuando el backend está caído y Next devuelve su
+  propia página de error)
+- **THEN** el resultado tipado del cliente expone un error `desconocido` con un mensaje
+  genérico de disponibilidad
+- **AND** ese mensaje nunca incluye el mensaje ni el cuerpo que haya enviado el servidor
 
 #### Scenario: Respuesta exitosa se distingue del error
 - **WHEN** la API responde con un código `2xx`
