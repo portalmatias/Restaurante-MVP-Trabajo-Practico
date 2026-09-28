@@ -9,6 +9,14 @@ import type { NextConfig } from "next";
 // CI) tienen prioridad sobre las del archivo.
 const envRaiz = resolve(process.cwd(), "..", ".env");
 if (existsSync(envRaiz)) {
+  // `process.loadEnvFile` requiere Node.js 20.12 o superior (ver README y `engines.node` de la
+  // raíz). Sin este chequeo, una instalación con un Node más viejo fallaría acá con un
+  // `TypeError: process.loadEnvFile is not a function` críptico, sin decir por qué.
+  if (typeof process.loadEnvFile !== "function") {
+    throw new Error(
+      `Node.js ${process.version} no tiene process.loadEnvFile: hace falta Node.js 20.12 o superior para cargar el .env de la raíz del proyecto (ver README, sección Requisitos). Actualizá tu versión de Node.js.`,
+    );
+  }
   process.loadEnvFile(envRaiz);
 }
 

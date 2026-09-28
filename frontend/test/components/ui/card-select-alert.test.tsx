@@ -18,6 +18,22 @@ describe("Card", () => {
     expect(screen.queryByRole("region")).toBeNull();
     expect(screen.getByText("Contenido sin título")).toBeInTheDocument();
   });
+
+  it("por defecto expone el título como encabezado de nivel 2", () => {
+    render(<Card title="Reservas">Contenido</Card>);
+
+    expect(screen.getByRole("heading", { level: 2, name: "Reservas" })).toBeInTheDocument();
+  });
+
+  it("con headingLevel=1 expone el título como el h1 de la página (WCAG 1.3.1)", () => {
+    render(
+      <Card title="Reservas" headingLevel={1}>
+        Contenido
+      </Card>,
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "Reservas" })).toBeInTheDocument();
+  });
 });
 
 describe("Select", () => {

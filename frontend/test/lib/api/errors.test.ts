@@ -84,16 +84,62 @@ describe("mapErrorApi", () => {
     });
   });
 
-  it("cualquier otro caso (por ejemplo 500) mapea a desconocido", () => {
+  it("409 con un motivo de codigo desconocido lo descarta y conserva el resto", () => {
+    // El codigo tiene que pertenecer al enum CodigoMotivo del contrato (schema.d.ts): un valor
+    // que no está ahí no es un MotivoNoDisponible válido, aunque tenga la forma correcta.
+    const resultado = mapErrorApi(409, {
+      statusCode: 409,
+      error: "Conflict",
+      message: "No hay lugar para la reserva.",
+      motivos: [
+        { codigo: "ANTICIPACION_MINIMA", mensaje: "Falta anticipación mínima." },
+        { codigo: "CODIGO_INVENTADO", mensaje: "Motivo que no existe en el contrato." },
+      ],
+    });
+
+    expect(resultado).toEqual({
+      tipo: "conflicto",
+      mensaje: "No hay lugar para la reserva.",
+      motivos: [{ codigo: "ANTICIPACION_MINIMA", mensaje: "Falta anticipación mínima." }],
+    });
+  });
+
+  it("cualquier 500 mapea a un mensaje genérico de disponibilidad, sin exponer el del servidor", () => {
+    // El mensaje del cuerpo simula uno que filtraría detalle interno (por ejemplo, del stack de
+    // conexión a la base): el resultado tipado nunca debe reenviarlo tal cual.
     const resultado = mapErrorApi(500, {
       statusCode: 500,
       error: "Internal Server Error",
-      message: "Internal server error",
+      message: "connect ECONNREFUSED 127.0.0.1:3001",
     });
 
     expect(resultado).toEqual({
       tipo: "desconocido",
-      mensaje: "Internal server error",
+      mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
+    });
+  });
+
+  it("un 500 con cuerpo HTML (proxy /api cuando el backend está caído) mapea al mismo mensaje genérico", () => {
+    // Next devuelve una página de error HTML, no un ErrorRespuesta JSON, cuando el rewrite de
+    // /api no puede comunicarse con el backend (D7/D6 de design.md).
+    const resultado = mapErrorApi(500, "<html><body>Internal Server Error</body></html>");
+
+    expect(resultado).toEqual({
+      tipo: "desconocido",
+      mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
+    });
+  });
+
+  it("un status mayor a 500 también mapea al mensaje genérico de disponibilidad", () => {
+    const resultado = mapErrorApi(503, {
+      statusCode: 503,
+      error: "Service Unavailable",
+      message: "Service Unavailable",
+    });
+
+    expect(resultado).toEqual({
+      tipo: "desconocido",
+      mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
     });
   });
 });

@@ -215,6 +215,14 @@ forma de error.
 - **THEN** el resultado tipado del cliente expone cada motivo con su `codigo` y su `mensaje`,
   en el mismo orden en que la API los envió
 
+#### Scenario: Error 5xx o backend inalcanzable a través del proxy
+- **WHEN** la API responde con un código igual o mayor a `500`, o el proxy `/api` no puede
+  comunicarse con el backend (por ejemplo, cuando el backend está caído y Next devuelve su
+  propia página de error)
+- **THEN** el resultado tipado del cliente expone un error `desconocido` con un mensaje
+  genérico de disponibilidad
+- **AND** ese mensaje nunca incluye el mensaje ni el cuerpo que haya enviado el servidor
+
 #### Scenario: Respuesta exitosa se distingue del error
 - **WHEN** la API responde con un código `2xx`
 - **THEN** el resultado del cliente expone los datos de la respuesta y no expone ningún campo

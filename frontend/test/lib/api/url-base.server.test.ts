@@ -8,7 +8,13 @@ describe("urlBaseApi en el servidor", () => {
   const originalUrl = process.env.NEXT_PUBLIC_API_URL;
 
   afterEach(() => {
-    process.env.NEXT_PUBLIC_API_URL = originalUrl;
+    // Asignar `undefined` a una variable de entorno guarda el texto "undefined": hay que
+    // borrarla cuando no estaba definida (mismo patrón que client.test.ts `afterAll`).
+    if (originalUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_API_URL;
+    } else {
+      process.env.NEXT_PUBLIC_API_URL = originalUrl;
+    }
   });
 
   it("devuelve el valor de NEXT_PUBLIC_API_URL", () => {

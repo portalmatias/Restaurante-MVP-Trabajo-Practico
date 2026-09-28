@@ -1,6 +1,6 @@
 import type { InputHTMLAttributes } from "react";
 
-export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "aria-invalid"> & {
   /** Marca el control como inválido (borde y `aria-invalid`), sin fijar el mensaje de error. */
   invalid?: boolean;
 };
@@ -22,10 +22,8 @@ export function Input({ className, invalid = false, ...props }: InputProps) {
     .join(" ");
 
   return (
-    <input
-      className={classes}
-      aria-invalid={invalid || undefined}
-      {...props}
-    />
+    // `aria-invalid` va después de `{...props}` (igual que Field/Select): así lo decide siempre
+    // `invalid`, sin que un `aria-invalid` que traiga el caller lo pise.
+    <input className={classes} {...props} aria-invalid={invalid || undefined} />
   );
 }

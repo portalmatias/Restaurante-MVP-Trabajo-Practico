@@ -225,14 +225,21 @@ que estar definida en ese momento.
 
 **Carga del `.env` de la raíz:** Next solo lee los `.env*` de `frontend/`, pero el `.env`
 del proyecto vive en la raíz del monorepo (§10). `next.config.ts` lo carga con
-`process.loadEnvFile` de Node (disponible en Node 20, la versión del proyecto y de CI), sin
-dependencias nuevas; las variables ya exportadas en el entorno tienen prioridad. Si
-`NEXT_PUBLIC_API_URL` sigue sin estar definida, `rewrites()` falla con un mensaje que la
-nombra, en vez de armar un destino `undefined/...`: un build o un deploy mal configurados no
-compilan. La única excepción es `next typegen` (parte de `npm run typecheck`), que también
-evalúa los rewrites con la misma fase que `next build` y corre en CI sin `.env`: ahí solo se
-avisa y se generan los tipos sin el proxy. Se descartó `@next/env`
+`process.loadEnvFile` de Node, sin dependencias nuevas; las variables ya exportadas en el
+entorno tienen prioridad. Si `NEXT_PUBLIC_API_URL` sigue sin estar definida, `rewrites()` falla
+con un mensaje que la nombra, en vez de armar un destino `undefined/...`: un build o un deploy
+mal configurados no compilan. La única excepción es `next typegen` (parte de `npm run
+typecheck`), que también evalúa los rewrites con la misma fase que `next build` y corre en CI
+sin `.env`: ahí solo se avisa y se generan los tipos sin el proxy. Se descartó `@next/env`
 (`loadEnvConfig`): la guía de Next pide instalarlo como dependencia propia.
+
+`process.loadEnvFile` requiere Node.js 20.12 o superior (no existe en versiones anteriores de
+la serie 20.x); por eso `engines.node` de la raíz queda en `>=20.12` y el README pide "Node.js
+20.12 o superior (20 LTS)". CI usa Node 20 (`actions/setup-node@v4` con `node-version: '20'`,
+que resuelve siempre a la última versión menor de la serie 20.x), así que ya la cubre. Si
+`next.config.ts` detecta `typeof process.loadEnvFile !== "function"` con un `.env` de raíz
+presente, corta con un mensaje en español que nombra la versión mínima requerida, en vez de
+dejar que Node falle con un `TypeError: process.loadEnvFile is not a function` críptico.
 
 **Alternativa considerada (`app.enableCors()` en el backend):** es el mecanismo estándar,
 pero toca `backend/` (fuera del alcance de un change de frontend, iría en uno propio) y
