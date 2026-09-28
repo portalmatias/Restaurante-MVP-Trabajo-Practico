@@ -92,8 +92,9 @@
       primitivas. Verificar que 3.3 pasa.
 - [ ] 3.5 Escribir y luego implementar `PasosReserva` (`frontend/src/components/ui/` o
       `frontend/src/components/reservas/`, a definir por dónde vive el resto de este change):
-      con `pasoActual={2}` `total={3}` renderiza un texto que contiene "Paso 2 de 3" y tres
-      indicadores, el segundo marcado como actual (`aria-current`). Verificar rojo y luego
+      con `pasoActual={2}` `total={3}` renderiza un texto que contiene "Paso 2 de 3" (la única
+      indicación accesible) y tres puntos decorativos con `aria-hidden`, el segundo con el
+      estilo de actual. Verificar rojo y luego
       verde con `npm test -w frontend -- pasos-reserva`.
 - [ ] 3.6 Escribir el test de `SiteHeader` verificando que, además del enlace a `/reservas` ya
       existente, hay un enlace a `/reservas/consultar` con nombre accesible "Consultar
@@ -150,8 +151,10 @@
       red, muestra el mensaje genérico y el botón de reintentar. Mockear el cliente tipado a
       nivel de módulo para estos casos (no golpear red real). Verificar rojo con
       `npm test -w frontend -- resultado`.
-- [ ] 4.6 Implementar la página de resultado (D3, Pantalla 3) y su `loading.tsx`. Verificar
-      que 4.5 pasa.
+- [ ] 4.6 Implementar la página de resultado (D3, Pantalla 3) y su `loading.tsx`: además de
+      `GET /disponibilidad`, resuelve `GET /zonas` (nombre y `requiereConfirmacionAdmin` para el
+      aviso de pendiente) y `GET /turnos` (horario del resumen), y ante un `404` de
+      `GET /disponibilidad` redirige al Paso 1. Verificar que 4.5 pasa.
 - [ ] 4.7 Escribir los tests de `FormularioDatosContacto`: validación en línea al salir de cada
       campo (nombre vacío, email sin arroba, teléfono vacío); el botón de enviar se deshabilita
       y cambia su texto mientras la promesa está pendiente; un `400` con mensajes que empiezan

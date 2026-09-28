@@ -143,7 +143,8 @@ acción para continuar al paso de datos de contacto.
 - **WHEN** la disponibilidad consultada no da lugar por aforo de zona
 - **THEN** la pantalla muestra un texto en español explicando que la zona está completa para
   ese turno y esa fecha
-- **AND** ofrece volver a elegir con la fecha, el turno y la zona ya seleccionados
+- **AND** ofrece volver a elegir con la fecha, el turno, la zona y la cantidad de comensales
+  ya seleccionados
 
 #### Scenario: No hay lugar por varios motivos a la vez
 - **WHEN** la disponibilidad consultada informa más de un motivo (por ejemplo, turno inactivo y
@@ -168,6 +169,13 @@ previa completa y válida (fecha, turno, zona y comensales), el sistema SHALL re
 - **WHEN** se accede directamente a la pantalla de resultado de disponibilidad sin haber
   completado el Paso 1
 - **THEN** el sistema redirige al Paso 1
+
+#### Scenario: La selección apunta a un turno o una zona que ya no existen
+- **WHEN** se accede al resultado de disponibilidad con un turno o una zona que ya no existen
+  (por ejemplo, desde un enlace viejo) y la consulta de disponibilidad responde que no se
+  encuentran
+- **THEN** el sistema redirige al Paso 1 conservando los datos que siguen siendo válidos y sin
+  mostrar un error técnico
 
 ### Requirement: Paso de datos de contacto
 El sistema SHALL exponer un paso donde la persona ingresa su nombre, su email y su teléfono
@@ -309,8 +317,8 @@ ni ningún dato de otra reserva.
 
 ### Requirement: La acción de cancelar solo se ofrece cuando es plausible
 La pantalla de detalle SHALL ofrecer la acción de cancelar únicamente cuando el estado de la
-reserva todavía admite cancelación (confirmada o pendiente de confirmación, nunca cancelada o
-ausente) y la fecha y hora locales del turno todavía están, según una estimación hecha con los
+reserva todavía admite cancelación (confirmada o pendiente de confirmación, nunca cancelada ni
+`NO_SHOW`) y la fecha y hora locales del turno todavía están, según una estimación hecha con los
 datos ya mostrados, dentro de la ventana de cancelación de su zona. Esta condición es una
 ayuda de navegación para no ofrecer una acción que muy probablemente va a fallar: la ventana de
 cancelación la valida siempre el servidor al momento de cancelar, y puede rechazar la

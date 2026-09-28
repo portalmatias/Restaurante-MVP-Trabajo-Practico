@@ -5,6 +5,14 @@ comportamiento exigido. Este documento resuelve cómo se arma el flujo sobre lo 
 `frontend-base` (PR #43, sin mergear todavía) y sobre los contratos que los otros changes de
 backend dejaron en sus propios `design.md`.
 
+> **Versiones de referencia.** Este documento cita `frontend-base` y `reservas-crear` en la
+> versión de sus PRs abiertos, no en la que hoy está en `main`: el proxy `/api` y `url-base.ts`
+> (D6), y la decisión D11 (sin enlaces a `/admin` en la interfaz pública), llegan con el PR
+> #43; el `400` ante campos de más en `POST /reservas` (D6 de `reservas-crear`, por
+> `forbidNonWhitelisted`) llega con el PR #40. Hasta que esos dos se mergeen, la versión de
+> `main` de esos documentos dice otra cosa. Por eso 1.1 exige que estén en `main` antes de
+> implementar.
+
 **Persona de diseño:** Raúl, 74 años, reserva desde el celular una mesa VIP para sus bodas de
 oro y se frustra con respuestas lentas. Todas las decisiones de layout, tipografía y flujo de
 esta capability se toman para él: texto grande, botones grandes, una sola tarea por pantalla,
@@ -243,8 +251,8 @@ ningún token. Uso específico de este change:
 - **Acciones principales en 18px y 56px de alto:** ver D4 (extensión de `Button`).
 - **Un progreso claro, sin ambigüedad de "cuánto falta":** `ux-guidelines.csv` (Feedback ▸
   Progress Indicators, severidad media) pide un indicador de paso para procesos de varios
-  pasos. Se agrega `<PasosReserva pasoActual={1|2|3} total={3} />`: un texto ("Paso 1 de 3") y
-  tres puntos con `aria-hidden`, mostrado en `/reservas/nueva`, `/reservas/nueva/resultado`
+  pasos. Se agrega `<PasosReserva pasoActual={1|2|3} total={3} />`: un texto ("Paso 1 de 3"),
+  que es la única indicación accesible, y tres puntos decorativos con `aria-hidden`, mostrado en `/reservas/nueva`, `/reservas/nueva/resultado`
   (solo cuando hay lugar) y `/reservas/nueva/datos`. La pantalla de éxito no lleva número de
   paso: es el cierre del flujo, no un paso más.
 
@@ -310,7 +318,7 @@ este orden, porque cada paso depende del anterior:
    ("Queda pendiente de confirmación"). La `Card` de la zona elegida usa `border-accent
    border-2` si es VIP-pendiente o `border-primary border-2` si no, para marcar la selección
    sin depender solo del color (también lleva un ícono de check, `aria-hidden`, y
-   `aria-pressed`/`aria-checked` en el control).
+   `aria-checked` en el control, que es el atributo de estado de `role="radio"`).
 6. Campo comensales: un stepper (`-` / número / `+`) con los mismos botones `Button`
    `variant="secondary"` de 44×44px mínimo (ux-guidelines Touch ▸ Touch Target Size/Touch
    Spacing: gap de 8px entre los tres controles), acotado al rango de la zona elegida (spec
@@ -336,7 +344,11 @@ con `useState`).
 Server Component. Sin `searchParams` válidos (spec "Acceso a un paso del asistente sin la
 selección previa") → `redirect('/reservas/nueva')` de Next.js, sin renderizar nada más.
 `app/reservas/nueva/resultado/loading.tsx` propio (mismo criterio que la Pantalla 2) mientras
-se resuelve `GET /disponibilidad`.
+se resuelven, en paralelo, `GET /disponibilidad` y los datos del resumen: `GET /zonas`
+(nombre de la zona y `requiereConfirmacionAdmin`, de donde sale el aviso de pendiente, porque
+`GET /disponibilidad` no lo trae) y `GET /turnos` (horario del turno). Si `GET /disponibilidad`
+responde `404` (turno o zona que ya no existen, por ejemplo con una URL vieja), se redirige al
+Paso 1 con los parámetros restantes, donde los IDs inválidos se ignoran (Pantalla 2).
 
 1. `<PasosReserva pasoActual={2} total={3} />` (solo si hay lugar; ver más abajo).
 2. **Hay lugar:** título "¡Hay lugar!" (`h1`, `text-2xl font-semibold text-foreground`), un
