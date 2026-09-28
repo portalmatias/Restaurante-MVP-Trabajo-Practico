@@ -270,6 +270,14 @@ un Client Component `FormularioSeleccion`. Layout de una columna, campos apilado
 `sm:` (es un formulario secuencial, no se beneficia de una grilla — D1 de `frontend-base`,
 mobile-first, no obliga a usar el ancho extra solo porque está disponible):
 
+También lee `fecha`, `turnoId`, `zonaId` y `comensales` de `searchParams` para prellenar
+`FormularioSeleccion` cuando se llega con una selección previa: el `Button` "Cambiar fecha,
+turno o zona" de la Pantalla 3 ("no hay lugar") y el `Button` "Volver a elegir" de la Pantalla 4
+(`409` con `motivos`) navegan acá con esos cuatro parámetros para que la persona no tenga que
+volver a elegir todo. Un valor inválido o ya inexistente (por ejemplo, un `turnoId` que ya no
+está en `GET /turnos`, o un `zonaId` que ya no está en `GET /zonas`) se ignora sin romper el
+render: ese campo queda sin seleccionar, como si no se hubiera pasado ningún valor.
+
 1. `<PasosReserva pasoActual={1} total={3} />`.
 2. Título (`h1`, `text-2xl font-semibold`): "¿Cuándo y para cuántos?".
 3. Campo fecha: un `<input type="date">` envuelto con la misma asociación de etiqueta que
@@ -301,7 +309,11 @@ mobile-first, no obliga a usar el ancho extra solo porque está disponible):
 7. `Button` `variant="primary"` `size="lg"` "Ver disponibilidad", deshabilitado hasta que los
    cuatro campos sean válidos (spec "No se puede continuar sin completar los cuatro datos"),
    que arma la URL de `/reservas/nueva/resultado` con los cuatro parámetros y navega
-   (`router.push`).
+   (`router.push`). Mientras el botón está deshabilitado, debajo aparece un texto breve en
+   `text-muted-foreground` dentro de una región `aria-live="polite"` que lista qué falta
+   completar (ej. "Falta elegir: turno y zona"), para que la persona sepa qué hacer sin tener
+   que adivinar por qué el botón no responde; el texto desaparece en cuanto los cuatro campos
+   quedan completos.
 
 Sin estado de carga propio (no llama a la API todavía, salvo la carga inicial de zonas/turnos
 que resuelve el Server Component antes de renderizar — Next.js la cubre con
@@ -480,6 +492,21 @@ cubre reusando el mismo `focus-visible:ring-2 focus-visible:ring-ring` de las de
 primitivas dentro del diálogo, no un estilo de foco propio). Cierra también con `Escape` de
 forma nativa.
 
+**Límite conocido de `jsdom` al probar esto:** `jsdom` (el DOM que usa la suite de RTL, ver
+`config.yaml` §9) no implementa la semántica modal real de `HTMLDialogElement`: no vuelve
+inerte el contenido detrás del diálogo, no atrapa el foco con Tab/Shift+Tab dentro de sus
+controles, y no devuelve el foco al elemento que lo abrió al cerrarse — son comportamientos que
+el navegador real sí da con `showModal()`/`close()`, pero que `jsdom` no simula. Por eso la
+suite automatizada de `Dialog` (`tasks.md` 3.3) solo prueba lo que `jsdom` sí puede probar (que
+se llama a `showModal()`/`close()`, con esos métodos stubeados en `HTMLDialogElement.prototype`;
+el nombre accesible; y que los botones disparan sus callbacks), y el atrapado de foco y la
+devolución de foco (spec "El diálogo de cancelación atrapa el foco" / "Cerrar el diálogo
+devuelve el foco") quedan como verificación manual en un navegador real, parte del checklist de
+cierre (`tasks.md` 7.2) — no una brecha de cobertura ignorada, sino la frontera real de lo que
+este entorno de test puede demostrar. No se agrega una dependencia nueva (como Playwright) solo
+para cerrar esa brecha: el caso de uso es acotado (un solo diálogo) y esta misma decisión ya
+descartó sumar dependencias de runtime para esta primitiva.
+
 **Alternativa considerada — Radix UI `Dialog` u otra librería de diálogos accesibles:** es lo
 que `frontend-base` D4 ya había descartado para el set inicial de primitivas, por sumar una
 dependencia de runtime por cada primitiva usada. El elemento nativo `<dialog>` da el mismo
@@ -579,6 +606,19 @@ y acotada a un solo cálculo de fecha ya resuelto por D2, para una decisión que
 se muestra un botón — no una regla de negocio que el cliente decida por su cuenta. Si el
 offset de Argentina cambiara algún día (fuera del alcance de este MVP), habría que actualizarlo
 en los dos lugares; se anota en Open Questions.
+
+**Manejo de falla al resolver `ventanaCancelacionHoras`:** buscar la zona por `zona.id` en
+`GET /zonas` puede no dar una respuesta usable de dos formas: la petición falla (`5xx` o red), o
+responde `200` pero esa `zona.id` ya no aparece en la lista (caso límite: la zona se eliminó
+entre que se consultó el detalle y que se renderiza esta pantalla). En los dos casos,
+`puedeCancelarSegunVentana` no tiene con qué evaluarse. La regla es la misma que ya rige toda
+acción condicionada por una regla que no se pudo comprobar: nunca se ofrece una acción cuya
+condición no se pudo verificar. En vez del botón "Cancelar mi reserva", el detalle muestra un
+`Alert` `variant="info"` ("No pudimos verificar si todavía podés cancelar. Probá de nuevo en
+unos minutos.") con un `Button` "Reintentar" que vuelve a pedir `GET /zonas` sin recargar la
+página ni perder el detalle ya mostrado. El resto del detalle (estado, resumen) sigue
+mostrándose con normalidad: es solo la acción de cancelar la que queda en suspenso hasta poder
+verificarse.
 
 ### D10: Grupos de trabajo por prerrequisito de backend
 

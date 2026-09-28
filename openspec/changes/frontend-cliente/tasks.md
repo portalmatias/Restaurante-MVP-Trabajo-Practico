@@ -18,13 +18,16 @@
 
 ## 2. Utilidades puras de fecha y hora (sin dependencia de backend)
 
-- [ ] 2.1 Escribir `frontend/test/lib/fecha-hora.test.ts` con los casos de
-      `fechaLocalDeHoy(ahora)`: para un instante UTC que cae después de la medianoche de
-      Argentina pero antes de la medianoche UTC (ej. `2026-09-15T02:00:00.000Z`, que en
-      Argentina todavía es `2026-09-14`), devuelve `2026-09-14`; para un instante bien entrada
-      la tarde en Argentina, devuelve el mismo día que un `toISOString().slice(0,10)` daría.
-      Correr con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`. Verificar que la suite
-      falla (rojo) con `npm test -w frontend -- fecha-hora`.
+- [ ] 2.1 Escribir `frontend/test/lib/fecha-hora.test.ts` (casos de `fechaLocalDeHoy`,
+      `diaSemanaDeFechaLocal`, `formatearFechaLargaEs` y `formatearHoraTurno`; los casos de
+      `puedeCancelarSegunVentana` van en un archivo aparte, `ventana-cancelacion.test.ts`, ver
+      2.9) con los casos de `fechaLocalDeHoy(ahora)`: para un instante UTC que cae después de
+      la medianoche UTC pero antes de la medianoche de Argentina (ej.
+      `2026-09-15T02:00:00.000Z`, que en Argentina todavía es `2026-09-14` a las 23:00),
+      devuelve `2026-09-14`; para un instante bien entrada la tarde en Argentina, devuelve el
+      mismo día que un `toISOString().slice(0,10)` daría. Correr con `TZ=UTC` y con
+      `TZ=America/Argentina/Buenos_Aires`. Verificar que la suite falla (rojo) con
+      `npm test -w frontend -- fecha-hora`.
 - [ ] 2.2 Implementar `fechaLocalDeHoy` en `frontend/src/lib/fecha-hora.ts` con el offset fijo
       de Argentina y `getUTC*`/`Date.UTC` (D2), sin usar `Intl` para el cálculo. Verificar que
       2.1 pasa con las dos zonas horarias del proceso.
@@ -45,14 +48,15 @@
       falla (rojo).
 - [ ] 2.8 Implementar `formatearHoraTurno` con `getUTCHours`/`getUTCMinutes` (D2, sin
       conversión de huso horario). Verificar que 2.7 pasa.
-- [ ] 2.9 Escribir los casos de `puedeCancelarSegunVentana(fecha, horaInicioTurno,
-      ventanaCancelacionHoras, ahora)` (D9): exactamente `ventanaCancelacionHoras` antes del
-      inicio del turno → `true` (borde inclusivo, mismo criterio que adoptó
-      `cancelacion-turnos` para el backend); un minuto menos → `false`; un turno que cruza la
-      medianoche local calculado igual que `finTurnoUtc` del backend para el caso de
-      `horaFin < horaInicio` (aunque acá solo se usa el inicio, agregar el caso de regresión
-      para dejar registrado el criterio). Verificar que falla (rojo) con
-      `npm test -w frontend -- ventana-cancelacion`.
+- [ ] 2.9 Escribir `frontend/test/lib/ventana-cancelacion.test.ts` (archivo propio, separado de
+      `fecha-hora.test.ts`, para que el filtro de Jest por nombre de archivo lo aísle) con los
+      casos de `puedeCancelarSegunVentana(fecha, horaInicioTurno, ventanaCancelacionHoras,
+      ahora)` (D9): exactamente `ventanaCancelacionHoras` antes del inicio del turno → `true`
+      (borde inclusivo, mismo criterio que adoptó `cancelacion-turnos` para el backend); un
+      minuto menos → `false`; un turno que cruza la medianoche local calculado igual que
+      `finTurnoUtc` del backend para el caso de `horaFin < horaInicio` (aunque acá solo se usa
+      el inicio, agregar el caso de regresión para dejar registrado el criterio). Verificar que
+      falla (rojo) con `npm test -w frontend -- ventana-cancelacion`.
 - [ ] 2.10 Implementar `puedeCancelarSegunVentana` (D9). Verificar que 2.9 pasa con las dos
       zonas horarias del proceso.
 - [ ] 2.11 Escribir y luego implementar `agruparPorCampo(mensajes, campos)` (D8): un mensaje
@@ -72,9 +76,15 @@
       `Button` ya existentes de `frontend-base` (`npm test -w frontend -- button`, sin
       regresiones).
 - [ ] 3.3 Escribir los tests de `Dialog` (`frontend/test/components/ui/dialog.test.tsx`, RTL
-      con `jsdom`): abre con el contenido visible y foco dentro de él; `Escape` lo cierra;
-      cerrarlo devuelve el foco al elemento que lo abrió (comprobable en `jsdom` verificando
-      `document.activeElement` antes y después). Verificar que falla (rojo).
+      con `jsdom`): `jsdom` no implementa la semántica modal real de `HTMLDialogElement`
+      (no vuelve inerte el fondo, no atrapa el foco con Tab ni devuelve el foco solo al
+      cerrarse — ver D5), así que la suite solo prueba lo que `jsdom` puede probar: stubear
+      `HTMLDialogElement.prototype.showModal` y `.close` (jsdom no los implementa) y verificar
+      que abrir el diálogo llama a `showModal()` y cerrarlo llama a `close()`; que el diálogo
+      expone el nombre accesible/rol esperado; y que los botones de confirmar y cancelar
+      disparan sus callbacks (`onConfirm`/`onCancel`) al hacer click. El atrapado de foco (Tab
+      no sale del diálogo) y la devolución de foco al elemento que lo abrió NO se prueban acá:
+      quedan como verificación manual en un navegador real (7.2). Verificar que falla (rojo).
 - [ ] 3.4 Implementar `frontend/src/components/ui/dialog.tsx` sobre `<dialog>` nativo
       (`showModal`/`close`, D5), con las mismas clases de foco visible que el resto de las
       primitivas. Verificar que 3.3 pasa.
@@ -110,12 +120,19 @@
       escribir la página. Verificar verde con `npm test -w frontend -- reservas/page`.
 - [ ] 4.3 Escribir los tests del formulario del Paso 1 (`FormularioSeleccion`, RTL con zonas y
       turnos de fixture, sin red): los cuatro campos son obligatorios para habilitar
-      "Ver disponibilidad"; elegir un sábado ofrece solo turnos de sábado; elegir un lunes sin
-      turnos activos muestra el aviso y oculta el `Select`; cambiar de fecha limpia un turno
-      que ya no corresponde; el stepper de comensales se acota al rango de la zona elegida y
-      se ajusta si la zona cambia; enviar arma la URL de `/reservas/nueva/resultado` con los
-      cuatro parámetros. Verificar que la suite falla (rojo) con
-      `npm test -w frontend -- formulario-seleccion`.
+      "Ver disponibilidad"; mientras falta algún campo, debajo del botón deshabilitado aparece
+      un texto en una región `aria-live="polite"` que lista qué falta completar (ej. "Falta
+      elegir: turno y zona"), y ese texto se actualiza a medida que se completan campos hasta
+      desaparecer con los cuatro completos; elegir un sábado ofrece solo turnos de sábado;
+      elegir un lunes sin turnos activos muestra el aviso y oculta el `Select`; cambiar de
+      fecha limpia un turno que ya no corresponde; el stepper de comensales se acota al rango
+      de la zona elegida y se ajusta si la zona cambia; recibir `fecha`, `turnoId`, `zonaId` y
+      `comensales` válidos como selección inicial (props que la página arma desde
+      `searchParams`, ver D3 Pantalla 2) prellena cada control con esos valores; un `turnoId` o
+      un `zonaId` inicial que no está en las fixtures de `GET /turnos`/`GET /zonas` se ignora
+      sin romper el render, dejando ese campo sin seleccionar; enviar arma la URL de
+      `/reservas/nueva/resultado` con los cuatro parámetros. Verificar que la suite falla
+      (rojo) con `npm test -w frontend -- formulario-seleccion`.
 - [ ] 4.4 Implementar `FormularioSeleccion` (D3, Pantalla 2) y el `Server Component`
       `app/reservas/nueva/page.tsx` que hace `GET /zonas`/`GET /turnos` directo al backend y se
       los pasa como props, más `app/reservas/nueva/loading.tsx`. Verificar que 4.3 pasa y que
@@ -166,9 +183,11 @@
       `grep -n "reservas/consultar" frontend/src/lib/api/schema.d.ts`.
 - [ ] 5.2 Escribir los tests de la sub-vista "formulario" de `ConsultaReserva`: código y email
       obligatorios con validación en línea; un `404` muestra el mensaje genérico sin indicar
-      cuál dato falló; un `429` muestra el mensaje de espera; un envío exitoso pasa a la
-      sub-vista "detalle" con los datos de la respuesta. Verificar rojo con
-      `npm test -w frontend -- consulta-reserva`.
+      cuál dato falló; un `429` muestra el mensaje de espera; un error de servidor (`5xx`) y
+      una falla de red muestran el mensaje genérico de `toApiResult`/`mapErrorApi` (en voseo,
+      D7) y conservan el código y el email ya tipeados en sus campos para poder reintentar sin
+      volver a escribirlos; un envío exitoso pasa a la sub-vista "detalle" con los datos de la
+      respuesta. Verificar rojo con `npm test -w frontend -- consulta-reserva`.
 - [ ] 5.3 Escribir los tests de la sub-vista "detalle": muestra estado, fecha (formateada),
       turno (formateado) y zona; no renderiza nombre, email ni teléfono en ningún elemento del
       DOM; un enlace "Consultar otra reserva" vuelve a "formulario". (El gating del botón de
@@ -190,10 +209,17 @@
       con una reserva `CANCELADA` no se ofrece; con una `CONFIRMADA` muy por delante de la
       ventana de su zona, se ofrece; con una `CONFIRMADA` dentro de la ventana, no se ofrece.
       Requiere que "detalle" resuelva `GET /zonas` para la `ventanaCancelacionHoras` de la
-      zona consultada (mock en el test). Verificar rojo.
+      zona consultada (mock en el test). Sumar también los dos casos de falla al verificar la
+      ventana (D9): si `GET /zonas` responde `5xx`/falla de red, o si responde `200` pero sin
+      la `zona.id` del detalle consultado (zona ya no existe en la lista), el botón "Cancelar
+      mi reserva" NO se ofrece y en su lugar aparece un `Alert` `variant="info"` ("No pudimos
+      verificar si todavía podés cancelar. Probá de nuevo en unos minutos.") con un `Button`
+      "Reintentar" que vuelve a pedir `GET /zonas`; ninguno de los dos casos rompe el render
+      del resto del detalle. Verificar rojo.
 - [ ] 6.3 Conectar la resolución de `GET /zonas` y `puedeCancelarSegunVentana` (2.9/2.10) en
-      "detalle" para decidir si se muestra el botón "Cancelar mi reserva". Verificar que 6.2
-      pasa.
+      "detalle" para decidir si se muestra el botón "Cancelar mi reserva", incluido el `Alert`
+      informativo con "Reintentar" de 6.2 cuando `GET /zonas` falla o no trae la zona buscada
+      (D9). Verificar que 6.2 pasa.
 - [ ] 6.4 Escribir los tests de la sub-vista "confirmar cancelación" (usa `Dialog` de 3.3/3.4):
       abrir el diálogo con el resumen visible; cerrarlo sin confirmar no envía ninguna
       solicitud y no cambia el estado mostrado; confirmar envía `{ email }` al código de la
@@ -219,8 +245,13 @@
       `frontend-base`: sin herramienta automatizada) en 375px, 768px, 1024px y 1440px para las
       nueve pantallas: sin scroll horizontal, contraste de la insignia dorada y del texto sobre
       `muted`, área táctil ≥44×44px del stepper y de los botones `size="lg"` (≥56px de alto),
-      foco visible en cada control nuevo incluido dentro de `Dialog`. Documentar el resultado
-      en la descripción del PR.
+      foco visible en cada control nuevo incluido dentro de `Dialog`. Sumar, específicamente
+      sobre `Dialog` (spec "El diálogo de cancelación atrapa el foco" / "Cerrar el diálogo
+      devuelve el foco"; D5 documenta que `jsdom` no puede probar esto, ver 3.3): abrir el
+      diálogo de confirmar cancelación en un navegador real y verificar que Tab/Shift+Tab no
+      saca el foco de sus controles mientras está abierto, y que cerrarlo (con "Volver", con
+      "Sí, cancelar", o con Escape) devuelve el foco al botón "Cancelar mi reserva" que lo
+      abrió. Documentar el resultado en la descripción del PR.
 - [ ] 7.3 El change no agrega ni modifica `openapi/openapi.yaml` ni `backend/prisma`: no
       aplican migración ni contrato propios. Verificar con `git diff main --stat -- backend
       openapi` vacío.

@@ -43,6 +43,14 @@ SHALL ser obligatorios antes de continuar al resultado de disponibilidad.
 - **WHEN** la persona completó fecha, turno, zona y comensales con valores válidos
 - **THEN** la acción para ver el resultado de disponibilidad queda habilitada
 
+#### Scenario: Volver a este paso conserva la selección anterior
+- **WHEN** la persona vuelve a este paso desde una acción que ofrece corregir la selección (por
+  ejemplo, "no hay lugar" o un rechazo al crear la reserva) con fecha, turno, zona y comensales
+  ya elegidos antes
+- **THEN** los cuatro campos muestran esos valores ya elegidos, en vez de empezar vacíos
+- **AND** si alguno de esos valores ya no es válido (por ejemplo, un turno que dejó de existir),
+  el sistema lo ignora y deja ese campo sin seleccionar, en vez de fallar
+
 ### Requirement: Solo se ofrecen turnos del día de la semana elegido
 Al elegir la fecha, el sistema SHALL ofrecer como opción de turno únicamente los turnos activos
 cuyo día de la semana coincide con el día de la semana de esa fecha en el calendario local del
@@ -233,6 +241,12 @@ ingresados en el formulario correspondiente.
 - **AND** los datos de contacto ya escritos siguen presentes en el formulario
 - **AND** se ofrece una acción para reintentar el envío
 
+#### Scenario: El servidor no responde al consultar una reserva
+- **WHEN** la consulta de una reserva falla por un error de servidor o de red
+- **THEN** la pantalla muestra un mensaje genérico de error
+- **AND** el código y el email ya tipeados siguen presentes en el formulario
+- **AND** se ofrece una acción para reintentar la consulta
+
 ### Requirement: Confirmación de la reserva creada
 Al crear la reserva con éxito, el sistema SHALL mostrar el código de reserva con énfasis visual
 propio, el estado resultante (confirmada o pendiente de confirmación), y un resumen con fecha,
@@ -300,7 +314,10 @@ ausente) y la fecha y hora locales del turno todavía están, según una estimac
 datos ya mostrados, dentro de la ventana de cancelación de su zona. Esta condición es una
 ayuda de navegación para no ofrecer una acción que muy probablemente va a fallar: la ventana de
 cancelación la valida siempre el servidor al momento de cancelar, y puede rechazar la
-cancelación aunque la pantalla la haya ofrecido.
+cancelación aunque la pantalla la haya ofrecido. Si no se puede calcular esa estimación (por
+ejemplo, porque falla la consulta de la que sale la ventana de cancelación de la zona, o esa
+zona ya no está en la respuesta), el sistema SHALL NOT ofrecer la acción de cancelar, y SHALL
+avisar que no se pudo verificar, con una forma de reintentar la verificación.
 
 #### Scenario: Una reserva ya cancelada no ofrece la acción
 - **WHEN** se muestra el detalle de una reserva en estado cancelada
@@ -315,6 +332,14 @@ cancelación aunque la pantalla la haya ofrecido.
 - **WHEN** se muestra el detalle de una reserva confirmada cuyo turno ya está a menos tiempo
   que la ventana de cancelación de su zona
 - **THEN** la pantalla no ofrece la acción de cancelar
+
+#### Scenario: No se puede verificar la ventana de cancelación
+- **WHEN** no se puede calcular si el turno de la reserva todavía está dentro de la ventana de
+  cancelación de su zona (por ejemplo, por una falla de servidor o de red al obtener los datos
+  de esa zona, o porque la zona ya no está en esa consulta)
+- **THEN** la pantalla no ofrece la acción de cancelar
+- **AND** avisa que no se pudo verificar
+- **AND** ofrece una acción para reintentar la verificación
 
 ### Requirement: Confirmación antes de cancelar
 Al elegir cancelar, el sistema SHALL pedir una confirmación explícita en un diálogo aparte que
