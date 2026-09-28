@@ -125,3 +125,56 @@ export function finTurnoUtc(
 export function diaSemanaDeFecha(fecha: Date): number {
   return fecha.getUTCDay();
 }
+
+/**
+ * Parsea una fecha de calendario `YYYY-MM-DD` (la forma en que viaja una `@db.Date` en la
+ * API, config.yaml §7) a la medianoche UTC de ese día. Se arma con `Date.UTC` explícito y no
+ * con `new Date(fechaIso)`: aunque el estándar interpreta como UTC una fecha sin hora, el mismo
+ * constructor toma como hora local un texto con hora y sin offset, y es fácil confundir los dos
+ * casos.
+ *
+ * Antes vivía duplicada como `fechaDeCalendario` en `reservas.controller.ts` y en
+ * `disponibilidad.service.ts` (cubic, PR #40, hallazgo P3).
+ *
+ * @param fechaIso Fecha calendario en formato `YYYY-MM-DD`
+ * @returns Date en medianoche UTC del día calendario indicado
+ */
+export function fechaCalendarioDesdeIso(fechaIso: string): Date {
+  const [anio, mes, dia] = fechaIso.split('-').map(Number);
+  return new Date(Date.UTC(anio, mes - 1, dia));
+}
+
+/**
+ * Formatea una fecha calendario como `YYYY-MM-DD` usando solo getters `getUTC*`, nunca
+ * `toISOString().slice(0, 10)` ni el reloj/zona horaria del proceso (config.yaml §7).
+ *
+ * Antes vivía duplicada como `fechaISO` en `reservas.controller.ts` y como
+ * `fechaCalendarioISO` en `bloquear-turno-fecha.ts` (cubic, PR #40, hallazgo P3).
+ *
+ * @param fecha Date que representa una fecha calendario (sin componente de hora significativo)
+ * @returns cadena `YYYY-MM-DD`
+ */
+export function fechaCalendarioAIso(fecha: Date): string {
+  const anio = String(fecha.getUTCFullYear()).padStart(4, '0');
+  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getUTCDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+}
+
+/**
+ * Normaliza un `Date` a la medianoche UTC de su día calendario, descartando cualquier
+ * componente de hora. A diferencia de `fechaCalendarioDesdeIso`, no parsea un string: toma
+ * un `Date` que ya puede tener hora (por ejemplo el inicio de un turno) y trunca la parte de
+ * fecha, porque Prisma trunca un `@db.Date` a la parte UTC del `Date` recibido (design.md de
+ * `disponibilidad` → Trampas de fechas).
+ *
+ * Antes vivía duplicada como `soloFecha` en `cargar-contexto.ts` (cubic, PR #40, hallazgo P3).
+ *
+ * @param fecha Date del que se toma únicamente la fecha calendario (parte UTC)
+ * @returns Date en medianoche UTC del mismo día calendario que `fecha`
+ */
+export function normalizarFechaCalendarioUtc(fecha: Date): Date {
+  return new Date(
+    Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()),
+  );
+}

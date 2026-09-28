@@ -28,6 +28,7 @@ describe('MesasService', () => {
       delete: jest.Mock;
     };
     reserva: { count: jest.Mock };
+    $transaction: jest.Mock;
   };
 
   const zonaStandard = { id: 'zona-standard', nombre: 'STANDARD' };
@@ -50,6 +51,9 @@ describe('MesasService', () => {
         delete: jest.fn(),
       },
       reserva: { count: jest.fn() },
+      // La transacción de `actualizar` recibe un `tx` con la misma forma que `prisma`;
+      // acá alcanza con delegarle el callback al mismo mock.
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -60,6 +64,18 @@ describe('MesasService', () => {
   });
 
   describe('crear', () => {
+    it('devuelve 404 de zona si desaparece antes del alta', async () => {
+      prisma.zona.findUnique.mockResolvedValue(zonaStandard);
+      prisma.mesa.create.mockRejectedValue(errorPrisma('P2003'));
+
+      await expect(
+        service.crear({
+          zonaId: zonaStandard.id,
+          capacidad: 4,
+          etiqueta: 'M2',
+        }),
+      ).rejects.toEqual(new NotFoundException('La zona indicada no existe.'));
+    });
     it('crea la mesa cuando la zona existe y la capacidad es positiva', async () => {
       prisma.zona.findUnique.mockResolvedValue(zonaStandard);
       prisma.mesa.create.mockResolvedValue(mesa);
@@ -87,6 +103,19 @@ describe('MesasService', () => {
         expect(prisma.mesa.create).not.toHaveBeenCalled();
       },
     );
+
+    it('traduce P2002 (etiqueta duplicada) a ConflictException', async () => {
+      prisma.zona.findUnique.mockResolvedValue(zonaStandard);
+      prisma.mesa.create.mockRejectedValue(errorPrisma('P2002'));
+
+      await expect(
+        service.crear({
+          zonaId: zonaStandard.id,
+          capacidad: 4,
+          etiqueta: 'M1',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
   });
 
   describe('listar', () => {
@@ -108,6 +137,26 @@ describe('MesasService', () => {
   });
 
   describe('actualizar', () => {
+    it('devuelve 404 de zona si desaparece antes de la edición', async () => {
+      prisma.mesa.findUnique.mockResolvedValue(mesa);
+      prisma.zona.findUnique.mockResolvedValue(zonaVip);
+      prisma.reserva.count.mockResolvedValue(0);
+      prisma.mesa.update.mockRejectedValue(errorPrisma('P2003'));
+
+      await expect(
+        service.actualizar(mesa.id, { zonaId: zonaVip.id }),
+      ).rejects.toEqual(new NotFoundException('La zona indicada no existe.'));
+    });
+    it.each([0, -1, 1.5])(
+      'rechaza capacidad no positiva (%s), sin llegar a la transacción',
+      async (capacidad) => {
+        await expect(
+          service.actualizar(mesa.id, { capacidad }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      },
+    );
+
     it('rechaza si la mesa no existe', async () => {
       prisma.mesa.findUnique.mockResolvedValue(null);
 
@@ -122,6 +171,9 @@ describe('MesasService', () => {
 
       await service.actualizar(mesa.id, { etiqueta: 'M1-nueva' });
       expect(prisma.reserva.count).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
       expect(prisma.mesa.update).toHaveBeenCalledWith({
         where: { id: mesa.id },
         data: { etiqueta: 'M1-nueva' },
@@ -189,6 +241,39 @@ describe('MesasService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.mesa.update).not.toHaveBeenCalled();
     });
+
+    it('traduce P2002 (etiqueta duplicada) a ConflictException', async () => {
+      prisma.mesa.findUnique.mockResolvedValue(mesa);
+      prisma.mesa.update.mockRejectedValue(errorPrisma('P2002'));
+
+      await expect(
+        service.actualizar(mesa.id, { etiqueta: 'M2' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('reintenta ante un conflicto de serialización y termina persistiendo', async () => {
+      prisma.mesa.findUnique.mockResolvedValue(mesa);
+      prisma.mesa.update.mockResolvedValue({ ...mesa, etiqueta: 'M1-nueva' });
+      prisma.$transaction
+        .mockImplementationOnce(() => Promise.reject(errorPrisma('P2034')))
+        .mockImplementationOnce((fn: (tx: unknown) => unknown) => fn(prisma));
+
+      await expect(
+        service.actualizar(mesa.id, { etiqueta: 'M1-nueva' }),
+      ).resolves.toBeDefined();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('rechaza con 409 tras agotar los reintentos de serialización', async () => {
+      prisma.$transaction.mockImplementation(() =>
+        Promise.reject(errorPrisma('P2034')),
+      );
+
+      await expect(
+        service.actualizar(mesa.id, { etiqueta: 'M1-nueva' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('eliminar', () => {
@@ -201,18 +286,21 @@ describe('MesasService', () => {
       expect(prisma.mesa.delete).not.toHaveBeenCalled();
     });
 
-    it.each(['PENDIENTE', 'CONFIRMADA', 'CANCELADA', 'NO_SHOW'])(
-      'rechaza si tiene una Reserva %s asociada',
-      async () => {
-        prisma.mesa.findUnique.mockResolvedValue(mesa);
-        prisma.reserva.count.mockResolvedValue(1);
+    it('rechaza si tiene alguna Reserva asociada, sin filtrar por estado', async () => {
+      prisma.mesa.findUnique.mockResolvedValue(mesa);
+      prisma.reserva.count.mockResolvedValue(1);
 
-        await expect(service.eliminar(mesa.id)).rejects.toBeInstanceOf(
-          ConflictException,
-        );
-        expect(prisma.mesa.delete).not.toHaveBeenCalled();
-      },
-    );
+      await expect(service.eliminar(mesa.id)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      // El chequeo no filtra por estado — spec: Reservas de CUALQUIER estado (PENDIENTE,
+      // CONFIRMADA, CANCELADA o NO_SHOW) bloquean la baja. Cuál estado específico tiene la
+      // Reserva de verdad lo cubre `mesas.integration-spec.ts` contra Postgres real.
+      expect(prisma.reserva.count).toHaveBeenCalledWith({
+        where: { mesaId: mesa.id },
+      });
+      expect(prisma.mesa.delete).not.toHaveBeenCalled();
+    });
 
     it('elimina físicamente sin reservas asociadas', async () => {
       prisma.mesa.findUnique.mockResolvedValue(mesa);

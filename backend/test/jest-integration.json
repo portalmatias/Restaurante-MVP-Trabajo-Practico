@@ -2,6 +2,7 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": ".",
   "testEnvironment": "node",
+  "maxWorkers": 1,
   "testRegex": ".integration-spec.ts$",
   "setupFiles": ["<rootDir>/jest-integration.setup.ts"],
   "testTimeout": 30000,
@@ -9,6 +10,6 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(.pnpm/)?(@nestjs|passport-jwt|passport)/)"
+    "node_modules/(?!(@nestjs|passport-jwt|passport)/)"
   ]
 }

@@ -17,7 +17,7 @@ de reintentos puede terminar propagando el `P2034` como `500` justo bajo concurr
 
 - Se introduce `POST /reservas`, **público** (sin auth), con `fecha` (`YYYY-MM-DD`, calendario
   local del restaurante), `turnoId`, `zonaId`, `comensales`, `nombreCliente`, `emailCliente` y
-  `telefonoCliente`. El cliente **no** elige mesa, estado ni código: si los manda, se ignoran.
+  `telefonoCliente`. El cliente **no** elige mesa, estado ni código: si los manda, se responde `400`.
 - La creación evalúa las reglas con el **validador compartido de `disponibilidad`**
   (`cargarContexto` + `evaluarReglas`), sin reimplementar ninguna. Si hay motivos, responde
   `409` con **todos** los motivos, con los mismos `CodigoMotivo` y en el mismo orden fijo que

@@ -1,8 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ZonasService } from './zonas.service';
+
+function errorSerializacion() {
+  return new Prisma.PrismaClientKnownRequestError('mock', {
+    code: 'P2034',
+    clientVersion: '6.19.0',
+  });
+}
 
 describe('ZonasService', () => {
   let service: ZonasService;
@@ -12,6 +24,7 @@ describe('ZonasService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const zonaVip = {
@@ -33,6 +46,9 @@ describe('ZonasService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      // La transacción del service recibe un `tx` con la misma forma que `prisma`; acá
+      // alcanza con delegarle el callback al mismo mock, no hace falta un cliente aparte.
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -51,6 +67,20 @@ describe('ZonasService', () => {
   });
 
   describe('actualizar', () => {
+    it('devuelve 404 si la Zona desaparece antes de actualizar', async () => {
+      prisma.zona.findUnique.mockResolvedValue(zonaVip);
+      prisma.zona.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('mock', {
+          code: 'P2025',
+          clientVersion: '6.19.0',
+        }),
+      );
+
+      await expect(
+        service.actualizar(zonaVip.id, { aforoMaximo: 25 }),
+      ).rejects.toEqual(new NotFoundException('La zona indicada no existe.'));
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
     it('rechaza si la Zona no existe', async () => {
       prisma.zona.findUnique.mockResolvedValue(null);
 
@@ -72,6 +102,9 @@ describe('ZonasService', () => {
         data: dto,
       });
       expect(resultado.aforoMaximo).toBe(25);
+      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
     });
 
     it('rechaza si el dto deja minComensales > maxComensales explícitamente', async () => {
@@ -111,6 +144,29 @@ describe('ZonasService', () => {
 
       await expect(service.actualizar(zonaVip.id, dto)).resolves.toBeDefined();
       expect(prisma.zona.update).toHaveBeenCalled();
+    });
+
+    it('reintenta ante un conflicto de serialización y termina persistiendo', async () => {
+      prisma.zona.findUnique.mockResolvedValue(zonaVip);
+      const dto = { aforoMaximo: 30 };
+      prisma.$transaction
+        .mockImplementationOnce(() => Promise.reject(errorSerializacion()))
+        .mockImplementationOnce((fn: (tx: unknown) => unknown) => fn(prisma));
+      prisma.zona.update.mockResolvedValue({ ...zonaVip, ...dto });
+
+      await expect(service.actualizar(zonaVip.id, dto)).resolves.toBeDefined();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('rechaza con 409 tras agotar los reintentos de serialización', async () => {
+      prisma.$transaction.mockImplementation(() =>
+        Promise.reject(errorSerializacion()),
+      );
+
+      await expect(
+        service.actualizar(zonaVip.id, { aforoMaximo: 30 }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(3);
     });
   });
 });
