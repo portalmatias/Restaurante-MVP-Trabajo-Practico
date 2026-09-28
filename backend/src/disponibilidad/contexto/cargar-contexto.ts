@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { normalizarFechaCalendarioUtc } from '../../common/timezone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ContextoReserva, SolicitudDisponibilidad } from '../reglas/tipos';
 
@@ -22,18 +23,6 @@ export type ClienteBaseDatos = PrismaService | Prisma.TransactionClient;
 const ESTADOS_QUE_OCUPAN: Prisma.EnumEstadoReservaFilter = {
   in: ['PENDIENTE', 'CONFIRMADA'],
 };
-
-/**
- * Normaliza una fecha de calendario a medianoche UTC. Prisma trunca un `@db.Date` a la
- * parte de fecha **UTC** del `Date` que recibe, así que pasar un instante con hora (por
- * ejemplo el inicio del turno, que para una cena tardía cae al día siguiente) correría la
- * fecha un día (design.md → Trampas de fechas).
- */
-function soloFecha(fecha: Date): Date {
-  return new Date(
-    Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()),
-  );
-}
 
 /**
  * Único punto del validador de disponibilidad que lee la base (design.md D1). Devuelve los
@@ -57,7 +46,7 @@ export async function cargarContexto(
 ): Promise<ContextoReserva> {
   const cliente: Prisma.TransactionClient = db;
   const { turnoId, zonaId } = solicitud;
-  const fecha = soloFecha(solicitud.fecha);
+  const fecha = normalizarFechaCalendarioUtc(solicitud.fecha);
 
   const turno = await cliente.turno.findUnique({
     where: { id: turnoId },

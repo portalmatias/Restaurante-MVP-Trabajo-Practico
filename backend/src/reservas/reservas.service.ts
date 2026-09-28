@@ -1,21 +1,37 @@
 import { randomInt } from 'node:crypto';
 
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DiaSemana, EstadoReserva, Prisma } from '@prisma/client';
+import { EstadoReserva, Prisma } from '@prisma/client';
 
+import { bloquearTurnoFecha } from '../disponibilidad/contexto/bloquear-turno-fecha';
+import { cargarContexto } from '../disponibilidad/contexto/cargar-contexto';
+import { evaluarReglas } from '../disponibilidad/reglas/evaluar-reglas';
+import {
+  CodigoMotivo,
+  MotivoNoDisponible,
+  SolicitudDisponibilidad,
+} from '../disponibilidad/reglas/tipos';
 import { PrismaService } from '../prisma/prisma.service';
-import { diaSemanaDeFecha } from '../common/timezone';
+import { elegirMesaBestFit } from './elegir-mesa-best-fit';
 
 const CODIGO_RESERVA_LONGITUD = 8;
 // Sin caracteres ambiguos (0/O, 1/I/L) para que sea legible por teléfono/email.
 const CODIGO_RESERVA_ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODIGO_RESERVA_MAX_INTENTOS = 5;
-const SERIALIZACION_MAX_INTENTOS = 3;
+
+/**
+ * Nombre real del índice único parcial `(mesaId, turnoId, fecha)` (invariante 1), tal como lo
+ * generó la migración editada a mano de #12
+ * (`backend/prisma/migrations/20260914234727_init_modelo_dominio/migration.sql`):
+ * `Reserva_mesaId_turnoId_fecha_key`. El design.md de este change (Trampas) anotaba como
+ * hipótesis el nombre `reserva_mesa_turno_fecha_activa_key`, que no es el real — se corrige
+ * acá con el nombre que efectivamente usa la base (verificado con el test de P2002 de 4.2).
+ */
+const INDICE_MESA_TURNO_FECHA_ACTIVA = 'Reserva_mesaId_turnoId_fecha_key';
 
 /** Transiciones válidas de `EstadoReserva` (config.yaml §6, invariante 5). */
 const TRANSICIONES_VALIDAS: Record<EstadoReserva, EstadoReserva[]> = {
@@ -26,11 +42,9 @@ const TRANSICIONES_VALIDAS: Record<EstadoReserva, EstadoReserva[]> = {
 };
 
 export interface CrearReservaInput {
-  /** Mesa ya elegida. La asignación automática (best fit) es de la capability `reservas-crear`. */
-  mesaId: string;
   turnoId: string;
-  /** Zona que el cliente solicitó — debe coincidir con la zona real de `mesaId` (invariante 3). */
-  zonaSolicitadaId: string;
+  /** Zona pedida por el cliente. La mesa la elige el service (best fit, D3): no llega en el input. */
+  zonaId: string;
   fecha: Date;
   comensales: number;
   nombreCliente: string;
@@ -38,12 +52,22 @@ export interface CrearReservaInput {
   telefonoCliente: string;
 }
 
+/** Cuerpo `409` fijo de D8/D9: `motivos` vacío significa choque de concurrencia, no regla. */
+function rechazoDeReserva(message: string, motivos: MotivoNoDisponible[]) {
+  return new ConflictException({
+    statusCode: 409,
+    message,
+    error: 'Conflict',
+    motivos,
+  });
+}
+
 /**
- * Contiene la lógica de negocio de Reserva que este change (`modelo-dominio`) necesita para
- * poder probar los cinco invariantes de config.yaml §6 contra datos reales. No define DTOs,
- * controllers ni el algoritmo de asignación automática de mesa — eso es alcance de las
- * capabilities `reservas-crear` / `cancelacion-turnos` / `reserva-vip` (ver design.md →
- * Non-Goals).
+ * Crea reservas sobre el validador compartido de `disponibilidad` (design.md D1 de
+ * `reservas-crear`): no reimplementa ninguna regla de negocio, solo orquesta
+ * `bloquearTurnoFecha`, `cargarContexto` y `evaluarReglas` dentro de una transacción, y elige
+ * la mesa con `elegirMesaBestFit`. También es el único punto que escribe `estado`
+ * (`transicionarEstado`, sin cambios de este change).
  */
 @Injectable()
 export class ReservasService {
@@ -58,7 +82,9 @@ export class ReservasService {
     return codigo;
   }
 
-  private esColisionDeCampo(error: unknown, campo: string): boolean {
+  /** `true` si `error` es un `P2002` cuyo `target` incluye alguno de `campos` (nombre de
+   * columna o, si Prisma no lo resolvió, nombre del índice — ver Trampas). */
+  private esColisionDeCampo(error: unknown, ...campos: string[]): boolean {
     if (
       !(error instanceof Prisma.PrismaClientKnownRequestError) ||
       error.code !== 'P2002'
@@ -66,173 +92,67 @@ export class ReservasService {
       return false;
     }
     const target = error.meta?.target as string[] | string | undefined;
-    if (Array.isArray(target)) return target.includes(campo);
-    return typeof target === 'string' && target.includes(campo);
+    const targets = Array.isArray(target)
+      ? target
+      : typeof target === 'string'
+        ? [target]
+        : [];
+    return campos.some((campo) => targets.includes(campo));
   }
 
   /**
-   * Crea una Reserva validando, dentro de una única transacción Prisma, los invariantes 2
-   * (capacidad de mesa), 3 (turno activo y mesa de la zona solicitada) y 4 (aforo de zona y
-   * aforo global) — ver design.md → "Invariantes 2, 3 y 4 → validación de servicio". El
-   * invariante 1 (exclusividad mesa+turno+fecha) lo hace cumplir el índice único parcial de
-   * la base; acá se traduce el `P2002` de Prisma a un `409 Conflict` legible en vez de
-   * propagarlo crudo.
+   * Crea una Reserva evaluando, dentro de una única transacción de Prisma, las mismas ocho
+   * reglas que `GET /disponibilidad` (design.md D1). Flujo, en `READ COMMITTED` —el
+   * aislamiento por defecto de Postgres, sin `isolationLevel` (D2)—:
    *
-   * Corre con aislamiento `Serializable`: bajo el default de Postgres (Read Committed), dos
-   * transacciones concurrentes que reservan mesas distintas de la misma zona pueden leer el
-   * mismo agregado de aforo, pasar ambas la validación, e insertar ambas — violando el
-   * invariante de aforo bajo concurrencia real. `Serializable` hace que Postgres aborte una
-   * de las dos con un error de serialización (P2034); ante eso, se reintenta la transacción
-   * completa desde cero (no solo el insert) hasta `SERIALIZACION_MAX_INTENTOS` veces.
+   *   1. `bloquearTurnoFecha` como primera sentencia: toma el lock advisory de
+   *      `(turnoId, fecha)` antes de leer nada, para que la lectura de ocupación de abajo ya
+   *      vea lo que confirmó quien tenía el lock antes (D2).
+   *   2. `cargarContexto`, único acceso a la base para turno/zona/ocupación/mesas libres;
+   *      lanza `NotFoundException` si el turno o la zona no existen.
+   *   3. `evaluarReglas` con el reloj real tomado DESPUÉS de obtener el lock: si informa
+   *      motivos, `409` con todos ellos (D8) y no se persiste nada.
+   *   4. `elegirMesaBestFit` sobre `contexto.mesasLibres` (D3).
+   *   5. Estado inicial según `contexto.zona.requiereConfirmacionAdmin`, no según el nombre
+   *      de la zona (D4).
+   *   6. `INSERT` dentro de un `SAVEPOINT`, con el generador y el reintento de código de #12
+   *      ante colisión de `codigoReserva` (D5).
+   *
+   * Los choques de escritura (`P2002` sobre la mesa, códigos agotados) y los `P2028`/`P2024`
+   * de la transacción se traducen a `409` en vez de propagarse como `500` (D9).
    */
   async crearReserva(input: CrearReservaInput) {
-    if (input.comensales <= 0) {
-      throw new BadRequestException(
-        'La cantidad de comensales debe ser mayor a cero.',
-      );
-    }
+    return this.prisma
+      .$transaction(async (tx) => {
+        await bloquearTurnoFecha(tx, input.turnoId, input.fecha);
 
-    for (
-      let intentoSerializacion = 0;
-      intentoSerializacion < SERIALIZACION_MAX_INTENTOS;
-      intentoSerializacion++
-    ) {
-      try {
-        return await this.ejecutarCreacionReserva(input);
-      } catch (error) {
-        const esConflictoDeSerializacion =
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === 'P2034';
-        if (!esConflictoDeSerializacion) {
-          throw error;
-        }
-        const quedanIntentos =
-          intentoSerializacion < SERIALIZACION_MAX_INTENTOS - 1;
-        if (quedanIntentos) {
-          continue;
-        }
-        // Se agotaron los reintentos de serialización: en vez de propagar el P2034 crudo
-        // (que Nest traduciría en un 500), lo convertimos en un 409 legible para el cliente.
-        throw new ConflictException(
-          'No se pudo completar la reserva por conflictos de concurrencia. Volvé a intentarlo.',
-        );
-      }
-    }
-    // Inalcanzable en la práctica (el loop siempre retorna o lanza), pero TypeScript
-    // exige que la función tenga un camino de retorno explícito al final.
-    throw new ConflictException(
-      'No se pudo completar la reserva tras varios reintentos por conflictos de concurrencia.',
-    );
-  }
-
-  private async ejecutarCreacionReserva(input: CrearReservaInput) {
-    return this.prisma.$transaction(
-      async (tx) => {
-        const mesa = await tx.mesa.findUnique({ where: { id: input.mesaId } });
-        if (!mesa) {
-          throw new NotFoundException('La mesa indicada no existe.');
-        }
-
-        const turno = await tx.turno.findUnique({
-          where: { id: input.turnoId },
-        });
-        if (!turno) {
-          throw new NotFoundException('El turno indicado no existe.');
-        }
-
-        // Invariante 3 (parte 1): el turno debe estar activo.
-        if (!turno.activo) {
-          throw new ConflictException('El turno solicitado no está activo.');
-        }
-
-        // Invariante 3 (parte 2): la mesa debe pertenecer a la zona solicitada.
-        if (mesa.zonaId !== input.zonaSolicitadaId) {
-          throw new ConflictException(
-            'La mesa elegida no pertenece a la zona solicitada.',
-          );
-        }
-
-        // Invariante 3 (parte 3): el día de la semana de la fecha debe coincidir con el
-        // diaSemana del turno. Usamos getUTCDay() (via diaSemanaDeFecha) porque
-        // Reserva.fecha es @db.Date (fecha calendario pura sin zona horaria).
-        const diaSemanaFecha = diaSemanaDeFecha(input.fecha);
-        const diaSemanaTurnoNumero: Record<DiaSemana, number> = {
-          DOMINGO: 0,
-          LUNES: 1,
-          MARTES: 2,
-          MIERCOLES: 3,
-          JUEVES: 4,
-          VIERNES: 5,
-          SABADO: 6,
+        const solicitud: SolicitudDisponibilidad = {
+          fecha: input.fecha,
+          turnoId: input.turnoId,
+          zonaId: input.zonaId,
+          comensales: input.comensales,
         };
-        if (diaSemanaFecha !== diaSemanaTurnoNumero[turno.diaSemana]) {
-          throw new ConflictException(
-            'La fecha de la reserva no coincide con el día de la semana del turno seleccionado.',
+        const contexto = await cargarContexto(tx, solicitud);
+
+        // El reloj se inyecta acá, después del lock: una creación que esperó evalúa la
+        // anticipación con la hora real en que decide, no con la hora de entrada (D1).
+        const motivos = evaluarReglas(contexto, solicitud, new Date());
+        if (motivos.length > 0) {
+          throw rechazoDeReserva('No se pudo crear la reserva', motivos);
+        }
+
+        const mesa = elegirMesaBestFit(contexto.mesasLibres, input.comensales);
+        if (!mesa) {
+          // No debería pasar nunca: evaluarReglas ya habría informado SIN_MESA_DISPONIBLE
+          // con la misma lista de mesasLibres (design.md D1). Si igual pasa, es un bug
+          // interno y no un 409 de negocio.
+          throw new Error(
+            'elegirMesaBestFit no encontró mesa pese a que evaluarReglas no informó motivos.',
           );
         }
 
-        // Invariante 2: los comensales no pueden superar la capacidad de la mesa.
-        if (input.comensales > mesa.capacidad) {
-          throw new ConflictException(
-            'La cantidad de comensales supera la capacidad de la mesa asignada.',
-          );
-        }
-
-        const zona = await tx.zona.findUnique({
-          where: { id: input.zonaSolicitadaId },
-        });
-        if (!zona) {
-          throw new NotFoundException('La zona indicada no existe.');
-        }
-
-        // Invariante 4: la suma de comensales activos del turno/fecha en la zona no puede
-        // superar el aforo configurado, aunque la mesa esté físicamente libre.
-        const agregado = await tx.reserva.aggregate({
-          where: {
-            turnoId: input.turnoId,
-            fecha: input.fecha,
-            estado: { in: ['PENDIENTE', 'CONFIRMADA'] },
-            mesa: { zonaId: input.zonaSolicitadaId },
-          },
-          _sum: { comensales: true },
-        });
-        const comensalesActivos = agregado._sum.comensales ?? 0;
-        if (comensalesActivos + input.comensales > zona.aforoMaximo) {
-          throw new ConflictException(
-            'La reserva excede el aforo restante de la zona para ese turno y esa fecha.',
-          );
-        }
-
-        // Invariante adicional: la suma de comensales activos de TODAS las zonas para ese
-        // turno/fecha no puede superar el aforo global — independiente de que el aforo de la
-        // zona solicitada, mirado en aislamiento, todavía alcance.
-        const configuracion = await tx.configuracionNegocio.findUnique({
-          where: { id: 1 },
-        });
-        if (!configuracion) {
-          throw new ConflictException(
-            'No hay configuración de negocio cargada para validar el aforo global.',
-          );
-        }
-        const agregadoGlobal = await tx.reserva.aggregate({
-          where: {
-            turnoId: input.turnoId,
-            fecha: input.fecha,
-            estado: { in: ['PENDIENTE', 'CONFIRMADA'] },
-          },
-          _sum: { comensales: true },
-        });
-        const comensalesActivosGlobal = agregadoGlobal._sum.comensales ?? 0;
-        if (
-          comensalesActivosGlobal + input.comensales >
-          configuracion.aforoGlobal
-        ) {
-          throw new ConflictException(
-            'La reserva excede el aforo global restante para ese turno y esa fecha.',
-          );
-        }
-
-        const estadoInicial: EstadoReserva = zona.requiereConfirmacionAdmin
+        const estadoInicial: EstadoReserva = contexto.zona
+          .requiereConfirmacionAdmin
           ? 'PENDIENTE'
           : 'CONFIRMADA';
 
@@ -244,15 +164,15 @@ export class ReservasService {
           const codigoReserva = this.generarCodigoReserva();
           // Postgres aborta el resto de la transacción en curso apenas una sentencia falla
           // por violar un constraint. Como el reintento por colisión de código necesita
-          // seguir usando la MISMA transacción (las validaciones de arriba deben quedar
-          // atómicas con el `create`, invariante 4 incluido), cada intento corre dentro de
-          // su propio SAVEPOINT: si falla, se hace ROLLBACK TO SAVEPOINT y la transacción
-          // queda utilizable para el siguiente intento.
+          // seguir usando la MISMA transacción (el lock y el contexto ya evaluado deben
+          // quedar atómicos con el `create`), cada intento corre dentro de su propio
+          // SAVEPOINT: si falla, se hace ROLLBACK TO SAVEPOINT y la transacción queda
+          // utilizable para el siguiente intento.
           await tx.$executeRawUnsafe('SAVEPOINT intento_codigo_reserva');
           try {
             const reserva = await tx.reserva.create({
               data: {
-                mesaId: input.mesaId,
+                mesaId: mesa.id,
                 turnoId: input.turnoId,
                 fecha: input.fecha,
                 comensales: input.comensales,
@@ -276,22 +196,52 @@ export class ReservasService {
               // reintentar con un código nuevo en vez de romper la creación.
               continue;
             }
-            if (this.esColisionDeCampo(error, 'mesaId')) {
-              // Índice único parcial de (mesaId, turnoId, fecha) — invariante 1.
-              throw new ConflictException(
+            if (
+              this.esColisionDeCampo(
+                error,
+                'mesaId',
+                INDICE_MESA_TURNO_FECHA_ACTIVA,
+              )
+            ) {
+              // Con el lock tomado como primera sentencia esto no debería ocurrir: solo
+              // aparece si otra escritura saltea `bloquearTurnoFecha`. Se traduce igual,
+              // como defensa — el índice parcial es la garantía de base del invariante 1
+              // (D9).
+              throw rechazoDeReserva(
                 'Ya existe una reserva activa para esa mesa, ese turno y esa fecha.',
+                [
+                  {
+                    codigo: CodigoMotivo.SIN_MESA_DISPONIBLE,
+                    mensaje: `No queda una mesa libre en la zona ${contexto.zona.nombre} para ${input.comensales} comensales.`,
+                  },
+                ],
               );
             }
             throw error;
           }
         }
 
-        throw new ConflictException(
-          'No se pudo generar un código de reserva único luego de varios intentos.',
+        // Agotar los intentos es prácticamente imposible (D5): 409 sin motivos, no 500.
+        throw rechazoDeReserva(
+          'No se pudo generar un código de reserva único luego de varios intentos. Volvé a intentarlo.',
+          [],
         );
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+      })
+      .catch((error: unknown) => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          (error.code === 'P2028' || error.code === 'P2024')
+        ) {
+          // P2028: timeout de la transacción interactiva (incluye la espera por el lock,
+          // design.md → Trampas). P2024: sin conexión libre en el pool. Ninguno de los dos
+          // es un error del servidor: "había demasiada gente reservando a la vez" (D9).
+          throw rechazoDeReserva(
+            'Hay muchas reservas en curso para ese turno y esa fecha. Intentá de nuevo en unos segundos.',
+            [],
+          );
+        }
+        throw error;
+      });
   }
 
   /**

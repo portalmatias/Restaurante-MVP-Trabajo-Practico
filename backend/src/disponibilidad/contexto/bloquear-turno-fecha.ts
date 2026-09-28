@@ -1,16 +1,6 @@
 import { Prisma } from '@prisma/client';
 
-/**
- * Formatea una fecha de calendario como `YYYY-MM-DD` usando solo getters `getUTC*`, para
- * que la clave del lock no dependa de la zona horaria del proceso (design.md → Trampas de
- * fechas: la máquina de desarrollo corre en Buenos Aires y CI en UTC).
- */
-function fechaCalendarioISO(fecha: Date): string {
-  const anio = String(fecha.getUTCFullYear()).padStart(4, '0');
-  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-  const dia = String(fecha.getUTCDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
-}
+import { fechaCalendarioAIso } from '../../common/timezone';
 
 /**
  * Toma el lock advisory de `(turno, fecha)` dentro de una transacción (design.md D6).
@@ -43,6 +33,6 @@ export async function bloquearTurnoFecha(
   turnoId: string,
   fecha: Date,
 ): Promise<void> {
-  const fechaISO = fechaCalendarioISO(fecha);
+  const fechaISO = fechaCalendarioAIso(fecha);
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${turnoId}::text || ':' || ${fechaISO}::text))`;
 }

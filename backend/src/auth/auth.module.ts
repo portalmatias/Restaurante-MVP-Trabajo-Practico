@@ -33,11 +33,11 @@ import { RolesGuard } from './guards/roles.guard';
   ],
   controllers: [AuthController],
   // `PrismaService` (el que usa AuthService) lo provee `PrismaModule`, que se importa
-  // explícito arriba como hacen `MesasModule`/`ReservasModule`: aunque sea `@Global()`, un
-  // módulo global solo existe si alguien lo importa, y `ReservasModule` no está registrado
-  // en `AppModule`. No hace falta proveer acá un `PrismaClient` propio: crear uno nuevo sin
-  // gestionar su ciclo de vida (sin `onModuleInit`/`onModuleDestroy`) dejaba una conexión a
-  // la base sin cerrar nunca.
+  // explícito arriba como hacen `MesasModule`/`ReservasModule` (ambos registrados en
+  // `AppModule`): aunque sea `@Global()`, un módulo global solo existe si alguien lo importa.
+  // No hace falta proveer acá un `PrismaClient` propio: crear uno nuevo sin gestionar su
+  // ciclo de vida (sin `onModuleInit`/`onModuleDestroy`) dejaba una conexión a la base sin
+  // cerrar nunca.
   providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
   exports: [AuthService, JwtModule, PassportModule, JwtAuthGuard, RolesGuard],
 })

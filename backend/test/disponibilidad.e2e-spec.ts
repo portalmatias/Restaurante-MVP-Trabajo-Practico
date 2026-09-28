@@ -5,11 +5,16 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 
 import { AppModule } from '../src/app.module';
-import { ARGENTINA_OFFSET_MS } from '../src/common/timezone';
 import { DisponibilidadRespuesta } from '../src/disponibilidad/dto/disponibilidad-respuesta.dto';
 import { ErrorRespuesta } from '../src/disponibilidad/dto/error-respuesta.dto';
 import { CodigoMotivo, DIAS } from '../src/disponibilidad/reglas/tipos';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { diaDe, FECHA, FECHA_LUNES, fechaISO } from './support/fechas-e2e';
+import {
+  configurarZonasYConfiguracionDeSeed,
+  TURNO_UUID_INEXISTENTE,
+  ZONA_UUID_INEXISTENTE,
+} from './support/zonas-seed-e2e';
 
 /**
  * Tareas 7.1–7.4 del change `disponibilidad`: `GET /disponibilidad` por HTTP con Supertest,
@@ -54,67 +59,10 @@ describe('GET /disponibilidad (e2e)', () => {
   let turnoIds: string[] = [];
   let reservaIds: string[] = [];
 
-  /** UUIDs bien formados que no existen en la base: sirven para el 400 y para el 404. */
-  const TURNO_UUID_INEXISTENTE = '3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73';
-  const ZONA_UUID_INEXISTENTE = 'b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19';
-
   const MENSAJE_COMENSALES =
     'comensales debe ser un número entero mayor o igual a 1';
   const MENSAJE_FECHA_FORMATO =
     'fecha debe ser una fecha de calendario con formato YYYY-MM-DD, sin hora';
-
-  // --- Fechas ---------------------------------------------------------------------------
-
-  /** Fecha de calendario (medianoche UTC), la forma en que viaja una `@db.Date` (D4). */
-  function fechaCalendario(anio: number, mes: number, dia: number): Date {
-    return new Date(Date.UTC(anio, mes - 1, dia));
-  }
-
-  /** Hoy según el calendario local del restaurante (UTC-3), no según el del proceso. */
-  function hoyLocal(): Date {
-    const ahoraLocal = new Date(Date.now() + ARGENTINA_OFFSET_MS);
-    return fechaCalendario(
-      ahoraLocal.getUTCFullYear(),
-      ahoraLocal.getUTCMonth() + 1,
-      ahoraLocal.getUTCDate(),
-    );
-  }
-
-  function sumarDias(fecha: Date, dias: number): Date {
-    return new Date(
-      Date.UTC(
-        fecha.getUTCFullYear(),
-        fecha.getUTCMonth(),
-        fecha.getUTCDate() + dias,
-      ),
-    );
-  }
-
-  /** `YYYY-MM-DD`, que es como viaja `fecha` en la query. */
-  function fechaISO(fecha: Date): string {
-    const anio = String(fecha.getUTCFullYear()).padStart(4, '0');
-    const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-    const dia = String(fecha.getUTCDate()).padStart(2, '0');
-    return `${anio}-${mes}-${dia}`;
-  }
-
-  /** El `DiaSemana` que le corresponde a una fecha de calendario. */
-  function diaDe(fecha: Date): DiaSemana {
-    return DIAS[fecha.getUTCDay()];
-  }
-
-  /** Primer lunes que cae a `minimoDias` días o más de hoy (entre 8 y 14 días). */
-  function proximoLunes(minimoDias: number): Date {
-    let candidata = sumarDias(hoyLocal(), minimoDias);
-    while (diaDe(candidata) !== DiaSemana.LUNES) {
-      candidata = sumarDias(candidata, 1);
-    }
-    return candidata;
-  }
-
-  /** Fecha de trabajo: 10 días adelante, lejos de toda anticipación mínima y máxima. */
-  const FECHA = sumarDias(hoyLocal(), 10);
-  const FECHA_LUNES = proximoLunes(8);
 
   // --- Fixtures --------------------------------------------------------------------------
 
@@ -276,58 +224,9 @@ describe('GET /disponibilidad (e2e)', () => {
 
     // Valores del seed (backend/prisma/seed.ts): la suite deja la base como la encontró.
     // `NombreZona` es un enum de dos valores, así que no se pueden crear zonas propias.
-    const standard = await prisma.zona.upsert({
-      where: { nombre: 'STANDARD' },
-      update: {
-        minComensales: 1,
-        maxComensales: 8,
-        anticipacionMinHoras: 2,
-        anticipacionMaxDias: 30,
-        ventanaCancelacionHoras: 2,
-        requiereConfirmacionAdmin: false,
-        aforoMaximo: 40,
-      },
-      create: {
-        nombre: 'STANDARD',
-        minComensales: 1,
-        maxComensales: 8,
-        anticipacionMinHoras: 2,
-        anticipacionMaxDias: 30,
-        ventanaCancelacionHoras: 2,
-        requiereConfirmacionAdmin: false,
-        aforoMaximo: 40,
-      },
-    });
-    const vip = await prisma.zona.upsert({
-      where: { nombre: 'VIP' },
-      update: {
-        minComensales: 2,
-        maxComensales: 12,
-        anticipacionMinHoras: 24,
-        anticipacionMaxDias: 60,
-        ventanaCancelacionHoras: 24,
-        requiereConfirmacionAdmin: true,
-        aforoMaximo: 20,
-      },
-      create: {
-        nombre: 'VIP',
-        minComensales: 2,
-        maxComensales: 12,
-        anticipacionMinHoras: 24,
-        anticipacionMaxDias: 60,
-        ventanaCancelacionHoras: 24,
-        requiereConfirmacionAdmin: true,
-        aforoMaximo: 20,
-      },
-    });
-    zonaStandardId = standard.id;
-    zonaVipId = vip.id;
-
-    await prisma.configuracionNegocio.upsert({
-      where: { id: 1 },
-      update: { aforoGlobal: 60 },
-      create: { id: 1, aforoGlobal: 60 },
-    });
+    const zonas = await configurarZonasYConfiguracionDeSeed(prisma);
+    zonaStandardId = zonas.zonaStandardId;
+    zonaVipId = zonas.zonaVipId;
 
     await limpiarResiduos();
   });

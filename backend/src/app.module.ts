@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { DisponibilidadModule } from './disponibilidad/disponibilidad.module';
+import { ReservasModule } from './reservas/reservas.module';
 import { ZonasModule } from './zonas/zonas.module';
 import { MesasModule } from './mesas/mesas.module';
 import { HorariosModule } from './horarios/horarios.module';
@@ -44,10 +45,7 @@ import { HorariosModule } from './horarios/horarios.module';
     // de que `AppModule` los registre). Con #28 en `main`, el job migra y seedea Postgres
     // antes de correr ningún test — ya no aplica esa razón, así que se registran acá. El job
     // `spec` (`openapi:check`) también construye esta app con `NestFactory.create`, pero sin
-    // `app.init()`, así que no abre ninguna conexión. `ReservasModule` (`modelo-dominio`,
-    // PR #12) sigue sin controller propio (nace en el change `reservas-crear`, todavía no
-    // implementado) y por eso no se registra todavía — no es el mismo motivo que los de
-    // arriba.
+    // `app.init()`, así que no abre ninguna conexión.
     AuthModule,
     ZonasModule,
     MesasModule,
@@ -55,6 +53,10 @@ import { HorariosModule } from './horarios/horarios.module';
     // `DisponibilidadModule` (change `disponibilidad`) expone `GET /disponibilidad`,
     // público y sin auth, e importa `PrismaModule` igual que los de arriba.
     DisponibilidadModule,
+    // `ReservasModule` (change `reservas-crear`) expone `POST /reservas`, público y sin
+    // auth. Reusa las funciones sueltas de `disponibilidad/` (no el `DisponibilidadModule`)
+    // e importa `PrismaModule` igual que los de arriba.
+    ReservasModule,
   ],
   controllers: [AppController],
   providers: [
