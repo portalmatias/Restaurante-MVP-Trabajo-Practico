@@ -8,11 +8,13 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Confirmar" })).toBeInTheDocument();
   });
 
-  it("expone un anillo de foco visible al recibir foco por teclado", () => {
+  it("define las clases de anillo de foco visible (:focus-visible)", () => {
     render(<Button>Confirmar</Button>);
 
     const button = screen.getByRole("button", { name: "Confirmar" });
 
+    // jsdom no aplica pseudoclases como :focus-visible (D9): se verifica que las clases están
+    // presentes en el DOM, no que el foco por teclado dispare el anillo en pantalla.
     expect(button.className).toMatch(/focus-visible:ring-2/);
     expect(button.className).toMatch(/focus-visible:ring-ring/);
   });
@@ -52,5 +54,16 @@ describe("buttonVariants", () => {
 
   it("agrega el className recibido a las clases generadas", () => {
     expect(buttonVariants({ className: "mt-4" })).toMatch(/mt-4/);
+  });
+
+  it("la variante ghost no lleva relleno de color y resalta el fondo en hover", () => {
+    const clases = buttonVariants({ variant: "ghost" });
+
+    expect(clases).toMatch(/hover:bg-muted/);
+    expect(clases).not.toMatch(/bg-primary|bg-secondary|bg-destructive/);
+  });
+
+  it("fullWidth=false omite el ancho completo en mobile, para reusarse en enlaces de navegación", () => {
+    expect(buttonVariants({ variant: "ghost", fullWidth: false })).not.toMatch(/w-full/);
   });
 });

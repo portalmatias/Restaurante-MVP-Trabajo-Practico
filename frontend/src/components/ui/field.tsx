@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { mergeDescribedBy } from "./aria";
 import { Input, type InputProps } from "./input";
 import { Label } from "./label";
 
@@ -9,17 +10,6 @@ export type FieldProps = Omit<InputProps, "id" | "invalid" | "aria-invalid"> & {
   error?: string;
   id?: string;
 };
-
-/**
- * Junta ids de `aria-describedby`: el que ya traiga el caller (por ejemplo, el id de un texto
- * de ayuda) y el del error, sin duplicados ni espacios vacíos.
- */
-function mergeDescribedBy(...values: Array<string | undefined>): string | undefined {
-  const ids = values
-    .flatMap((value) => (value ? value.split(/\s+/) : []))
-    .filter((value, index, all) => value.length > 0 && all.indexOf(value) === index);
-  return ids.length > 0 ? ids.join(" ") : undefined;
-}
 
 /**
  * Campo de formulario accesible: etiqueta visible asociada al control y, si hay error, el

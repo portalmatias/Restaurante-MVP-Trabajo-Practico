@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
+import { buttonVariants } from "../src/components/ui/button";
 import "./globals.css";
 
 // D3 (design.md): una sola familia, Inter, pesos 400 a 700, auto-hosteada con next/font/google.
@@ -16,8 +17,15 @@ export const metadata: Metadata = {
     "Consultá disponibilidad, reservá una mesa y gestioná tus reservas.",
 };
 
-const navLinkClassName =
-  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-medium text-foreground underline-offset-4 transition-colors duration-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
+// Reusa las clases base de Button (altura mínima, anillo de foco, transición) con la variante
+// `ghost` (sin relleno) y `fullWidth: false` (un enlace de navegación no debe ocupar todo el
+// ancho de la fila, a diferencia de un botón primario). `min-w-11` y el subrayado en hover son
+// propios de la navegación, no de `buttonVariants`.
+const navLinkClassName = buttonVariants({
+  variant: "ghost",
+  fullWidth: false,
+  className: "min-w-11 underline-offset-4 hover:underline",
+});
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

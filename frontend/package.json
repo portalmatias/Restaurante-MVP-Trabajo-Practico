@@ -9,7 +9,7 @@
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.json",
     "test": "jest",
     "api:types": "openapi-typescript ../openapi/openapi.yaml -o src/lib/api/schema.d.ts",
-    "api:types:check": "tmp=\"$(mktemp)\" && npx openapi-typescript ../openapi/openapi.yaml -o \"$tmp\" >/dev/null && diff -u src/lib/api/schema.d.ts \"$tmp\"; rc=$?; rm -f \"$tmp\"; exit $rc"
+    "api:types:check": "node scripts/api-types-check.mjs"
   },
   "dependencies": {
     "next": "16.3.4",

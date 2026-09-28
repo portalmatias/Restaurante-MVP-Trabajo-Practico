@@ -1,4 +1,5 @@
 import { useId, type SelectHTMLAttributes } from "react";
+import { mergeDescribedBy } from "./aria";
 import { Label } from "./label";
 
 export type SelectProps = Omit<
@@ -11,17 +12,6 @@ export type SelectProps = Omit<
   error?: string;
   id?: string;
 };
-
-/**
- * Junta ids de `aria-describedby`: el que ya traiga el caller (por ejemplo, el id de un texto
- * de ayuda) y el del error, sin duplicados ni espacios vacíos.
- */
-function mergeDescribedBy(...values: Array<string | undefined>): string | undefined {
-  const ids = values
-    .flatMap((value) => (value ? value.split(/\s+/) : []))
-    .filter((value, index, all) => value.length > 0 && all.indexOf(value) === index);
-  return ids.length > 0 ? ids.join(" ") : undefined;
-}
 
 /**
  * Selector accesible con la misma asociación etiqueta/control y el mismo mapeo de error que

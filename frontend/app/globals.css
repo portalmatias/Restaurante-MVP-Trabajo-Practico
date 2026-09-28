@@ -7,6 +7,7 @@
  * MVP en modo claro únicamente: sin variante de esquema de color oscuro.
  */
 :root {
+  color-scheme: light; /* MVP: solo modo claro, sin variante oscura del navegador */
   --primary: #171717;
   --primary-foreground: #ffffff;
   --secondary: #404040;
