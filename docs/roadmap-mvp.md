@@ -26,6 +26,7 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 | `reserva-consultar` | FedeWerk | Spec #32 mergeada (2026-09-21): define `POST /reservas/consultar` (código + email en el body, no `GET`, para no exponer el email en la URL ni en logs de acceso) y `GET /admin/reservas`. #35 (borrador) adelanta la búsqueda y la consulta a nivel de `ReservasService`; el controller sigue bloqueado por `reservas-crear`. | Esperar `reservas-crear` para el controller, el listado de admin y el contrato OpenAPI. |
 | `cancelacion-turnos` | lussofacundo-iresm | Spec #16 y ajuste UTC−3 #23 mergeados; implementación pendiente. | Esperar el merge de `reservas-crear` antes de la sección 2 de sus tareas. |
 | `reserva-vip` | lussofacundo-iresm | Spec #17 mergeada; implementación pendiente. | Esperar el merge de `reservas-crear`; endpoints admin requieren auth. |
+| `catalogo-publico` | portalmatias | Spec en curso (`openspec/changes/catalogo-publico/`): `GET /zonas` y `GET /turnos`, públicos y de solo lectura, para que `frontend-cliente` obtenga los ids de zona y turno sin usar los endpoints de `/admin`. | Implementar antes de `frontend-cliente`; no bloquea a `disponibilidad` ni a `reservas-crear`. |
 | Frontend funcional | portalmatias (`frontend-base`, `frontend-cliente`) / FedeWerk (`frontend-admin`) | Solo base generada de Next.js; sin PRs abiertos de pantallas. | Preparar `frontend-base` y contratos/tipos según §9. |
 | `entrega-final` | lussofacundo-iresm | Pendiente. | Preparar checklist; no cerrar hasta completar los flujos y la DoD. |
 
@@ -344,6 +345,12 @@ Puede prepararse en paralelo al backend leyendo las specs y sus contratos planea
 | `frontend-cliente` | portalmatias | Reservar, consultar por código+email, cancelar. Conversión UTC → hora local (§7: es responsabilidad del front). |
 | `frontend-admin` | FedeWerk | Login, dashboard de aforo, CRUD del salón, confirmar VIP, marcar NO_SHOW. |
 
+> **Prerrequisito agregado (2026-09-28):** `frontend-cliente` necesita los ids de zona y turno
+> para armar el formulario de reserva. Los únicos endpoints que hoy los listan son
+> `GET /admin/zonas` y `GET /admin/turnos`, protegidos con JWT, así que se agregó el change
+> backend `catalogo-publico` (portalmatias) con `GET /zonas` y `GET /turnos`, públicos y de
+> solo lectura. Se implementa antes de `frontend-cliente`.
+
 ## 10. Fase 6 — Entrega
 
 **Change `entrega-final`** — dueño: **lussofacundo-iresm**
@@ -356,7 +363,8 @@ por punto de la Definition of Done de §13 sobre cada change archivado**.
 
 ```
 portalmatias        fundacion-repo, disponibilidad, reservas-crear,
-                    frontend-base (chico), frontend-cliente           -> 5 changes
+                    catalogo-publico (chico), frontend-base (chico),
+                    frontend-cliente                                  -> 6 changes
 FedeWerk            modelo-dominio, ci-integracion-db (chico),
                     auth-admin, reserva-consultar,
                     frontend-admin                                    -> 5 changes
@@ -364,15 +372,18 @@ lussofacundo-iresm  gestion-salon, cancelacion-turnos, reserva-vip,
                     entrega-final                                     -> 4 changes
 ```
 
-14 changes x 2 PRs = **~28 PRs**, más los de Fase 0. §11 exige que cada integrante ejecute las
+15 changes x 2 PRs = **~30 PRs**, más los de Fase 0. §11 exige que cada integrante ejecute las
 sesiones de su propio módulo y commitee bajo su propia autoría: nadie mergea trabajo generado en
 nombre de otro.
 
-> **El recuento son items, no esfuerzo.** `ci-integracion-db` y `frontend-base` son chicos.
+> **El recuento son items, no esfuerzo.** `ci-integracion-db`, `frontend-base` y
+> `catalogo-publico` son chicos.
 > **Cambio de responsable (2026-09-23):** `frontend-base` pasó de FedeWerk a portalmatias, que
 > ya tiene `frontend-cliente`; así el mismo integrante arma la base y las pantallas del cliente
-> sobre ella. Quedan 5, 5 y 4 changes. Si al equipo le queda desbalanceado, el ajuste fácil
-> sigue siendo mover `frontend-admin` a Facundo.
+> sobre ella.
+> **Change agregado (2026-09-28):** `catalogo-publico` (portalmatias, chico) — ver Fase 5.
+> Quedan 6, 5 y 4 changes. Si al equipo le queda desbalanceado, el ajuste fácil sigue siendo
+> mover `frontend-admin` a Facundo.
 >
 > Nota: la tarea 0.3 (docx + `.gitignore`) estaba pensada para abrirle el historial a Facundo,
 > pero los documentos los incorporó Fede en el PR #4. Facundo ya aportó las specs de
@@ -402,6 +413,7 @@ Fase 4        reservas-crear (matias)              |
         (fede)             (facundo)            (facundo)
            |
 Fase 5  frontend-base -> frontend-cliente / frontend-admin      <- PARALELO al backend
+        catalogo-publico ---^  (prerrequisito de frontend-cliente)
            |
 Fase 6  entrega-final (facundo)
 ```
