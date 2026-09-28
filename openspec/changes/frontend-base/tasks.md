@@ -134,12 +134,13 @@
 
 - [x] 5.1 Reescribir `frontend/app/page.tsx`: quitar el contenido de ejemplo de
       `create-next-app` y dejar una landing mínima en español que usa las primitivas de la
-      sección 4 y enlaza a `/reservas` y a `/admin` con `next/link`. Mobile-first: los enlaces
+      sección 4 y enlaza a `/reservas` con `next/link` (el enlace a `/admin` se quitó en 5.4,
+      D11). Mobile-first: los enlaces
       son de ancho completo o fácilmente alcanzables a 375px (D1). Verificar con
       `npm run dev -w frontend` que `/` renderiza sin errores y los dos enlaces navegan.
       Verificado con `npm run build -w frontend` (prerenderizada como estática) y sirviendo el
       build de producción (`next start`) en un puerto temporal: `curl` a `/` devuelve `200`,
-      contiene `href="/reservas"` y `href="/admin"`, y usa `Card`/`buttonVariants` de la
+      contiene `href="/reservas"` (y `href="/admin"`, que 5.4 quitó después), y usa `Card`/`buttonVariants` de la
       sección 4. No se abrió un navegador real para hacer clic en los enlaces.
 - [x] 5.2 Crear `frontend/app/reservas/page.tsx` y `frontend/app/admin/page.tsx` como páginas
       placeholder (Server Components, sin `"use client"`: no tienen interactividad todavía)

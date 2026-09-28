@@ -200,8 +200,10 @@ habilitar CORS.
 
 ### Requirement: Mapeo tipado de errores de la API
 El cliente HTTP SHALL traducir toda respuesta de error de la API a un resultado tipado y
-discriminable de una respuesta exitosa, preservando la información que la API envía en cada
-forma de error.
+discriminable de una respuesta exitosa, preservando la información que la API envía en los
+errores `4xx`. En los errores `5xx` (incluido el backend inalcanzable a través del proxy) y en
+las fallas de red, el cliente SHALL NOT exponer el mensaje del servidor y SHALL usar un
+mensaje genérico.
 
 #### Scenario: Error 400 con lista de mensajes
 - **WHEN** la API responde `400` con `ErrorRespuesta` cuyo `message` es una lista de textos

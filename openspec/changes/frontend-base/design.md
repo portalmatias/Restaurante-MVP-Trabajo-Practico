@@ -321,7 +321,7 @@ frontend/
 ├── app/
 │   ├── layout.tsx          # reescrito: header/footer, tokens, Inter
 │   ├── globals.css         # reescrito: tokens D2, sin dark mode
-│   ├── page.tsx            # reescrito: landing con enlaces a /reservas y /admin
+│   ├── page.tsx            # reescrito: landing con enlace a /reservas (sin /admin, D11)
 │   ├── admin/page.tsx      # nuevo: placeholder
 │   └── reservas/page.tsx   # nuevo: placeholder
 ├── src/

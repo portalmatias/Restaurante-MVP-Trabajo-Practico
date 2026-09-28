@@ -142,4 +142,15 @@ describe("mapErrorApi", () => {
       mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
     });
   });
+
+  it("un 4xx sin mapeo propio (por ejemplo 401) conserva el mensaje del servidor", () => {
+    // Solo los >= 500 ocultan el mensaje; el resto de los errores lo preservan.
+    const resultado = mapErrorApi(401, {
+      statusCode: 401,
+      error: "Unauthorized",
+      message: "Credenciales inválidas.",
+    });
+
+    expect(resultado).toEqual({ tipo: "desconocido", mensaje: "Credenciales inválidas." });
+  });
 });
