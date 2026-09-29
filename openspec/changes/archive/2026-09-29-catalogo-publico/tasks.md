@@ -104,7 +104,7 @@
 
 ## 6. Cierre (Definition of Done, `config.yaml` §13)
 
-- [ ] 6.1 `openspec validate catalogo-publico --strict` pasa y todas las tareas de este archivo
+- [x] 6.1 `openspec validate catalogo-publico --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
 - [x] 6.2 El change no agrega migraciones ni toca `schema.prisma`. Verificar con
       `git diff main --stat -- backend/prisma` vacío.
@@ -117,9 +117,9 @@
       `npm run test:e2e -w backend` en verde. Verificar con esos dos comandos desde la raíz.
 - [x] 6.6 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con
       los dos comandos desde la raíz.
-- [ ] 6.7 CI en verde en el PR de implementación.
-- [ ] 6.8 PR con descripción en español, enlazado a
+- [x] 6.7 CI en verde en el PR de implementación.
+- [x] 6.8 PR con descripción en español, enlazado a
       `openspec/changes/catalogo-publico/`, aprobado por un compañero distinto del autor.
       Verificar en GitHub.
-- [ ] 6.9 Después del merge, archivar el change con `openspec archive catalogo-publico` en su
+- [x] 6.9 Después del merge, archivar el change con `openspec archive catalogo-publico` en su
       propio PR. Verificar que `openspec/specs/catalogo-publico/spec.md` existe en `main`.
