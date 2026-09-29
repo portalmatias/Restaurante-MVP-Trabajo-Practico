@@ -3,12 +3,13 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { HorariosController } from './horarios.controller';
+import { TurnosPublicosController } from './turnos-publicos.controller';
 import { HorariosService } from './horarios.service';
 
 @Module({
   // Ver zonas.module.ts: AuthModule trae los guards y registra JwtStrategy.
   imports: [PrismaModule, AuthModule],
-  controllers: [HorariosController],
+  controllers: [HorariosController, TurnosPublicosController],
   providers: [HorariosService],
   exports: [HorariosService],
 })

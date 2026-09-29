@@ -126,6 +126,7 @@ async listarPublicas() {
       ventanaCancelacionHoras: true,
       requiereConfirmacionAdmin: true,
     },
+    orderBy: { nombre: 'asc' },
   });
 }
 
@@ -138,6 +139,11 @@ async listarPublicos(diaSemana?: DiaSemana) {
   });
 }
 ```
+
+`listarPublicas` ordena por `nombre` ascendente para que la respuesta sea determinística:
+Postgres ordena un enum nativo por la posición de declaración (`schema.prisma:31-34`,
+`STANDARD` primero), así que el resultado es `STANDARD`, `VIP`. Sin `orderBy`, el orden de
+`findMany` no está garantizado.
 
 Un `select` explícito es una lista de permitidos: si mañana se agrega una columna a `Zona` o
 `Turno`, el endpoint público no la expone hasta que alguien la sume a propósito a este
@@ -291,8 +297,8 @@ paths:
       summary: Catálogo público de Zonas
       description: >-
         Lista todas las Zonas con los campos no sensibles que necesita el formulario de
-        reserva del cliente. No incluye `aforoMaximo` ni las Mesas de la zona. Es una ruta
-        pública, sin autenticación.
+        reserva del cliente, ordenadas por nombre (`STANDARD` antes que `VIP`). No incluye
+        `aforoMaximo` ni las Mesas de la zona. Es una ruta pública, sin autenticación.
       operationId: ZonasPublicasController_listar
       tags:
         - zonas

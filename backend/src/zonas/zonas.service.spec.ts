@@ -66,6 +66,29 @@ describe('ZonasService', () => {
     });
   });
 
+  describe('listarPublicas', () => {
+    it('pide solo los campos públicos, sin aforoMaximo, y devuelve lo que responde Prisma', async () => {
+      const zonaPublica = { ...zonaVip, aforoMaximo: undefined };
+      delete zonaPublica.aforoMaximo;
+      prisma.zona.findMany.mockResolvedValue([zonaPublica]);
+
+      await expect(service.listarPublicas()).resolves.toEqual([zonaPublica]);
+      expect(prisma.zona.findMany).toHaveBeenCalledWith({
+        select: {
+          id: true,
+          nombre: true,
+          minComensales: true,
+          maxComensales: true,
+          anticipacionMinHoras: true,
+          anticipacionMaxDias: true,
+          ventanaCancelacionHoras: true,
+          requiereConfirmacionAdmin: true,
+        },
+        orderBy: { nombre: 'asc' },
+      });
+    });
+  });
+
   describe('actualizar', () => {
     it('devuelve 404 si la Zona desaparece antes de actualizar', async () => {
       prisma.zona.findUnique.mockResolvedValue(zonaVip);

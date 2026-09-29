@@ -51,6 +51,38 @@ describe('HorariosService', () => {
     service = module.get(HorariosService);
   });
 
+  describe('listarPublicos', () => {
+    const select = {
+      id: true,
+      diaSemana: true,
+      horaInicio: true,
+      horaFin: true,
+    };
+    const orderBy = [{ diaSemana: 'asc' }, { horaInicio: 'asc' }];
+
+    it('sin día filtra solo por activos, sin exponer activo y ordenado', async () => {
+      prisma.turno.findMany.mockResolvedValue([]);
+
+      await expect(service.listarPublicos()).resolves.toEqual([]);
+      expect(prisma.turno.findMany).toHaveBeenCalledWith({
+        where: { activo: true },
+        select,
+        orderBy,
+      });
+    });
+
+    it('con día agrega el filtro diaSemana al where', async () => {
+      prisma.turno.findMany.mockResolvedValue([]);
+
+      await service.listarPublicos('SABADO');
+      expect(prisma.turno.findMany).toHaveBeenCalledWith({
+        where: { activo: true, diaSemana: 'SABADO' },
+        select,
+        orderBy,
+      });
+    });
+  });
+
   describe('crear', () => {
     it('queda activo por defecto si el dto no lo especifica', async () => {
       const dto = {

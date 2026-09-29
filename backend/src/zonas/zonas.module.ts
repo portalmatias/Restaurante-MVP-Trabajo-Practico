@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ZonasController } from './zonas.controller';
+import { ZonasPublicasController } from './zonas-publicas.controller';
 import { ZonasService } from './zonas.service';
 
 @Module({
@@ -11,7 +12,7 @@ import { ZonasService } from './zonas.service';
   // 'jwt' en tiempo de ejecución). No se registra este módulo en AppModule todavía — ver
   // el comentario en app.module.ts.
   imports: [PrismaModule, AuthModule],
-  controllers: [ZonasController],
+  controllers: [ZonasController, ZonasPublicasController],
   providers: [ZonasService],
   exports: [ZonasService],
 })

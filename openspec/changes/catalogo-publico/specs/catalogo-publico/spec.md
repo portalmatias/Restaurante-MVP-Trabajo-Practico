@@ -39,6 +39,15 @@ operativos del salón sin uso para quien todavía no reservó.
   `anticipacionMinHoras: 24`, `anticipacionMaxDias: 60`, `ventanaCancelacionHoras: 24` y
   `requiereConfirmacionAdmin: true`
 
+### Requirement: Orden determinístico de Zonas
+El sistema SHALL devolver las Zonas de `GET /zonas` ordenadas por `nombre` ascendente, es
+decir, `STANDARD` antes que `VIP` (orden de declaración del enum). El orden SHALL ser el mismo
+en llamadas repetidas sobre los mismos datos.
+
+#### Scenario: STANDARD aparece antes que VIP
+- **WHEN** se consulta `GET /zonas`
+- **THEN** el elemento de la zona `STANDARD` aparece antes que el de la zona `VIP`
+
 ### Requirement: Catálogo público de Turnos activos
 El sistema SHALL exponer `GET /turnos`, accesible sin autenticación, que devuelve únicamente
 los Turnos con `activo = true`. Un Turno inactivo SHALL NOT aparecer en la respuesta, y la
