@@ -247,13 +247,24 @@ describe("Dialog", () => {
       expect(onCancel).not.toHaveBeenCalled();
     });
 
-    it("cerrar con open=false no llama a onCancel", () => {
+    it("un close pendiente de un cierre propio (open=false) no llama a onCancel al reabrir", () => {
+      // El navegador entrega `close` de forma asíncrona: acá `close()` no lo dispara y el
+      // evento pendiente se despacha a mano, después de volver a abrir con open=true. Este caso
+      // pasa también sin `cierreIntencional` (el diálogo reabierto ya no está cerrado): quien
+      // depende de esa guarda es el test de StrictMode de abajo, que falla si se la quita.
+      HTMLDialogElement.prototype.close = jest.fn(function (this: HTMLDialogElement) {
+        this.removeAttribute("open");
+      });
       const onCancel = jest.fn();
       const { rerender } = render(ui(onCancel));
+      const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
 
       rerender(ui(onCancel, false));
+      rerender(ui(onCancel, true));
+      dialogo.dispatchEvent(new Event("close"));
 
       expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog", { name: "Cancelar reserva" })).toBeInTheDocument();
     });
 
     it("en StrictMode (montar, limpiar, montar) queda abierto y no llama a onCancel", () => {
