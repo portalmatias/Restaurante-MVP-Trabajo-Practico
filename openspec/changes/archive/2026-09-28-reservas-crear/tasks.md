@@ -163,14 +163,16 @@
 
 ## 8. Tests contra base real en CI (depende de `ci-integracion-db`)
 
-- [ ] 8.1 Hasta que `ci-integracion-db` esté mergeado, correr las suites de las secciones 2, 3,
+- [x] 8.1 Hasta que `ci-integracion-db` esté mergeado, correr las suites de las secciones 2, 3,
       4 y 7 localmente contra `docker-compose` y dejar la salida en la descripción del PR,
       aclarando que CI todavía no las ejecuta. Verificar que el PR tiene esa nota, o que el job
       `test` de CI las muestra si `ci-integracion-db` ya está mergeado.
+      `ci-integracion-db` (#28) ya estaba mergeado antes del PR #40; el job `test` corrió las
+      cuatro secciones contra Postgres real en CI.
 
 ## 9. Cierre (Definition of Done, `config.yaml` §13)
 
-- [ ] 9.1 `openspec validate reservas-crear --strict` pasa y todas las tareas de este archivo
+- [x] 9.1 `openspec validate reservas-crear --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
 - [x] 9.2 El change no agrega migraciones ni toca `schema.prisma` (Migration Plan). Verificar
       con `git diff main --stat -- backend/prisma` vacío.
@@ -186,10 +188,12 @@
       sin resultados fuera de tests.
 - [x] 9.7 `npm run lint` y `npm run typecheck` en limpio, sin warnings nuevos. Verificar con los
       dos comandos desde la raíz.
-- [ ] 9.8 CI en verde en el PR `feature/reservas-crear`. Verificar en la pestaña Checks.
-- [ ] 9.9 PR con descripción en español, enlazado a `openspec/changes/reservas-crear/`, con la
+- [x] 9.8 CI en verde en el PR `feature/reservas-crear`. Verificar en la pestaña Checks.
+      Los tres checks obligatorios y Cubic en verde en el PR #40 (mergeado el 2026-09-28).
+- [x] 9.9 PR con descripción en español, enlazado a `openspec/changes/reservas-crear/`, con la
       nota de 8.1 si corresponde, con las Open Questions de `design.md` resueltas o
       explícitamente pospuestas, y aprobado por un compañero distinto del autor. Verificar en
       GitHub.
-- [ ] 9.10 Después del merge, archivar el change con `openspec archive reservas-crear` en su
+      PR #40, aprobado por FedeWerk (distinto del autor).
+- [x] 9.10 Después del merge, archivar el change con `openspec archive reservas-crear` en su
       propio PR. Verificar que `openspec/specs/reservas-crear/spec.md` existe en `main`.
