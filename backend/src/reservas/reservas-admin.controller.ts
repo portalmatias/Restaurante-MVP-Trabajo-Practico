@@ -157,8 +157,14 @@ export class ReservasAdminController {
    * (`ReservasService.marcarNoShow`); `204` sin cuerpo al completarse, igual que las bajas
    * de `gestion-salon`. Sin throttling propio: usa el límite global de la app, a diferencia
    * de `listar` (que sí necesita uno más alto por ser un panel que pagina y filtra).
+   *
+   * `operationId` fijado explícito como `ReservasController_marcarNoShow` (en vez del
+   * `ReservasAdminController_marcarNoShow` que generaría Swagger por default): mismo
+   * criterio que ya usa `listar` para `ReservasController_listar` — la división en dos
+   * controllers es un detalle de implementación de NestJS, no del contrato.
    */
   @ApiOperation({
+    operationId: 'ReservasController_marcarNoShow',
     summary: 'Marcar una reserva como ausente (NO_SHOW)',
     description:
       'Transiciona una reserva CONFIRMADA a NO_SHOW. Rechaza con 409 si la reserva no está CONFIRMADA o si su turno todavía no terminó (el instante exacto de fin también se rechaza). Requiere un JWT de rol ADMIN.',

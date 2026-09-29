@@ -1516,7 +1516,7 @@ paths:
           description: Se superó el límite de solicitudes al listado en la ventana configurada.
   /admin/reservas/{id}/no-show:
     patch:
-      operationId: ReservasAdminController_marcarNoShow
+      operationId: ReservasController_marcarNoShow
       summary: Marcar una reserva como ausente (NO_SHOW)
       description: >-
         Transiciona una reserva CONFIRMADA a NO_SHOW. Rechaza con 409 si la reserva no
