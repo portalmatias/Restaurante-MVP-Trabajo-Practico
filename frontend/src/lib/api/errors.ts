@@ -110,7 +110,7 @@ export function mapErrorApi(status: number, body: unknown): ErrorApi {
     // error HTML (no un `ErrorRespuesta` JSON) porque no puede comunicarse con el backend.
     return {
       tipo: "desconocido",
-      mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
+      mensaje: "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
     };
   }
 

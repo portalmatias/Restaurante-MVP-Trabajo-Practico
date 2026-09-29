@@ -1,0 +1,138 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { Dialog } from "../../../src/components/ui/dialog";
+
+// jsdom no implementa la semántica modal de HTMLDialogElement (design.md D5): no vuelve inerte
+// el fondo, no atrapa el foco con Tab ni devuelve el foco al cerrarse. Esta suite solo prueba
+// lo que jsdom puede probar; el atrapado y la devolución de foco se verifican a mano en un
+// navegador real (tasks.md 7.2). Los stubs de showModal/close reflejan el atributo `open`
+// para que el rol y el nombre accesible del diálogo se puedan consultar.
+const showModal = jest.fn(function (this: HTMLDialogElement) {
+  this.setAttribute("open", "");
+});
+const close = jest.fn(function (this: HTMLDialogElement) {
+  this.removeAttribute("open");
+});
+
+beforeEach(() => {
+  showModal.mockClear();
+  close.mockClear();
+  HTMLDialogElement.prototype.showModal = showModal;
+  HTMLDialogElement.prototype.close = close;
+});
+
+function renderDialog(props: Partial<React.ComponentProps<typeof Dialog>> = {}) {
+  const onConfirm = jest.fn();
+  const onCancel = jest.fn();
+  const resultado = render(
+    <Dialog
+      open
+      titulo="Cancelar reserva"
+      textoConfirmar="Sí, cancelar"
+      textoCancelar="Volver"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      {...props}
+    >
+      {props.children ?? <p>Resumen de la reserva</p>}
+    </Dialog>,
+  );
+  return { ...resultado, onConfirm, onCancel };
+}
+
+describe("Dialog", () => {
+  it("abrirlo llama a showModal()", () => {
+    renderDialog();
+
+    expect(showModal).toHaveBeenCalledTimes(1);
+  });
+
+  it("no llama a showModal() mientras está cerrado", () => {
+    renderDialog({ open: false });
+
+    expect(showModal).not.toHaveBeenCalled();
+  });
+
+  it("cerrarlo llama a close()", () => {
+    const { rerender, onConfirm, onCancel } = renderDialog();
+
+    rerender(
+      <Dialog
+        open={false}
+        titulo="Cancelar reserva"
+        textoConfirmar="Sí, cancelar"
+        textoCancelar="Volver"
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      >
+        <p>Resumen de la reserva</p>
+      </Dialog>,
+    );
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("expone el rol dialog con su título como nombre accesible", () => {
+    renderDialog();
+
+    expect(screen.getByRole("dialog", { name: "Cancelar reserva" })).toBeInTheDocument();
+  });
+
+  it("muestra el contenido recibido", () => {
+    renderDialog();
+
+    expect(screen.getByText("Resumen de la reserva")).toBeInTheDocument();
+  });
+
+  it("el botón de confirmar dispara onConfirm", () => {
+    const { onConfirm, onCancel } = renderDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sí, cancelar" }));
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("el botón de cancelar dispara onCancel", () => {
+    const { onConfirm, onCancel } = renderDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("un evento cancel (Escape en el navegador) llama a onCancel exactamente una vez", () => {
+    const { onCancel } = renderDialog();
+    const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
+
+    // Un navegador real dispara `cancel` y después `close` al apretar Escape: onCancel no
+    // debe llamarse dos veces.
+    const cancelar = new Event("cancel", { cancelable: true });
+    dialogo.dispatchEvent(cancelar);
+    dialogo.dispatchEvent(new Event("close"));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    // El cierre lo decide `open`, no el navegador: se evita el cierre nativo.
+    expect(cancelar.defaultPrevented).toBe(true);
+  });
+
+  it("con confirmando deshabilita el botón de confirmar", () => {
+    renderDialog({ confirmando: true, textoConfirmar: "Cancelando…" });
+
+    expect(screen.getByRole("button", { name: "Cancelando…" })).toBeDisabled();
+  });
+
+  it("muestra el contenido de error dentro del diálogo", () => {
+    renderDialog({ children: <p role="alert">No se pudo cancelar</p> });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cancelar");
+  });
+
+  it("define el anillo de foco visible en sus botones", () => {
+    renderDialog();
+
+    expect(screen.getByRole("button", { name: "Volver" }).className).toMatch(
+      /focus-visible:ring-2/,
+    );
+  });
+});

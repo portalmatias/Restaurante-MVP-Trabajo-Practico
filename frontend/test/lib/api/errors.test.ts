@@ -115,7 +115,7 @@ describe("mapErrorApi", () => {
 
     expect(resultado).toEqual({
       tipo: "desconocido",
-      mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
+      mensaje: "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
     });
   });
 
@@ -126,7 +126,7 @@ describe("mapErrorApi", () => {
 
     expect(resultado).toEqual({
       tipo: "desconocido",
-      mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
+      mensaje: "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
     });
   });
 
@@ -139,7 +139,7 @@ describe("mapErrorApi", () => {
 
     expect(resultado).toEqual({
       tipo: "desconocido",
-      mensaje: "El servicio no está disponible en este momento. Intente de nuevo más tarde.",
+      mensaje: "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
     });
   });
 
