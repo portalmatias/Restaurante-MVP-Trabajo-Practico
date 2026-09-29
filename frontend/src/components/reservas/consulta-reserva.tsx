@@ -9,11 +9,11 @@ import { apiClient, toApiResult } from "../../lib/api/client";
 import type { ErrorApi } from "../../lib/api/errors";
 import type { components } from "../../lib/api/schema";
 import { formatearFechaLargaEs } from "../../lib/fecha-hora";
+import { esCodigoReservaValido } from "../../lib/reserva-codigo";
 
 type ReservaConsultada = components["schemas"]["ReservaConsultadaRespuesta"];
 type Estado = ReservaConsultada["estado"];
 
-const FORMATO_CODIGO = /^[A-Za-z0-9]{8}$/;
 const FORMATO_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const MENSAJE_NO_ENCONTRADA =
@@ -35,7 +35,7 @@ const ETIQUETA_POR_ESTADO: Record<Estado, string> = {
 
 function errorDeCodigo(codigo: string): string | undefined {
   if (codigo === "") return "Falta ingresar el código de tu reserva.";
-  if (!FORMATO_CODIGO.test(codigo)) return "El código tiene 8 caracteres, entre letras y números.";
+  if (!esCodigoReservaValido(codigo)) return "El código tiene 8 caracteres, entre letras y números.";
   return undefined;
 }
 

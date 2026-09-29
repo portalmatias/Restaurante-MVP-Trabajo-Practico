@@ -1,6 +1,6 @@
 import { ConsultaReserva } from "../../../src/components/reservas/consulta-reserva";
+import { esCodigoReservaValido } from "../../../src/lib/reserva-codigo";
 
-const FORMATO_CODIGO = /^[A-Za-z0-9]{8}$/;
 
 type ConsultarPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -12,7 +12,7 @@ type ConsultarPageProps = {
  */
 export default async function ConsultarPage({ searchParams }: ConsultarPageProps) {
   const { codigo } = await searchParams;
-  const codigoInicial = typeof codigo === "string" && FORMATO_CODIGO.test(codigo) ? codigo : "";
+  const codigoInicial = typeof codigo === "string" && esCodigoReservaValido(codigo) ? codigo : "";
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10">

@@ -150,6 +150,31 @@ describe("ConsultaReserva - formulario", () => {
     expect(screen.getByLabelText("Email")).not.toHaveAttribute("aria-invalid", "true");
   });
 
+  it("un 400 muestra un mensaje fijo, nunca el cuerpo del servidor", async () => {
+    POST.mockResolvedValue(
+      respuestaError(400, { statusCode: 400, message: ["codigo detalle interno del validador"] }),
+    );
+    render(<ConsultaReserva />);
+
+    completarFormulario();
+    enviar();
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent("Revisá el código y el email e intentá de nuevo.");
+    expect(alerta.textContent).not.toMatch(/detalle interno/);
+  });
+
+  it.each([400, 404, 429])("un %i no ofrece 'Reintentar'", async (status) => {
+    POST.mockResolvedValue(respuestaError(status, { statusCode: status, message: "x" }));
+    render(<ConsultaReserva />);
+
+    completarFormulario();
+    enviar();
+
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
   it("un 429 muestra el mensaje de espera", async () => {
     POST.mockResolvedValue(respuestaError(429));
     render(<ConsultaReserva />);
