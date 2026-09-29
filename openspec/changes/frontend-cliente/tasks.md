@@ -38,9 +38,12 @@
       a `DiaSemana`. Verificar que 2.3 pasa.
 - [x] 2.5 Sumar los casos de `formatearFechaLargaEs(fecha)`: `2026-09-19` da un texto que
       contiene "sábado", "19", "septiembre" y "2026"; el resultado no cambia entre
-      `TZ=UTC` y `TZ=America/Argentina/Buenos_Aires`, ni entre `TZ=UTC` y una zona horaria muy
-      adelantada (ej. `Pacific/Kiritimati`, UTC+14) que sí haría fallar una implementación sin
-      `timeZone: 'UTC'` explícito en `Intl.DateTimeFormat`. Verificar que falla (rojo).
+      `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires` y `TZ=Pacific/Kiritimati`. Solo un huso con
+      offset negativo (como Argentina) hace fallar una implementación sin `timeZone: 'UTC'`
+      explícito en `Intl.DateTimeFormat`: con `TZ=UTC` o con un offset positivo como UTC+14 el
+      resultado no cambia, por lo que esos husos no detectan la omisión. Por eso Jest fija
+      `TZ=America/Argentina/Buenos_Aires` por defecto (`frontend/jest.config.ts`). Verificar que
+      falla (rojo).
 - [x] 2.6 Implementar `formatearFechaLargaEs` (D2). Verificar que 2.5 pasa con las tres zonas
       horarias del proceso.
 - [x] 2.7 Sumar los casos de `formatearHoraTurno(horaIso)`: `'1970-01-01T20:00:00.000Z'` →
@@ -308,7 +311,10 @@
   define como tipo local en `frontend/src/lib/fecha-hora.ts` con los mismos valores del enum
   de Prisma. Al mergear ese PR conviene reemplazarlo por el tipo generado.
 - `puedeCancelarSegunVentana` vive en `frontend/src/lib/ventana-cancelacion.ts` (D9 no fija
-  archivo) y reusa `ARGENTINA_OFFSET_MS`, exportada desde `fecha-hora.ts`.
+  archivo) y reusa `ARGENTINA_OFFSET_MS`, exportada desde `fecha-hora.ts`. Acepta la hora de
+  inicio como `HH:mm` (formato de `POST /reservas/consultar`) o como ISO
+  `1970-01-01THH:mm:00.000Z` (formato de `GET /turnos`); una hora mal formada lanza un `Error`,
+  no devuelve `false` por `NaN`.
 
 **Observación sobre 2.5:** el caso de `Pacific/Kiritimati` (UTC+14) no puede detectar la falta
 de `timeZone: 'UTC'`: la medianoche UTC leída en UTC+14 sigue siendo el mismo día (14:00). Solo
