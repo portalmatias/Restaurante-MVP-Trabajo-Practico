@@ -30,9 +30,6 @@ export function SiteHeader() {
           <Link href="/reservas" className={navLinkClassName}>
             Reservas
           </Link>
-          <Link href="/reservas/consultar" className={navLinkClassName}>
-            Consultar reserva
-          </Link>
         </nav>
       </div>
     </header>
