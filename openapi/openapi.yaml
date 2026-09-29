@@ -18,7 +18,9 @@ tags:
   - name: disponibilidad
     description: Consulta pública de disponibilidad de mesas (openspec/config.yaml §6).
   - name: Reservas
-    description: Creación de reservas sin cuenta (openspec/config.yaml §5 y §6).
+    description: >-
+      Creación, consulta pública y listado de administrador de reservas
+      (openspec/config.yaml §5 y §6).
   - name: Estado
     description: Estado operativo del backend.
   - name: Auth
@@ -512,6 +514,211 @@ components:
         - message
         - error
         - motivos
+    ConsultarReservaDto:
+      type: object
+      properties:
+        codigo:
+          type: string
+          description: Código alfanumérico de 8 caracteres. Se compara sin distinguir mayúsculas y minúsculas.
+          pattern: '^[A-Za-z0-9]{8}$'
+          example: K7PM3QXA
+        email:
+          type: string
+          description: Email con el que se hizo la reserva. Se compara sin distinguir mayúsculas y minúsculas.
+          format: email
+          maxLength: 254
+          example: ana.perez@example.com
+      required:
+        - codigo
+        - email
+    TurnoReservaRespuesta:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Id del turno.
+          format: uuid
+          example: 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+        horaInicio:
+          type: string
+          description: Hora local de inicio (`HH:mm`), sin conversión de zona horaria.
+          pattern: '^\d{2}:\d{2}$'
+          example: '20:00'
+        horaFin:
+          type: string
+          description: Hora local de fin (`HH:mm`). Si es anterior a la de inicio, el turno termina al día siguiente.
+          pattern: '^\d{2}:\d{2}$'
+          example: '23:30'
+      required:
+        - id
+        - horaInicio
+        - horaFin
+    ZonaReservaRespuesta:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Id de la zona.
+          format: uuid
+          example: b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
+        nombre:
+          type: string
+          description: Nombre de la zona.
+          enum:
+            - STANDARD
+            - VIP
+          example: STANDARD
+      required:
+        - id
+        - nombre
+    ReservaConsultadaRespuesta:
+      type: object
+      properties:
+        codigoReserva:
+          type: string
+          description: Código alfanumérico de 8 caracteres.
+          pattern: '^[A-Za-z0-9]{8}$'
+          example: K7PM3QXA
+        estado:
+          type: string
+          description: Estado actual de la reserva.
+          enum:
+            - PENDIENTE
+            - CONFIRMADA
+            - CANCELADA
+            - NO_SHOW
+          example: CONFIRMADA
+        fecha:
+          type: string
+          description: Fecha de calendario local del restaurante (`YYYY-MM-DD`).
+          format: date
+          example: '2026-09-19'
+        comensales:
+          type: integer
+          description: Cantidad de comensales reservados.
+          minimum: 1
+          example: 4
+        turno:
+          $ref: '#/components/schemas/TurnoReservaRespuesta'
+        zona:
+          $ref: '#/components/schemas/ZonaReservaRespuesta'
+      required:
+        - codigoReserva
+        - estado
+        - fecha
+        - comensales
+        - turno
+        - zona
+    MesaReservaRespuesta:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Id de la mesa.
+          format: uuid
+          example: e1a7c3f5-2d94-4b60-8a1e-9f3c6b0d7a52
+        etiqueta:
+          type: string
+          description: Etiqueta de la mesa en el salón.
+          example: V2
+      required:
+        - id
+        - etiqueta
+    ReservaAdminRespuesta:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador interno de la reserva, el que usan las demás rutas de admin.
+          format: uuid
+          example: 9c4e1d70-3a2b-4c58-b1f6-7e0a5d2c8b34
+        codigoReserva:
+          type: string
+          description: Código alfanumérico de 8 caracteres.
+          pattern: '^[A-Za-z0-9]{8}$'
+          example: R2WN8HDE
+        estado:
+          type: string
+          description: Estado actual de la reserva.
+          enum:
+            - PENDIENTE
+            - CONFIRMADA
+            - CANCELADA
+            - NO_SHOW
+          example: PENDIENTE
+        fecha:
+          type: string
+          description: Fecha de calendario local del restaurante (`YYYY-MM-DD`).
+          format: date
+          example: '2026-09-19'
+        comensales:
+          type: integer
+          description: Cantidad de comensales reservados.
+          minimum: 1
+          example: 6
+        nombreCliente:
+          type: string
+          description: Nombre de quien reservó.
+          example: Ana Pérez
+        emailCliente:
+          type: string
+          description: Email de quien reservó, tal cual se guardó.
+          format: email
+          example: ana.perez@example.com
+        telefonoCliente:
+          type: string
+          description: Teléfono de contacto, en formato libre.
+          example: '+54 9 11 5555-1234'
+        turno:
+          $ref: '#/components/schemas/TurnoReservaRespuesta'
+        zona:
+          $ref: '#/components/schemas/ZonaReservaRespuesta'
+        mesa:
+          $ref: '#/components/schemas/MesaReservaRespuesta'
+        createdAt:
+          type: string
+          description: Instante de creación de la reserva, en UTC.
+          format: date-time
+          example: '2026-09-17T14:32:10.000Z'
+      required:
+        - id
+        - codigoReserva
+        - estado
+        - fecha
+        - comensales
+        - nombreCliente
+        - emailCliente
+        - telefonoCliente
+        - turno
+        - zona
+        - mesa
+        - createdAt
+    ListadoReservasRespuesta:
+      type: object
+      properties:
+        items:
+          description: Reservas de la página, en orden cronológico.
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservaAdminRespuesta'
+        total:
+          type: integer
+          description: Cantidad total de reservas que cumplen los filtros, sin paginar.
+          minimum: 0
+          example: 1
+        limit:
+          type: integer
+          description: Tamaño de página aplicado.
+          example: 20
+        offset:
+          type: integer
+          description: Desplazamiento aplicado.
+          example: 0
+      required:
+        - items
+        - total
+        - limit
+        - offset
 paths:
   /:
     get:
@@ -751,6 +958,99 @@ paths:
                       unos segundos.
                     error: Conflict
                     motivos: []
+  /reservas/consultar:
+    post:
+      summary: Consultar una reserva por código y email
+      description: >-
+        Devuelve el estado de una reserva sin cuenta. Exige el código y el email de la misma
+        reserva; el código y el email se comparan sin distinguir mayúsculas y minúsculas. Si el
+        código no existe o el email no coincide, responde el mismo `404`, para que no se pueda
+        averiguar si un código existe. Devuelve solo una vista mínima: no incluye la mesa ni los
+        datos de contacto. Es una ruta pública, sin autenticación, con límite de solicitudes por
+        cliente.
+      operationId: ReservasController_consultar
+      tags:
+        - Reservas
+      security: []
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsultarReservaDto'
+      responses:
+        '200':
+          description: El código y el email corresponden a una misma reserva, en cualquier estado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaConsultadaRespuesta'
+              examples:
+                confirmada:
+                  summary: Reserva STANDARD confirmada
+                  value:
+                    codigoReserva: K7PM3QXA
+                    estado: CONFIRMADA
+                    fecha: '2026-09-19'
+                    comensales: 4
+                    turno:
+                      id: 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+                      horaInicio: '20:00'
+                      horaFin: '23:30'
+                    zona:
+                      id: b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
+                      nombre: STANDARD
+                pendiente:
+                  summary: Reserva VIP pendiente de confirmación
+                  value:
+                    codigoReserva: R2WN8HDE
+                    estado: PENDIENTE
+                    fecha: '2026-09-19'
+                    comensales: 6
+                    turno:
+                      id: 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+                      horaInicio: '20:00'
+                      horaFin: '23:30'
+                    zona:
+                      id: 5d2a9c41-7e3b-4f6a-a1d8-0c9b2e7f4a63
+                      nombre: VIP
+        '400':
+          description: >-
+            El body está mal formado: falta `codigo` o `email`, el código no es alfanumérico de
+            8 caracteres, el email no es válido o hay campos no declarados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              examples:
+                bodyInvalido:
+                  summary: Código corto y email inválido
+                  value:
+                    statusCode: 400
+                    message:
+                      - codigo debe ser alfanumérico de 8 caracteres
+                      - email debe ser un email válido
+                    error: Bad Request
+        '404':
+          description: >-
+            No existe una reserva con ese código y email. Es la misma respuesta si el código no
+            existe y si el email no coincide, sin indicar cuál dato falló.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              examples:
+                noEncontrada:
+                  summary: Código inexistente o email incorrecto
+                  value:
+                    statusCode: 404
+                    message: No se encontró una reserva con ese código y email
+                    error: Not Found
+        '429':
+          description: >-
+            Se superó el límite de consultas permitidas en la ventana configurada. Se rechaza
+            antes de validar el body y de buscar la reserva.
   /auth/login:
     post:
       summary: Login de administrador
@@ -1035,3 +1335,104 @@ paths:
           description: El turno indicado no existe.
         '409':
           description: Ya existe un turno para ese día y esa hora de inicio.
+  /admin/reservas:
+    get:
+      summary: Listar reservas
+      description: >-
+        Lista las reservas con sus datos de contacto, la mesa y el identificador que usan las
+        demás rutas de admin. Se puede filtrar por fecha, estado, zona y turno; los filtros se
+        combinan todos juntos. El orden es cronológico (fecha, hora de inicio del turno, fecha
+        de creación, identificador) y está paginado. Un filtro con un identificador inexistente
+        devuelve una lista vacía. Requiere un JWT de rol `ADMIN` y tiene un límite de
+        solicitudes por cliente.
+      operationId: ReservasController_listar
+      tags:
+        - Reservas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fecha
+          in: query
+          required: false
+          description: Fecha de calendario local del restaurante, sin hora (`YYYY-MM-DD`).
+          schema:
+            type: string
+            format: date
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+            example: '2026-09-19'
+        - name: estado
+          in: query
+          required: false
+          description: Estado de la reserva.
+          schema:
+            type: string
+            enum:
+              - PENDIENTE
+              - CONFIRMADA
+              - CANCELADA
+              - NO_SHOW
+        - name: zonaId
+          in: query
+          required: false
+          description: Id de la zona. Un id inexistente devuelve una lista vacía.
+          schema:
+            type: string
+            format: uuid
+            example: 5d2a9c41-7e3b-4f6a-a1d8-0c9b2e7f4a63
+        - name: turnoId
+          in: query
+          required: false
+          description: Id del turno. Un id inexistente devuelve una lista vacía.
+          schema:
+            type: string
+            format: uuid
+            example: 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+        - name: limit
+          in: query
+          required: false
+          description: Cantidad máxima de reservas por página.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: offset
+          in: query
+          required: false
+          description: Cantidad de reservas a saltear desde el inicio del listado.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+      responses:
+        '200':
+          description: Página de reservas. Si ninguna cumple los filtros, `items` viene vacío y `total` es 0.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListadoReservasRespuesta'
+        '400':
+          description: >-
+            Un filtro está mal formado: la fecha no es `YYYY-MM-DD` o no existe, el estado no es
+            uno de los cuatro, un id no es UUID, `limit` u `offset` están fuera de rango, o hay
+            parámetros no declarados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '403':
+          description: Token válido sin rol `ADMIN`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '429':
+          description: Se superó el límite de solicitudes al listado en la ventana configurada.

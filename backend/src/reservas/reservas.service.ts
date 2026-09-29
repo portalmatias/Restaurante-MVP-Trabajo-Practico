@@ -15,14 +15,22 @@ import {
   MotivoNoDisponible,
   SolicitudDisponibilidad,
 } from '../disponibilidad/reglas/tipos';
+import { fechaCalendarioDesdeIso } from '../common/timezone';
 import { PrismaService } from '../prisma/prisma.service';
 import { elegirMesaBestFit } from './elegir-mesa-best-fit';
+import type { ListarReservasDto } from './dto/listar-reservas.dto';
+import type { ListadoReservasRespuesta } from './dto/listado-reservas-respuesta.dto';
 import type { ReservaConsultadaRespuesta } from './dto/reserva-consultada-respuesta.dto';
+import { aReservaAdminRespuesta } from './reserva-admin.mapper';
 import {
   aReservaConsultadaRespuesta,
   type ReservaParaConsulta,
 } from './reserva-consultada.mapper';
 import { reservaNoEncontrada } from './reserva-no-encontrada';
+
+/** `limit`/`offset` por defecto del listado de admin cuando no llegan en la query (D6). */
+const LISTADO_LIMIT_DEFAULT = 20;
+const LISTADO_OFFSET_DEFAULT = 0;
 
 const CODIGO_RESERVA_LONGITUD = 8;
 // Sin caracteres ambiguos (0/O, 1/I/L) para que sea legible por teléfono/email.
@@ -354,5 +362,54 @@ export class ReservasService {
       throw reservaNoEncontrada();
     }
     return aReservaConsultadaRespuesta(reserva);
+  }
+
+  /**
+   * Listado de Reservas para el admin (capability `reserva-consultar`, design.md D6). Arma
+   * el `where` solo con los filtros presentes (AND entre todos), pagina con `limit`/`offset`
+   * y devuelve el `total` sin paginar en la misma consulta transaccional.
+   *
+   * **Orden total** (D6): `fecha`, `turno.horaInicio`, `createdAt`, `id`, todos ascendentes.
+   * El `id` desempata para que dos páginas consecutivas nunca repitan ni omitan una Reserva
+   * bajo escrituras concurrentes (a diferencia de un orden que empatara sin desempate final).
+   *
+   * Un `zonaId`/`turnoId` con formato válido pero inexistente no es un `404`: es un filtro
+   * que ninguna Reserva cumple, así que da lista vacía con `total: 0` (a diferencia de
+   * `disponibilidad`/`reservas-crear`, donde el turno o la zona son el objeto de la
+   * operación, no un filtro).
+   */
+  async listar(filtros: ListarReservasDto): Promise<ListadoReservasRespuesta> {
+    const limit = filtros.limit ?? LISTADO_LIMIT_DEFAULT;
+    const offset = filtros.offset ?? LISTADO_OFFSET_DEFAULT;
+
+    const where: Prisma.ReservaWhereInput = {
+      ...(filtros.fecha && { fecha: fechaCalendarioDesdeIso(filtros.fecha) }),
+      ...(filtros.estado && { estado: filtros.estado }),
+      ...(filtros.zonaId && { mesa: { zonaId: filtros.zonaId } }),
+      ...(filtros.turnoId && { turnoId: filtros.turnoId }),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.reserva.findMany({
+        where,
+        include: { turno: true, mesa: { include: { zona: true } } },
+        orderBy: [
+          { fecha: 'asc' },
+          { turno: { horaInicio: 'asc' } },
+          { createdAt: 'asc' },
+          { id: 'asc' },
+        ],
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.reserva.count({ where }),
+    ]);
+
+    return {
+      items: items.map(aReservaAdminRespuesta),
+      total,
+      limit,
+      offset,
+    };
   }
 }

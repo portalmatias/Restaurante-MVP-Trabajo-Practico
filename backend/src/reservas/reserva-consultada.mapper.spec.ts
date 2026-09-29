@@ -2,7 +2,6 @@ import { EstadoReserva } from '@prisma/client';
 
 import {
   aReservaConsultadaRespuesta,
-  formatearFechaCalendario,
   formatearHoraLocal,
   type ReservaParaConsulta,
 } from './reserva-consultada.mapper';
@@ -56,22 +55,6 @@ function reservaDePrueba(
     ...cambios,
   };
 }
-
-describe('formatearFechaCalendario', () => {
-  it('devuelve YYYY-MM-DD con ceros a la izquierda', () => {
-    expect(formatearFechaCalendario(new Date(Date.UTC(2026, 0, 5)))).toBe(
-      '2026-01-05',
-    );
-  });
-
-  it('lee el día en UTC: una fecha a medianoche UTC no retrocede un día', () => {
-    // `getDate()` en un proceso con zona horaria al oeste de UTC (Buenos Aires) daría el
-    // 18. Se corre la suite con TZ=America/Argentina/Buenos_Aires para que ese bug falle.
-    expect(formatearFechaCalendario(new Date(Date.UTC(2026, 8, 19)))).toBe(
-      '2026-09-19',
-    );
-  });
-});
 
 describe('formatearHoraLocal', () => {
   it('devuelve HH:mm con ceros a la izquierda y sin convertir la zona horaria', () => {

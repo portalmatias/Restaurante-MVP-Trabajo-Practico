@@ -5,8 +5,10 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 
 import {
@@ -14,9 +16,12 @@ import {
   fechaCalendarioDesdeIso,
 } from '../common/timezone';
 import { ErrorRespuesta } from '../disponibilidad/dto/error-respuesta.dto';
+import { ConsultarReservaDto } from './dto/consultar-reserva.dto';
 import { CrearReservaDto } from './dto/crear-reserva.dto';
+import { ReservaConsultadaRespuesta } from './dto/reserva-consultada-respuesta.dto';
 import { ReservaCreadaRespuesta } from './dto/reserva-creada-respuesta.dto';
 import { ReservaRechazadaRespuesta } from './dto/reserva-rechazada-respuesta.dto';
+import { RESERVA_NO_ENCONTRADA_MENSAJE } from './reserva-no-encontrada';
 import { ReservasService } from './reservas.service';
 
 /**
@@ -176,5 +181,111 @@ export class ReservasController {
       zonaId: dto.zonaId,
       comensales: reserva.comensales,
     };
+  }
+
+  /**
+   * `POST /reservas/consultar` (design.md D1 de `reserva-consultar`, decisión confirmada de
+   * FedeWerk el 2026-09-21). El email va en el body, no en la URL ni en un header, para no
+   * dejarlo en logs de acceso ni en el historial del navegador — el mismo motivo por el que
+   * `cancelacion-turnos` descartó `DELETE` con query string. Responde `200`, no `201`: no
+   * crea nada.
+   *
+   * `@SkipThrottle({ default: false })` reactiva, solo para este método, el límite global
+   * que la clase desactiva para `crear` (D5): esta ruta sí recibe un código de reserva de
+   * baja entropía y necesita el throttling contra enumeración que exige `config.yaml` §5.
+   */
+  @SkipThrottle({ default: false })
+  @ApiOperation({
+    summary: 'Consultar una reserva por código y email',
+    description:
+      'Devuelve el estado de una reserva sin cuenta. Exige el código y el email de la misma reserva; el código y el email se comparan sin distinguir mayúsculas y minúsculas. Si el código no existe o el email no coincide, responde el mismo `404`, para que no se pueda averiguar si un código existe. Devuelve solo una vista mínima: no incluye la mesa ni los datos de contacto. Es una ruta pública, sin autenticación, con límite de solicitudes por cliente.',
+    security: [],
+  })
+  @ApiOkResponse({
+    type: ReservaConsultadaRespuesta,
+    description:
+      'El código y el email corresponden a una misma reserva, en cualquier estado.',
+    examples: {
+      confirmada: {
+        summary: 'Reserva STANDARD confirmada',
+        value: {
+          codigoReserva: 'K7PM3QXA',
+          estado: 'CONFIRMADA',
+          fecha: '2026-09-19',
+          comensales: 4,
+          turno: {
+            id: '3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73',
+            horaInicio: '20:00',
+            horaFin: '23:30',
+          },
+          zona: {
+            id: 'b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19',
+            nombre: 'STANDARD',
+          },
+        },
+      },
+      pendiente: {
+        summary: 'Reserva VIP pendiente de confirmación',
+        value: {
+          codigoReserva: 'R2WN8HDE',
+          estado: 'PENDIENTE',
+          fecha: '2026-09-19',
+          comensales: 6,
+          turno: {
+            id: '3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73',
+            horaInicio: '20:00',
+            horaFin: '23:30',
+          },
+          zona: {
+            id: '5d2a9c41-7e3b-4f6a-a1d8-0c9b2e7f4a63',
+            nombre: 'VIP',
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    type: ErrorRespuesta,
+    description:
+      'El body está mal formado: falta `codigo` o `email`, el código no es alfanumérico de 8 caracteres, el email no es válido o hay campos no declarados.',
+    examples: {
+      bodyInvalido: {
+        summary: 'Código corto y email inválido',
+        value: {
+          statusCode: 400,
+          message: [
+            'codigo debe ser alfanumérico de 8 caracteres',
+            'email debe ser un email válido',
+          ],
+          error: 'Bad Request',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorRespuesta,
+    description:
+      'No existe una reserva con ese código y email. Es la misma respuesta si el código no existe y si el email no coincide, sin indicar cuál dato falló.',
+    examples: {
+      noEncontrada: {
+        summary: 'Código inexistente o email incorrecto',
+        value: {
+          statusCode: 404,
+          message: RESERVA_NO_ENCONTRADA_MENSAJE,
+          error: 'Not Found',
+        },
+      },
+    },
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'Se superó el límite de consultas permitidas en la ventana configurada. Se rechaza antes de validar el body y de buscar la reserva.',
+  })
+  @Post('consultar')
+  @HttpCode(HttpStatus.OK)
+  async consultar(
+    @Body() dto: ConsultarReservaDto,
+  ): Promise<ReservaConsultadaRespuesta> {
+    return this.reservasService.consultar(dto.codigo, dto.email);
   }
 }

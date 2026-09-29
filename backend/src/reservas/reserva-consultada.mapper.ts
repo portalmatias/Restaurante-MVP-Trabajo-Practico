@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
+import { fechaCalendarioAIso } from '../common/timezone';
 import type { ReservaConsultadaRespuesta } from './dto/reserva-consultada-respuesta.dto';
 
 /**
@@ -10,18 +11,6 @@ import type { ReservaConsultadaRespuesta } from './dto/reserva-consultada-respue
 export type ReservaParaConsulta = Prisma.ReservaGetPayload<{
   include: { turno: true; mesa: { include: { zona: true } } };
 }>;
-
-/**
- * `YYYY-MM-DD` de una fecha de calendario (`@db.Date`). Se lee con `getUTC*`: Prisma
- * devuelve esa columna como un `Date` a medianoche UTC, y `getDate()` daría el día anterior
- * en un proceso con zona horaria al oeste de UTC (config.yaml §7).
- */
-export function formatearFechaCalendario(fecha: Date): string {
-  const anio = String(fecha.getUTCFullYear()).padStart(4, '0');
-  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-  const dia = String(fecha.getUTCDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
-}
 
 /**
  * `HH:mm` de una hora local del restaurante (`@db.Time`). Prisma la devuelve como un `Date`
@@ -46,7 +35,7 @@ export function aReservaConsultadaRespuesta(
   return {
     codigoReserva: reserva.codigoReserva,
     estado: reserva.estado,
-    fecha: formatearFechaCalendario(reserva.fecha),
+    fecha: fechaCalendarioAIso(reserva.fecha),
     comensales: reserva.comensales,
     turno: {
       id: reserva.turno.id,

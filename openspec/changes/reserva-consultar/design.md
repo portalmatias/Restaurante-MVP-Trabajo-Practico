@@ -191,8 +191,24 @@ protección que el espacio de códigos no necesite.
 
 ### D6: Listado de admin: `GET /admin/reservas`
 
-Método `listar` de `ReservasController` (`operationId` `ReservasController_listar`), con
-`@UseGuards(JwtAuthGuard, RolesGuard)` y `@Roles(RolUsuario.ADMIN)` por ruta.
+Método `listar` de un controller nuevo, `ReservasAdminController` (`@Controller('admin/reservas')`,
+mismo `ReservasService` inyectado), con `operationId` fijado explícito como
+`ReservasController_listar` y `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(RolUsuario.ADMIN)`
+a nivel de clase.
+
+**Corrección del 2026-09-28, durante la implementación:** la versión original de este
+documento ponía `listar` dentro de `ReservasController` (`@Controller('reservas')`), la
+misma clase que expone `POST /reservas` y `POST /reservas/consultar`. Es **técnicamente
+imposible**: el prefijo de `@Controller()` se aplica a toda la clase, y ningún decorador de
+método puede hacer que una ruta de esa clase ignore ese prefijo. Un `@Get()` dentro de
+`ReservasController` nunca puede resolver a `/admin/reservas`; como máximo resuelve a
+`/reservas/admin/reservas`. No lo detectó la revisión de la spec porque nadie lo ejecutó
+contra una app real hasta este punto. Se corrige con el controller separado que la
+alternativa de abajo ya consideraba, y que ahora deja de ser una preferencia de estilo para
+ser un requisito. El mismo problema le aplica a cualquier otro change que planee agregar
+una ruta bajo `/admin/reservas/...` desde `ReservasController` (`cancelacion-turnos` con
+`PATCH /admin/reservas/:id/no-show`, `reserva-vip` con `.../confirmar` y `.../rechazar`):
+las tres tienen que vivir en `ReservasAdminController`, no en `ReservasController`.
 
 **Filtros** (todos opcionales, se combinan con AND): `fecha` (`YYYY-MM-DD`), `estado`
 (`PENDIENTE|CONFIRMADA|CANCELADA|NO_SHOW`), `zonaId` (UUID, se traduce a `mesa: { zonaId }`
@@ -227,10 +243,6 @@ Questions): el caso de `reserva-vip` se resuelve con `estado` sin fecha, y el de
 día con `fecha`.
 **Alternativa considerada:** `GET /admin/reservas/:id` para el detalle. Se deja afuera: el
 listado ya incluye todo el contenido y ningún change lo pide.
-**Alternativa considerada:** un `ReservasAdminController` separado con los guards a nivel de
-clase. Se descarta por ahora para mantener las operaciones de `Reservas` en un solo
-controller, como ya hace `cancelacion-turnos` con su ruta `PATCH /admin/reservas/:id/no-show`.
-
 ### D7: Rate limiting del listado de admin
 
 El límite global (10 solicitudes por 60 s por IP) es demasiado bajo para un panel con
@@ -731,6 +743,15 @@ los mismos códigos, descripciones y esquemas.
 
 ## Risks / Trade-offs
 
+- **[Riesgo, cerrado]** La primera versión de D6 ponía `GET /admin/reservas` dentro de
+  `ReservasController` (`@Controller('reservas')`). El prefijo de `@Controller()` se aplica
+  a toda la clase; ningún método puede hacer que su ruta lo ignore. Se detectó al escribir
+  el código, no en la revisión de la spec → **Resolución:** `listar` pasó a un controller
+  nuevo, `ReservasAdminController` (`@Controller('admin/reservas')`), con el mismo
+  `operationId` fijado a mano para no cambiar el contrato ya publicado. El mismo problema le
+  va a aparecer a `cancelacion-turnos` (`PATCH /admin/reservas/:id/no-show`) y a
+  `reserva-vip` (`.../confirmar`, `.../rechazar`) si sus diseños asumen lo mismo: las tres
+  rutas tienen que ir en `ReservasAdminController`.
 - **[Riesgo]** El `ValidationPipe` global de `main` (`whitelist` + `forbidNonWhitelisted`, sin
   `transform`) y el de la rama de `disponibilidad` (`transform: true`, sin `whitelist`) son
   incompatibles entre sí. Este change necesita **las dos**: `transform: true` para que

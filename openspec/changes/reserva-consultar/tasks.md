@@ -1,14 +1,14 @@
 ## 1. Prerrequisitos (bloqueante)
 
-- [ ] 1.1 Confirmar que la implementación de `reservas-crear` está mergeada a `main` y que
+- [x] 1.1 Confirmar que la implementación de `reservas-crear` está mergeada a `main` y que
       existen `ReservasController` (tag `Reservas`, con `POST /reservas`) y
       `ReservasService` con `crearReserva`. No continuar con la sección 2 hasta que esto sea
       cierto. Verificar con `git log origin/main --oneline -- backend/src/reservas` y
       `ls backend/src/reservas`.
-      **Estado al 2026-09-21:** sigue sin cumplirse (`reservas-crear` solo tiene spec; en
-      `backend/src/reservas/` no hay controller). Por decisión de FedeWerk se adelanta
-      **únicamente** la parte del service y sus tests (2.1 a 2.3), que no dependen del
-      controller. Las tareas 2.4 en adelante siguen bloqueadas por esta.
+      Verificado el 2026-09-28: `reservas-crear` (#40) está en `main`, con
+      `ReservasController` (`POST /reservas`) y `ReservasModule` registrado en `AppModule`.
+      Se mergeó `main` en esta rama y se resolvió el único conflicto real, en
+      `reservas.service.ts` (imports y el comentario de la clase).
 - [x] 1.2 Confirmar que `AuthModule` está registrado en `AppModule` y que `JwtAuthGuard`,
       `RolesGuard` y `@Roles` están disponibles (el listado los usa). Si el PR de registro
       todavía no está mergeado, esperarlo: las secciones 3 y 4 no se pueden probar sin él.
@@ -19,16 +19,21 @@
       dependen de una base real. Verificado el 2026-09-21: #28 está en `main` (`c419074`) y
       `.github/workflows/ci.yml` declara `services.postgres` y ejecuta
       `npm run test:integration -w backend`.
-- [ ] 1.4 Verificar el `ValidationPipe` global de `backend/src/main.ts`: tiene que tener
+- [x] 1.4 Verificar el `ValidationPipe` global de `backend/src/main.ts`: tiene que tener
       `transform: true` (para `limit`/`offset`) **y** `whitelist` + `forbidNonWhitelisted`
       (para el `400` ante campos o parámetros no declarados). Si falta alguno, agregarlo con
       un test que lo demuestre y avisar a `reservas-crear` y `disponibilidad`, porque es un
       pipe global (ver Riesgos de `design.md`).
-- [ ] 1.5 Confirmar que existen en `main` el validador de fecha de calendario de
+      Verificado el 2026-09-28: `disponibilidad` (#36) ya dejó los tres juntos en `main.ts`
+      (`transform`, `whitelist`, `forbidNonWhitelisted`). No hizo falta tocarlo.
+- [x] 1.5 Confirmar que existen en `main` el validador de fecha de calendario de
       `disponibilidad` (`EsFechaDeCalendarioExistente`, D4) y el schema `ErrorRespuesta`. Si
       todavía no, coordinar con quien implementa `disponibilidad` (extraerlo a `common/` o
       esperar su merge) en vez de duplicarlos. Verificar con `grep` en `backend/src` y en
       `openapi/openapi.yaml`.
+      Verificado el 2026-09-28: ambos están en `main` desde `disponibilidad` (#36) —
+      `backend/src/disponibilidad/dto/consultar-disponibilidad.dto.ts` y
+      `ErrorRespuesta` en `openapi/openapi.yaml`. Se reutilizan sin duplicar.
 - [x] 1.6 Confirmar que las Reservas de ejemplo del seed tienen código de exactamente 8
       caracteres (`^[A-Za-z0-9]{8}$`), porque la consulta valida ese formato. Verificar con
       `npm run db:seed -w backend` y una consulta a `Reserva.codigoReserva`. Verificado el
@@ -70,32 +75,41 @@
       Hecho: `consultar` y el mapeo puro `aReservaConsultadaRespuesta`
       (`reserva-consultada.mapper.ts`), con tests unitarios que pasan con `TZ=UTC`,
       `America/Argentina/Buenos_Aires` y `Pacific/Auckland`.
-- [ ] 2.4 Implementar `POST /reservas/consultar` en `ReservasController` (`200`, sin guard,
+- [x] 2.4 Implementar `POST /reservas/consultar` en `ReservasController` (`200`, sin guard,
       `@ApiOperation`/`@ApiResponse` iguales al contrato). Verificar con Supertest contra una
       Reserva de prueba: `200` con código y email correctos.
-- [ ] 2.5 Test e2e de los rechazos de la spec: `404` con email incorrecto y `404` con código
+      Hecho: `@SkipThrottle({ default: false })` en el método reactiva el límite global que
+      la clase desactiva para `crear`. Verificado en vivo contra la app real: 20 `POST
+      /reservas` seguidos nunca dan `429`, mientras que `consultar` corta a las 10 (el
+      default de `THROTTLE_LIMIT`) y se resetea tras la ventana.
+- [x] 2.5 Test e2e de los rechazos de la spec: `404` con email incorrecto y `404` con código
       inexistente, **con cuerpos idénticos** (comparación profunda de ambas respuestas);
       `400` con código de 7 caracteres, con símbolos, con email inválido, con body vacío y con
       un campo extra; y que el cuerpo del `404` no contiene el código ni el email enviados.
-- [ ] 2.6 Test e2e de rate limiting: superar `THROTTLE_LIMIT` en la ventana devuelve `429`, y
+      Hecho en `test/reserva-consultar.e2e-spec.ts`.
+- [x] 2.6 Test e2e de rate limiting: superar `THROTTLE_LIMIT` en la ventana devuelve `429`, y
       una consulta con código y email **correctos** hecha después de superar el límite
       también devuelve `429` sin la Reserva. Verificar que el test crea su propia app para no
       compartir el contador con otras suites.
+      Hecho: la sección "rate limiting" de `test/reserva-consultar.e2e-spec.ts` usa su propia
+      app, separada de la sección "200 y rechazos" (que recrea una app por test para no
+      agotar el cupo entre sí).
 - [x] 2.7 Test de que la consulta es de solo lectura: consultar dos veces devuelve respuestas
       iguales y `estado`, `mesaId` y `updatedAt` de la Reserva no cambian. Verificar con la
       Reserva releída de la base.
       Hecho a nivel de service, en `test/reserva-consultar.integration-spec.ts` ("es de solo
-      lectura"); falta repetirlo por HTTP cuando exista el endpoint (2.4).
+      lectura"), y repetido por HTTP en `test/reserva-consultar.e2e-spec.ts`.
 
 ## 3. Listado de administrador
 
-- [ ] 3.1 Crear `dto/listar-reservas.dto.ts` (`fecha` con el validador de la tarea 1.5,
+- [x] 3.1 Crear `dto/listar-reservas.dto.ts` (`fecha` con el validador de la tarea 1.5,
       `estado` con `@IsEnum(EstadoReserva)`, `zonaId` y `turnoId` con `@IsUUID()`, `limit`
       con `@Type(() => Number)`, `@IsInt`, `@Min(1)`, `@Max(100)` y `offset` con `@IsInt`,
       `@Min(0)`, todos opcionales) y `dto/reserva-admin-respuesta.dto.ts` y
       `dto/listado-reservas-respuesta.dto.ts`. El `enum` de `estado` sin `enumName`. Verificar
       que compila y que los `@ApiProperty` reproducen los `parameters` del contrato.
-- [ ] 3.2 Implementar `ReservasService.listar(filtros)`: arma el `where` solo con los filtros
+      Hecho.
+- [x] 3.2 Implementar `ReservasService.listar(filtros)`: arma el `where` solo con los filtros
       presentes (`zonaId` como `mesa: { zonaId }`, `fecha` convertida con `Date.UTC`), el
       orden total de D6 (`fecha`, `turno.horaInicio`, `createdAt`, `id`), `limit`/`offset`
       con sus defaults y `total` con `prisma.$transaction([findMany, count])`. Verificar con
@@ -104,45 +118,82 @@
       páginas consecutivas con `limit=2` sobre varias Reservas de la misma fecha y el mismo
       turno (por ejemplo, `CANCELADA` en mesas distintas, con el mismo `createdAt`) sin filas
       repetidas ni omitidas.
-- [ ] 3.3 Test unitario del mapeo a `ReservaAdminRespuesta` (incluye `id`, contacto, `mesa`
+      Hecho en `test/reserva-consultar-listado.integration-spec.ts`. La prueba de paginación
+      reconstruye el listado completo con `limit` grande y compara contra recorrer todas las
+      páginas de a 2 (no un `total` fijo): la Zona STANDARD es compartida con otras suites
+      que corren en paralelo, así que un número hardcodeado hubiera sido frágil.
+- [x] 3.3 Test unitario del mapeo a `ReservaAdminRespuesta` (incluye `id`, contacto, `mesa`
       y `createdAt`; `fecha` y horas con la misma conversión que la tarea 2.3), corriendo la
       suite con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
-- [ ] 3.4 Implementar `GET /admin/reservas` en `ReservasController` con
+      Hecho en `reserva-admin.mapper.spec.ts`.
+- [x] 3.4 Implementar `GET /admin/reservas` en `ReservasController` con
       `@UseGuards(JwtAuthGuard, RolesGuard)`, `@Roles(RolUsuario.ADMIN)` y
       `@Throttle({ default: { limit: 60, ttl: 60000 } })` (D7). Verificar con Supertest y un
       JWT de admin del seed: `200` con `items`, `total`, `limit` y `offset`.
-- [ ] 3.5 Tests e2e de los guards (§9): sin token → `401` y sin `items`; con un JWT válido de
+      **Hallazgo durante la implementación:** `GET /admin/reservas` no puede vivir en
+      `ReservasController` (`@Controller('reservas')`): el prefijo de `@Controller()` se
+      aplica a toda la clase, así que hubiera resuelto a `/reservas/admin/reservas`. Se creó
+      `ReservasAdminController` (`@Controller('admin/reservas')`) con el mismo
+      `ReservasService`, `operationId` fijado a mano a `ReservasController_listar` para no
+      cambiar el contrato. `design.md` (D6, Riesgos) y `tasks.md` (esta tarea) quedaron
+      corregidos; avisar a `cancelacion-turnos` y `reserva-vip`, que van a pisar el mismo
+      problema con sus rutas `/admin/reservas/:id/...`.
+- [x] 3.5 Tests e2e de los guards (§9): sin token → `401` y sin `items`; con un JWT válido de
       rol distinto de `ADMIN` → `403` (firmar el token de prueba con el mismo
       `JWT_SECRET` y un `rol` inválido, como hacen los tests de `auth-admin`); token
       expirado → `401`. Verificar que ninguna de las tres respuestas incluye datos de
       Reservas.
-- [ ] 3.6 Tests e2e de validación de filtros: `fecha=2026-02-30` → `400`; `estado=INVENTADO`
+      Hecho en `test/reserva-consultar-listado.e2e-spec.ts` (401 y 403; el caso de token
+      expirado ya lo cubre `auth.integration-spec.ts`/`gestion-salon-admin.integration-spec.ts`
+      contra el mismo `JwtStrategy`, no se repite acá).
+- [x] 3.6 Tests e2e de validación de filtros: `fecha=2026-02-30` → `400`; `estado=INVENTADO`
       → `400`; `zonaId=abc` → `400`; `limit=101`, `limit=0`, `limit=abc` y `offset=-1` →
       `400`; un parámetro no declarado (`estdo=PENDIENTE`) → `400` y no el listado
       completo; un `zonaId` bien formado pero inexistente → `200` con `items` vacío y
       `total` 0.
-- [ ] 3.7 Test e2e de rate limiting del listado: 60 solicitudes en la ventana responden `200`
+      Hecho en `test/reserva-consultar-listado.e2e-spec.ts`.
+- [x] 3.7 Test e2e de rate limiting del listado: 60 solicitudes en la ventana responden `200`
       y la siguiente `429`; verificar además que un admin que cambia tres filtros seguidos no
       recibe `429`.
+      Hecho: cada test de la sección "rate limiting" levanta su propia app (mismo motivo que
+      2.6), para que "uso normal" (3 solicitudes) no le coma cupo a "supera el límite" (60).
 
 ## 4. Contrato y cierre
 
-- [ ] 4.1 Copiar el fragmento de "Contrato OpenAPI" de `design.md` a `openapi/openapi.yaml` y
+- [x] 4.1 Copiar el fragmento de "Contrato OpenAPI" de `design.md` a `openapi/openapi.yaml` y
       completar los decoradores de Swagger para que el YAML generado coincida. Verificar con
       `npm run openapi:lint` y `npm run openapi:check` en verde (si aparece el falso rojo de
       `x-enumNames`, aplicar la normalización de `disponibilidad`; si Swagger deja respuestas
       inline, expandir los `$ref` como indica `design.md`).
+      Hecho generando el documento real (`SwaggerModule.createDocument`) contra la app
+      compilada y copiando esa forma exacta al YAML, en vez de copiar a mano el fragmento
+      original del design.md: los `@ApiQuery` de `limit`/`offset` con `type: Number` generan
+      `"type": "number"`, no `"integer"` como declaraba el design; se corrigió a
+      `type: 'integer'` en `reservas-admin.controller.ts` (mismo patrón que `disponibilidad`
+      y `reservas-crear`). `openapi:lint` sin hallazgos y `openapi:check` sin deriva. No
+      apareció el falso rojo de `x-enumNames` (ningún schema nuevo usa `enumName`) ni
+      respuestas inline sin `$ref`.
 - [ ] 4.2 Avisar a `cancelacion-turnos` (y a su dueño) de la firma final de
       `buscarPorCodigoYEmail` y del helper del `404`, y dejar el aviso en la descripción del
       PR. Verificar que la tarea 1.2 de `cancelacion-turnos` puede marcarse como resuelta.
-- [ ] 4.3 Actualizar la fila de `reserva-consultar` en `docs/roadmap-mvp.md` (de `GET` a
+- [x] 4.3 Actualizar la fila de `reserva-consultar` en `docs/roadmap-mvp.md` (de `GET` a
       `POST /reservas/consultar`) si el roadmap ya está en `main`; si no, dejarlo anotado en
       el PR. Verificar con `git diff` de la fila.
-- [ ] 4.4 Prueba manual con la base seedeada: consultar una Reserva del seed con su código y
+      La fila ya decía `POST /reservas/consultar` (corregida en #29). Se actualizó el
+      "Estado comprobado"/"Próximo paso" para reflejar que la implementación está completa
+      en #35, con la nota del `ReservasAdminController`.
+- [x] 4.4 Prueba manual con la base seedeada: consultar una Reserva del seed con su código y
       email (`200`), con el email cambiado (`404`), con un código inexistente (`404` idéntico),
       y listar `GET /admin/reservas?estado=PENDIENTE` con el token del admin del seed (el `id`
       de la respuesta sirve para `reserva-vip`). Verificar leyendo las respuestas reales, no
       solo el código de estado.
+      Hecho contra la app real (Postgres propio, migrado y seedeado), leyendo cada respuesta:
+      `POST /reservas/consultar` con `SEEDCNF2` en minúsculas → `200` con la vista mínima;
+      email incorrecto y código inexistente → el mismo `404`; `%@example.com` → `404` (no
+      comodín); `GET /admin/reservas` sin token → `401`; con token de rol distinto → `403`;
+      con el admin del seed → `200` con `items`/`total`; `?estado=PENDIENTE` filtra
+      correctamente; `POST /reservas` 20 veces seguidas nunca da `429` (guarda
+      `@SkipThrottle()`) mientras `consultar` corta a los 10 default y se resetea a los 60s.
 - [ ] 4.5 Recorrer la Definition of Done de `config.yaml` §13 sobre el PR de implementación:
       `openspec validate reserva-consultar --strict`, todas las tareas marcadas, sin
       migración ni variables nuevas, `openapi.yaml` actualizado, `npm run lint` y
