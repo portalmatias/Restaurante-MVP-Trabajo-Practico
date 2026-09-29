@@ -99,11 +99,11 @@
       indicación accesible) y tres puntos decorativos con `aria-hidden`, el segundo con el
       estilo de actual. Verificar rojo y luego
       verde con `npm test -w frontend -- pasos-reserva`.
-- [ ] 3.6 (movida al slice de consultar: el enlace apuntaría a una página que todavía no existe) Escribir el test de `SiteHeader` verificando que, además del enlace a `/reservas` ya
+- [x] 3.6 (hecha en el slice de consultar, cuando la página ya existe) Escribir el test de `SiteHeader` verificando que, además del enlace a `/reservas` ya
       existente, hay un enlace a `/reservas/consultar` con nombre accesible "Consultar
       reserva", y que ningún enlace apunta a `/admin` (spec "Sin enlaces a la
       administración"). Verificar que falla (rojo) por el enlace nuevo.
-- [ ] 3.7 (movida al slice de consultar, junto con 3.6) Agregar el enlace a `SiteHeader` (D6), reusando `navLinkClassName`. Verificar que 3.6
+- [x] 3.7 (hecha en el slice de consultar, junto con 3.6) Agregar el enlace a `SiteHeader` (D6), reusando `navLinkClassName`. Verificar que 3.6
       pasa.
 - [x] 3.8 Revisar `frontend/test/lib/api/errors.test.ts` y `client.test.ts` de `frontend-base`:
       si algún test fija el texto exacto de un mensaje genérico, actualizarlo al texto en
@@ -189,27 +189,30 @@
 
 ## 5. Grupo B — Consultar (depende de `reserva-consultar` mergeado)
 
-- [ ] 5.1 Confirmar `POST /reservas/consultar` en `openapi/openapi.yaml` de `main` y
+- [x] 5.1 Confirmar `POST /reservas/consultar` en `openapi/openapi.yaml` de `main` y
       regenerar `schema.d.ts` (`npm run api:types -w frontend`). Verificar con
       `grep -n "reservas/consultar" frontend/src/lib/api/schema.d.ts`.
-- [ ] 5.2 Escribir los tests de la sub-vista "formulario" de `ConsultaReserva`: código y email
+- [x] 5.2 Escribir los tests de la sub-vista "formulario" de `ConsultaReserva`: código y email
       obligatorios con validación en línea; un `404` muestra el mensaje genérico sin indicar
       cuál dato falló; un `429` muestra el mensaje de espera; un error de servidor (`5xx`) y
       una falla de red muestran el mensaje genérico de `toApiResult`/`mapErrorApi` (en voseo,
       D7) y conservan el código y el email ya tipeados en sus campos para poder reintentar sin
       volver a escribirlos; un envío exitoso pasa a la sub-vista "detalle" con los datos de la
       respuesta. Verificar rojo con `npm test -w frontend -- consulta-reserva`.
-- [ ] 5.3 Escribir los tests de la sub-vista "detalle": muestra estado, fecha (formateada),
+- [x] 5.3 Escribir los tests de la sub-vista "detalle": muestra estado, fecha (formateada),
       turno (formateado) y zona; no renderiza nombre, email ni teléfono en ningún elemento del
       DOM; un enlace "Consultar otra reserva" vuelve a "formulario". (El gating del botón de
       cancelar según la ventana se cubre en la sección 6, una vez que ese dato esté
       disponible). Verificar rojo.
-- [ ] 5.4 Implementar `ConsultaReserva` (sub-vistas "formulario"/"detalle", D3 Pantalla 6-7,
+- [x] 5.4 Implementar `ConsultaReserva` (sub-vistas "formulario"/"detalle", D3 Pantalla 6-7,
       D1.2 sin reflejar el email en la URL, solo `?codigo=` opcional) y
       `app/reservas/consultar/page.tsx`. Verificar que 5.2 y 5.3 pasan.
-- [ ] 5.5 Prueba manual: consultar una reserva `CONFIRMADA` y una `PENDIENTE` del seed con su
+- [x] 5.5 Prueba manual: consultar una reserva `CONFIRMADA` y una `PENDIENTE` del seed con su
       código y su email reales; consultar con un email que no corresponde y verificar el mismo
       mensaje genérico que con un código inexistente.
+      Hecho el 29/09/2026 en Chromium (390 px): `SEEDCNF2` y `SEEDPND2` muestran su detalle sin
+      datos de contacto; email ajeno y código inexistente muestran el mismo mensaje genérico, y
+      la URL no cambia.
 
 ## 6. Grupo C — Cancelar (depende de `cancelacion-turnos` mergeado; usa `GET /zonas` del Grupo A)
 
@@ -355,3 +358,35 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   Los mensajes de `mensajeDeRechazo` en `client.ts` son impersonales y no se tocaron, como
   ya preveía D7. Los tres tests de `errors.test.ts` que fijaban el texto exacto se
   actualizaron antes que el código (rojo por el texto viejo).
+
+**Grupo B, consultar (sección 5):**
+
+- 5.1: `npm run api:types -w frontend` agregó a `schema.d.ts` solo líneas nuevas (656 líneas, sin
+  borrados): `/reservas` (`POST`), `/reservas/consultar`, `/reservas/{codigo}/cancelar` y
+  `/admin/reservas` con sus schemas, todos ya mergeados en `main` y todavía ausentes del archivo
+  versionado. No apareció ningún diff ajeno a esos contratos.
+- El `turno` de `POST /reservas/consultar` trae `horaInicio`/`horaFin` como `HH:mm` (hora local
+  ya formateada por el backend), no como ISO `1970-01-01T...` como `GET /turnos` (D2). El
+  detalle los muestra tal cual y no usa `formatearHoraTurno`. Para 6.3, `puedeCancelarSegunVentana`
+  ya acepta `HH:mm` además del ISO de `GET /turnos`, así que se le puede pasar `turno.horaInicio`
+  sin convertir.
+- `POST /reservas/consultar` responde `429` sin cuerpo y `mapErrorApi` lo dejaba como el mensaje
+  genérico "Ocurrió un error inesperado.". Se agregó a `errors.ts` (aditivo, sin renombrar nada)
+  el caso `limite-de-intentos` con el mensaje "Hiciste demasiados intentos. Esperá unos minutos
+  antes de volver a intentar.", con su test. Lo reusará la cancelación (6.4).
+- `ConsultaReserva` vive en `frontend/src/components/reservas/consulta-reserva.tsx`; el código
+  se valida como 8 caracteres alfanuméricos y se pasa a mayúsculas al tipear. El botón
+  "Reintentar" aparece solo ante `desconocido` (5xx o red); ante un `404` o un `429` se corrige
+  o se espera y se vuelve a enviar con el botón principal. "Consultar otra reserva" es un
+  `<button>` con aspecto de enlace (no navega) y vacía el email. `app/reservas/consultar/page.tsx`
+  solo prellena `?codigo=` (ignora valores con formato inválido o repetidos) y nunca lee el email.
+- 5.5 (prueba manual contra el backend real) se hizo el 29/09/2026; el detalle está en la tarea.
+- `ConsultaReserva` deshabilita el código y el email mientras consulta, ignora un nuevo envío si
+  ya hay una consulta en curso (referencia, no solo el estado) y deshabilita "Reintentar" mientras
+  tanto. Cada consulta lleva un número de solicitud y solo se aplica la respuesta de la vigente;
+  con los campos bloqueados y sin reentradas, una respuesta pisada solo puede ocurrir si el
+  componente se desmonta a mitad de la consulta, caso en que se descarta. La página usa
+  `key={codigoInicial}` para reiniciar el formulario al navegar entre `?codigo=` distintos.
+- El detalle de `ConsultaReserva` formatea la fecha con un envoltorio local que, si la utilidad
+  lanza (fecha inesperada en un `200`), muestra el valor tal cual llegó en vez de romper la
+  pantalla. Las utilidades de `fecha-hora.ts` siguen lanzando.

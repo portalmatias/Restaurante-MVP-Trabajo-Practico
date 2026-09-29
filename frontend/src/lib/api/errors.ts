@@ -11,6 +11,7 @@ export type ErrorApi =
   | { tipo: "validacion"; mensajes: string[] }
   | { tipo: "no-encontrado"; mensaje: string }
   | { tipo: "conflicto"; mensaje: string; motivos: MotivoNoDisponible[] }
+  | { tipo: "limite-de-intentos"; mensaje: string }
   | { tipo: "desconocido"; mensaje: string };
 
 /**
@@ -102,6 +103,14 @@ export function mapErrorApi(status: number, body: unknown): ErrorApi {
 
   if (status === 409) {
     return { tipo: "conflicto", mensaje: mensajeDe(body), motivos: motivosDe(body) };
+  }
+
+  if (status === 429) {
+    // El `429` de las rutas con límite de solicitudes llega sin cuerpo: el texto es fijo.
+    return {
+      tipo: "limite-de-intentos",
+      mensaje: "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
+    };
   }
 
   if (status >= 500) {

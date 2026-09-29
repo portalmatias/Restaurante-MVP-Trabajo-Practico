@@ -44,6 +44,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reservas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Crear una reserva
+         * @description Crea una reserva sin cuenta para una fecha, un turno, una zona y una cantidad de comensales. Evalúa las mismas reglas que la consulta de disponibilidad en el momento de crear, asigna automáticamente la mesa libre más chica que alcance y genera el código de reserva. Queda `PENDIENTE` si la zona requiere confirmación del admin y `CONFIRMADA` si no. El cliente no elige mesa, estado ni código: si los manda, se responde 400. Es una ruta pública, sin autenticación.
+         */
+        post: operations["ReservasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reservas/consultar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consultar una reserva por código y email
+         * @description Devuelve el estado de una reserva sin cuenta. Exige el código y el email de la misma reserva; el código y el email se comparan sin distinguir mayúsculas y minúsculas. Si el código no existe o el email no coincide, responde el mismo `404`, para que no se pueda averiguar si un código existe. Devuelve solo una vista mínima: no incluye la mesa ni los datos de contacto. Es una ruta pública, sin autenticación, con límite de solicitudes por cliente.
+         */
+        post: operations["ReservasController_consultar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reservas/{codigo}/cancelar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancelar una reserva por código y email
+         * @description Cancela una reserva PENDIENTE o CONFIRMADA dentro de la ventana mínima de cancelación de su zona (2 h STANDARD / 24 h VIP). El límite exacto de la ventana está permitido. Exige el código y el email de la misma reserva; si no coinciden, responde el mismo 404 que la consulta, sin indicar cuál dato era incorrecto. Es una ruta pública, sin autenticación, con límite de solicitudes por cliente.
+         */
+        post: operations["ReservasController_cancelar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -194,6 +254,46 @@ export interface paths {
          * @description `activo` viaja en el mismo PATCH de edición que día/horario, sin una ruta aparte de activar/desactivar.
          */
         patch: operations["HorariosController_actualizar"];
+        trace?: never;
+    };
+    "/admin/reservas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listar reservas
+         * @description Lista las reservas con sus datos de contacto, la mesa y el identificador que usan las demás rutas de admin. Se puede filtrar por fecha, estado, zona y turno; los filtros se combinan todos juntos. El orden es cronológico (fecha, hora de inicio del turno, fecha de creación, identificador) y está paginado. Un filtro con un identificador inexistente devuelve una lista vacía. Requiere un JWT de rol `ADMIN` y tiene un límite de solicitudes por cliente.
+         */
+        get: operations["ReservasController_listar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reservas/{id}/no-show": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Marcar una reserva como ausente (NO_SHOW)
+         * @description Transiciona una reserva CONFIRMADA a NO_SHOW. Rechaza con 409 si la reserva no está CONFIRMADA o si su turno todavía no terminó (el instante exacto de fin también se rechaza). Requiere un JWT de rol ADMIN.
+         */
+        patch: operations["ReservasController_marcarNoShow"];
         trace?: never;
     };
 }
@@ -430,6 +530,271 @@ export interface components {
              */
             error: string;
         };
+        /** @description Datos para crear una reserva sin cuenta. */
+        CrearReservaDto: {
+            /**
+             * Format: date
+             * @description Fecha de calendario local del restaurante, sin hora (`YYYY-MM-DD`).
+             * @example 2026-09-19
+             */
+            fecha: string;
+            /**
+             * Format: uuid
+             * @description Id del turno.
+             * @example 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+             */
+            turnoId: string;
+            /**
+             * Format: uuid
+             * @description Id de la zona.
+             * @example b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
+             */
+            zonaId: string;
+            /**
+             * @description Cantidad de comensales. Entero, mínimo 1.
+             * @example 4
+             */
+            comensales: number;
+            /**
+             * @description Nombre de quien reserva.
+             * @example Ana Pérez
+             */
+            nombreCliente: string;
+            /**
+             * Format: email
+             * @description Email de quien reserva. Junto con el código, sirve para consultar o cancelar.
+             * @example ana.perez@example.com
+             */
+            emailCliente: string;
+            /**
+             * @description Teléfono de contacto, en formato libre.
+             * @example +54 9 11 5555-1234
+             */
+            telefonoCliente: string;
+        };
+        /** @description Reserva recién creada, sin datos internos ni de contacto. */
+        ReservaCreadaRespuesta: {
+            /**
+             * @description Código alfanumérico de 8 caracteres, único. Junto con el email, identifica la reserva.
+             * @example K7PM3QXA
+             */
+            codigoReserva: string;
+            /**
+             * @description `PENDIENTE` si la zona requiere confirmación del admin, `CONFIRMADA` si no. Una reserva recién creada nunca está `CANCELADA` ni `NO_SHOW`.
+             * @example CONFIRMADA
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "CONFIRMADA";
+            /**
+             * Format: date
+             * @description La misma fecha de calendario local enviada (`YYYY-MM-DD`).
+             * @example 2026-09-19
+             */
+            fecha: string;
+            /**
+             * Format: uuid
+             * @description Id del turno reservado.
+             * @example 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+             */
+            turnoId: string;
+            /**
+             * Format: uuid
+             * @description Id de la zona reservada.
+             * @example b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
+             */
+            zonaId: string;
+            /**
+             * @description Cantidad de comensales reservados.
+             * @example 4
+             */
+            comensales: number;
+        };
+        /** @description Cuerpo del `409` de la creación de reservas. */
+        ReservaRechazadaRespuesta: {
+            /**
+             * @description Siempre 409.
+             * @example 409
+             */
+            statusCode: number;
+            /**
+             * @description Explicación general en español.
+             * @example No se pudo crear la reserva
+             */
+            message: string;
+            /**
+             * @description Nombre estándar del código HTTP.
+             * @example Conflict
+             */
+            error: string;
+            /** @description Todas las reglas que impiden la reserva, en el orden fijo de `CodigoMotivo`. Vacío solo cuando el rechazo se debe a un choque con reservas simultáneas. */
+            motivos: components["schemas"]["MotivoNoDisponible"][];
+        };
+        ConsultarReservaDto: {
+            /**
+             * @description Código alfanumérico de 8 caracteres. Se compara sin distinguir mayúsculas y minúsculas.
+             * @example K7PM3QXA
+             */
+            codigo: string;
+            /**
+             * Format: email
+             * @description Email con el que se hizo la reserva. Se compara sin distinguir mayúsculas y minúsculas.
+             * @example ana.perez@example.com
+             */
+            email: string;
+        };
+        CancelarReservaDto: {
+            /**
+             * Format: email
+             * @description Email registrado en la reserva.
+             * @example ana.perez@example.com
+             */
+            email: string;
+        };
+        TurnoReservaRespuesta: {
+            /**
+             * Format: uuid
+             * @description Id del turno.
+             * @example 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+             */
+            id: string;
+            /**
+             * @description Hora local de inicio (`HH:mm`), sin conversión de zona horaria.
+             * @example 20:00
+             */
+            horaInicio: string;
+            /**
+             * @description Hora local de fin (`HH:mm`). Si es anterior a la de inicio, el turno termina al día siguiente.
+             * @example 23:30
+             */
+            horaFin: string;
+        };
+        ZonaReservaRespuesta: {
+            /**
+             * Format: uuid
+             * @description Id de la zona.
+             * @example b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
+             */
+            id: string;
+            /**
+             * @description Nombre de la zona.
+             * @example STANDARD
+             * @enum {string}
+             */
+            nombre: "STANDARD" | "VIP";
+        };
+        ReservaConsultadaRespuesta: {
+            /**
+             * @description Código alfanumérico de 8 caracteres.
+             * @example K7PM3QXA
+             */
+            codigoReserva: string;
+            /**
+             * @description Estado actual de la reserva.
+             * @example CONFIRMADA
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "CONFIRMADA" | "CANCELADA" | "NO_SHOW";
+            /**
+             * Format: date
+             * @description Fecha de calendario local del restaurante (`YYYY-MM-DD`).
+             * @example 2026-09-19
+             */
+            fecha: string;
+            /**
+             * @description Cantidad de comensales reservados.
+             * @example 4
+             */
+            comensales: number;
+            turno: components["schemas"]["TurnoReservaRespuesta"];
+            zona: components["schemas"]["ZonaReservaRespuesta"];
+        };
+        MesaReservaRespuesta: {
+            /**
+             * Format: uuid
+             * @description Id de la mesa.
+             * @example e1a7c3f5-2d94-4b60-8a1e-9f3c6b0d7a52
+             */
+            id: string;
+            /**
+             * @description Etiqueta de la mesa en el salón.
+             * @example V2
+             */
+            etiqueta: string;
+        };
+        ReservaAdminRespuesta: {
+            /**
+             * Format: uuid
+             * @description Identificador interno de la reserva, el que usan las demás rutas de admin.
+             * @example 9c4e1d70-3a2b-4c58-b1f6-7e0a5d2c8b34
+             */
+            id: string;
+            /**
+             * @description Código alfanumérico de 8 caracteres.
+             * @example R2WN8HDE
+             */
+            codigoReserva: string;
+            /**
+             * @description Estado actual de la reserva.
+             * @example PENDIENTE
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "CONFIRMADA" | "CANCELADA" | "NO_SHOW";
+            /**
+             * Format: date
+             * @description Fecha de calendario local del restaurante (`YYYY-MM-DD`).
+             * @example 2026-09-19
+             */
+            fecha: string;
+            /**
+             * @description Cantidad de comensales reservados.
+             * @example 6
+             */
+            comensales: number;
+            /**
+             * @description Nombre de quien reservó.
+             * @example Ana Pérez
+             */
+            nombreCliente: string;
+            /**
+             * Format: email
+             * @description Email de quien reservó, tal cual se guardó.
+             * @example ana.perez@example.com
+             */
+            emailCliente: string;
+            /**
+             * @description Teléfono de contacto, en formato libre.
+             * @example +54 9 11 5555-1234
+             */
+            telefonoCliente: string;
+            turno: components["schemas"]["TurnoReservaRespuesta"];
+            zona: components["schemas"]["ZonaReservaRespuesta"];
+            mesa: components["schemas"]["MesaReservaRespuesta"];
+            /**
+             * Format: date-time
+             * @description Instante de creación de la reserva, en UTC.
+             * @example 2026-09-17T14:32:10.000Z
+             */
+            createdAt: string;
+        };
+        ListadoReservasRespuesta: {
+            /** @description Reservas de la página, en orden cronológico. */
+            items: components["schemas"]["ReservaAdminRespuesta"][];
+            /**
+             * @description Cantidad total de reservas que cumplen los filtros, sin paginar.
+             * @example 1
+             */
+            total: number;
+            /**
+             * @description Tamaño de página aplicado.
+             * @example 20
+             */
+            limit: number;
+            /**
+             * @description Desplazamiento aplicado.
+             * @example 0
+             */
+            offset: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -503,6 +868,165 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorRespuesta"];
                 };
+            };
+        };
+    };
+    ReservasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearReservaDto"];
+            };
+        };
+        responses: {
+            /** @description Reserva creada. Devuelve el código que el cliente usa para consultarla o cancelarla. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservaCreadaRespuesta"];
+                };
+            };
+            /** @description El body está mal formado: falta un campo, la fecha no es `YYYY-MM-DD` o no existe, un id no es UUID, `comensales` no es un entero mayor o igual a 1, el email no es válido o el nombre o el teléfono están vacíos o son demasiado largos, o el body trae un campo que no es de los siete (por ejemplo `mesaId` o `estado`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description El turno o la zona indicados no existen. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description No se pudo crear la reserva. Si alguna regla de negocio lo impide, `motivos` trae todas las que fallan, en el mismo orden y con los mismos códigos que la consulta de disponibilidad. Si el problema fue un choque con otras reservas hechas al mismo tiempo, `motivos` puede venir vacío y conviene reintentar. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservaRechazadaRespuesta"];
+                };
+            };
+        };
+    };
+    ReservasController_consultar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsultarReservaDto"];
+            };
+        };
+        responses: {
+            /** @description El código y el email corresponden a una misma reserva, en cualquier estado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservaConsultadaRespuesta"];
+                };
+            };
+            /** @description El body está mal formado: falta `codigo` o `email`, el código no es alfanumérico de 8 caracteres, el email no es válido o hay campos no declarados. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description No existe una reserva con ese código y email. Es la misma respuesta si el código no existe y si el email no coincide, sin indicar cuál dato falló. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Se superó el límite de consultas permitidas en la ventana configurada. Se rechaza antes de validar el body y de buscar la reserva. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReservasController_cancelar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Código alfanumérico de 8 caracteres. Se compara sin distinguir mayúsculas y minúsculas. */
+                codigo: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelarReservaDto"];
+            };
+        };
+        responses: {
+            /** @description Reserva cancelada; respuesta sin cuerpo. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description El código no es alfanumérico de 8 caracteres o el body no trae un email válido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description No existe una reserva con ese código y email. Es la misma respuesta si el código no existe y si el email no coincide, sin indicar cuál dato falló. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description La reserva ya está en un estado terminal (CANCELADA o NO_SHOW), o al inicio de su turno le quedan menos horas que la ventana mínima de cancelación de su zona. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Se superó el límite de intentos de cancelación permitidos en la ventana configurada. Se rechaza antes de validar código y email. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -827,6 +1351,138 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ReservasController_listar: {
+        parameters: {
+            query?: {
+                /** @description Fecha de calendario local del restaurante, sin hora (`YYYY-MM-DD`). */
+                fecha?: string;
+                /** @description Estado de la reserva. */
+                estado?: "PENDIENTE" | "CONFIRMADA" | "CANCELADA" | "NO_SHOW";
+                /** @description Id de la zona. Un id inexistente devuelve una lista vacía. */
+                zonaId?: string;
+                /** @description Id del turno. Un id inexistente devuelve una lista vacía. */
+                turnoId?: string;
+                /** @description Cantidad máxima de reservas por página. */
+                limit?: number;
+                /** @description Cantidad de reservas a saltear desde el inicio del listado. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Página de reservas. Si ninguna cumple los filtros, `items` viene vacío y `total` es 0. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListadoReservasRespuesta"];
+                };
+            };
+            /** @description Un filtro está mal formado: la fecha no es `YYYY-MM-DD` o no existe, el estado no es uno de los cuatro, un id no es UUID, `limit` u `offset` están fuera de rango, o hay parámetros no declarados. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token ausente, inválido o expirado. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token válido sin rol `ADMIN`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Se superó el límite de solicitudes al listado en la ventana configurada. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ReservasController_marcarNoShow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reserva marcada NO_SHOW; respuesta sin cuerpo. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description El identificador de la reserva no es un UUID válido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token ausente, inválido o expirado. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token válido sin rol ADMIN. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description La reserva indicada no existe. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description La reserva no está CONFIRMADA, o su turno todavía no terminó. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
             };
         };
     };
