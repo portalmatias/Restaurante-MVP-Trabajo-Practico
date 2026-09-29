@@ -57,4 +57,35 @@ describe("puedeCancelarSegunVentana", () => {
       ),
     ).toBe(false);
   });
+
+  describe("formato de la hora de inicio", () => {
+    it("acepta HH:mm, el formato de POST /reservas/consultar", () => {
+      const ahora = new Date(INICIO_UTC_MS - 24 * HORA_MS);
+
+      expect(puedeCancelarSegunVentana(FECHA, "20:00", 24, ahora)).toBe(true);
+      expect(puedeCancelarSegunVentana(FECHA, "20:00", 24, new Date(ahora.getTime() + 60_000))).toBe(
+        false,
+      );
+    });
+
+    it("HH:mm e ISO de GET /turnos dan el mismo resultado", () => {
+      const ahora = new Date(INICIO_UTC_MS - 5 * HORA_MS);
+
+      expect(puedeCancelarSegunVentana(FECHA, "08:05", 2, ahora)).toBe(
+        puedeCancelarSegunVentana(FECHA, "1970-01-01T08:05:00.000Z", 2, ahora),
+      );
+      expect(puedeCancelarSegunVentana(FECHA, "20:00", 5, ahora)).toBe(
+        puedeCancelarSegunVentana(FECHA, HORA_INICIO, 5, ahora),
+      );
+    });
+
+    it.each(["", "abc", "25:00", "20:60", "20", "20:0", "1970-01-01T99:00:00.000Z"])(
+      "una hora mal formada (%p) lanza un error explícito, no devuelve false por NaN",
+      (horaMalFormada) => {
+        expect(() =>
+          puedeCancelarSegunVentana(FECHA, horaMalFormada, 24, new Date(INICIO_UTC_MS)),
+        ).toThrow(/hora de inicio/i);
+      },
+    );
+  });
 });
