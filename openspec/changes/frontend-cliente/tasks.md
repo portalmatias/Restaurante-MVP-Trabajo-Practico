@@ -204,9 +204,12 @@
 - [x] 5.4 Implementar `ConsultaReserva` (sub-vistas "formulario"/"detalle", D3 Pantalla 6-7,
       D1.2 sin reflejar el email en la URL, solo `?codigo=` opcional) y
       `app/reservas/consultar/page.tsx`. Verificar que 5.2 y 5.3 pasan.
-- [ ] 5.5 Prueba manual: consultar una reserva `CONFIRMADA` y una `PENDIENTE` del seed con su
+- [x] 5.5 Prueba manual: consultar una reserva `CONFIRMADA` y una `PENDIENTE` del seed con su
       código y su email reales; consultar con un email que no corresponde y verificar el mismo
       mensaje genérico que con un código inexistente.
+      Hecho el 29/09/2026 en Chromium (390 px): `SEEDCNF2` y `SEEDPND2` muestran su detalle sin
+      datos de contacto; email ajeno y código inexistente muestran el mismo mensaje genérico, y
+      la URL no cambia.
 
 ## 6. Grupo C — Cancelar (depende de `cancelacion-turnos` mergeado; usa `GET /zonas` del Grupo A)
 
@@ -363,4 +366,4 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   o se espera y se vuelve a enviar con el botón principal. "Consultar otra reserva" es un
   `<button>` con aspecto de enlace (no navega) y vacía el email. `app/reservas/consultar/page.tsx`
   solo prellena `?codigo=` (ignora valores con formato inválido o repetidos) y nunca lee el email.
-- 5.5 (prueba manual contra el backend real) queda sin marcar.
+- 5.5 (prueba manual contra el backend real) se hizo el 29/09/2026; el detalle está en la tarea.
