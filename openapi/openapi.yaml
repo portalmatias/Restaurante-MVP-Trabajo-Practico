@@ -531,6 +531,17 @@ components:
       required:
         - codigo
         - email
+    CancelarReservaDto:
+      type: object
+      properties:
+        email:
+          type: string
+          description: Email registrado en la reserva.
+          format: email
+          maxLength: 254
+          example: ana.perez@example.com
+      required:
+        - email
     TurnoReservaRespuesta:
       type: object
       properties:
@@ -1051,6 +1062,73 @@ paths:
           description: >-
             Se superó el límite de consultas permitidas en la ventana configurada. Se rechaza
             antes de validar el body y de buscar la reserva.
+  /reservas/{codigo}/cancelar:
+    post:
+      operationId: ReservasController_cancelar
+      summary: Cancelar una reserva por código y email
+      description: >-
+        Cancela una reserva PENDIENTE o CONFIRMADA dentro de la ventana mínima de
+        cancelación de su zona (2 h STANDARD / 24 h VIP). El límite exacto de la
+        ventana está permitido. Exige el código y el email de la misma reserva; si no
+        coinciden, responde el mismo 404 que la consulta, sin indicar cuál dato era
+        incorrecto. Es una ruta pública, sin autenticación, con límite de solicitudes
+        por cliente.
+      tags:
+        - Reservas
+      security: []
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          description: >-
+            Código alfanumérico de 8 caracteres. Se compara sin distinguir mayúsculas y
+            minúsculas.
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9]{8}$'
+            example: K7PM3QXA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelarReservaDto'
+      responses:
+        '204':
+          description: Reserva cancelada; respuesta sin cuerpo.
+        '400':
+          description: El código no es alfanumérico de 8 caracteres o el body no trae un email válido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '404':
+          description: >-
+            No existe una reserva con ese código y email. Es la misma respuesta si el código no
+            existe y si el email no coincide, sin indicar cuál dato falló.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+              examples:
+                noEncontrada:
+                  summary: Código inexistente o email incorrecto
+                  value:
+                    statusCode: 404
+                    message: No se encontró una reserva con ese código y email
+                    error: Not Found
+        '409':
+          description: >-
+            La reserva ya está en un estado terminal (CANCELADA o NO_SHOW), o al inicio de su
+            turno le quedan menos horas que la ventana mínima de cancelación de su zona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '429':
+          description: >-
+            Se superó el límite de intentos de cancelación permitidos en la ventana configurada.
+            Se rechaza antes de validar código y email.
   /auth/login:
     post:
       summary: Login de administrador
@@ -1436,3 +1514,54 @@ paths:
                 $ref: '#/components/schemas/ErrorRespuesta'
         '429':
           description: Se superó el límite de solicitudes al listado en la ventana configurada.
+  /admin/reservas/{id}/no-show:
+    patch:
+      operationId: ReservasController_marcarNoShow
+      summary: Marcar una reserva como ausente (NO_SHOW)
+      description: >-
+        Transiciona una reserva CONFIRMADA a NO_SHOW. Rechaza con 409 si la reserva no
+        está CONFIRMADA o si su turno todavía no terminó (el instante exacto de fin
+        también se rechaza). Requiere un JWT de rol ADMIN.
+      tags:
+        - Reservas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Reserva marcada NO_SHOW; respuesta sin cuerpo.
+        '400':
+          description: El identificador de la reserva no es un UUID válido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '403':
+          description: Token válido sin rol ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '404':
+          description: La reserva indicada no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '409':
+          description: La reserva no está CONFIRMADA, o su turno todavía no terminó.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'

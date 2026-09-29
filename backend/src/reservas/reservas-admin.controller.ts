@@ -1,9 +1,22 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -136,5 +149,53 @@ export class ReservasAdminController {
     @Query() query: ListarReservasDto,
   ): Promise<ListadoReservasRespuesta> {
     return this.reservasService.listar(query);
+  }
+
+  /**
+   * `PATCH /admin/reservas/:id/no-show` (capability `cancelacion-turnos`, design.md
+   * "Rutas"). Marca `NO_SHOW` solo si la Reserva está `CONFIRMADA` y su Turno ya terminó
+   * (`ReservasService.marcarNoShow`); `204` sin cuerpo al completarse, igual que las bajas
+   * de `gestion-salon`. Sin throttling propio: usa el límite global de la app, a diferencia
+   * de `listar` (que sí necesita uno más alto por ser un panel que pagina y filtra).
+   *
+   * `operationId` fijado explícito como `ReservasController_marcarNoShow` (en vez del
+   * `ReservasAdminController_marcarNoShow` que generaría Swagger por default): mismo
+   * criterio que ya usa `listar` para `ReservasController_listar` — la división en dos
+   * controllers es un detalle de implementación de NestJS, no del contrato.
+   */
+  @ApiOperation({
+    operationId: 'ReservasController_marcarNoShow',
+    summary: 'Marcar una reserva como ausente (NO_SHOW)',
+    description:
+      'Transiciona una reserva CONFIRMADA a NO_SHOW. Rechaza con 409 si la reserva no está CONFIRMADA o si su turno todavía no terminó (el instante exacto de fin también se rechaza). Requiere un JWT de rol ADMIN.',
+  })
+  @ApiNoContentResponse({
+    description: 'Reserva marcada NO_SHOW; respuesta sin cuerpo.',
+  })
+  @ApiBadRequestResponse({
+    type: ErrorRespuesta,
+    description: 'El identificador de la reserva no es un UUID válido.',
+  })
+  @ApiUnauthorizedResponse({
+    type: ErrorRespuesta,
+    description: 'Token ausente, inválido o expirado.',
+  })
+  @ApiForbiddenResponse({
+    type: ErrorRespuesta,
+    description: 'Token válido sin rol ADMIN.',
+  })
+  @ApiNotFoundResponse({
+    type: ErrorRespuesta,
+    description: 'La reserva indicada no existe.',
+  })
+  @ApiConflictResponse({
+    type: ErrorRespuesta,
+    description:
+      'La reserva no está CONFIRMADA, o su turno todavía no terminó.',
+  })
+  @Patch(':id/no-show')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async marcarNoShow(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    await this.reservasService.marcarNoShow(id);
   }
 }
