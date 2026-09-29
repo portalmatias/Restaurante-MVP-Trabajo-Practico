@@ -19,9 +19,8 @@ Estado del que se parte (`main` al 2026-09-21):
   de 60 s y 10 solicitudes) y `ThrottlerGuard` como `APP_GUARD` global. Un guard global corre
   antes que los guards de ruta y que los pipes: el `429` llega antes de validar el body y
   antes de tocar la base. `POST /auth/login` lo sobreescribe con un `@Throttle()` propio.
-- `AuthModule` (`JwtAuthGuard`, `RolesGuard`, decorador `@Roles`) está mergeado (#25) pero
-  **no registrado en `AppModule`** hasta que se integre el PR de registro del módulo.
-  `POST /reservas` y la cancelación pública no llevan guard; las rutas de admin se protegen
+- `AuthModule` (`JwtAuthGuard`, `RolesGuard`, decorador `@Roles`) está mergeado (#25) y
+  registrado en `AppModule` desde #33. `POST /reservas` y la cancelación pública no llevan guard; las rutas de admin se protegen
   por ruta con `JwtAuthGuard` + `RolesGuard`, no con un guard global (`reservas-crear`).
 - `main.ts` en `main` construye el `ValidationPipe` global con `whitelist` y
   `forbidNonWhitelisted`, **sin** `transform`. La rama de `disponibilidad` lo construye con
@@ -78,38 +77,55 @@ cancelación. Se descarta porque el par código + email es la credencial complet
 en el body lo trata como una unidad. La ruta no choca con `POST /reservas` ni con
 `POST /reservas/:codigo/cancelar` porque tienen distinta cantidad de segmentos.
 
-### D2: Comparación sin distinguir mayúsculas, en una sola consulta
+### D2: Comparación sin distinguir mayúsculas, en la aplicación y con un solo camino de fallo
 
 **Decisión:** el service normaliza el código con `toUpperCase()` (el alfabeto de
-`reservas-crear` y el del seed son solo mayúsculas, así que sigue usando el índice único) y
-compara el email sin distinguir mayúsculas con Prisma (`mode: 'insensitive'`), en **una sola**
-consulta con ambos criterios:
+`reservas-crear` y el del seed son solo mayúsculas, así que la búsqueda usa el índice único)
+y lee la Reserva por ese índice trayendo solo `id` y `emailCliente`. Compara el email **en
+la aplicación**, con `toLowerCase()` de los dos lados, como texto literal: ningún carácter
+del email funciona como comodín. Recién cuando coinciden el código y el email lee la Reserva
+completa, con su `turno` y `mesa.zona`.
 
 ```
-prisma.reserva.findFirst({
-  where: { codigoReserva: codigo.toUpperCase(), emailCliente: { equals: email, mode: 'insensitive' } },
-  include: { turno: true, mesa: { include: { zona: true } } },
-})
+candidata = findUnique({ where: { codigoReserva: codigo.toUpperCase() },
+                         select: { id, emailCliente } })
+si !candidata o !emailsIguales(candidata.emailCliente, email)  ->  null
+findUnique({ where: { id: candidata.id }, include: { turno, mesa: { include: { zona } } } })
 ```
 
-Con una sola consulta, "código inexistente" y "email incorrecto" son el mismo camino de
-código: ambos devuelven `null` de la misma sentencia, sin una rama que compare el email solo
-cuando el código existe. Así no hay diferencia de tiempo atribuible a la lógica de la
+"Código inexistente" y "email incorrecto" siguen el mismo camino: una sola lectura por el
+índice único, sin relaciones, y `null`. Como las relaciones se leen después de comparar, las
+dos fallas cuestan lo mismo y no hay una diferencia de tiempo atribuible a la lógica de la
 aplicación (`auth-admin` tuvo observaciones de revisión por diferencias de tiempo al validar
 credenciales).
+
+**Corrección del 2026-09-21, durante la implementación:** la primera versión de este
+documento comparaba el email dentro de la consulta con `mode: 'insensitive'`, en una sola
+sentencia. El test de integración contra PostgreSQL real mostró que Prisma traduce eso a un
+`ILIKE` sin escapar: la consulta con el email `%@example.com` **encontró la Reserva de otro
+cliente**, y un `_` en la consulta reemplazaba a cualquier carácter. Es decir, quien conoce
+un código podía saltear el email, el segundo factor de `config.yaml` §5. Con esa
+implementación fallan exactamente los dos tests de comodín (`%` y `_`), y con la actual
+pasan; por eso el escenario "Caracteres de patrón en el email no funcionan como comodín"
+está en la spec. Se aplicó el plan B que este diseño ya tenía previsto.
 
 El email **se sigue guardando tal cual** llegó: este change no toca `reservas-crear` ni migra
 datos. Esto cierra las dos Open Questions de `reservas-crear` y define lo que
 `cancelacion-turnos` debe usar. No hace `trim` del email: `@IsEmail()` rechaza los espacios
 con `400`, y el frontend es quien recorta.
 
+**Alternativa considerada:** comparar en la consulta con `mode: 'insensitive'` (el diseño
+original). Se descarta por el `ILIKE` sin escapar descrito arriba.
+**Alternativa considerada:** escapar `%`, `_` y `\` del email antes de pasarlo a
+`mode: 'insensitive'`. Se descarta: depende de un detalle interno de Prisma. Si una versión
+futura usara `LOWER(...) =`, el escape rompería la coincidencia legítima de los emails que
+tengan esos caracteres.
+**Alternativa considerada:** `$queryRaw` con `lower(email) = lower($1)`. Se descarta: suma SQL
+escrito a mano en un service que hoy no tiene ninguno, para algo que se resuelve en tres
+líneas de TypeScript con la misma garantía.
 **Alternativa considerada:** guardar el email en minúsculas al crear y comparar por igualdad
 exacta. Sería más simple, pero obliga a tocar `reservas-crear` y a migrar reservas
 existentes, y cambia lo que el cliente ve guardado. Se descarta para este MVP.
-**Alternativa considerada:** `findUnique` por código y comparar `email.toLowerCase()` en la
-aplicación. Es el plan B si `mode: 'insensitive'` no se comporta como texto literal (ver
-Riesgos). Tiene la desventaja de dos ramas (código inexistente vs. email incorrecto), que
-habría que igualar con una comparación ficticia.
 **Alternativa considerada:** exigir el código exacto (con mayúsculas). Se descarta: un
 cliente que copia el código de un mensaje y lo tipea en minúsculas no debería recibir un
 `404` que además no le explica por qué.
@@ -117,7 +133,7 @@ cliente que copia el código de un mensaje y lo tipea en minúsculas no debería
 ### D3: Un único punto de búsqueda, compartido con `cancelacion-turnos`
 
 **Decisión:** `ReservasService.buscarPorCodigoYEmail(codigo, email, db = this.prisma)` ejecuta
-la consulta de D2 y devuelve la Reserva con su turno y su mesa/zona, o `null`. Acepta un
+la búsqueda de D2 y devuelve la Reserva con su turno y su mesa/zona, o `null`. Acepta un
 cliente de Prisma o una transacción como tercer parámetro para que `cancelacion-turnos`
 pueda usarla dentro de su propia transacción. El `404` lo arma un helper exportado que usa
 un texto fijo ("No se encontró una reserva con ese código y email"), de modo que consulta y
@@ -175,8 +191,26 @@ protección que el espacio de códigos no necesite.
 
 ### D6: Listado de admin: `GET /admin/reservas`
 
-Método `listar` de `ReservasController` (`operationId` `ReservasController_listar`), con
-`@UseGuards(JwtAuthGuard, RolesGuard)` y `@Roles(RolUsuario.ADMIN)` por ruta.
+Método `listar` de un controller nuevo, `ReservasAdminController` (`@Controller('admin/reservas')`,
+mismo `ReservasService` inyectado), con `operationId` fijado explícito como
+`ReservasController_listar` y `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(RolUsuario.ADMIN)`
+a nivel de clase.
+
+**Corrección del 2026-09-28, durante la implementación:** la versión original de este
+documento ponía `listar` dentro de `ReservasController` (`@Controller('reservas')`), la
+misma clase que expone `POST /reservas` y `POST /reservas/consultar`. Es **técnicamente
+imposible**: el prefijo de `@Controller()` se aplica a toda la clase, y ningún decorador de
+método puede hacer que una ruta de esa clase ignore ese prefijo. Un `@Get()` dentro de
+`ReservasController` nunca puede resolver a `/admin/reservas`; como máximo resuelve a
+`/reservas/admin/reservas`. No lo detectó la revisión de la spec porque nadie lo ejecutó
+contra una app real hasta este punto. Se corrige con un controller separado
+(`ReservasAdminController`): la primera versión de este documento ya había evaluado esa
+opción como alternativa de estilo y la había descartado por preferir un único controller;
+ese descarte queda sin efecto, porque dejó de ser una preferencia y pasó a ser un requisito
+técnico. El mismo problema le aplica a cualquier otro change que planee agregar una ruta
+bajo `/admin/reservas/...` desde `ReservasController` (`cancelacion-turnos` con
+`PATCH /admin/reservas/:id/no-show`, `reserva-vip` con `.../confirmar` y `.../rechazar`):
+las tres tienen que vivir en `ReservasAdminController`, no en `ReservasController`.
 
 **Filtros** (todos opcionales, se combinan con AND): `fecha` (`YYYY-MM-DD`), `estado`
 (`PENDIENTE|CONFIRMADA|CANCELADA|NO_SHOW`), `zonaId` (UUID, se traduce a `mesa: { zonaId }`
@@ -211,10 +245,6 @@ Questions): el caso de `reserva-vip` se resuelve con `estado` sin fecha, y el de
 día con `fecha`.
 **Alternativa considerada:** `GET /admin/reservas/:id` para el detalle. Se deja afuera: el
 listado ya incluye todo el contenido y ningún change lo pide.
-**Alternativa considerada:** un `ReservasAdminController` separado con los guards a nivel de
-clase. Se descarta por ahora para mantener las operaciones de `Reservas` en un solo
-controller, como ya hace `cancelacion-turnos` con su ruta `PATCH /admin/reservas/:id/no-show`.
-
 ### D7: Rate limiting del listado de admin
 
 El límite global (10 solicitudes por 60 s por IP) es demasiado bajo para un panel con
@@ -715,6 +745,29 @@ los mismos códigos, descripciones y esquemas.
 
 ## Risks / Trade-offs
 
+- **[Riesgo, cerrado]** La primera versión de D6 ponía `GET /admin/reservas` dentro de
+  `ReservasController` (`@Controller('reservas')`). El prefijo de `@Controller()` se aplica
+  a toda la clase; ningún método puede hacer que su ruta lo ignore. Se detectó al escribir
+  el código, no en la revisión de la spec → **Resolución:** `listar` pasó a un controller
+  nuevo, `ReservasAdminController` (`@Controller('admin/reservas')`), con el mismo
+  `operationId` fijado a mano para no cambiar el contrato ya publicado. El mismo problema le
+  va a aparecer a `cancelacion-turnos` (`PATCH /admin/reservas/:id/no-show`) y a
+  `reserva-vip` (`.../confirmar`, `.../rechazar`) si sus diseños asumen lo mismo: las tres
+  rutas tienen que ir en `ReservasAdminController`.
+- **[Riesgo, cerrado]** `ReservasModule` no importaba `AuthModule`. Contra la `AppModule`
+  real, `JwtAuthGuard`/`RolesGuard` igual funcionaban (Passport registra la estrategia
+  `'jwt'` en un registro global propio, no en el contenedor de DI de Nest, y `AuthModule` ya
+  se instancia ahí para `/auth/login`), así que la prueba manual de D8 no lo detectó. Cubic sí
+  lo marcó, en la revisión del PR de implementación → **Resolución:** se agregó `AuthModule`
+  a los imports de `ReservasModule`, igual que ya hacen `zonas.module.ts`/`mesas.module.ts`/
+  `horarios.module.ts` (mismo comentario, mismo motivo). Reproducido antes del fix con un
+  test que arma `ReservasModule` aislado de `AppModule`: sin `AuthModule`, `GET
+  /admin/reservas` sin token daba `500` ("Unknown authentication strategy jwt") en vez de
+  `401`. Ese import además hizo falta agregar `ConfigModule.forRoot({ isGlobal: true })` a
+  los módulos de test que ya armaban `ReservasModule` aislado (`JwtStrategy`, que trae
+  `AuthModule`, necesita `ConfigService`) — afectó también a
+  `reservas-invariantes.integration-spec.ts` y `reservas-concurrencia.integration-spec.ts`,
+  de `reservas-crear`, no solo a los tests de este change.
 - **[Riesgo]** El `ValidationPipe` global de `main` (`whitelist` + `forbidNonWhitelisted`, sin
   `transform`) y el de la rama de `disponibilidad` (`transform: true`, sin `whitelist`) son
   incompatibles entre sí. Este change necesita **las dos**: `transform: true` para que
@@ -723,13 +776,14 @@ los mismos códigos, descripciones y esquemas.
   si falta alguna, la agrega con su test en este PR. Conviene avisarle a quien implementa
   `disponibilidad` y a `reservas-crear`, porque el pipe es global y cambia el comportamiento
   de sus DTOs.
-- **[Riesgo]** No está confirmado cómo traduce Prisma `mode: 'insensitive'` sobre `equals`
-  en PostgreSQL. Si genera un `ILIKE` sin escapar, un `_` o un `%` del email funcionaría
-  como comodín y `%@example.com` encontraría Reservas ajenas → **Mitigación:** un test de
-  integración contra PostgreSQL real que consulta con `anaXperez@example.com` y
-  `%@example.com` sobre una Reserva de `ana_perez@example.com`; es la razón por la que ese
-  escenario está en la spec. Si falla, se pasa al plan B de D2 (`findUnique` y comparación en
-  la aplicación).
+- **[Riesgo, cerrado]** Prisma traduce `mode: 'insensitive'` sobre `equals` a un `ILIKE` sin
+  escapar, así que un `%` o un `_` del email funcionaba como comodín (comprobado el
+  2026-09-21 contra PostgreSQL real: `%@example.com` encontró una Reserva ajena) →
+  **Resolución:** se aplicó el plan B de D2 (comparación en la aplicación). Los tests de
+  integración que consultan con `ana_perez.<sufijo>@example.com` y con `%@example.com`
+  sobre una Reserva de `ana.perez.<sufijo>@example.com` fallan con la implementación
+  anterior y pasan con la actual; quedan como red de seguridad ante un cambio futuro de la
+  búsqueda.
 - **[Riesgo]** La consulta pública devuelve el estado a cualquiera que tenga código + email.
   Eso es lo que pide §5, pero un email conocido reduce el secreto al código de 8 caracteres
   → **Mitigación:** ~2^40 combinaciones por Reserva y el límite de D5; no se agrega un

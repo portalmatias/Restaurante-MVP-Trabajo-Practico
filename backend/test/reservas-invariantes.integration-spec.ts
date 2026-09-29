@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { DiaSemana } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -151,7 +152,14 @@ describe('ReservasService — invariantes de negocio (integración)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, ReservasModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        ReservasModule,
+      ],
     }).compile();
 
     prisma = moduleRef.get(PrismaService);
