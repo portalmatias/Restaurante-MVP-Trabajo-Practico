@@ -43,8 +43,9 @@
       único punto de escritura de estado. Verificar con tests unitarios de cada rechazo y del
       caso exitoso, incluyendo el turno de cena (20:00–23:30 local) que cruza medianoche en
       UTC; correr la suite con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
-- [ ] 3.2 Implementar `PATCH /admin/reservas/:id/no-show` en `ReservasController`, protegido
-      por `JwtAuthGuard` + `RolesGuard(ADMIN)`. Verificar con Supertest.
+- [ ] 3.2 Implementar `PATCH /admin/reservas/:id/no-show` en `ReservasAdminController` (no en
+      `ReservasController`: su prefijo `/reservas` no puede resolver una ruta `/admin/...`, ver
+      `design.md`), protegido por `JwtAuthGuard` + `RolesGuard(ADMIN)`. Verificar con Supertest.
 
 ## 4. Tests de los requisitos de la spec
 
