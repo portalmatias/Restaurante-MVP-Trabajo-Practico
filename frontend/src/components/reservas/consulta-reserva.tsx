@@ -33,6 +33,17 @@ const ETIQUETA_POR_ESTADO: Record<Estado, string> = {
   NO_SHOW: "No se presentó",
 };
 
+// Las utilidades de fecha lanzan ante un valor inválido (falla ruidosa a propósito); en la
+// vista, un valor inesperado de una respuesta 200 no debe tirar toda la pantalla: se muestra
+// tal cual llegó.
+function formatearSinRomper(formatear: (valor: string) => string, valor: string): string {
+  try {
+    return formatear(valor);
+  } catch {
+    return valor;
+  }
+}
+
 function errorDeCodigo(codigo: string): string | undefined {
   if (codigo === "") return "Falta ingresar el código de tu reserva.";
   if (!esCodigoReservaValido(codigo)) return "El código tiene 8 caracteres, entre letras y números.";
@@ -212,7 +223,7 @@ function DetalleReserva({
           <dt className="text-muted-foreground">Código</dt>
           <dd className="font-bold tracking-widest text-accent">{reserva.codigoReserva}</dd>
           <dt className="text-muted-foreground">Fecha</dt>
-          <dd>{formatearFechaLargaEs(reserva.fecha)}</dd>
+          <dd>{formatearSinRomper(formatearFechaLargaEs, reserva.fecha)}</dd>
           <dt className="text-muted-foreground">Turno</dt>
           {/* La API entrega `HH:mm` ya en hora local del restaurante: se muestra tal cual. */}
           <dd>{`${reserva.turno.horaInicio} a ${reserva.turno.horaFin}`}</dd>

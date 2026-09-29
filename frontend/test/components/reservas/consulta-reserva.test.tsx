@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ConsultaReserva } from "../../../src/components/reservas/consulta-reserva";
 import { apiClient } from "../../../src/lib/api/client";
 
@@ -234,18 +234,23 @@ describe("ConsultaReserva - formulario", () => {
     expect(POST).toHaveBeenCalledTimes(1);
   });
 
-  it("'Reintentar' se deshabilita mientras la nueva consulta está en curso y no la duplica", async () => {
+  it("una doble activación inmediata de 'Reintentar' dispara una sola solicitud", async () => {
     POST.mockRejectedValueOnce(new TypeError("fetch failed"));
     render(<ConsultaReserva />);
     completarFormulario();
     enviar();
     const reintentar = await screen.findByRole("button", { name: "Reintentar" });
+    expect(POST).toHaveBeenCalledTimes(1);
 
     POST.mockReturnValue(new Promise(() => {}));
-    fireEvent.click(reintentar);
-    fireEvent.click(reintentar);
+    // Dentro de un mismo `act` React no refleja todavía el estado: el botón sigue en el DOM y
+    // habilitado en la segunda activación, así que solo la guarda `enCurso` evita el duplicado.
+    act(() => {
+      reintentar.click();
+      reintentar.click();
+    });
 
-    await waitFor(() => expect(POST).toHaveBeenCalledTimes(2));
+    expect(POST).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
   });
 
@@ -329,6 +334,14 @@ describe("ConsultaReserva - detalle", () => {
     await verDetalle({ ...RESERVA, estado });
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(titulo);
+  });
+
+  it("una fecha inválida en la respuesta no rompe el detalle y se muestra tal cual", async () => {
+    await verDetalle({ ...RESERVA, fecha: "2026-02-30" });
+
+    expect(screen.getByText("2026-02-30")).toBeInTheDocument();
+    expect(screen.getByText("20:00 a 23:30")).toBeInTheDocument();
+    expect(screen.getByText("VIP")).toBeInTheDocument();
   });
 
   it("no renderiza nombre, email ni teléfono aunque la API los devuelva", async () => {

@@ -387,3 +387,6 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   con los campos bloqueados y sin reentradas, una respuesta pisada solo puede ocurrir si el
   componente se desmonta a mitad de la consulta, caso en que se descarta. La página usa
   `key={codigoInicial}` para reiniciar el formulario al navegar entre `?codigo=` distintos.
+- El detalle de `ConsultaReserva` formatea la fecha con un envoltorio local que, si la utilidad
+  lanza (fecha inesperada en un `200`), muestra el valor tal cual llegó en vez de romper la
+  pantalla. Las utilidades de `fecha-hora.ts` siguen lanzando.
