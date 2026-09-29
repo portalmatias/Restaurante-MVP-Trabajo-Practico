@@ -203,10 +203,12 @@ imposible**: el prefijo de `@Controller()` se aplica a toda la clase, y ningún 
 método puede hacer que una ruta de esa clase ignore ese prefijo. Un `@Get()` dentro de
 `ReservasController` nunca puede resolver a `/admin/reservas`; como máximo resuelve a
 `/reservas/admin/reservas`. No lo detectó la revisión de la spec porque nadie lo ejecutó
-contra una app real hasta este punto. Se corrige con el controller separado que la
-alternativa de abajo ya consideraba, y que ahora deja de ser una preferencia de estilo para
-ser un requisito. El mismo problema le aplica a cualquier otro change que planee agregar
-una ruta bajo `/admin/reservas/...` desde `ReservasController` (`cancelacion-turnos` con
+contra una app real hasta este punto. Se corrige con un controller separado
+(`ReservasAdminController`): la primera versión de este documento ya había evaluado esa
+opción como alternativa de estilo y la había descartado por preferir un único controller;
+ese descarte queda sin efecto, porque dejó de ser una preferencia y pasó a ser un requisito
+técnico. El mismo problema le aplica a cualquier otro change que planee agregar una ruta
+bajo `/admin/reservas/...` desde `ReservasController` (`cancelacion-turnos` con
 `PATCH /admin/reservas/:id/no-show`, `reserva-vip` con `.../confirmar` y `.../rechazar`):
 las tres tienen que vivir en `ReservasAdminController`, no en `ReservasController`.
 
@@ -752,6 +754,20 @@ los mismos códigos, descripciones y esquemas.
   va a aparecer a `cancelacion-turnos` (`PATCH /admin/reservas/:id/no-show`) y a
   `reserva-vip` (`.../confirmar`, `.../rechazar`) si sus diseños asumen lo mismo: las tres
   rutas tienen que ir en `ReservasAdminController`.
+- **[Riesgo, cerrado]** `ReservasModule` no importaba `AuthModule`. Contra la `AppModule`
+  real, `JwtAuthGuard`/`RolesGuard` igual funcionaban (Passport registra la estrategia
+  `'jwt'` en un registro global propio, no en el contenedor de DI de Nest, y `AuthModule` ya
+  se instancia ahí para `/auth/login`), así que la prueba manual de D8 no lo detectó. Cubic sí
+  lo marcó, en la revisión del PR de implementación → **Resolución:** se agregó `AuthModule`
+  a los imports de `ReservasModule`, igual que ya hacen `zonas.module.ts`/`mesas.module.ts`/
+  `horarios.module.ts` (mismo comentario, mismo motivo). Reproducido antes del fix con un
+  test que arma `ReservasModule` aislado de `AppModule`: sin `AuthModule`, `GET
+  /admin/reservas` sin token daba `500` ("Unknown authentication strategy jwt") en vez de
+  `401`. Ese import además hizo falta agregar `ConfigModule.forRoot({ isGlobal: true })` a
+  los módulos de test que ya armaban `ReservasModule` aislado (`JwtStrategy`, que trae
+  `AuthModule`, necesita `ConfigService`) — afectó también a
+  `reservas-invariantes.integration-spec.ts` y `reservas-concurrencia.integration-spec.ts`,
+  de `reservas-crear`, no solo a los tests de este change.
 - **[Riesgo]** El `ValidationPipe` global de `main` (`whitelist` + `forbidNonWhitelisted`, sin
   `transform`) y el de la rama de `disponibilidad` (`transform: true`, sin `whitelist`) son
   incompatibles entre sí. Este change necesita **las dos**: `transform: true` para que

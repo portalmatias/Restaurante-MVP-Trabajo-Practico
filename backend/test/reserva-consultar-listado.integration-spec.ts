@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { DiaSemana, EstadoReserva } from '@prisma/client';
 
@@ -76,7 +77,14 @@ describe('ReservasService.listar (integración)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, ReservasModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        ReservasModule,
+      ],
     }).compile();
     prisma = moduleRef.get(PrismaService);
     service = moduleRef.get(ReservasService);

@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { DiaSemana } from '@prisma/client';
 
@@ -169,7 +170,14 @@ describe('ReservasService — concurrencia (integración)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, ReservasModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        ReservasModule,
+      ],
     }).compile();
 
     prisma = moduleRef.get(PrismaService);

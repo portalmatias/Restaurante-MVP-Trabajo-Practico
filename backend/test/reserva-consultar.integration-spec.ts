@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 
 import { NotFoundException } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { DiaSemana, EstadoReserva } from '@prisma/client';
 
@@ -94,7 +95,14 @@ describe('ReservasService — búsqueda y consulta por código y email (integrac
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [PrismaModule, ReservasModule],
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        ReservasModule,
+      ],
     }).compile();
     prisma = moduleRef.get(PrismaService);
     service = moduleRef.get(ReservasService);
