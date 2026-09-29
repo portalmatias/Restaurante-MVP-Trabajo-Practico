@@ -99,11 +99,11 @@
       indicación accesible) y tres puntos decorativos con `aria-hidden`, el segundo con el
       estilo de actual. Verificar rojo y luego
       verde con `npm test -w frontend -- pasos-reserva`.
-- [ ] 3.6 (movida al slice de consultar: el enlace apuntaría a una página que todavía no existe) Escribir el test de `SiteHeader` verificando que, además del enlace a `/reservas` ya
+- [x] 3.6 (hecha en el slice de consultar, cuando la página ya existe) Escribir el test de `SiteHeader` verificando que, además del enlace a `/reservas` ya
       existente, hay un enlace a `/reservas/consultar` con nombre accesible "Consultar
       reserva", y que ningún enlace apunta a `/admin` (spec "Sin enlaces a la
       administración"). Verificar que falla (rojo) por el enlace nuevo.
-- [ ] 3.7 (movida al slice de consultar, junto con 3.6) Agregar el enlace a `SiteHeader` (D6), reusando `navLinkClassName`. Verificar que 3.6
+- [x] 3.7 (hecha en el slice de consultar, junto con 3.6) Agregar el enlace a `SiteHeader` (D6), reusando `navLinkClassName`. Verificar que 3.6
       pasa.
 - [x] 3.8 Revisar `frontend/test/lib/api/errors.test.ts` y `client.test.ts` de `frontend-base`:
       si algún test fija el texto exacto de un mensaje genérico, actualizarlo al texto en
@@ -360,10 +360,9 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   versionado. No apareció ningún diff ajeno a esos contratos.
 - El `turno` de `POST /reservas/consultar` trae `horaInicio`/`horaFin` como `HH:mm` (hora local
   ya formateada por el backend), no como ISO `1970-01-01T...` como `GET /turnos` (D2). El
-  detalle los muestra tal cual y no usa `formatearHoraTurno`. Consecuencia para 6.3: cuando
-  `puedeCancelarSegunVentana` se conecte al detalle, hay que pasarle el inicio en el formato que
-  reciba; hoy espera el ISO de `GET /turnos`, así que habrá que aceptar también `HH:mm` o
-  convertir antes de llamarla.
+  detalle los muestra tal cual y no usa `formatearHoraTurno`. Para 6.3, `puedeCancelarSegunVentana`
+  ya acepta `HH:mm` además del ISO de `GET /turnos`, así que se le puede pasar `turno.horaInicio`
+  sin convertir.
 - `POST /reservas/consultar` responde `429` sin cuerpo y `mapErrorApi` lo dejaba como el mensaje
   genérico "Ocurrió un error inesperado.". Se agregó a `errors.ts` (aditivo, sin renombrar nada)
   el caso `limite-de-intentos` con el mensaje "Hiciste demasiados intentos. Esperá unos minutos
