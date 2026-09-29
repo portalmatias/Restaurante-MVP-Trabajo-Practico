@@ -84,6 +84,7 @@ describe('ZonasService', () => {
           ventanaCancelacionHoras: true,
           requiereConfirmacionAdmin: true,
         },
+        orderBy: { nombre: 'asc' },
       });
     });
   });

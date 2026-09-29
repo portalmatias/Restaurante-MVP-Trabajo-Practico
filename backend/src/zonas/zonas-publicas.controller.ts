@@ -25,7 +25,7 @@ export class ZonasPublicasController {
   @ApiOperation({
     summary: 'Catálogo público de Zonas',
     description:
-      'Lista todas las Zonas con los campos no sensibles que necesita el formulario de reserva del cliente. No incluye `aforoMaximo` ni las Mesas de la zona. Es una ruta pública, sin autenticación.',
+      'Lista todas las Zonas con los campos no sensibles que necesita el formulario de reserva del cliente, ordenadas por nombre (`STANDARD` antes que `VIP`). No incluye `aforoMaximo` ni las Mesas de la zona. Es una ruta pública, sin autenticación.',
   })
   @ApiOkResponse({
     description: 'Listado de Zonas. Una lista vacía responde `200`, no `404`.',

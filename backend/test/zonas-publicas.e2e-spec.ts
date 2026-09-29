@@ -120,6 +120,15 @@ describe('GET /zonas (e2e)', () => {
     expect(nombres).toEqual(expect.arrayContaining(['STANDARD', 'VIP']));
   });
 
+  it('ordena las Zonas de forma determinística: STANDARD antes que VIP', async () => {
+    const res = await request(app.getHttpServer()).get('/zonas').expect(200);
+
+    const nombres = (res.body as Array<{ nombre: string }>).map(
+      (z) => z.nombre,
+    );
+    expect(nombres).toEqual(['STANDARD', 'VIP']);
+  });
+
   it('ningún elemento expone aforoMaximo ni mesas', async () => {
     const res = await request(app.getHttpServer()).get('/zonas').expect(200);
 

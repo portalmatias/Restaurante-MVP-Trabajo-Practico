@@ -943,8 +943,8 @@ paths:
       summary: Catálogo público de Zonas
       description: >-
         Lista todas las Zonas con los campos no sensibles que necesita el formulario de
-        reserva del cliente. No incluye `aforoMaximo` ni las Mesas de la zona. Es una ruta
-        pública, sin autenticación.
+        reserva del cliente, ordenadas por nombre (`STANDARD` antes que `VIP`). No incluye
+        `aforoMaximo` ni las Mesas de la zona. Es una ruta pública, sin autenticación.
       operationId: ZonasPublicasController_listar
       tags:
         - zonas

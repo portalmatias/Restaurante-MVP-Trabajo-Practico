@@ -28,7 +28,8 @@ export class ZonasService {
   /**
    * Catálogo público (change `catalogo-publico`, D2): `select` explícito, o sea una lista
    * de campos permitidos. Un campo nuevo de `Zona` no se expone hasta sumarlo acá. No
-   * incluye `aforoMaximo` ni la relación `mesas`.
+   * incluye `aforoMaximo` ni la relación `mesas`. Orden determinístico por `nombre`: Postgres
+   * ordena un enum nativo por posición de declaración, así que `STANDARD` va antes que `VIP`.
    */
   async listarPublicas() {
     return this.prisma.zona.findMany({
@@ -42,6 +43,7 @@ export class ZonasService {
         ventanaCancelacionHoras: true,
         requiereConfirmacionAdmin: true,
       },
+      orderBy: { nombre: 'asc' },
     });
   }
 
