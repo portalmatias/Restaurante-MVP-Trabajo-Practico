@@ -20,7 +20,7 @@ actualizados. Los estados de los PRs deben volver a consultarse antes de integra
 | `modelo-dominio` | FedeWerk | Spec #7 e implementación #12 mergeadas: schema, migraciones, seed, invariantes y helpers horarios. | Verificar DoD antes de archivar; todavía figura como change activo. |
 | `ci-integracion-db` | FedeWerk | Spec #26 e implementación #28 mergeadas (2026-09-21). PostgreSQL corre en el job `test` de `main`: migra, seedea y ejecuta unitarios, e2e e integración. | Cerrado. Verificar DoD antes de archivar. |
 | `auth-admin` | FedeWerk | Spec #9 e implementación #25 mergeadas (2026-09-21). El registro en `AppModule` y el contrato OpenAPI de `/auth/login`, pendientes de ese PR, los completó #33 (`feature/auth-registro-contrato`, mergeado 2026-09-21): `main` ya tiene `AuthModule` importado en `app.module.ts` y `/auth/login` en `openapi/openapi.yaml`. Cerrado. | Verificar DoD antes de archivar. |
-| `disponibilidad` | portalmatias | Specs #19/#21 mergeadas; rama `feature/disponibilidad` con tres commits propios y sin PR abierto. | Revisar y abrir PR de implementación; verificar el validador compartido y el lock que reutilizará creación. |
+| `disponibilidad` | portalmatias | Specs #19/#21 e implementación #36 mergeadas (2026-09-22): `GET /disponibilidad` con el validador compartido, ya reutilizado por `reservas-crear`. Cerrado. | Verificar DoD antes de archivar. |
 | `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. #27 (abierto) agrega los tres controllers y registra `ZonasModule`/`MesasModule`/`HorariosModule` en `AppModule` (ya no bloqueado, con Postgres en CI) y su contrato OpenAPI. **Nota de coordinación:** #27 y #33 tocaron el registro de `AuthModule` en paralelo sin saberlo — #33 mergeó primero; #27 se rebaseó sobre `main` después y no duplica ese trabajo, solo agrega sus propios módulos. | Obtener revisión de #27 y mergear. |
 | `reservas-crear` | portalmatias | Spec #22 e implementación #40 mergeadas (2026-09-28): `POST /reservas` sobre el validador compartido de `disponibilidad`. Cerrado. | Verificar DoD antes de archivar. |
 | `reserva-consultar` | FedeWerk | Spec #32 mergeada (2026-09-21): define `POST /reservas/consultar` (código + email en el body, no `GET`, para no exponer el email en la URL ni en logs de acceso) y `GET /admin/reservas`. Implementación completa en #35 (2026-09-28, tras el merge de `reservas-crear` #40): controller, listado de admin y contrato OpenAPI, con `GET /admin/reservas` en un `ReservasAdminController` propio (`/admin/reservas` no puede vivir dentro de `ReservasController`, que ya tiene el prefijo `/reservas` — ver design.md). | Obtener revisión de #35 y mergear. |
@@ -56,11 +56,14 @@ Quedan abiertos: [#27 — controllers y contrato de `gestion-salon`](https://git
 3. ~~**Fede:** atender pendientes de #25 y probar auth contra PostgreSQL en CI.~~
    **Cerrado el 2026-09-21:** #25 mergeado. El registro en `AppModule` y el contrato
    OpenAPI de `/auth/login`, que quedaban pendientes de ese PR, los completó #33.
-4. **Matías:** abrir/revisar disponibilidad y después implementar `reservas-crear`.
-5. **Facundo:** implementar cancelación y VIP en cuanto #27 mergee y se cumplan sus
-   prerrequisitos (`reservas-crear`). Mientras tanto, revisar disponibilidad, preparar
-   matrices de pruebas y mantener documentación; modificar PRs ajenos solo con
-   autorización del responsable, como se acordó para #28.
+4. ~~**Matías:** abrir/revisar disponibilidad y después implementar `reservas-crear`.~~
+   **Cerrado el 2026-09-28:** #36 (disponibilidad) y #40 (`reservas-crear`) mergeados.
+5. **Facundo:** implementar cancelación y VIP. Ya no bloqueado: #27 (salón) mergeó el
+   2026-09-22 y `reservas-crear` (#40) mergeó el 2026-09-28. Reutilizar
+   `ReservasService.buscarPorCodigoYEmail` (de `reserva-consultar`, #35) y sumar las rutas
+   de admin a `ReservasAdminController`, no a `ReservasController` (ver design.md de
+   `reserva-consultar`, D6). Modificar PRs ajenos solo con autorización del responsable,
+   como se acordó para #28.
 
 ### Fundación y protección de main
 
@@ -420,17 +423,18 @@ Fase 6  entrega-final (facundo)
 
 ## 12. Riesgos
 
-- **Cuello de botella actual:** revisión y merge de #27 (controllers de `gestion-salon`,
-  registro de sus propios módulos en `AppModule` y su contrato OpenAPI); disponibilidad y
-  creación para implementar cancelación/VIP. Fundación, modelo, auth (login y su registro
-  en `AppModule`, completados por #25/#33) y PostgreSQL en CI ya están mergeados. Avanzar
-  revisiones, specs y preparación de pruebas sin saltar prerrequisitos.
+- **Cuello de botella actual:** revisión y merge de #35 (`reserva-consultar`, ya
+  implementado: consulta pública y listado de admin). Fundación, modelo, auth, PostgreSQL
+  en CI, salón (#27), disponibilidad (#36) y `reservas-crear` (#40) ya están mergeados —
+  `cancelacion-turnos` y `reserva-vip` ya no tienen prerrequisitos pendientes y pueden
+  arrancar su implementación. Avanzar revisiones, specs y preparación de pruebas sin
+  saltar prerrequisitos.
 - **Librerías nuevas que §2 obliga a justificar en su `design.md`:** el linter de OpenAPI y la CLI
   de OpenSpec en CI (Fase 1), y el generador de tipos desde OpenAPI (Fase 5). `@nestjs/jwt`,
   Passport, bcrypt y `@nestjs/throttler` ya están avaladas por §5.
-- **Contrato OpenAPI:** resuelto como contract-first en §2/§3 de la constitución. Sigue
-  pendiente integrar y verificar el fix de normalización de enums que está en la rama de
-  disponibilidad, no en `main`.
+- **Contrato OpenAPI:** resuelto como contract-first en §2/§3 de la constitución. El fix de
+  normalización de enums (`JSON.parse(JSON.stringify(...))` en `scripts/openapi-check.mjs`
+  antes de comparar) mergeó con `disponibilidad` (#36) y ya está en `main`.
 - ~~**La cobertura de CI crece en dos etapas.** Entre la Fase 1 y `ci-integracion-db` (§6.1), CI
   corre lint, tipos y unitarios, pero **no** tests contra base real. Es una ventana corta y
   deliberada; el riesgo es olvidarse de cerrarla y dejar los e2e de §9 fuera del pipeline.~~
