@@ -2,8 +2,11 @@ import type { ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "destructive" | "ghost";
 
+export type ButtonSize = "md" | "lg";
+
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
+  size?: ButtonSize;
 };
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -15,8 +18,18 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost: "text-foreground hover:bg-muted",
 };
 
+// El tamaño va en una tabla (no en las clases base) para que dos utilidades de Tailwind sobre
+// la misma propiedad (`text-sm`/`text-lg`, `min-h-11`/`min-h-14`) nunca convivan en el mismo
+// elemento: el orden en el atributo `class` no decide cuál gana.
+const sizeClasses: Record<ButtonSize, string> = {
+  md: "min-h-11 text-sm",
+  lg: "min-h-14 text-lg",
+};
+
 export type ButtonVariantsOptions = {
   variant?: ButtonVariant;
+  /** `md` (default, 44px de alto, 14px de texto) o `lg` (56px, 18px) para acciones principales. */
+  size?: ButtonSize;
   className?: string;
   /**
    * `true` (default) da ancho completo en mobile y `sm:w-auto` en pantallas más anchas (D1),
@@ -34,15 +47,17 @@ export type ButtonVariantsOptions = {
  */
 export function buttonVariants({
   variant = "primary",
+  size = "md",
   className,
   fullWidth = true,
 }: ButtonVariantsOptions = {}) {
   return [
-    "inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium",
+    "inline-flex items-center justify-center rounded-md px-4 font-medium",
     "transition-colors duration-200 motion-reduce:transition-none",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     "disabled:cursor-not-allowed disabled:opacity-50",
     fullWidth ? "w-full sm:w-auto" : undefined,
+    sizeClasses[size],
     variantClasses[variant],
     className,
   ]
@@ -57,9 +72,10 @@ export function buttonVariants({
  */
 export function Button({
   variant = "primary",
+  size = "md",
   className,
   type = "button",
   ...props
 }: ButtonProps) {
-  return <button type={type} className={buttonVariants({ variant, className })} {...props} />;
+  return <button type={type} className={buttonVariants({ variant, size, className })} {...props} />;
 }

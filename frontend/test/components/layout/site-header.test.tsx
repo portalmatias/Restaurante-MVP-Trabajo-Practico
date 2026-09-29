@@ -9,6 +9,14 @@ describe("SiteHeader", () => {
     expect(screen.getByRole("link", { name: "Reservas" })).toHaveAttribute("href", "/reservas");
   });
 
+  it("ningún enlace apunta a /admin", () => {
+    render(<SiteHeader />);
+
+    for (const enlace of screen.getAllByRole("link")) {
+      expect(enlace.getAttribute("href")).not.toMatch(/^\/admin/);
+    }
+  });
+
   it("no muestra ningún enlace ni mención a la administración", () => {
     const { container } = render(<SiteHeader />);
 
