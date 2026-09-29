@@ -99,11 +99,11 @@
       indicación accesible) y tres puntos decorativos con `aria-hidden`, el segundo con el
       estilo de actual. Verificar rojo y luego
       verde con `npm test -w frontend -- pasos-reserva`.
-- [x] 3.6 Escribir el test de `SiteHeader` verificando que, además del enlace a `/reservas` ya
+- [ ] 3.6 (movida al slice de consultar: el enlace apuntaría a una página que todavía no existe) Escribir el test de `SiteHeader` verificando que, además del enlace a `/reservas` ya
       existente, hay un enlace a `/reservas/consultar` con nombre accesible "Consultar
       reserva", y que ningún enlace apunta a `/admin` (spec "Sin enlaces a la
       administración"). Verificar que falla (rojo) por el enlace nuevo.
-- [x] 3.7 Agregar el enlace a `SiteHeader` (D6), reusando `navLinkClassName`. Verificar que 3.6
+- [ ] 3.7 (movida al slice de consultar, junto con 3.6) Agregar el enlace a `SiteHeader` (D6), reusando `navLinkClassName`. Verificar que 3.6
       pasa.
 - [x] 3.8 Revisar `frontend/test/lib/api/errors.test.ts` y `client.test.ts` de `frontend-base`:
       si algún test fija el texto exacto de un mensaje genérico, actualizarlo al texto en
@@ -336,12 +336,14 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   asistente de reserva, no una primitiva genérica de `ui/`).
 - `Dialog` es controlado (`open`) y trae sus dos botones (`textoConfirmar`/`textoCancelar`,
   `onConfirm`/`onCancel`, `confirmando` para deshabilitar la confirmación en curso). Escucha
-  solo el evento `cancel` (con `preventDefault`, el cierre lo decide `open`) para que Escape
-  llame a `onCancel` exactamente una vez, aunque el navegador dispare `cancel` y después
-  `close`; el test lo verifica. Si el navegador cierra el diálogo por su cuenta (Chromium dispara
-  un `cancel` no cancelable ante Escape repetido sin interacción), el evento `close`
-  resincroniza: se llama a `onCancel` una vez y un `open=true` posterior lo vuelve a mostrar. El atrapado y la devolución de foco siguen pendientes de la
-  verificación manual 7.2.
+  `cancel` y `close`. Un `cancel` cancelable (Escape) se evita con `preventDefault` y llama a
+  `onCancel` una vez: el cierre lo decide `open` y el navegador no dispara `close` después. Un
+  `cancel` no cancelable (Chromium ante Escape repetido sin interacción del usuario) cierra el
+  diálogo nativo igual: el evento `close` llama a `onCancel` una vez, para que el padre baje
+  `open`, y un `open=true` posterior lo vuelve a mostrar. Los cierres que provoca el propio
+  componente (`open=false`, desmontaje, el ciclo montar/limpiar/montar de React Strict Mode) se
+  marcan con una referencia y `close` los ignora: no llaman a `onCancel`. Los tests lo cubren; el
+  atrapado y la devolución de foco siguen pendientes de la verificación manual 7.2.
 - D7 (voseo): solo cambió el mensaje de 5xx de `errors.ts` ("Intentá de nuevo más tarde.").
   Los mensajes de `mensajeDeRechazo` en `client.ts` son impersonales y no se tocaron, como
   ya preveía D7. Los tres tests de `errors.test.ts` que fijaban el texto exacto se

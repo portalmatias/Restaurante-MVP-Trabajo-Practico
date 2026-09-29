@@ -45,6 +45,10 @@ export function Dialog({
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const tituloId = useId();
+  // Marca los cierres que provoca el propio componente (`open=false`, desmontaje, el ciclo
+  // montar/limpiar/montar de React Strict Mode): no se distinguen de un cierre del navegador
+  // por el evento, y `onClose` no debe tratarlos como un pedido de cancelar.
+  const cierreIntencional = useRef(false);
 
   // Sin lista de dependencias a propósito: compara `open` con el estado nativo en cada render,
   // así un diálogo que el navegador cerró por su cuenta se vuelve a mostrar si `open` sigue en
@@ -55,8 +59,12 @@ export function Dialog({
       return;
     }
     if (open && !dialogo.open) {
+      // Un cierre propio que todavía no entregó su `close` (asíncrono en el navegador) ya no
+      // corresponde: el diálogo se vuelve a abrir.
+      cierreIntencional.current = false;
       dialogo.showModal();
     } else if (!open && dialogo.open) {
+      cierreIntencional.current = true;
       dialogo.close();
     }
   });
@@ -66,6 +74,7 @@ export function Dialog({
     const dialogo = ref.current;
     return () => {
       if (dialogo?.open) {
+        cierreIntencional.current = true;
         dialogo.close();
       }
     };
@@ -84,8 +93,12 @@ export function Dialog({
         }
       }}
       onClose={(evento) => {
-        // Cerrado por el navegador mientras `open` sigue en true. El `close` provocado por
-        // `open=false` o el de un diálogo ya reabierto no llegan acá con `open` y cerrado.
+        // Cerrado por el navegador mientras `open` sigue en true. Los cierres propios se
+        // ignoran (`cierreIntencional`), y un diálogo ya reabierto no está cerrado.
+        if (cierreIntencional.current) {
+          cierreIntencional.current = false;
+          return;
+        }
         if (open && !evento.currentTarget.open) {
           onCancel();
         }
