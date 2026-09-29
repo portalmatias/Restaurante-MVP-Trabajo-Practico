@@ -114,17 +114,31 @@ describe('GET /turnos (e2e)', () => {
 
   it('ordena por día de la semana y, dentro del día, por hora de inicio', async () => {
     // Se crean desordenados a propósito.
+    const domingo = await crearTurno(DiaSemana.DOMINGO, 3, 0);
     const miercoles = await crearTurno(DiaSemana.MIERCOLES, 3, 0);
+    const sabado = await crearTurno(DiaSemana.SABADO, 3, 0);
     const martes0330 = await crearTurno(DiaSemana.MARTES, 3, 30);
     const martes0300 = await crearTurno(DiaSemana.MARTES, 3, 0);
 
     const res = await request(app.getHttpServer()).get('/turnos').expect(200);
 
-    const propios = new Set([miercoles.id, martes0330.id, martes0300.id]);
+    const propios = new Set([
+      domingo.id,
+      miercoles.id,
+      sabado.id,
+      martes0330.id,
+      martes0300.id,
+    ]);
     const idsEnOrden = (res.body as TurnoPublico[])
       .map((t) => t.id)
       .filter((id) => propios.has(id));
-    expect(idsEnOrden).toEqual([martes0300.id, martes0330.id, miercoles.id]);
+    expect(idsEnOrden).toEqual([
+      martes0300.id,
+      martes0330.id,
+      miercoles.id,
+      sabado.id,
+      domingo.id,
+    ]);
   });
 
   it('serializa horaInicio y horaFin como ISO con fecha fija 1970-01-01', async () => {

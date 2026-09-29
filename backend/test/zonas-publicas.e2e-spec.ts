@@ -101,6 +101,10 @@ describe('GET /zonas (e2e)', () => {
           where: { nombre },
           data: { ...original, id: undefined },
         });
+      } else {
+        // La Zona no existía antes de la suite: la creó `fijarValores`, se borra para no
+        // dejar filas en la base de TEST compartida.
+        await prisma.zona.deleteMany({ where: { nombre } });
       }
     }
     await app.close();
