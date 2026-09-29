@@ -311,8 +311,15 @@
   archivo) y reusa `ARGENTINA_OFFSET_MS`, exportada desde `fecha-hora.ts`.
 
 **Observación sobre 2.5:** el caso de `Pacific/Kiritimati` (UTC+14) no puede detectar la falta
-de `timeZone: 'UTC'`: la medianoche UTC leída en UTC+14 sigue siendo el mismo día (14:00). Quien
-sí lo detecta es un huso con offset negativo: al quitar `timeZone: 'UTC'`, la suite falla con
-`TZ=America/Argentina/Buenos_Aires` (2 tests) y pasa con `TZ=UTC` y `TZ=Pacific/Kiritimati`. Se
-verificó con esa mutación temporal; la suite se corrió igual con las tres zonas y además con
-`Pacific/Pago_Pago`.
+de `timeZone: 'UTC'`: la medianoche UTC leída en UTC+14 sigue siendo el mismo día (14:00). Solo
+un huso con offset negativo lo detecta: al quitar `timeZone: 'UTC'`, la suite falla con
+`TZ=America/Argentina/Buenos_Aires` (2 tests) y pasa con `TZ=UTC` y `TZ=Pacific/Kiritimati`. Por
+eso `frontend/jest.config.ts` fija `TZ=America/Argentina/Buenos_Aires` por defecto (solo si el
+entorno no define `TZ`, de modo que 7.5 puede seguir corriendo la suite con `TZ=UTC`). Se
+verificó con la mutación temporal usando `npm run test -w frontend` sin `TZ` en el entorno. Nota:
+hoy `ci.yml` no ejecuta los tests del frontend.
+
+**Desvío de D8 (`agruparPorCampo`):** en vez de `mensaje.startsWith(nombreDeCampo)`, el nombre
+del campo debe ser la primera palabra del mensaje. Así una clave corta como `email` no captura
+los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los mensajes de
+`class-validator` (nombre del campo, espacio, texto) el resultado es el mismo.

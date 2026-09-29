@@ -45,4 +45,25 @@ describe("agruparPorCampo", () => {
       generales: ["comensales debe ser un número entero"],
     });
   });
+
+  it("con claves que se prefijan entre sí, cada mensaje cae en su campo (no gana la primera clave)", () => {
+    const resultado = agruparPorCampo(
+      ["emailCliente debe ser un email válido", "email no debe estar vacío"],
+      { email: "soloEmail", emailCliente: "email" },
+    );
+
+    expect(resultado).toEqual({
+      porCampo: {
+        email: ["emailCliente debe ser un email válido"],
+        soloEmail: ["email no debe estar vacío"],
+      },
+      generales: [],
+    });
+  });
+
+  it("un mensaje cuyo primer término solo comparte prefijo con un campo cae en generales", () => {
+    const resultado = agruparPorCampo(["emailClienteExtra debe ser texto"], CAMPOS);
+
+    expect(resultado).toEqual({ porCampo: {}, generales: ["emailClienteExtra debe ser texto"] });
+  });
 });

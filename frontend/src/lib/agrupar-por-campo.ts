@@ -7,7 +7,7 @@ export type MensajesAgrupados = {
  * Reparte los mensajes de un `400` (`class-validator`, con el nombre del campo del DTO al
  * frente, ej. "emailCliente debe ser un email válido") entre los campos del formulario
  * (design.md D8). `campos` mapea el nombre del campo del DTO a la clave del formulario. Un
- * mensaje que no empieza con ninguno de esos nombres va a `generales`: nunca se pierde.
+ * mensaje cuya primera palabra no es ninguno de esos nombres va a `generales`: nunca se pierde.
  */
 export function agruparPorCampo(
   mensajes: string[],
@@ -18,7 +18,10 @@ export function agruparPorCampo(
   const nombresDto = Object.keys(campos);
 
   for (const mensaje of mensajes) {
-    const nombreDto = nombresDto.find((nombre) => mensaje.startsWith(nombre));
+    // El nombre del campo debe ser la primera palabra del mensaje: `email` no debe robarle
+    // los mensajes a `emailCliente`, ni un campo que solo comparte prefijo.
+    const primeraPalabra = mensaje.split(" ", 1)[0];
+    const nombreDto = nombresDto.find((nombre) => nombre === primeraPalabra);
     if (nombreDto === undefined) {
       generales.push(mensaje);
       continue;

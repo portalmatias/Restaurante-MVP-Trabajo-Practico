@@ -64,9 +64,10 @@ describe("formatearFechaLargaEs", () => {
   });
 
   it("no depende del huso horario del proceso", () => {
-    // La suite se corre con TZ=UTC, TZ=America/Argentina/Buenos_Aires y TZ=Pacific/Kiritimati
-    // (UTC+14, que haría fallar una implementación sin `timeZone: "UTC"` explícito): el
-    // resultado esperado es siempre el mismo.
+    // `jest.config.ts` fija TZ=America/Argentina/Buenos_Aires por defecto: un huso con offset
+    // negativo es el único que detecta la falta de `timeZone: "UTC"` (la medianoche UTC se lee
+    // como el día anterior). Con TZ=UTC o con un offset positivo como Pacific/Kiritimati el
+    // resultado sería el mismo aunque faltara, así que esos husos no prueban nada acá.
     expect(formatearFechaLargaEs("2026-09-19")).toBe("sábado, 19 de septiembre de 2026");
   });
 });
