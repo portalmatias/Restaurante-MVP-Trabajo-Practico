@@ -310,6 +310,11 @@
 - `DiaSemana` no existe todavía en `schema.d.ts` (llega con `catalogo-publico`, PR #51): se
   define como tipo local en `frontend/src/lib/fecha-hora.ts` con los mismos valores del enum
   de Prisma. Al mergear ese PR conviene reemplazarlo por el tipo generado.
+- Las utilidades de `fecha-hora.ts` validan su entrada y lanzan un `Error` claro en vez de dar
+  `NaN` o pasar al mes siguiente: `diaSemanaDeFechaLocal` y `formatearFechaLargaEs` exigen una
+  fecha `YYYY-MM-DD` que exista en el calendario, y `formatearHoraTurno` exige `HH:mm` o el ISO
+  `1970-01-01T...Z` (acepta ambos). El validador de fecha (`leerFechaIso`) y el de hora
+  (`leerHoraLocalMs`) se exportan desde `fecha-hora.ts` y los reusa `ventana-cancelacion.ts`.
 - `puedeCancelarSegunVentana` vive en `frontend/src/lib/ventana-cancelacion.ts` (D9 no fija
   archivo) y reusa `ARGENTINA_OFFSET_MS`, exportada desde `fecha-hora.ts`. Acepta la hora de
   inicio como `HH:mm` (formato de `POST /reservas/consultar`) o como ISO
