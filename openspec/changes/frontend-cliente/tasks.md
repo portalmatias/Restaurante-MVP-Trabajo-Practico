@@ -186,22 +186,22 @@
 
 ## 5. Grupo B — Consultar (depende de `reserva-consultar` mergeado)
 
-- [ ] 5.1 Confirmar `POST /reservas/consultar` en `openapi/openapi.yaml` de `main` y
+- [x] 5.1 Confirmar `POST /reservas/consultar` en `openapi/openapi.yaml` de `main` y
       regenerar `schema.d.ts` (`npm run api:types -w frontend`). Verificar con
       `grep -n "reservas/consultar" frontend/src/lib/api/schema.d.ts`.
-- [ ] 5.2 Escribir los tests de la sub-vista "formulario" de `ConsultaReserva`: código y email
+- [x] 5.2 Escribir los tests de la sub-vista "formulario" de `ConsultaReserva`: código y email
       obligatorios con validación en línea; un `404` muestra el mensaje genérico sin indicar
       cuál dato falló; un `429` muestra el mensaje de espera; un error de servidor (`5xx`) y
       una falla de red muestran el mensaje genérico de `toApiResult`/`mapErrorApi` (en voseo,
       D7) y conservan el código y el email ya tipeados en sus campos para poder reintentar sin
       volver a escribirlos; un envío exitoso pasa a la sub-vista "detalle" con los datos de la
       respuesta. Verificar rojo con `npm test -w frontend -- consulta-reserva`.
-- [ ] 5.3 Escribir los tests de la sub-vista "detalle": muestra estado, fecha (formateada),
+- [x] 5.3 Escribir los tests de la sub-vista "detalle": muestra estado, fecha (formateada),
       turno (formateado) y zona; no renderiza nombre, email ni teléfono en ningún elemento del
       DOM; un enlace "Consultar otra reserva" vuelve a "formulario". (El gating del botón de
       cancelar según la ventana se cubre en la sección 6, una vez que ese dato esté
       disponible). Verificar rojo.
-- [ ] 5.4 Implementar `ConsultaReserva` (sub-vistas "formulario"/"detalle", D3 Pantalla 6-7,
+- [x] 5.4 Implementar `ConsultaReserva` (sub-vistas "formulario"/"detalle", D3 Pantalla 6-7,
       D1.2 sin reflejar el email en la URL, solo `?codigo=` opcional) y
       `app/reservas/consultar/page.tsx`. Verificar que 5.2 y 5.3 pasan.
 - [ ] 5.5 Prueba manual: consultar una reserva `CONFIRMADA` y una `PENDIENTE` del seed con su
@@ -340,3 +340,27 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   Los mensajes de `mensajeDeRechazo` en `client.ts` son impersonales y no se tocaron, como
   ya preveía D7. Los tres tests de `errors.test.ts` que fijaban el texto exacto se
   actualizaron antes que el código (rojo por el texto viejo).
+
+**Grupo B, consultar (sección 5):**
+
+- 5.1: `npm run api:types -w frontend` agregó a `schema.d.ts` solo líneas nuevas (656 líneas, sin
+  borrados): `/reservas` (`POST`), `/reservas/consultar`, `/reservas/{codigo}/cancelar` y
+  `/admin/reservas` con sus schemas, todos ya mergeados en `main` y todavía ausentes del archivo
+  versionado. No apareció ningún diff ajeno a esos contratos.
+- El `turno` de `POST /reservas/consultar` trae `horaInicio`/`horaFin` como `HH:mm` (hora local
+  ya formateada por el backend), no como ISO `1970-01-01T...` como `GET /turnos` (D2). El
+  detalle los muestra tal cual y no usa `formatearHoraTurno`. Consecuencia para 6.3: cuando
+  `puedeCancelarSegunVentana` se conecte al detalle, hay que pasarle el inicio en el formato que
+  reciba; hoy espera el ISO de `GET /turnos`, así que habrá que aceptar también `HH:mm` o
+  convertir antes de llamarla.
+- `POST /reservas/consultar` responde `429` sin cuerpo y `mapErrorApi` lo dejaba como el mensaje
+  genérico "Ocurrió un error inesperado.". Se agregó a `errors.ts` (aditivo, sin renombrar nada)
+  el caso `limite-de-intentos` con el mensaje "Hiciste demasiados intentos. Esperá unos minutos
+  antes de volver a intentar.", con su test. Lo reusará la cancelación (6.4).
+- `ConsultaReserva` vive en `frontend/src/components/reservas/consulta-reserva.tsx`; el código
+  se valida como 8 caracteres alfanuméricos y se pasa a mayúsculas al tipear. El botón
+  "Reintentar" aparece solo ante `desconocido` (5xx o red); ante un `404` o un `429` se corrige
+  o se espera y se vuelve a enviar con el botón principal. "Consultar otra reserva" es un
+  `<button>` con aspecto de enlace (no navega) y vacía el email. `app/reservas/consultar/page.tsx`
+  solo prellena `?codigo=` (ignora valores con formato inválido o repetidos) y nunca lee el email.
+- 5.5 (prueba manual contra el backend real) queda sin marcar.
