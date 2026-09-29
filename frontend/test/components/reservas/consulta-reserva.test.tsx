@@ -187,6 +187,68 @@ describe("ConsultaReserva - formulario", () => {
     );
   });
 
+  it("mientras consulta deshabilita el código y el email, y los rehabilita con los valores al fallar", async () => {
+    let resolver: (valor: unknown) => void = () => {};
+    POST.mockReturnValue(new Promise((resolve) => (resolver = resolve)));
+    render(<ConsultaReserva />);
+
+    completarFormulario("K7PM3QXA", "ana.perez@example.com");
+    enviar();
+
+    await screen.findByRole("button", { name: "Buscando…" });
+    expect(screen.getByLabelText("Código de reserva")).toBeDisabled();
+    expect(screen.getByLabelText("Email")).toBeDisabled();
+
+    resolver(respuestaError(404, { statusCode: 404, message: "x" }));
+
+    await screen.findByRole("alert");
+    expect(screen.getByLabelText("Código de reserva")).toBeEnabled();
+    expect(screen.getByLabelText("Código de reserva")).toHaveValue("K7PM3QXA");
+    expect(screen.getByLabelText("Email")).toHaveValue("ana.perez@example.com");
+  });
+
+  it("al resolver la consulta pendiente muestra el detalle de esa consulta", async () => {
+    let resolver: (valor: unknown) => void = () => {};
+    POST.mockReturnValue(new Promise((resolve) => (resolver = resolve)));
+    render(<ConsultaReserva />);
+
+    completarFormulario();
+    enviar();
+    await screen.findByRole("button", { name: "Buscando…" });
+    resolver(respuestaOk(RESERVA));
+
+    expect(await screen.findByText("K7PM3QXA")).toBeInTheDocument();
+  });
+
+  it("un segundo envío mientras hay una consulta en curso no dispara otra solicitud", async () => {
+    POST.mockReturnValue(new Promise(() => {}));
+    const { container } = render(<ConsultaReserva />);
+
+    completarFormulario();
+    const formulario = container.querySelector("form") as HTMLFormElement;
+    fireEvent.submit(formulario);
+    fireEvent.submit(formulario);
+    fireEvent.submit(formulario);
+
+    await screen.findByRole("button", { name: "Buscando…" });
+    expect(POST).toHaveBeenCalledTimes(1);
+  });
+
+  it("'Reintentar' se deshabilita mientras la nueva consulta está en curso y no la duplica", async () => {
+    POST.mockRejectedValueOnce(new TypeError("fetch failed"));
+    render(<ConsultaReserva />);
+    completarFormulario();
+    enviar();
+    const reintentar = await screen.findByRole("button", { name: "Reintentar" });
+
+    POST.mockReturnValue(new Promise(() => {}));
+    fireEvent.click(reintentar);
+    fireEvent.click(reintentar);
+
+    await waitFor(() => expect(POST).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
   it("un error de servidor muestra el mensaje genérico y conserva código y email", async () => {
     POST.mockResolvedValue(respuestaError(500, { message: "stack interno" }));
     render(<ConsultaReserva />);

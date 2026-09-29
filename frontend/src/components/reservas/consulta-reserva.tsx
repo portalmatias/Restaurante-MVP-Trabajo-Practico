@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -72,8 +72,22 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
   const [errorApi, setErrorApi] = useState<ErrorApi>();
   const [consultando, setConsultando] = useState(false);
   const [reserva, setReserva] = useState<ReservaConsultada>();
+  // `enCurso` evita reentradas (el estado tarda un render en reflejarse); `ultimaSolicitud`
+  // identifica la consulta vigente: la respuesta de una consulta abandonada (por ejemplo, tras
+  // desmontar el componente) nunca se aplica.
+  const enCurso = useRef(false);
+  const ultimaSolicitud = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      ultimaSolicitud.current += 1;
+    };
+  }, []);
 
   async function consultar() {
+    if (enCurso.current) {
+      return;
+    }
     const nuevoErrorCodigo = errorDeCodigo(codigo);
     const nuevoErrorEmail = errorDeEmail(email);
     setErrorCodigo(nuevoErrorCodigo);
@@ -82,11 +96,17 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
       return;
     }
 
+    const solicitud = ++ultimaSolicitud.current;
+    enCurso.current = true;
     setErrorApi(undefined);
     setConsultando(true);
     const resultado = await toApiResult(
       apiClient.POST("/reservas/consultar", { body: { codigo, email: email.trim() } }),
     );
+    if (solicitud !== ultimaSolicitud.current) {
+      return;
+    }
+    enCurso.current = false;
     setConsultando(false);
 
     if (resultado.error) {
@@ -123,6 +143,7 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
         name="codigo"
         value={codigo}
         maxLength={8}
+        disabled={consultando}
         autoComplete="off"
         autoCapitalize="characters"
         error={errorCodigo}
@@ -134,6 +155,7 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
         name="email"
         type="email"
         value={email}
+        disabled={consultando}
         autoComplete="email"
         error={errorEmail}
         onChange={(evento) => setEmail(evento.target.value)}
@@ -145,7 +167,12 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
             {mensajeDeError(errorApi)}
           </Alert>
           {errorApi.tipo === "desconocido" ? (
-            <Button variant="secondary" size="lg" onClick={() => void consultar()}>
+            <Button
+              variant="secondary"
+              size="lg"
+              disabled={consultando}
+              onClick={() => void consultar()}
+            >
               Reintentar
             </Button>
           ) : null}

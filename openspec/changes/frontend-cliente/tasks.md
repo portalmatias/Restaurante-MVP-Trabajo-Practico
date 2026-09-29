@@ -381,3 +381,9 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   `<button>` con aspecto de enlace (no navega) y vacía el email. `app/reservas/consultar/page.tsx`
   solo prellena `?codigo=` (ignora valores con formato inválido o repetidos) y nunca lee el email.
 - 5.5 (prueba manual contra el backend real) se hizo el 29/09/2026; el detalle está en la tarea.
+- `ConsultaReserva` deshabilita el código y el email mientras consulta, ignora un nuevo envío si
+  ya hay una consulta en curso (referencia, no solo el estado) y deshabilita "Reintentar" mientras
+  tanto. Cada consulta lleva un número de solicitud y solo se aplica la respuesta de la vigente;
+  con los campos bloqueados y sin reentradas, una respuesta pisada solo puede ocurrir si el
+  componente se desmonta a mitad de la consulta, caso en que se descarta. La página usa
+  `key={codigoInicial}` para reiniciar el formulario al navegar entre `?codigo=` distintos.
