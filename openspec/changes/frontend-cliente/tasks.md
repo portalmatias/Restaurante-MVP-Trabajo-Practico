@@ -1,16 +1,16 @@
 ## 1. Prerrequisitos (bloqueante)
 
-- [ ] 1.1 Confirmar que la implementación de `frontend-base` (PR #43) está mergeada a `main` y
+- [x] 1.1 Confirmar que la implementación de `frontend-base` (PR #43) está mergeada a `main` y
       crear `feature/frontend-cliente` desde ese `main`. No seguir hasta que sea cierto.
       Verificar con `git log origin/main --oneline` y comprobando que existen
       `frontend/src/components/ui/{button,field,input,label,select,card,alert}.tsx` y
       `frontend/src/lib/api/{client.ts,errors.ts,url-base.ts,schema.d.ts}`.
-- [ ] 1.2 Releer los archivos reales de 1.1 y anotar cualquier diferencia de nombre, prop o
+- [x] 1.2 Releer los archivos reales de 1.1 y anotar cualquier diferencia de nombre, prop o
       firma respecto de lo asumido en `design.md` (D2/D4/D7 citan `buttonVariants`,
       `variantClasses`, `Field`, `mapErrorApi`, `ApiResult`, `mensajeDeRechazo` tal como
       existían el 28/09/2026). Si algo cambió, usar la forma real y anotarlo en la descripción
       del PR, sin renombrar nada del lado de `frontend-base`. Verificar leyendo esos archivos.
-- [ ] 1.3 Confirmar el estado de merge de los cuatro backends de los que dependen los Grupos
+- [x] 1.3 Confirmar el estado de merge de los cuatro backends de los que dependen los Grupos
       A/B/C (`catalogo-publico`, `reservas-crear` PR #40, `reserva-consultar`,
       `cancelacion-turnos`) con `gh pr list --state merged` y `git log origin/main --oneline`.
       Anotar cuáles ya están para saber qué secciones (4, 5, 6) se pueden completar contra el
@@ -18,7 +18,7 @@
 
 ## 2. Utilidades puras de fecha y hora (sin dependencia de backend)
 
-- [ ] 2.1 Escribir `frontend/test/lib/fecha-hora.test.ts` (casos de `fechaLocalDeHoy`,
+- [x] 2.1 Escribir `frontend/test/lib/fecha-hora.test.ts` (casos de `fechaLocalDeHoy`,
       `diaSemanaDeFechaLocal`, `formatearFechaLargaEs` y `formatearHoraTurno`; los casos de
       `puedeCancelarSegunVentana` van en un archivo aparte, `ventana-cancelacion.test.ts`, ver
       2.9) con los casos de `fechaLocalDeHoy(ahora)`: para un instante UTC que cae después de
@@ -28,27 +28,27 @@
       mismo día que un `toISOString().slice(0,10)` daría. Correr con `TZ=UTC` y con
       `TZ=America/Argentina/Buenos_Aires`. Verificar que la suite falla (rojo) con
       `npm test -w frontend -- fecha-hora`.
-- [ ] 2.2 Implementar `fechaLocalDeHoy` en `frontend/src/lib/fecha-hora.ts` con el offset fijo
+- [x] 2.2 Implementar `fechaLocalDeHoy` en `frontend/src/lib/fecha-hora.ts` con el offset fijo
       de Argentina y `getUTC*`/`Date.UTC` (D2), sin usar `Intl` para el cálculo. Verificar que
       2.1 pasa con las dos zonas horarias del proceso.
-- [ ] 2.3 Sumar a la misma suite los casos de `diaSemanaDeFechaLocal(fecha)`: `2026-09-19` →
+- [x] 2.3 Sumar a la misma suite los casos de `diaSemanaDeFechaLocal(fecha)`: `2026-09-19` →
       `SABADO`, `2026-09-21` → `LUNES`, y los siete días de una semana completa mapean sin
       desfase. Verificar que falla (rojo).
-- [ ] 2.4 Implementar `diaSemanaDeFechaLocal` con `Date.UTC(y, m-1, d).getUTCDay()` y el mapeo
+- [x] 2.4 Implementar `diaSemanaDeFechaLocal` con `Date.UTC(y, m-1, d).getUTCDay()` y el mapeo
       a `DiaSemana`. Verificar que 2.3 pasa.
-- [ ] 2.5 Sumar los casos de `formatearFechaLargaEs(fecha)`: `2026-09-19` da un texto que
+- [x] 2.5 Sumar los casos de `formatearFechaLargaEs(fecha)`: `2026-09-19` da un texto que
       contiene "sábado", "19", "septiembre" y "2026"; el resultado no cambia entre
       `TZ=UTC` y `TZ=America/Argentina/Buenos_Aires`, ni entre `TZ=UTC` y una zona horaria muy
       adelantada (ej. `Pacific/Kiritimati`, UTC+14) que sí haría fallar una implementación sin
       `timeZone: 'UTC'` explícito en `Intl.DateTimeFormat`. Verificar que falla (rojo).
-- [ ] 2.6 Implementar `formatearFechaLargaEs` (D2). Verificar que 2.5 pasa con las tres zonas
+- [x] 2.6 Implementar `formatearFechaLargaEs` (D2). Verificar que 2.5 pasa con las tres zonas
       horarias del proceso.
-- [ ] 2.7 Sumar los casos de `formatearHoraTurno(horaIso)`: `'1970-01-01T20:00:00.000Z'` →
+- [x] 2.7 Sumar los casos de `formatearHoraTurno(horaIso)`: `'1970-01-01T20:00:00.000Z'` →
       `'20:00'`, `'1970-01-01T08:05:00.000Z'` → `'08:05'` (cero a la izquierda). Verificar que
       falla (rojo).
-- [ ] 2.8 Implementar `formatearHoraTurno` con `getUTCHours`/`getUTCMinutes` (D2, sin
+- [x] 2.8 Implementar `formatearHoraTurno` con `getUTCHours`/`getUTCMinutes` (D2, sin
       conversión de huso horario). Verificar que 2.7 pasa.
-- [ ] 2.9 Escribir `frontend/test/lib/ventana-cancelacion.test.ts` (archivo propio, separado de
+- [x] 2.9 Escribir `frontend/test/lib/ventana-cancelacion.test.ts` (archivo propio, separado de
       `fecha-hora.test.ts`, para que el filtro de Jest por nombre de archivo lo aísle) con los
       casos de `puedeCancelarSegunVentana(fecha, horaInicioTurno, ventanaCancelacionHoras,
       ahora)` (D9): exactamente `ventanaCancelacionHoras` antes del inicio del turno → `true`
@@ -57,9 +57,9 @@
       `finTurnoUtc` del backend para el caso de `horaFin < horaInicio` (aunque acá solo se usa
       el inicio, agregar el caso de regresión para dejar registrado el criterio). Verificar que
       falla (rojo) con `npm test -w frontend -- ventana-cancelacion`.
-- [ ] 2.10 Implementar `puedeCancelarSegunVentana` (D9). Verificar que 2.9 pasa con las dos
+- [x] 2.10 Implementar `puedeCancelarSegunVentana` (D9). Verificar que 2.9 pasa con las dos
       zonas horarias del proceso.
-- [ ] 2.11 Escribir y luego implementar `agruparPorCampo(mensajes, campos)` (D8): un mensaje
+- [x] 2.11 Escribir y luego implementar `agruparPorCampo(mensajes, campos)` (D8): un mensaje
       que empieza con `"emailCliente"` cae en ese campo; uno que empieza con `"turnoId"` (no
       declarado en `campos`) cae en `generales`; una lista vacía da `{ porCampo: {}, generales:
       [] }`. Verificar rojo y después verde con `npm test -w frontend -- agrupar-por-campo`.
@@ -279,3 +279,40 @@
       pospuestas, y aprobado por un compañero distinto del autor. Verificar en GitHub.
 - [ ] 7.9 Después del merge, archivar el change con `openspec archive frontend-cliente` en su
       propio PR. Verificar que `openspec/specs/frontend-cliente/spec.md` existe en `main`.
+
+## Notas de implementación (para la descripción del PR)
+
+**Prerrequisitos (1.1 a 1.3), estado verificado al 29/09/2026 con `gh pr list --state merged` y
+`git log origin/main`:**
+
+- Mergeados a `main`: `frontend-base` (PR #43), `reservas-crear` (PR #40), `reserva-consultar`
+  (PR #35) y `cancelacion-turnos` (PR #50). `feature/frontend-cliente` se creó desde `main`
+  en `f5058bb`.
+- NO mergeado: `catalogo-publico` (PR #51, abierto, CI en verde, pendiente de revisión de un
+  compañero). Sin `GET /zonas` ni `GET /turnos` en `openapi/openapi.yaml` de `main`, las
+  secciones 4 (Grupo A) y 6 (Grupo C, que usa `GET /zonas` para la ventana) no se pueden
+  completar contra el cliente tipado real: quedan con fixtures locales (D10) hasta que ese PR
+  mergee. La sección 5 (Grupo B) ya tiene su endpoint en `main`.
+
+**Diferencias entre `design.md` y el código real de `frontend-base` (1.2):**
+
+- Los nombres citados existen tal cual: `buttonVariants`, `variantClasses`, `Field`,
+  `mapErrorApi`, `ApiResult`, `mensajeDeRechazo` (este último en `client.ts`, no en
+  `errors.ts`, como ya decía D7). No se renombró nada.
+- `fullWidth` es una opción de `buttonVariants`, no una prop de `Button` (`ButtonProps` solo
+  declara `variant`). `size` se agrega a ambos: a `buttonVariants` como opción y a `Button`
+  como prop.
+- `min-h-11` y `text-sm` están en las clases base de `buttonVariants`, no en una tabla, como
+  anticipaba D4; pasan a `sizeClasses`.
+- `DiaSemana` no existe todavía en `schema.d.ts` (llega con `catalogo-publico`, PR #51): se
+  define como tipo local en `frontend/src/lib/fecha-hora.ts` con los mismos valores del enum
+  de Prisma. Al mergear ese PR conviene reemplazarlo por el tipo generado.
+- `puedeCancelarSegunVentana` vive en `frontend/src/lib/ventana-cancelacion.ts` (D9 no fija
+  archivo) y reusa `ARGENTINA_OFFSET_MS`, exportada desde `fecha-hora.ts`.
+
+**Observación sobre 2.5:** el caso de `Pacific/Kiritimati` (UTC+14) no puede detectar la falta
+de `timeZone: 'UTC'`: la medianoche UTC leída en UTC+14 sigue siendo el mismo día (14:00). Quien
+sí lo detecta es un huso con offset negativo: al quitar `timeZone: 'UTC'`, la suite falla con
+`TZ=America/Argentina/Buenos_Aires` (2 tests) y pasa con `TZ=UTC` y `TZ=Pacific/Kiritimati`. Se
+verificó con esa mutación temporal; la suite se corrió igual con las tres zonas y además con
+`Pacific/Pago_Pago`.
