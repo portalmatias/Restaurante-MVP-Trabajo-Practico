@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { DiaSemana, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ActualizarTurnoDto } from './dto/actualizar-turno.dto';
@@ -41,6 +41,19 @@ export class HorariosService {
 
   async listar() {
     return this.prisma.turno.findMany();
+  }
+
+  /**
+   * Catálogo público (change `catalogo-publico`, D2): solo Turnos activos, con `select`
+   * explícito (sin `activo`) y orden de calendario semanal: Postgres ordena un enum nativo
+   * por posición de declaración, así que `diaSemana asc` va de LUNES a DOMINGO.
+   */
+  async listarPublicos(diaSemana?: DiaSemana) {
+    return this.prisma.turno.findMany({
+      where: { activo: true, ...(diaSemana ? { diaSemana } : {}) },
+      select: { id: true, diaSemana: true, horaInicio: true, horaFin: true },
+      orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }],
+    });
   }
 
   private async obtenerOFallar(id: string) {

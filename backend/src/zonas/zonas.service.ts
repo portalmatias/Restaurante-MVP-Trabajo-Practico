@@ -26,6 +26,26 @@ export class ZonasService {
   }
 
   /**
+   * Catálogo público (change `catalogo-publico`, D2): `select` explícito, o sea una lista
+   * de campos permitidos. Un campo nuevo de `Zona` no se expone hasta sumarlo acá. No
+   * incluye `aforoMaximo` ni la relación `mesas`.
+   */
+  async listarPublicas() {
+    return this.prisma.zona.findMany({
+      select: {
+        id: true,
+        nombre: true,
+        minComensales: true,
+        maxComensales: true,
+        anticipacionMinHoras: true,
+        anticipacionMaxDias: true,
+        ventanaCancelacionHoras: true,
+        requiereConfirmacionAdmin: true,
+      },
+    });
+  }
+
+  /**
    * Actualiza los valores de configuración de una Zona existente. Rechaza con
    * `BadRequestException` si, combinando los campos del `dto` con los que ya están
    * persistidos (para los que no vienen en el `dto`), el mínimo de comensales resultante

@@ -1,37 +1,37 @@
 ## 1. Prerrequisitos (verificación, no bloqueante)
 
-- [ ] 1.1 Confirmar que `ZonasModule` y `HorariosModule` ya están registrados en `AppModule` y
+- [x] 1.1 Confirmar que `ZonasModule` y `HorariosModule` ya están registrados en `AppModule` y
       ya exportan `ZonasService`/`HorariosService` (`backend/src/app.module.ts:52,54`,
       `zonas.module.ts:16`, `horarios.module.ts:13`). Verificar con
       `rg -n "ZonasModule|HorariosModule" backend/src/app.module.ts` y confirmando los
       `exports` de cada módulo. No hace falta tocar `AppModule`: los controllers nuevos se
       agregan a `controllers: []` de cada módulo, que ya está importado.
-- [ ] 1.2 Confirmar que el `ValidationPipe({ transform: true })` global de `main.ts` y
+- [x] 1.2 Confirmar que el `ValidationPipe({ transform: true })` global de `main.ts` y
       `class-validator`/`class-transformer` ya están instalados (los trajo `disponibilidad`).
       Verificar con `rg -n "ValidationPipe" backend/src/main.ts` y
       `npm run build -w backend`.
 
 ## 2. Service de Zonas: test primero, después `listarPublicas`
 
-- [ ] 2.1 En `backend/src/zonas/zonas.service.spec.ts`, agregar un `describe('listarPublicas')`
+- [x] 2.1 En `backend/src/zonas/zonas.service.spec.ts`, agregar un `describe('listarPublicas')`
       que mockea `prisma.zona.findMany` (mismo patrón de mock manual que el resto del archivo,
       `zonas.service.spec.ts:42-52`, el `beforeEach` que arma los `jest.fn()`) y verifica que `listarPublicas()` llama a `findMany` con
       `select: { id, nombre, minComensales, maxComensales, anticipacionMinHoras,
       anticipacionMaxDias, ventanaCancelacionHoras, requiereConfirmacionAdmin }` — sin
       `aforoMaximo` — y que devuelve tal cual lo que responde el mock. Verificar que la suite
       falla (rojo) con `npm test -w backend -- zonas.service`.
-- [ ] 2.2 Implementar `ZonasService.listarPublicas()` (design.md D2). Verificar que el test de
+- [x] 2.2 Implementar `ZonasService.listarPublicas()` (design.md D2). Verificar que el test de
       2.1 pasa y que `npm run typecheck -w backend` no rompe.
 
 ## 3. Service de Turnos: test primero, después `listarPublicos`
 
-- [ ] 3.1 En `backend/src/horarios/horarios.service.spec.ts`, agregar un
+- [x] 3.1 En `backend/src/horarios/horarios.service.spec.ts`, agregar un
       `describe('listarPublicos')` que mockea `prisma.turno.findMany` y verifica: sin
       argumento, llama con `where: { activo: true }`, `select: { id, diaSemana, horaInicio,
       horaFin }` (sin `activo`) y `orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }]`; con
       `listarPublicos('SABADO')`, el `where` incluye además `diaSemana: 'SABADO'`. Verificar
       que la suite falla (rojo) con `npm test -w backend -- horarios.service`.
-- [ ] 3.2 Implementar `HorariosService.listarPublicos(diaSemana?: DiaSemana)` (design.md D2).
+- [x] 3.2 Implementar `HorariosService.listarPublicos(diaSemana?: DiaSemana)` (design.md D2).
       Verificar que los tests de 3.1 pasan y que `npm run typecheck -w backend` no rompe.
 
 ## 4. Contrato OpenAPI y controllers públicos (orden D2 de `fundacion-repo`)
