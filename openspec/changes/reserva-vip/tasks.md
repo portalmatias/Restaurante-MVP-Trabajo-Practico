@@ -18,9 +18,10 @@
       no está `PENDIENTE`, y transiciona a `CANCELADA` por el único punto de escritura de
       estado. Verificar con tests unitarios del caso exitoso y del rechazo por estado inválido.
 - [ ] 2.3 Implementar `PATCH /admin/reservas/:id/confirmar` y
-      `PATCH /admin/reservas/:id/rechazar` en `ReservasController`, ambos protegidos por
-      `JwtAuthGuard` + `RolesGuard(ADMIN)`. Verificar con Supertest contra una Reserva
-      `PENDIENTE` de prueba.
+      `PATCH /admin/reservas/:id/rechazar` en `ReservasAdminController` (no en
+      `ReservasController`: su prefijo `/reservas` no puede resolver una ruta `/admin/...`, ver
+      `design.md`), ambos protegidos por `JwtAuthGuard` + `RolesGuard(ADMIN)`. Verificar con
+      Supertest contra una Reserva `PENDIENTE` de prueba.
 
 ## 3. Tests de los requisitos de la spec
 

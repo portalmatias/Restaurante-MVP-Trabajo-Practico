@@ -42,15 +42,32 @@ nombre de Zona fijo en vez de a la propiedad de configuración que realmente imp
 Mismo patrón que el `NO_SHOW` de `cancelacion-turnos`: `PATCH` sobre un sub-recurso de acción,
 sin introducir un endpoint genérico de "editar estado de Reserva" que no está en ninguna spec.
 
+**Corrección (2026-09-29):** ambas rutas van en `ReservasAdminController`
+(`@Controller('admin/reservas')`, el mismo `ReservasService` inyectado,
+`@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(RolUsuario.ADMIN)` a nivel de clase) — **no**
+en `ReservasController` (`@Controller('reservas')`). El prefijo de `@Controller()` se aplica a
+toda la clase, así que ningún método de `ReservasController` puede resolver a `/admin/...`.
+`openspec/changes/archive/2026-09-28-reserva-consultar/design.md` (D6 y "Risks / Trade-offs")
+documenta este error para `GET /admin/reservas` — se detectó al ejecutar el código contra una
+app real, no en la revisión de la spec — y advierte explícitamente que `reserva-vip` iba a
+pisarlo si su diseño asumía lo mismo. `ReservasAdminController` ya existe desde
+`reserva-consultar`; este change agrega métodos ahí, no crea un controller nuevo.
+
 ## Risks / Trade-offs
 
 - **[Riesgo]** Este change se acopla a la forma final de `ReservasService`, que nace en
   `reservas-crear` y todavía no tiene spec → **Mitigación:** dependencia ya reconocida por el
   roadmap (Fase 4); no se puede implementar antes de todos modos.
 - **[Riesgo]** `reserva-vip`, `reserva-consultar` y `cancelacion-turnos` tocan el mismo
-  `ReservasController`/`ReservasService` → **Mitigación:** el roadmap ya sugiere un orden de
-  merge (`reserva-consultar` primero); cada change agrega métodos nuevos sin tocar los de los
-  otros, así que el riesgo de conflicto es de rebase, no de diseño.
+  `ReservasService` (y, para las rutas admin, el mismo `ReservasAdminController`) →
+  **Mitigación:** el roadmap ya sugiere un orden de merge (`reserva-consultar` primero); cada
+  change agrega métodos nuevos sin tocar los de los otros, así que el riesgo de conflicto es de
+  rebase, no de diseño.
+- **[Riesgo, cerrado]** Las versiones anteriores de este documento asumían
+  `PATCH /admin/reservas/:id/confirmar` y `.../rechazar` dentro de `ReservasController` —
+  técnicamente imposible, mismo motivo que documentó `reserva-consultar` (D6) para
+  `GET /admin/reservas` → **Resolución:** ambas rutas pasan a `ReservasAdminController`. Sin
+  impacto en contrato publicado: este change todavía no se implementó.
 - **[Riesgo]** No validar Zona explícitamente asume que `PENDIENTE` seguirá siendo exclusivo
   de Zonas con `requiereConfirmacionAdmin = true` → **Mitigación:** esa garantía la da
   `reservas-crear`, no este change; si en el futuro cambiara, el ajuste es agregar un chequeo

@@ -88,6 +88,23 @@ estado, sin necesidad de un cuarto estado genérico "editar Reserva" que no exis
 **Alternativa considerada:** `DELETE /reservas/:codigo?email=...` — se descarta por la
 exposición del email en la URL.
 
+**Corrección (2026-09-29):** `POST /reservas/:codigo/cancelar` vive en `ReservasController`
+(`@Controller('reservas')`) — coincide con su propio prefijo. Pero `PATCH
+/admin/reservas/:id/no-show` **no puede** vivir ahí: el prefijo de `@Controller()` se aplica a
+toda la clase, así que ningún método de `ReservasController` puede resolver a una ruta que
+empieza con `/admin`. `openspec/changes/archive/2026-09-28-reserva-consultar/design.md` (D6 y
+"Risks / Trade-offs") documenta este mismo error para `GET /admin/reservas` — se detectó recién
+al ejecutar el código contra una app real — y advierte explícitamente que `cancelacion-turnos`
+iba a pisarlo. Corregido acá antes de implementar: `marcarNoShow` va en el controller nuevo que
+ya existe desde `reserva-consultar`, `ReservasAdminController` (`@Controller('admin/reservas')`,
+mismo `ReservasService` inyectado, `@UseGuards(JwtAuthGuard, RolesGuard)` +
+`@Roles(RolUsuario.ADMIN)` a nivel de clase) — no uno nuevo. El `operationId` se fija explícito
+como `ReservasController_marcarNoShow` (no el `ReservasAdminController_marcarNoShow` que
+generaría Swagger por default), mismo criterio que ya usa `ReservasController_listar` en
+`reserva-consultar`: la división en dos archivos es un detalle de implementación de NestJS, no
+del contrato — la ruta sigue siendo conceptualmente parte de la capability `Reservas` (hallazgo
+de cubic en el PR de esta corrección, P3).
+
 ### Throttling: se reutiliza el límite global, sin `@Throttle()` propio
 A diferencia de `POST /auth/login` (que sí definió un límite más estricto porque es el endpoint
 de mayor privilegio del sistema), la cancelación pública reutiliza `THROTTLE_TTL` /
@@ -255,6 +272,18 @@ no equivalencia semántica. Mantener los mismos códigos, descripciones y esquem
   `ConfiguracionNegocio.zonaHoraria`, un campo que nunca se agregó → ya no aplica: #12 y #21
   fijaron el offset UTC-3 constante, sin campo de configuración que esperar. Se deja esta
   entrada para que quien lea el historial de este archivo entienda por qué cambió.
+- **[Riesgo, cerrado]** Las versiones anteriores de este documento asumían `PATCH
+  /admin/reservas/:id/no-show` dentro de `ReservasController` — técnicamente imposible, mismo
+  motivo que documentó `reserva-consultar` (D6) para `GET /admin/reservas` → **Resolución:**
+  `marcarNoShow` pasa a `ReservasAdminController`, el controller que ya trajo ese change, pero
+  conserva el `operationId` `ReservasController_marcarNoShow` (no el
+  `ReservasAdminController_marcarNoShow` que generaría Swagger por default): mismo criterio que
+  `ReservasController_listar` en `reserva-consultar` — la división en dos archivos es un
+  detalle de implementación, no del contrato — sin esperar a que haya un `operationId` ya
+  publicado que proteger (hallazgo de cubic sobre la primera versión de esta corrección, que sí
+  dejaba el default de Swagger razonando que "todavía no se implementó, no hay nada que
+  preservar": ese razonamiento vale para decidir si hace falta una migración de contrato, no
+  para decidir la convención de nombres a seguir desde el principio).
 - **[Riesgo]** `backend/src/common/timezone.ts` ya está mergeado (#12) y `disponibilidad` (#21)
   ya lo adoptó, así que la firma de `inicioTurnoUtc`/`finTurnoUtc` es estable — pero si
   `reservas-crear` (todavía sin implementar) necesitara una firma distinta para su propio uso,
