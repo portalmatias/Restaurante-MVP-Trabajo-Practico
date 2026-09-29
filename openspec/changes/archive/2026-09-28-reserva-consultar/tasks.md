@@ -173,9 +173,13 @@
       y `reservas-crear`). `openapi:lint` sin hallazgos y `openapi:check` sin deriva. No
       apareció el falso rojo de `x-enumNames` (ningún schema nuevo usa `enumName`) ni
       respuestas inline sin `$ref`.
-- [ ] 4.2 Avisar a `cancelacion-turnos` (y a su dueño) de la firma final de
+- [x] 4.2 Avisar a `cancelacion-turnos` (y a su dueño) de la firma final de
       `buscarPorCodigoYEmail` y del helper del `404`, y dejar el aviso en la descripción del
       PR. Verificar que la tarea 1.2 de `cancelacion-turnos` puede marcarse como resuelta.
+      Hecho: en la descripción de #35 y en un comentario dedicado a lussofacundo-iresm, con
+      el aviso adicional (fuera de esta tarea) de que `GET /admin/reservas` necesitó un
+      controller separado (`ReservasAdminController`), que también le va a tocar a
+      `cancelacion-turnos` y a `reserva-vip` para sus rutas `/admin/reservas/:id/...`.
 - [x] 4.3 Actualizar la fila de `reserva-consultar` en `docs/roadmap-mvp.md` (de `GET` a
       `POST /reservas/consultar`) si el roadmap ya está en `main`; si no, dejarlo anotado en
       el PR. Verificar con `git diff` de la fila.
@@ -194,8 +198,10 @@
       con el admin del seed → `200` con `items`/`total`; `?estado=PENDIENTE` filtra
       correctamente; `POST /reservas` 20 veces seguidas nunca da `429` (guarda
       `@SkipThrottle()`) mientras `consultar` corta a los 10 default y se resetea a los 60s.
-- [ ] 4.5 Recorrer la Definition of Done de `config.yaml` §13 sobre el PR de implementación:
+- [x] 4.5 Recorrer la Definition of Done de `config.yaml` §13 sobre el PR de implementación:
       `openspec validate reserva-consultar --strict`, todas las tareas marcadas, sin
       migración ni variables nuevas, `openapi.yaml` actualizado, `npm run lint` y
       `tsc --noEmit` en limpio, CI en verde, PR en español enlazado al change, aprobación de
       un compañero distinto del autor y archivado con `openspec archive` después del merge.
+      Todo cumplido: #35 aprobado por portalmatias y mergeado el 2026-09-29 (`26249cb`); los
+      tres checks obligatorios y Cubic en verde en el head final. Se archiva a continuación.

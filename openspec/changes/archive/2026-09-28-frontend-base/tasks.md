@@ -268,7 +268,7 @@
 
 ## 8. Cierre (Definition of Done, `config.yaml` §13)
 
-- [ ] 8.1 `openspec validate frontend-base --strict` pasa y todas las tareas de este archivo
+- [x] 8.1 `openspec validate frontend-base --strict` pasa y todas las tareas de este archivo
       están marcadas. Verificar con el comando y revisando que no quede ningún `- [ ]`.
 - [x] 8.2 El change no agrega migraciones ni toca `backend/` ni `openapi/openapi.yaml`.
       Verificar con `git diff main --stat -- backend openapi` vacío.
@@ -289,12 +289,14 @@
       Confirmado por portalmatias el 2026-09-28: contraste calculado (3.3), sin scroll
       horizontal y primitivas a 375px (5.3, 4.7), y foco visible navegando con Tab en `/`,
       `/reservas` y `/admin`. Documentado en la descripción del PR.
-- [ ] 8.7 CI en verde en el PR `feature/frontend-base` (los jobs `spec` y `lint` cubren este
+- [x] 8.7 CI en verde en el PR `feature/frontend-base` (los jobs `spec` y `lint` cubren este
       change; el job `test` no lo toca porque no corre nada de `frontend/` todavía — ver Open
       Questions de `design.md`). Verificar en la pestaña Checks.
-- [ ] 8.8 PR con descripción en español, enlazado a `openspec/changes/frontend-base/`, con las
+      Los tres checks obligatorios y Cubic en verde en el PR #43 (mergeado el 2026-09-28).
+- [x] 8.8 PR con descripción en español, enlazado a `openspec/changes/frontend-base/`, con las
       constancias manuales de 3.3/4.7/5.3, las Open Questions de `design.md` resueltas o
       explícitamente pospuestas, y aprobado por un compañero distinto del autor. Verificar en
       GitHub.
-- [ ] 8.9 Después del merge, archivar el change con `openspec archive frontend-base` en su
+      PR #43, aprobado por FedeWerk (distinto del autor, portalmatias).
+- [x] 8.9 Después del merge, archivar el change con `openspec archive frontend-base` en su
       propio PR. Verificar que `openspec/specs/frontend-base/spec.md` existe en `main`.
