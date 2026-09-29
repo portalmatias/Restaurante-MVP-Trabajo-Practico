@@ -43,4 +43,15 @@ describe("/reservas/consultar", () => {
 
     expect(document.querySelector('a[href^="/admin"]')).toBeNull();
   });
+
+  it("al navegar de ?codigo=A a ?codigo=B el formulario se reinicia con el código nuevo", async () => {
+    const { rerender } = render(
+      await ConsultarPage({ searchParams: Promise.resolve({ codigo: "AAAAAAAA" }) }),
+    );
+    expect(screen.getByLabelText("Código de reserva")).toHaveValue("AAAAAAAA");
+
+    rerender(await ConsultarPage({ searchParams: Promise.resolve({ codigo: "BBBBBBBB" }) }));
+
+    expect(screen.getByLabelText("Código de reserva")).toHaveValue("BBBBBBBB");
+  });
 });
