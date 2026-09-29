@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Dialog } from "../../../src/components/ui/dialog";
 
@@ -105,11 +106,11 @@ describe("Dialog", () => {
     const { onCancel } = renderDialog();
     const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
 
-    // Un navegador real dispara `cancel` y después `close` al apretar Escape: onCancel no
-    // debe llamarse dos veces.
+    // Un `cancel` cancelable con `preventDefault` deja el diálogo abierto: el navegador no
+    // dispara `close` después, así que `onCancel` se llama solo desde `cancel`. El cierre
+    // nativo sin `preventDefault` (cancel no cancelable) se prueba más abajo.
     const cancelar = new Event("cancel", { cancelable: true });
     dialogo.dispatchEvent(cancelar);
-    dialogo.dispatchEvent(new Event("close"));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
     // El cierre lo decide `open`, no el navegador: se evita el cierre nativo.
@@ -210,6 +211,71 @@ describe("Dialog", () => {
       dialogo.dispatchEvent(new Event("close")); // el navegador lo dispara de forma asíncrona
 
       expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
+
+  // Como un navegador: `close()` dispara el evento `close` (acá de forma síncrona).
+  describe("cierres que provoca el propio componente", () => {
+    beforeEach(() => {
+      HTMLDialogElement.prototype.close = jest.fn(function (this: HTMLDialogElement) {
+        this.removeAttribute("open");
+        this.dispatchEvent(new Event("close"));
+      });
+    });
+
+    function ui(onCancel: () => void, open = true) {
+      return (
+        <Dialog
+          open={open}
+          titulo="Cancelar reserva"
+          textoConfirmar="Sí, cancelar"
+          textoCancelar="Volver"
+          onConfirm={jest.fn()}
+          onCancel={onCancel}
+        >
+          <p>Resumen de la reserva</p>
+        </Dialog>
+      );
+    }
+
+    it("desmontar con open=true no llama a onCancel", () => {
+      const onCancel = jest.fn();
+      const { unmount } = render(ui(onCancel));
+
+      unmount();
+
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("cerrar con open=false no llama a onCancel", () => {
+      const onCancel = jest.fn();
+      const { rerender } = render(ui(onCancel));
+
+      rerender(ui(onCancel, false));
+
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("en StrictMode (montar, limpiar, montar) queda abierto y no llama a onCancel", () => {
+      const onCancel = jest.fn();
+
+      render(<StrictMode>{ui(onCancel)}</StrictMode>);
+
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog", { name: "Cancelar reserva" })).toBeInTheDocument();
+    });
+
+    it("un cierre nativo posterior a un cierre propio sigue llamando a onCancel", () => {
+      const onCancel = jest.fn();
+      const { rerender } = render(ui(onCancel));
+      rerender(ui(onCancel, false));
+      rerender(ui(onCancel, true));
+
+      const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
+      dialogo.removeAttribute("open");
+      dialogo.dispatchEvent(new Event("close"));
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
     });
   });
 });
