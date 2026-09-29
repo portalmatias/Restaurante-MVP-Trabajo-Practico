@@ -88,4 +88,54 @@ describe("puedeCancelarSegunVentana", () => {
       },
     );
   });
+
+  describe("segundos y milisegundos de la hora ISO", () => {
+    // 20:00:30.500 hora de Argentina = 23:00:30.500 UTC.
+    const inicioMs = Date.parse("2026-09-19T23:00:30.500Z");
+    const iso = "1970-01-01T20:00:30.500Z";
+
+    it("conserva los segundos y milisegundos: no cierra la ventana antes de tiempo", () => {
+      expect(puedeCancelarSegunVentana(FECHA, iso, 2, new Date(inicioMs - 2 * HORA_MS))).toBe(true);
+      expect(puedeCancelarSegunVentana(FECHA, iso, 2, new Date(inicioMs - 2 * HORA_MS + 1))).toBe(
+        false,
+      );
+    });
+
+    it("HH:mm equivale a :00 y el ISO sin fracción también", () => {
+      const ahora = new Date(INICIO_UTC_MS - 2 * HORA_MS);
+
+      expect(puedeCancelarSegunVentana(FECHA, "20:00", 2, ahora)).toBe(true);
+      expect(puedeCancelarSegunVentana(FECHA, "1970-01-01T20:00:00Z", 2, ahora)).toBe(true);
+      expect(puedeCancelarSegunVentana(FECHA, "1970-01-01T20:00Z", 2, ahora)).toBe(true);
+    });
+
+    it("rechaza segundos fuera de rango", () => {
+      expect(() =>
+        puedeCancelarSegunVentana(FECHA, "1970-01-01T20:00:60.000Z", 2, new Date()),
+      ).toThrow(/hora de inicio/i);
+    });
+  });
+
+  describe("fecha", () => {
+    it.each(["", "abc", "2026-9-19", "2026-09-19T00:00:00Z", "2026-13-01", "2026-00-10"])(
+      "una fecha mal formada (%p) lanza un error explícito",
+      (fechaMalFormada) => {
+        expect(() =>
+          puedeCancelarSegunVentana(fechaMalFormada, HORA_INICIO, 24, new Date(INICIO_UTC_MS)),
+        ).toThrow(/fecha/i);
+      },
+    );
+
+    it("una fecha imposible (2026-02-30) lanza en vez de pasar a marzo", () => {
+      expect(() =>
+        puedeCancelarSegunVentana("2026-02-30", HORA_INICIO, 24, new Date(INICIO_UTC_MS)),
+      ).toThrow(/fecha/i);
+    });
+
+    it("acepta el 29 de febrero de un año bisiesto", () => {
+      expect(() =>
+        puedeCancelarSegunVentana("2028-02-29", HORA_INICIO, 24, new Date(INICIO_UTC_MS)),
+      ).not.toThrow();
+    });
+  });
 });
