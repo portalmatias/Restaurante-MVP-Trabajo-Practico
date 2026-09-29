@@ -31,6 +31,11 @@ tags:
     description: Alta, listado, edición y baja de Mesas (change gestion-salon).
   - name: Turnos
     description: Alta, listado, edición y activación/desactivación de Turnos (change gestion-salon).
+  - name: zonas
+    description: Catálogo público y de solo lectura de Zonas (change catalogo-publico).
+  - name: turnos
+    description: >-
+      Catálogo público y de solo lectura de Turnos activos (change catalogo-publico).
 components:
   securitySchemes:
     bearerAuth:
@@ -730,6 +735,80 @@ components:
         - total
         - limit
         - offset
+    ZonaPublicaRespuestaDto:
+      type: object
+      description: >-
+        Forma pública de una Zona: sin `aforoMaximo` ni Mesas, datos operativos del salón sin
+        uso para quien todavía no reservó.
+      properties:
+        id:
+          type: string
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        nombre:
+          type: string
+          enum:
+            - STANDARD
+            - VIP
+          example: VIP
+        minComensales:
+          type: number
+          example: 2
+        maxComensales:
+          type: number
+          example: 12
+        anticipacionMinHoras:
+          type: number
+          example: 24
+        anticipacionMaxDias:
+          type: number
+          example: 60
+        ventanaCancelacionHoras:
+          type: number
+          example: 24
+        requiereConfirmacionAdmin:
+          type: boolean
+          example: true
+      required:
+        - id
+        - nombre
+        - minComensales
+        - maxComensales
+        - anticipacionMinHoras
+        - anticipacionMaxDias
+        - ventanaCancelacionHoras
+        - requiereConfirmacionAdmin
+    TurnoPublicoRespuestaDto:
+      type: object
+      description: >-
+        Forma pública de un Turno activo: sin el campo `activo` (todos los devueltos ya lo
+        son). `horaInicio`/`horaFin` viajan en el mismo formato que ya usa
+        `TurnoRespuestaDto` de `GET /admin/turnos`.
+      properties:
+        id:
+          type: string
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        diaSemana:
+          type: string
+          enum:
+            - LUNES
+            - MARTES
+            - MIERCOLES
+            - JUEVES
+            - VIERNES
+            - SABADO
+            - DOMINGO
+          example: SABADO
+        horaInicio:
+          type: string
+          example: '1970-01-01T20:00:00.000Z'
+        horaFin:
+          type: string
+          example: '1970-01-01T23:30:00.000Z'
+      required:
+        - id
+        - diaSemana
+        - horaInicio
+        - horaFin
 paths:
   /:
     get:
@@ -859,6 +938,68 @@ paths:
                     statusCode: 404
                     message: No existe una zona con id b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
                     error: Not Found
+  /zonas:
+    get:
+      summary: Catálogo público de Zonas
+      description: >-
+        Lista todas las Zonas con los campos no sensibles que necesita el formulario de
+        reserva del cliente. No incluye `aforoMaximo` ni las Mesas de la zona. Es una ruta
+        pública, sin autenticación.
+      operationId: ZonasPublicasController_listar
+      tags:
+        - zonas
+      parameters: []
+      responses:
+        '200':
+          description: Listado de Zonas. Una lista vacía responde `200`, no `404`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ZonaPublicaRespuestaDto'
+  /turnos:
+    get:
+      summary: Catálogo público de Turnos activos
+      description: >-
+        Lista los Turnos con `activo: true`, ordenados por día de la semana (lunes a domingo)
+        y, dentro del mismo día, por hora de inicio. Es una ruta pública, sin autenticación.
+      operationId: TurnosPublicosController_listar
+      tags:
+        - turnos
+      parameters:
+        - name: diaSemana
+          in: query
+          required: false
+          description: Filtra los Turnos activos devueltos por día de la semana.
+          schema:
+            type: string
+            enum:
+              - LUNES
+              - MARTES
+              - MIERCOLES
+              - JUEVES
+              - VIERNES
+              - SABADO
+              - DOMINGO
+            example: SABADO
+      responses:
+        '200':
+          description: >-
+            Listado de Turnos activos, opcionalmente filtrado por día de la semana. Una lista
+            vacía responde `200`, no `404`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TurnoPublicoRespuestaDto'
+        '400':
+          description: '`diaSemana` no es uno de los siete días válidos.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
   /reservas:
     post:
       summary: Crear una reserva
