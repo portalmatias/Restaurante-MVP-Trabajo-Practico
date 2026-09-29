@@ -24,9 +24,13 @@ export type DialogProps = {
  * fondo inerte, atrapa el foco de teclado y lo devuelve al elemento que abrió el diálogo al
  * cerrarse, sin implementar nada de eso a mano. Es controlado: quien lo usa decide `open`.
  *
- * Al pedir cerrar con Escape el navegador dispara `cancel` y luego `close`. Se escucha solo
- * `cancel` (con `preventDefault`, para que el cierre lo decida `open`) y así `onCancel` se
- * llama una única vez.
+ * Escape dispara `cancel`. Si es cancelable se evita el cierre nativo (`preventDefault`) y
+ * `onCancel` se llama una vez, para que el cierre lo decida `open`. Chromium, ante Escape
+ * repetido sin interacción del usuario, dispara un `cancel` NO cancelable y cierra el diálogo
+ * igual: ese caso se resincroniza con el evento `close` (si el diálogo nativo ya no está
+ * abierto pero `open` sigue en true, se llama a `onCancel`, una vez, para que el padre lo
+ * cierre). Con eso cada Escape llama a `onCancel` exactamente una vez, y un `open=true` posterior
+ * vuelve a mostrar el diálogo porque el efecto revisa el estado nativo en cada render.
  */
 export function Dialog({
   open,
@@ -42,22 +46,49 @@ export function Dialog({
   const ref = useRef<HTMLDialogElement>(null);
   const tituloId = useId();
 
+  // Sin lista de dependencias a propósito: compara `open` con el estado nativo en cada render,
+  // así un diálogo que el navegador cerró por su cuenta se vuelve a mostrar si `open` sigue en
+  // true. `showModal()` lanza si ya está abierto, de ahí la guarda.
   useEffect(() => {
     const dialogo = ref.current;
-    if (!open || !dialogo) {
+    if (!dialogo) {
       return;
     }
-    dialogo.showModal();
-    return () => dialogo.close();
-  }, [open]);
+    if (open && !dialogo.open) {
+      dialogo.showModal();
+    } else if (!open && dialogo.open) {
+      dialogo.close();
+    }
+  });
+
+  // Al desmontar se cierra el diálogo nativo si quedó abierto.
+  useEffect(() => {
+    const dialogo = ref.current;
+    return () => {
+      if (dialogo?.open) {
+        dialogo.close();
+      }
+    };
+  }, []);
 
   return (
     <dialog
       ref={ref}
       aria-labelledby={tituloId}
       onCancel={(evento) => {
-        evento.preventDefault();
-        onCancel();
+        // Un `cancel` no cancelable ya no se puede evitar: el diálogo se cierra y `onClose`
+        // resincroniza (ver arriba), así `onCancel` no se llama dos veces.
+        if (evento.cancelable) {
+          evento.preventDefault();
+          onCancel();
+        }
+      }}
+      onClose={(evento) => {
+        // Cerrado por el navegador mientras `open` sigue en true. El `close` provocado por
+        // `open=false` o el de un diálogo ya reabierto no llegan acá con `open` y cerrado.
+        if (open && !evento.currentTarget.open) {
+          onCancel();
+        }
       }}
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-border bg-card p-6 text-foreground backdrop:bg-black/50"
     >

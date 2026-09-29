@@ -135,4 +135,81 @@ describe("Dialog", () => {
       /focus-visible:ring-2/,
     );
   });
+
+  // Chromium (close watcher) dispara un `cancel` NO cancelable ante Escape repetido sin
+  // interacción del usuario: el diálogo nativo se cierra igual, aunque `open` siga en true.
+  describe("cierre nativo que el padre no pidió", () => {
+    function cerrarNativo(dialogo: HTMLElement) {
+      dialogo.removeAttribute("open");
+      dialogo.dispatchEvent(new Event("close"));
+    }
+
+    function conOpen(open: boolean, onCancel: () => void) {
+      return (
+        <Dialog
+          open={open}
+          titulo="Cancelar reserva"
+          textoConfirmar="Sí, cancelar"
+          textoCancelar="Volver"
+          onConfirm={jest.fn()}
+          onCancel={onCancel}
+        >
+          <p>Resumen de la reserva</p>
+        </Dialog>
+      );
+    }
+
+    it("un cancel no cancelable seguido de close llama a onCancel exactamente una vez", () => {
+      const { onCancel } = renderDialog();
+      const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
+
+      const cancelar = new Event("cancel", { cancelable: false });
+      dialogo.dispatchEvent(cancelar);
+      cerrarNativo(dialogo);
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("un close sin cancel previo, con open todavía en true, llama a onCancel una vez", () => {
+      const { onCancel } = renderDialog();
+
+      cerrarNativo(screen.getByRole("dialog", { name: "Cancelar reserva" }));
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("después del cierre nativo, el padre puede cerrar y volver a abrir el diálogo", () => {
+      const onCancel = jest.fn();
+      const { rerender } = render(conOpen(true, onCancel));
+      cerrarNativo(screen.getByRole("dialog", { name: "Cancelar reserva", hidden: true }));
+      expect(showModal).toHaveBeenCalledTimes(1);
+
+      rerender(conOpen(false, onCancel));
+      rerender(conOpen(true, onCancel));
+
+      expect(showModal).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("dialog", { name: "Cancelar reserva" })).toBeInTheDocument();
+    });
+
+    it("si el padre ignora onCancel y vuelve a renderizar con open=true, se vuelve a mostrar", () => {
+      const onCancel = jest.fn();
+      const { rerender } = render(conOpen(true, onCancel));
+      cerrarNativo(screen.getByRole("dialog", { name: "Cancelar reserva", hidden: true }));
+
+      rerender(conOpen(true, onCancel));
+
+      expect(showModal).toHaveBeenCalledTimes(2);
+    });
+
+    it("el close que provoca el propio cierre por open=false no llama a onCancel", () => {
+      const onCancel = jest.fn();
+      const { rerender } = render(conOpen(true, onCancel));
+      const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
+
+      rerender(conOpen(false, onCancel));
+      dialogo.dispatchEvent(new Event("close")); // el navegador lo dispara de forma asíncrona
+
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
 });

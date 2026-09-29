@@ -332,7 +332,9 @@ los mensajes de `emailCliente`, ni un campo que solo comparte prefijo. Con los m
   `onConfirm`/`onCancel`, `confirmando` para deshabilitar la confirmación en curso). Escucha
   solo el evento `cancel` (con `preventDefault`, el cierre lo decide `open`) para que Escape
   llame a `onCancel` exactamente una vez, aunque el navegador dispare `cancel` y después
-  `close`; el test lo verifica. El atrapado y la devolución de foco siguen pendientes de la
+  `close`; el test lo verifica. Si el navegador cierra el diálogo por su cuenta (Chromium dispara
+  un `cancel` no cancelable ante Escape repetido sin interacción), el evento `close`
+  resincroniza: se llama a `onCancel` una vez y un `open=true` posterior lo vuelve a mostrar. El atrapado y la devolución de foco siguen pendientes de la
   verificación manual 7.2.
 - D7 (voseo): solo cambió el mensaje de 5xx de `errors.ts` ("Intentá de nuevo más tarde.").
   Los mensajes de `mensajeDeRechazo` en `client.ts` son impersonales y no se tocaron, como
