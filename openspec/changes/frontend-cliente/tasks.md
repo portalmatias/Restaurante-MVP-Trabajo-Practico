@@ -316,7 +316,7 @@
 - `puedeCancelarSegunVentana` vive en `frontend/src/lib/ventana-cancelacion.ts` (D9 no fija
   archivo) y reusa `ARGENTINA_OFFSET_MS`, exportada desde `fecha-hora.ts`. Acepta la hora de
   inicio como `HH:mm` (formato de `POST /reservas/consultar`) o como ISO
-  `1970-01-01THH:mm:00.000Z` (formato de `GET /turnos`); conserva los segundos y milisegundos del
+  `1970-01-01THH:mm:ss.sssZ` (formato de `GET /turnos`); conserva los segundos y milisegundos del
   ISO (`HH:mm` equivale a `:00`). Una hora mal formada, una `fecha` que no sea `YYYY-MM-DD` o que
   no exista en el calendario (ej. `2026-02-30`) lanzan un `Error`; nunca devuelve `false` por
   `NaN` ni pasa al mes siguiente.
