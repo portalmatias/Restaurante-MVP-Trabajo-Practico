@@ -29,15 +29,18 @@ es la primera vez que el frontend maneja un JWT. `design.md` fija esa decisión.
   Reservas `CONFIRMADA`/`PENDIENTE` de ese turno y esa fecha) — sin agregar un endpoint
   nuevo al backend.
 - Se agrega el CRUD de salón bajo `/admin/salon`: listar y editar Zonas
-  (`GET`/`PATCH /admin/zonas`), alta/listado/edición/baja de Mesas
-  (`POST`/`GET`/`PATCH`/`DELETE /admin/mesas`) y alta/listado/edición/activación de Turnos
-  (`POST`/`GET`/`PATCH /admin/turnos`), con los errores `400`/`404`/`409` de cada operación
-  (`gestion-salon`).
+  (`GET /admin/zonas`, `PATCH /admin/zonas/:id`), alta/listado/edición/baja de Mesas
+  (`POST /admin/mesas`, `GET /admin/mesas`, `PATCH /admin/mesas/:id`,
+  `DELETE /admin/mesas/:id`) y alta/listado/edición/activación de Turnos
+  (`POST /admin/turnos`, `GET /admin/turnos`, `PATCH /admin/turnos/:id`), con los errores
+  `400`/`404`/`409` de cada operación (`gestion-salon`).
 - Se agrega el listado de Reservas en `/admin/reservas`, sobre `GET /admin/reservas`
   (`reserva-consultar`), con los mismos filtros que expone la API (fecha, estado, zona,
-  turno) y paginación. Desde cada fila `PENDIENTE` (zona VIP) se accede a confirmar o
-  rechazar; desde cada fila `CONFIRMADA` de un turno ya pasado, a marcar `NO_SHOW` — ambas
-  acciones **bloqueadas hasta que sus backends existan** (grupos D y E de `tasks.md`).
+  turno) y paginación. Desde cada fila `PENDIENTE` se accede a confirmar o rechazar; desde
+  cada fila `CONFIRMADA` se accede a marcar `NO_SHOW` (el backend rechaza con `409` si el
+  turno todavía no terminó; la UI no filtra por turno pasado de antemano) — ambas acciones
+  **bloqueadas hasta que sus backends existan** (grupos E y F de `tasks.md`; el listado en
+  sí, grupo D, no está bloqueado: `reserva-consultar` ya mergeó).
 - Copy en español rioplatense **formal** (voseo sin lunfardo, tono profesional): a
   diferencia de `frontend-cliente`, que usa voseo coloquial pensado para un cliente que
   reserva desde el celular, este es personal del restaurante operando un panel de trabajo.

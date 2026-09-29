@@ -125,10 +125,21 @@ implemente el que llegue segundo.
 
 ### D4: Protección de rutas con un layout de cliente, no `middleware.ts`
 
-**Decisión:** `frontend/app/admin/layout.tsx` es un layout que envuelve todo `/admin/...`
-**excepto** `/admin/login` (con el mecanismo de grupos de rutas de Next.js:
-`(protegido)/layout.tsx` para las pantallas que exigen sesión, y `login/page.tsx` fuera de
-ese grupo). Ese layout es un Client Component: al montarse, lee la sesión de
+**Decisión:** el guard de sesión vive **únicamente** en
+`frontend/app/admin/(protegido)/layout.tsx` — el layout del grupo de rutas que agrupa
+todas las pantallas protegidas (`(protegido)/page.tsx` el dashboard,
+`(protegido)/salon/page.tsx`, `(protegido)/reservas/page.tsx`), sin agregar el segmento
+`(protegido)` a la URL. `frontend/app/admin/login/page.tsx` queda **fuera** de ese grupo,
+como hermano, así que ningún layout con guard lo envuelve. **No existe** un
+`frontend/app/admin/layout.tsx` a nivel de todo `/admin/...`: en Next.js, un layout de
+segmento envuelve a *todos* sus hijos, incluidos los de otros grupos de rutas debajo suyo
+— un `admin/layout.tsx` que redirigiera sin sesión envolvería también a `login/page.tsx` y
+generaría un bucle de redirección (`/admin/login` → sin sesión → redirige a
+`/admin/login`). Es un error de la primera versión de este documento, que describía el
+guard como si viviera en `admin/layout.tsx`; `tasks.md` (4.1/4.2) ya lo tenía bien planteado
+con `(protegido)/layout.tsx`, esta sección solo lo alineaba mal en la prosa.
+
+El layout de `(protegido)` es un Client Component: al montarse, lee la sesión de
 `sessionStorage` y, si no hay una vigente, redirige a `/admin/login` antes de renderizar
 sus hijos. `toAdminApiResult` (D2), al recibir un `401` de cualquier llamada, descarta la
 sesión guardada y dispara la misma redirección.
@@ -141,14 +152,25 @@ el layout de cliente no cubra igual.
 
 ### D5: Dashboard de aforo calculado en el cliente, sin endpoint nuevo
 
-**Decisión:** `/admin` pide `GET /admin/zonas` (aforo máximo por Zona) una vez, y
-`GET /admin/reservas?fecha=<fecha>&turnoId=<turno>&limit=100` por la fecha y el turno
-elegidos (con `limit` alto porque el volumen de un turno de un restaurante no se acerca a
-cien Reservas; si algún día lo hiciera, paginar la suma es trabajo de una revisión futura,
-no de este change). Con esas dos respuestas, calcula en el cliente:
+**Decisión:** `/admin` pide `GET /admin/zonas` (aforo máximo por Zona) una vez, y **dos**
+llamadas a `GET /admin/reservas` por la fecha y el turno elegidos — una por cada estado
+activo, `?fecha=<fecha>&turnoId=<turno>&estado=CONFIRMADA&limit=100` y
+`...&estado=PENDIENTE&limit=100` — en vez de una sola llamada sin filtrar por `estado`.
+
+**Por qué dos llamadas filtradas y no una sola con `limit=100` (corrección durante la
+revisión del PR de spec):** `GET /admin/reservas` sin `estado` devuelve **todas** las
+Reservas de esa fecha y ese turno, incluidas `CANCELADA`/`NO_SHOW` acumuladas con el tiempo
+— nada garantiza que el total quede bajo 100 filas. Filtrando por `estado`, en cambio, la
+cota sí es real: cada Reserva activa suma al menos 1 comensal al aforo de su Zona, así que
+la cantidad de filas `CONFIRMADA` más `PENDIENTE` de una fecha y un turno nunca supera la
+suma de `aforoMaximo` de las Zonas (60 en el seed) — muy por debajo de 100. Sin este
+filtro, una consulta silenciosamente truncada en 100 filas podía omitir Reservas activas y
+mostrar un aforo menor al real.
+
+Con esas respuestas, calcula en el cliente:
 
 ```
-ocupacionPorZona[zona] = suma(comensales de Reservas de esa Zona con estado CONFIRMADA o PENDIENTE)
+ocupacionPorZona[zona] = suma(comensales de las Reservas de esa Zona, uniendo ambas llamadas)
 ocupacionGlobal        = suma(ocupacionPorZona de todas las Zonas)
 ```
 
@@ -158,12 +180,26 @@ aforo") que ya aplica el backend como tope duro al crear una Reserva (`disponibi
 de verdad (las Reservas reales) y reproduce el mismo cálculo, en vez de pedirle al backend
 un número ya agregado.
 
+**El aforo *máximo* global (`ConfiguracionNegocio.aforoGlobal`) no tiene de dónde salir
+hoy** (hallazgo de la revisión del PR de spec): `GET /admin/zonas` solo devuelve el
+`aforoMaximo` de cada Zona, nunca el de `ConfiguracionNegocio`; `aforoGlobal` hoy es interno
+del validador de `disponibilidad` (`cargarContexto`) y ningún endpoint lo expone. Sumar los
+`aforoMaximo` de las Zonas **no** es equivalente al `aforoGlobal` real: son dos topes
+independientes (`config.yaml` §6: "se validan los dos topes... no solo el de la zona"), y
+hoy 40 + 20 = 60 coincide con el `aforoGlobal` del seed por casualidad, no por relación
+lógica entre ambos. Con estos datos, este change **muestra la ocupación global calculada,
+sin un máximo global de referencia** (sí muestra máximo por Zona, que si está disponible).
+Mostrar "X / 60" a nivel global exige que un change de backend exponga `aforoGlobal` (por
+ejemplo, agregándolo a la respuesta de `GET /admin/zonas` o a un endpoint nuevo chico) —
+alcance fuera de este change, que es frontend-only. Queda en Open Questions.
+
 **Alternativa considerada:** un endpoint nuevo `GET /admin/aforo` que devuelva la ocupación
-ya calculada. Se descarta por ahora: agregar un endpoint es alcance de un change de
-backend, y `GET /admin/reservas` ya trae todo el dato necesario para un volumen de
-Reservas por turno que nunca es grande. Si el cálculo en el cliente resultara insuficiente
-(por ejemplo, si el volumen creciera mucho), migrar a un endpoint agregado es un cambio de
-backend que no afecta las pantallas, solo de dónde sale el número.
+ya calculada, con el aforo global incluido. Se descarta por ahora: agregar un endpoint es
+alcance de un change de backend, y las dos llamadas filtradas de arriba ya alcanzan para
+el número que sí se puede mostrar (ocupación, y el máximo por Zona) sin ese endpoint. Si el
+equipo decide resolver el aforo global, ese change de backend puede reemplazar las dos
+llamadas de este `design.md` por una sola, sin cambiar la forma en que la pantalla
+presenta el resultado.
 
 ### D6: Confirmación de acciones irreversibles con un patrón de dos pasos en línea, no un `Dialog` nuevo
 
@@ -255,3 +291,9 @@ librería de grillas.
 - **Unificar el patrón de confirmación** (D6) con el `Dialog` de `frontend-cliente` una vez
   que ambos estén implementados, si el equipo lo prefiere visualmente. No es parte de este
   change.
+- **Exponer `ConfiguracionNegocio.aforoGlobal` por API** (D5, hallazgo de la revisión del
+  PR de spec): sin esto, el dashboard no puede mostrar un máximo de referencia para la
+  ocupación global, solo el número ocupado. Es un change de backend chico (agregar el
+  campo a la respuesta de `GET /admin/zonas`, o un endpoint nuevo), fuera de alcance de
+  este change frontend-only. Si el equipo lo prioriza, un PR de seguimiento lo agrega y
+  este change solo necesita leer el campo nuevo, sin rehacer la pantalla.

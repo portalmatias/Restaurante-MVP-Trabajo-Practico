@@ -7,8 +7,9 @@
       `frontend/src/lib/api/{client.ts,errors.ts,url-base.ts,schema.d.ts}`.
 - [ ] 1.2 Releer esos archivos reales y anotar cualquier diferencia respecto de lo que asume
       `design.md` (D2 cita `createClient`/`urlBaseApi`/`toApiResult`; D8 cita `ErrorApi`/
-      `mapErrorApi`; D6 cita `Button` con `variant: 'primary'|'secondary'|'destructive'|'ghost'`
-      y `Field`/`Select` con `label`/`error`). Si algo cambió, usar la forma real y anotarlo en
+      `mapErrorApi`) y respecto de las primitivas de `frontend-base` que usan las secciones 3,
+      6 y 7 de este archivo (`Button` con `variant: 'primary'|'secondary'|'destructive'|'ghost'`;
+      `Field`/`Select` con `label`/`error`). Si algo cambió, usar la forma real y anotarlo en
       la descripción del PR, sin renombrar nada del lado de `frontend-base`.
 - [ ] 1.3 Confirmar con un login manual (`curl` o el backend real) que `POST /auth/login`
       responde `accessToken` con el admin del seed, y que `openapi-typescript` ya generó
@@ -23,12 +24,17 @@
 
 ## 2. Sesión y cliente HTTP de admin (Grupo A, parte 1)
 
-- [ ] 2.1 Crear `frontend/src/lib/auth/session.ts`: `guardarSesion(accessToken)` (decodifica
-      `exp` del payload del JWT con `atob()`, sin verificar firma, y hace
-      `sessionStorage.setItem`), `leerSesion()` (lee y valida que no haya vencido; si venció,
+- [ ] 2.1 Crear `frontend/src/lib/auth/session.ts`: `guardarSesion(accessToken)` decodifica
+      `exp` del payload del JWT (sin verificar firma) normalizando primero la segunda parte
+      del token a base64 estándar (JWT usa base64**url**: reemplazar `-`→`+` y `_`→`/`,
+      completar con `=` hasta múltiplo de 4) y recién ahí llamar a `atob()` — `atob()` sobre
+      el string base64url crudo falla o decodifica mal apenas el payload trae `-`/`_`, que
+      pasa seguido (son caracteres válidos de base64url). Después hace
+      `sessionStorage.setItem`. `leerSesion()` (lee y valida que no haya vencido; si venció,
       la borra y devuelve `null`) y `borrarSesion()`. Verificar con tests unitarios: guardar y
-      leer devuelve el mismo token; una sesión con `exp` en el pasado no se devuelve; leer sin
-      sesión guardada devuelve `null`.
+      leer devuelve el mismo token; un JWT real (firmado por el backend, con `-`/`_` en el
+      payload) decodifica el `exp` correcto; una sesión con `exp` en el pasado no se
+      devuelve; leer sin sesión guardada devuelve `null`.
 - [ ] 2.2 Crear `frontend/src/lib/api/admin-client.ts`: instancia propia de `createClient<paths>`
       (D2) con `.use({ onRequest })` que agrega `Authorization: Bearer <token>` leyendo
       `leerSesion()`; si no hay sesión, no agrega el header (deja que el backend responda
@@ -37,7 +43,7 @@
       sesión guardada, la request saliente tiene el header, y que sin sesión no lo tiene.
 - [ ] 2.3 Extender `toAdminApiResult` (o un envoltorio alrededor) para que, ante un `401` de
       cualquier llamada, llame a `borrarSesion()` y dispare la redirección de D4 (una función
-      inyectada o un evento, no un `window.location` directo, para que el test de 2.2 no
+      inyectada o un evento, no un `window.location` directo, para que el test de 2.3 no
       dependa de un navegador real). Verificar con un test: una respuesta `401` simulada borra
       la sesión y dispara la redirección.
 
@@ -81,18 +87,23 @@
       Turno (`Select`, poblado desde `GET /admin/turnos` — ya disponible por `gestion-salon`,
       sin depender de `catalogo-publico`, que es para las rutas públicas), con la fecha de
       hoy y el primer Turno activo como valores iniciales.
-- [ ] 5.2 Crear la función pura `calcularAforo(zonas, reservas)` en
+- [ ] 5.2 Crear la función pura `calcularAforo(zonas, reservasActivas)` en
       `frontend/src/lib/aforo/calcular-aforo.ts` (D5): agrupa por Zona los comensales de
-      Reservas en estado `CONFIRMADA` o `PENDIENTE`, devuelve `{ porZona: Record<zonaId,
-      {ocupado, maximo}>, global: {ocupado, maximo} }`. Verificar con tests unitarios: los
-      cuatro escenarios de la spec (con Reservas activas, con `CANCELADA`/`NO_SHOW`
-      excluidas, sin Reservas, y con varias Zonas sumando al global).
-- [ ] 5.3 Conectar `calcularAforo` con `GET /admin/zonas` y
-      `GET /admin/reservas?fecha=...&turnoId=...&limit=100` (D5) cada vez que cambian la
-      fecha o el Turno seleccionados, y mostrar el resultado por Zona y global (por ejemplo,
-      una barra o un texto "X / Y comensales"). Verificar con un test de integración de
-      componente, mockeando `admin-client`, que cambiar el selector de fecha dispara una
-      nueva consulta y actualiza los números mostrados.
+      `reservasActivas` (ya se asume que el caller filtró por `CONFIRMADA`/`PENDIENTE`, D5),
+      devuelve `{ porZona: Record<zonaId, {ocupado, maximo}>, global: {ocupado} }` — sin
+      `maximo` en `global`, D5 no tiene de dónde sacarlo hoy. Verificar con tests unitarios:
+      los cuatro escenarios de la spec (con Reservas activas, con `CANCELADA`/`NO_SHOW`
+      excluidas por el caller antes de llegar acá, sin Reservas, y con varias Zonas sumando
+      al global).
+- [ ] 5.3 Conectar `calcularAforo` con `GET /admin/zonas` y **dos** llamadas a
+      `GET /admin/reservas` (`?fecha=...&turnoId=...&estado=CONFIRMADA&limit=100` y
+      `...&estado=PENDIENTE&limit=100`, D5 — nunca una sola llamada sin `estado`: incluiría
+      Reservas `CANCELADA`/`NO_SHOW` acumuladas y podría superar el `limit` sin que las
+      Reservas activas quepan) cada vez que cambian la fecha o el Turno seleccionados, y
+      mostrar el resultado: por Zona con su máximo ("X / Y comensales"), global solo con la
+      ocupación (sin "/ máximo", D5). Verificar con un test de integración de componente,
+      mockeando `admin-client`, que cambiar el selector de fecha dispara las dos consultas
+      filtradas y actualiza los números mostrados.
 
 ## 6. CRUD de salón (Grupo C)
 
@@ -101,9 +112,11 @@
       `frontend/src/components/admin/` (por ejemplo `zonas-panel.tsx`,
       `mesas-panel.tsx`, `turnos-panel.tsx`) para no tener un archivo único gigante.
 - [ ] 6.2 Zonas: listar (`GET /admin/zonas`) en una tabla y editar cada una con un formulario
-      (`PATCH /admin/zonas/:id`) con los seis campos de la spec. Verificar con tests: edición
-      exitosa actualiza la fila; `400` por rango de comensales inválido muestra el error
-      junto al campo, sin actualizar la fila.
+      (`PATCH /admin/zonas/:id`) con los siete campos de la spec: `minComensales`,
+      `maxComensales`, `anticipacionMinHoras`, `anticipacionMaxDias`,
+      `ventanaCancelacionHoras`, `requiereConfirmacionAdmin` y `aforoMaximo`. Verificar con
+      tests: edición exitosa actualiza la fila; `400` por rango de comensales inválido
+      muestra el error junto al campo, sin actualizar la fila.
 - [ ] 6.3 Mesas: listar con filtro opcional por Zona (`GET /admin/mesas?zonaId=...`), alta
       (`POST /admin/mesas`) y edición (`PATCH /admin/mesas/:id`). Verificar con tests: alta
       exitosa agrega la fila; `409` por etiqueta duplicada muestra el error junto al campo de

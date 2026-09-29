@@ -81,16 +81,19 @@ El sistema SHALL exponer una acción de cerrar sesión, visible en toda pantalla
 - **AND** una visita posterior a `/admin` vuelve a redirigir a `/admin/login`
 
 ### Requirement: Dashboard de aforo
-El sistema SHALL mostrar en `/admin` el aforo global y el aforo de cada Zona para una fecha y
-un turno seleccionables, calculando la ocupación como la suma de comensales de las Reservas
-en estado `CONFIRMADA` o `PENDIENTE` de esa fecha y ese turno, sobre el aforo máximo
-configurado de cada Zona y el aforo global. El sistema SHALL NOT contar Reservas
-`CANCELADA` o `NO_SHOW` en la ocupación.
+El sistema SHALL mostrar en `/admin`, para una fecha y un turno seleccionables, la
+ocupación de cada Zona y la ocupación global, calculadas como la suma de comensales de las
+Reservas en estado `CONFIRMADA` o `PENDIENTE` de esa fecha y ese turno. La ocupación de
+cada Zona SHALL mostrarse junto a su aforo máximo configurado. El sistema SHALL NOT contar
+Reservas `CANCELADA` o `NO_SHOW` en la ocupación. Como el aforo máximo global no tiene hoy
+un endpoint que lo exponga (`design.md` D5), la ocupación global SHALL mostrarse sin un
+aforo máximo de referencia, hasta que un change de backend lo agregue.
 
 #### Scenario: Ocupación calculada sobre Reservas activas
 - **WHEN** se muestra el dashboard para una fecha y un turno con Reservas `CONFIRMADA` y
   `PENDIENTE` de varias Zonas
-- **THEN** la ocupación de cada Zona es la suma de comensales de esas Reservas en esa Zona
+- **THEN** la ocupación de cada Zona es la suma de comensales de esas Reservas en esa Zona,
+  junto al aforo máximo configurado de esa Zona
 - **AND** la ocupación global es la suma de comensales de todas las Zonas
 
 #### Scenario: Reservas canceladas o no show no cuentan
@@ -99,8 +102,7 @@ configurado de cada Zona y el aforo global. El sistema SHALL NOT contar Reservas
 
 #### Scenario: Sin Reservas, el aforo está en cero
 - **WHEN** no hay ninguna Reserva activa para la fecha y el turno elegidos
-- **THEN** el dashboard muestra la ocupación de cada Zona y la global en cero, sobre el
-  aforo máximo configurado
+- **THEN** el dashboard muestra la ocupación de cada Zona y la global en cero
 
 #### Scenario: Cambiar la fecha o el turno actualiza el aforo mostrado
 - **WHEN** el administrador cambia la fecha o el turno seleccionados
@@ -210,8 +212,11 @@ fecha, el Turno, la Zona, los comensales y los datos de contacto del cliente.
 - **THEN** el sistema muestra un mensaje de que no hay Reservas para esos filtros, sin
   tratarlo como un error
 
-### Requirement: Confirmar y rechazar una Reserva VIP pendiente
-El sistema SHALL ofrecer, sobre cada Reserva en estado `PENDIENTE` del listado, las
+### Requirement: Confirmar y rechazar una Reserva pendiente
+En la práctica solo la Zona VIP deja Reservas `PENDIENTE` (es la única con
+`requiereConfirmacionAdmin: true` en el seed), pero esta acción se habilita por **estado**,
+no por Zona, para seguir siéndolo si otra Zona adopta esa configuración. El sistema SHALL
+ofrecer, sobre cada Reserva en estado `PENDIENTE` del listado, las
 acciones de confirmar y rechazar, y SHALL pedir una confirmación explícita antes de
 rechazar, dado que es una transición irreversible. Al confirmar o rechazar, el sistema
 SHALL actualizar el estado de esa Reserva en el listado sin recargar toda la página.
