@@ -95,15 +95,18 @@
       los cuatro escenarios de la spec (con Reservas activas, con `CANCELADA`/`NO_SHOW`
       excluidas por el caller antes de llegar acá, sin Reservas, y con varias Zonas sumando
       al global).
-- [ ] 5.3 Conectar `calcularAforo` con `GET /admin/zonas` y **dos** llamadas a
+- [ ] 5.3 Pedir `GET /admin/zonas` **una sola vez**, al montar la pantalla (D5: son los
+      aforos máximos configurados, no dependen de la fecha ni del Turno elegidos). Cada vez
+      que cambian la fecha o el Turno seleccionados, disparar **dos** llamadas a
       `GET /admin/reservas` (`?fecha=...&turnoId=...&estado=CONFIRMADA&limit=100` y
       `...&estado=PENDIENTE&limit=100`, D5 — nunca una sola llamada sin `estado`: incluiría
       Reservas `CANCELADA`/`NO_SHOW` acumuladas y podría superar el `limit` sin que las
-      Reservas activas quepan) cada vez que cambian la fecha o el Turno seleccionados, y
-      mostrar el resultado: por Zona con su máximo ("X / Y comensales"), global solo con la
-      ocupación (sin "/ máximo", D5). Verificar con un test de integración de componente,
-      mockeando `admin-client`, que cambiar el selector de fecha dispara las dos consultas
-      filtradas y actualiza los números mostrados.
+      Reservas activas quepan), pasar sus resultados junto con las Zonas ya cargadas a
+      `calcularAforo`, y mostrar el resultado: por Zona con su máximo ("X / Y comensales"),
+      global solo con la ocupación (sin "/ máximo", D5). Verificar con un test de
+      integración de componente, mockeando `admin-client`, que: `GET /admin/zonas` se pide
+      una sola vez aunque el selector de fecha cambie varias veces, y cada cambio de fecha
+      dispara las dos consultas de Reservas y actualiza los números mostrados.
 
 ## 6. CRUD de salón (Grupo C)
 
