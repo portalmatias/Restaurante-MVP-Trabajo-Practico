@@ -98,7 +98,12 @@ al ejecutar el código contra una app real — y advierte explícitamente que `c
 iba a pisarlo. Corregido acá antes de implementar: `marcarNoShow` va en el controller nuevo que
 ya existe desde `reserva-consultar`, `ReservasAdminController` (`@Controller('admin/reservas')`,
 mismo `ReservasService` inyectado, `@UseGuards(JwtAuthGuard, RolesGuard)` +
-`@Roles(RolUsuario.ADMIN)` a nivel de clase) — no uno nuevo.
+`@Roles(RolUsuario.ADMIN)` a nivel de clase) — no uno nuevo. El `operationId` se fija explícito
+como `ReservasController_marcarNoShow` (no el `ReservasAdminController_marcarNoShow` que
+generaría Swagger por default), mismo criterio que ya usa `ReservasController_listar` en
+`reserva-consultar`: la división en dos archivos es un detalle de implementación de NestJS, no
+del contrato — la ruta sigue siendo conceptualmente parte de la capability `Reservas` (hallazgo
+de cubic en el PR de esta corrección, P3).
 
 ### Throttling: se reutiliza el límite global, sin `@Throttle()` propio
 A diferencia de `POST /auth/login` (que sí definió un límite más estricto porque es el endpoint
@@ -163,7 +168,7 @@ paths:
                 $ref: '#/components/schemas/ErrorCancelacionDto'
   /admin/reservas/{id}/no-show:
     patch:
-      operationId: ReservasAdminController_marcarNoShow
+      operationId: ReservasController_marcarNoShow
       summary: Marcar una reserva como ausente
       description: Marca NO_SHOW solo en reservas confirmadas y después del fin del turno.
       tags: [Reservas]
@@ -270,9 +275,15 @@ no equivalencia semántica. Mantener los mismos códigos, descripciones y esquem
 - **[Riesgo, cerrado]** Las versiones anteriores de este documento asumían `PATCH
   /admin/reservas/:id/no-show` dentro de `ReservasController` — técnicamente imposible, mismo
   motivo que documentó `reserva-consultar` (D6) para `GET /admin/reservas` → **Resolución:**
-  `marcarNoShow` pasa a `ReservasAdminController`, el controller que ya trajo ese change. Sin
-  impacto en el contrato: este change todavía no se implementó, así que no hay `operationId`
-  publicado que preservar (a diferencia de `ReservasController_listar` en `reserva-consultar`).
+  `marcarNoShow` pasa a `ReservasAdminController`, el controller que ya trajo ese change, pero
+  conserva el `operationId` `ReservasController_marcarNoShow` (no el
+  `ReservasAdminController_marcarNoShow` que generaría Swagger por default): mismo criterio que
+  `ReservasController_listar` en `reserva-consultar` — la división en dos archivos es un
+  detalle de implementación, no del contrato — sin esperar a que haya un `operationId` ya
+  publicado que proteger (hallazgo de cubic sobre la primera versión de esta corrección, que sí
+  dejaba el default de Swagger razonando que "todavía no se implementó, no hay nada que
+  preservar": ese razonamiento vale para decidir si hace falta una migración de contrato, no
+  para decidir la convención de nombres a seguir desde el principio).
 - **[Riesgo]** `backend/src/common/timezone.ts` ya está mergeado (#12) y `disponibilidad` (#21)
   ya lo adoptó, así que la firma de `inicioTurnoUtc`/`finTurnoUtc` es estable — pero si
   `reservas-crear` (todavía sin implementar) necesitara una firma distinta para su propio uso,
