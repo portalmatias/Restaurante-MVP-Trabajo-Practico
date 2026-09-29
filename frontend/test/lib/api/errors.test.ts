@@ -153,4 +153,18 @@ describe("mapErrorApi", () => {
 
     expect(resultado).toEqual({ tipo: "desconocido", mensaje: "Credenciales inválidas." });
   });
+
+  it("un 429 (límite de intentos, sin cuerpo) mapea a un mensaje de espera", () => {
+    expect(mapErrorApi(429, undefined)).toEqual({
+      tipo: "limite-de-intentos",
+      mensaje: "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
+    });
+  });
+
+  it("un 429 nunca expone el mensaje del servidor", () => {
+    const resultado = mapErrorApi(429, { statusCode: 429, message: "ThrottlerException" });
+
+    expect(resultado).toMatchObject({ tipo: "limite-de-intentos" });
+    expect(JSON.stringify(resultado)).not.toMatch(/Throttler/);
+  });
 });
