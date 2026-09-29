@@ -1,9 +1,17 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -16,6 +24,8 @@ import {
   fechaCalendarioDesdeIso,
 } from '../common/timezone';
 import { ErrorRespuesta } from '../disponibilidad/dto/error-respuesta.dto';
+import { CancelarReservaDto } from './dto/cancelar-reserva.dto';
+import { CodigoReservaParamDto } from './dto/codigo-reserva-param.dto';
 import { ConsultarReservaDto } from './dto/consultar-reserva.dto';
 import { CrearReservaDto } from './dto/crear-reserva.dto';
 import { ReservaConsultadaRespuesta } from './dto/reserva-consultada-respuesta.dto';
@@ -287,5 +297,63 @@ export class ReservasController {
     @Body() dto: ConsultarReservaDto,
   ): Promise<ReservaConsultadaRespuesta> {
     return this.reservasService.consultar(dto.codigo, dto.email);
+  }
+
+  /**
+   * `POST /reservas/:codigo/cancelar` (design.md "Rutas" de `cancelacion-turnos`). El email
+   * va en el body, no en la URL, por el mismo motivo que `POST /reservas/consultar`: no
+   * dejarlo en logs de acceso ni en el historial del navegador. `204` sin cuerpo al
+   * cancelar, igual que las bajas de `gestion-salon`.
+   *
+   * `@SkipThrottle({ default: false })`: misma razón que `consultar` (D5 de
+   * `reserva-consultar`) — esta ruta sí recibe un código de reserva de baja entropía y
+   * necesita el throttling contra enumeración que exige `config.yaml` §5.
+   */
+  @SkipThrottle({ default: false })
+  @ApiOperation({
+    summary: 'Cancelar una reserva por código y email',
+    description:
+      'Cancela una reserva PENDIENTE o CONFIRMADA dentro de la ventana mínima de cancelación de su zona (2 h STANDARD / 24 h VIP). El límite exacto de la ventana está permitido. Exige el código y el email de la misma reserva; si no coinciden, responde el mismo 404 que la consulta, sin indicar cuál dato era incorrecto. Es una ruta pública, sin autenticación, con límite de solicitudes por cliente.',
+    security: [],
+  })
+  @ApiNoContentResponse({
+    description: 'Reserva cancelada; respuesta sin cuerpo.',
+  })
+  @ApiBadRequestResponse({
+    type: ErrorRespuesta,
+    description:
+      'El código no es alfanumérico de 8 caracteres o el body no trae un email válido.',
+  })
+  @ApiNotFoundResponse({
+    type: ErrorRespuesta,
+    description:
+      'No existe una reserva con ese código y email. Es la misma respuesta si el código no existe y si el email no coincide, sin indicar cuál dato falló.',
+    examples: {
+      noEncontrada: {
+        summary: 'Código inexistente o email incorrecto',
+        value: {
+          statusCode: 404,
+          message: RESERVA_NO_ENCONTRADA_MENSAJE,
+          error: 'Not Found',
+        },
+      },
+    },
+  })
+  @ApiConflictResponse({
+    type: ErrorRespuesta,
+    description:
+      'La reserva ya está en un estado terminal (CANCELADA o NO_SHOW), o al inicio de su turno le quedan menos horas que la ventana mínima de cancelación de su zona.',
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'Se superó el límite de intentos de cancelación permitidos en la ventana configurada. Se rechaza antes de validar código y email.',
+  })
+  @Post(':codigo/cancelar')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async cancelar(
+    @Param() params: CodigoReservaParamDto,
+    @Body() dto: CancelarReservaDto,
+  ): Promise<void> {
+    await this.reservasService.cancelar(params.codigo, dto.email);
   }
 }

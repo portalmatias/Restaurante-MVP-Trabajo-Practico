@@ -15,7 +15,11 @@ import {
   MotivoNoDisponible,
   SolicitudDisponibilidad,
 } from '../disponibilidad/reglas/tipos';
-import { fechaCalendarioDesdeIso } from '../common/timezone';
+import {
+  fechaCalendarioDesdeIso,
+  finTurnoUtc,
+  inicioTurnoUtc,
+} from '../common/timezone';
 import { PrismaService } from '../prisma/prisma.service';
 import { elegirMesaBestFit } from './elegir-mesa-best-fit';
 import type { ListarReservasDto } from './dto/listar-reservas.dto';
@@ -31,6 +35,8 @@ import { reservaNoEncontrada } from './reserva-no-encontrada';
 /** `limit`/`offset` por defecto del listado de admin cuando no llegan en la query (D6). */
 const LISTADO_LIMIT_DEFAULT = 20;
 const LISTADO_OFFSET_DEFAULT = 0;
+
+const MS_POR_HORA = 60 * 60 * 1000;
 
 const CODIGO_RESERVA_LONGITUD = 8;
 // Sin caracteres ambiguos (0/O, 1/I/L) para que sea legible por teléfono/email.
@@ -411,5 +417,72 @@ export class ReservasService {
       limit,
       offset,
     };
+  }
+
+  /**
+   * Cancelación pública por código + email (capability `cancelacion-turnos`). Reusa
+   * `buscarPorCodigoYEmail` (design.md D2 de `reserva-consultar`): el mismo `404` genérico
+   * que la consulta, sin distinguir código inexistente de email incorrecto. Rechaza con
+   * `409` si al inicio del Turno le quedan menos horas que `Zona.ventanaCancelacionHoras`
+   * (límite inclusive: exactamente esa cantidad de horas ya alcanza, design.md → Decisions).
+   * La transición en sí (incluido el rechazo si la Reserva ya está en un estado terminal, o
+   * el `404` si desapareció entre la lectura y la escritura) la resuelve
+   * `transicionarEstado`, el único punto de escritura de `estado` (invariante 5).
+   *
+   * `ahora` se inyecta (default `new Date()`) para poder probar el borde exacto de la
+   * ventana sin mocks de reloj — mismo patrón que `evaluarReglas` en `disponibilidad`.
+   */
+  async cancelar(
+    codigo: string,
+    email: string,
+    ahora: Date = new Date(),
+  ): Promise<void> {
+    const reserva = await this.buscarPorCodigoYEmail(codigo, email);
+    if (!reserva) {
+      throw reservaNoEncontrada();
+    }
+
+    const inicio = inicioTurnoUtc(reserva.fecha, reserva.turno.horaInicio);
+    const ventanaMs = reserva.mesa.zona.ventanaCancelacionHoras * MS_POR_HORA;
+    if (inicio.getTime() - ahora.getTime() < ventanaMs) {
+      throw new ConflictException(
+        'La reserva ya no se puede cancelar: está fuera de la ventana mínima de cancelación de su zona.',
+      );
+    }
+
+    await this.transicionarEstado(reserva.id, 'CANCELADA');
+  }
+
+  /**
+   * Marcado de `NO_SHOW` por el admin (capability `cancelacion-turnos`). Rechaza con `404`
+   * si la Reserva no existe, y con `409` si el Turno todavía no terminó — el instante exacto
+   * de fin se rechaza (`ahora` debe ser estrictamente posterior, design.md → Decisions), con
+   * `finTurnoUtc` resolviendo el cruce de medianoche. Si la Reserva no está `CONFIRMADA`, el
+   * `409` lo da igual `transicionarEstado` (`NO_SHOW` no es una transición válida desde
+   * ningún otro estado, ver `TRANSICIONES_VALIDAS`), sin necesidad de un chequeo aparte acá.
+   *
+   * `ahora` se inyecta por el mismo motivo que en `cancelar`.
+   */
+  async marcarNoShow(id: string, ahora: Date = new Date()): Promise<void> {
+    const reserva = await this.prisma.reserva.findUnique({
+      where: { id },
+      include: { turno: true },
+    });
+    if (!reserva) {
+      throw new NotFoundException('La reserva indicada no existe.');
+    }
+
+    const fin = finTurnoUtc(
+      reserva.fecha,
+      reserva.turno.horaInicio,
+      reserva.turno.horaFin,
+    );
+    if (ahora.getTime() <= fin.getTime()) {
+      throw new ConflictException(
+        'No se puede marcar NO_SHOW antes de que termine el turno.',
+      );
+    }
+
+    await this.transicionarEstado(id, 'NO_SHOW');
   }
 }
