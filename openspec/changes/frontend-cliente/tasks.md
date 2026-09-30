@@ -181,7 +181,7 @@
       primero el test de `BotonCopiarCodigo` (usa `navigator.clipboard.writeText`, muestra
       confirmación momentánea) y verificar rojo antes de implementarlo. Verificar que 4.9 y el
       test del botón de copiar pasan.
-- [ ] 4.11 Prueba manual de punta a punta del Grupo A contra el backend real levantado
+- [x] 4.11 Prueba manual de punta a punta del Grupo A contra el backend real levantado
       localmente (base sembrada): Inicio → Paso 1 → resultado con lugar en STANDARD → datos →
       éxito confirmada; repetir para VIP y verificar el aviso de pendiente; forzar "no hay
       lugar" con una fecha/turno sin cupo del seed. Verificar que las cuatro URLs conservan la
