@@ -2,6 +2,7 @@ import { ErrorConReintento } from "../../../src/components/reservas/error-con-re
 import { FormularioSeleccion } from "../../../src/components/reservas/formulario-seleccion";
 import { apiClient, toApiResult } from "../../../src/lib/api/client";
 import { MENSAJE_SERVICIO_NO_DISPONIBLE } from "../../../src/lib/api/errors";
+import { fechaLocalDeHoy } from "../../../src/lib/fecha-hora";
 
 type NuevaReservaPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -47,6 +48,7 @@ export default async function NuevaReservaPage({ searchParams }: NuevaReservaPag
         key={JSON.stringify(seleccionInicial)}
         zonas={zonas.data}
         turnos={turnos.data}
+        hoy={fechaLocalDeHoy(new Date())}
         seleccionInicial={seleccionInicial}
       />
     </div>

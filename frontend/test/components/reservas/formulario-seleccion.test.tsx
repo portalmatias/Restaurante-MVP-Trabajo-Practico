@@ -13,44 +13,21 @@ import {
 const push = jest.fn();
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
-// Hoy en Argentina: lunes 2026-09-14 (12:00 local). Solo se falsea `Date`: el resto de los
-// temporizadores quedan reales para no interferir con Testing Library.
-const AHORA = new Date("2026-09-14T15:00:00.000Z");
+// Hoy en Argentina: lunes 2026-09-14. Lo calcula el servidor y llega por prop: no se falsea `Date`.
+const HOY = "2026-09-14";
 const SABADO = "2026-09-19";
 const LUNES = "2026-09-21";
 const MARTES = "2026-09-15";
 
-const SIN_FALSEAR = [
-  "hrtime",
-  "nextTick",
-  "performance",
-  "queueMicrotask",
-  "requestAnimationFrame",
-  "cancelAnimationFrame",
-  "requestIdleCallback",
-  "cancelIdleCallback",
-  "setImmediate",
-  "clearImmediate",
-  "setInterval",
-  "clearInterval",
-  "setTimeout",
-  "clearTimeout",
-] as const;
-
 beforeEach(() => {
   push.mockReset();
-  jest.useFakeTimers({ now: AHORA, doNotFake: [...SIN_FALSEAR] });
-});
-
-afterEach(() => {
-  jest.useRealTimers();
 });
 
 type Inicial = Parameters<typeof FormularioSeleccion>[0]["seleccionInicial"];
 
-function renderizar(seleccionInicial?: Inicial) {
+function renderizar(seleccionInicial?: Inicial, hoy = HOY) {
   return render(
-    <FormularioSeleccion zonas={ZONAS} turnos={TURNOS} seleccionInicial={seleccionInicial} />,
+    <FormularioSeleccion zonas={ZONAS} turnos={TURNOS} hoy={hoy} seleccionInicial={seleccionInicial} />,
   );
 }
 
@@ -142,12 +119,10 @@ describe("FormularioSeleccion - fecha", () => {
     expect(campoFecha()).toHaveAttribute("min", "2026-09-14");
   });
 
-  it("calcula el mínimo con el offset de Argentina, no con el día UTC", () => {
-    // 02:00 UTC del 15 sigue siendo el 14 a las 23:00 en Argentina.
-    jest.setSystemTime(new Date("2026-09-15T02:00:00.000Z"));
-    renderizar();
+  it("toma el mínimo de la prop `hoy`, sin leer el reloj del navegador", () => {
+    renderizar(undefined, "2026-09-20");
 
-    expect(campoFecha()).toHaveAttribute("min", "2026-09-14");
+    expect(campoFecha()).toHaveAttribute("min", "2026-09-20");
   });
 
   it("señala una fecha anterior a hoy escrita a mano y no ofrece turnos", () => {

@@ -36,8 +36,12 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
 
   const paso1ConSeleccion = urlConSeleccion("/reservas/nueva", seleccion);
 
-  // Turno o zona que ya no existen (por ejemplo, un enlace viejo): el Paso 1 ignora lo inválido.
-  if (disponibilidad.error?.tipo === "no-encontrado") {
+  // Turno o zona que ya no existen, o una selección que el servidor rechaza por inválida (por
+  // ejemplo, un enlace viejo o editado a mano): reintentar no la arregla, el Paso 1 ignora lo inválido.
+  if (
+    disponibilidad.error?.tipo === "no-encontrado" ||
+    disponibilidad.error?.tipo === "validacion"
+  ) {
     redirect(paso1ConSeleccion);
   }
 

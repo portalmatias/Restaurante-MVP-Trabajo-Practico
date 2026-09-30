@@ -223,6 +223,24 @@ describe("/reservas/nueva/resultado - errores", () => {
     expect(destino).toBe(`/reservas/nueva?${new URLSearchParams(SELECCION).toString()}`);
   });
 
+  it("ante un 400 de la disponibilidad (por ejemplo, comensales fuera de rango) redirige al Paso 1", async () => {
+    const seleccion = { ...SELECCION, comensales: "9999" };
+    responder(falla(400, { statusCode: 400, message: ["comensales must not be greater than 100"], error: "Bad Request" }));
+
+    const destino = await destinoDeRedireccion(seleccion);
+
+    expect(destino).toBe(`/reservas/nueva?${new URLSearchParams(seleccion).toString()}`);
+  });
+
+  it("ante un 429 de la disponibilidad no redirige: muestra el mensaje genérico con reintentar", async () => {
+    responder(falla(429));
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+  });
+
   it("si la zona ya no figura en el catálogo redirige al Paso 1", async () => {
     responder(CON_LUGAR, { zonas: ok([ZONA_VIP]) });
 

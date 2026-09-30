@@ -9,7 +9,6 @@ import { Select } from "../ui/select";
 import type { components } from "../../lib/api/schema";
 import {
   diaSemanaDeFechaLocal,
-  fechaLocalDeHoy,
   formatearHoraTurno,
 } from "../../lib/fecha-hora";
 import {
@@ -26,6 +25,8 @@ type TurnoPublico = components["schemas"]["TurnoPublicoRespuestaDto"];
 export type FormularioSeleccionProps = {
   zonas: ZonaPublica[];
   turnos: TurnoPublico[];
+  /** Fecha de hoy (`YYYY-MM-DD`, calendario del restaurante) calculada en el servidor. */
+  hoy: string;
   /** Selección previa tal como llega de `searchParams`; lo que no es coherente se ignora. */
   seleccionInicial?: SeleccionCruda;
 };
@@ -53,11 +54,11 @@ function acotar(valor: number, minimo: number, maximo: number): number {
 export function FormularioSeleccion({
   zonas,
   turnos,
+  hoy,
   seleccionInicial = {},
 }: FormularioSeleccionProps) {
   const router = useRouter();
   const tituloZonaId = useId();
-  const [hoy] = useState(() => fechaLocalDeHoy(new Date()));
   const [inicial] = useState(() => resolverSeleccionInicial(seleccionInicial, { zonas, turnos, hoy }));
   const [fecha, setFecha] = useState(inicial.fecha ?? "");
   const [turnoId, setTurnoId] = useState(inicial.turnoId ?? "");

@@ -50,6 +50,19 @@ describe("/reservas/nueva", () => {
     expect(screen.getByRole("radio", { name: /VIP/ })).toBeInTheDocument();
   });
 
+  it("calcula 'hoy' en el servidor con el offset de Argentina, no con el día UTC", async () => {
+    responder();
+    // 02:00 UTC del 15 sigue siendo el 14 a las 23:00 en Argentina.
+    jest.useFakeTimers({ now: new Date("2026-09-15T02:00:00.000Z"), doNotFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "setImmediate", "clearImmediate", "nextTick", "queueMicrotask", "performance"] });
+    try {
+      await renderizar();
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(screen.getByLabelText("Fecha")).toHaveAttribute("min", "2026-09-14");
+  });
+
   it("prellena el formulario con la selección de searchParams", async () => {
     responder();
 
