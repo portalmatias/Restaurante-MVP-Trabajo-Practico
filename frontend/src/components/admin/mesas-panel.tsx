@@ -136,7 +136,7 @@ export function MesasPanel({ zonas }: { zonas: Zona[] }) {
         ) : null}
         {mesas && mesas.length === 0 ? <p className="text-sm text-muted-foreground">No hay mesas para mostrar.</p> : null}
         {mesas && mesas.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="text-muted-foreground">
                 <tr>

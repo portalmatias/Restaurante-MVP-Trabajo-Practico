@@ -11,7 +11,7 @@
       6 y 7 de este archivo (`Button` con `variant: 'primary'|'secondary'|'destructive'|'ghost'`;
       `Field`/`Select` con `label`/`error`). Si algo cambió, usar la forma real y anotarlo en
       la descripción del PR, sin renombrar nada del lado de `frontend-base`.
-- [ ] 1.3 Confirmar con un login manual (`curl` o el backend real) que `POST /auth/login`
+- [x] 1.3 Confirmar con un login manual (`curl` o el backend real) que `POST /auth/login`
       responde `accessToken` con el admin del seed, y que `openapi-typescript` ya generó
       `paths['/auth/login']`, `paths['/admin/zonas']`, `paths['/admin/mesas']`,
       `paths['/admin/turnos']` y `paths['/admin/reservas']` en `schema.d.ts`. Si no están,
@@ -186,7 +186,7 @@
 - [x] 10.3 Tests en verde: `npm run test -w frontend`, `npm run build -w frontend` y
       `npm run typecheck -w frontend`.
 - [x] 10.4 `npm run lint` (raíz) en limpio, sin warnings nuevos en `frontend/**`.
-- [ ] 10.5 Checklist manual de accesibilidad y responsive (mismo criterio que 8.6 de
+- [x] 10.5 Checklist manual de accesibilidad y responsive (mismo criterio que 8.6 de
       `frontend-base`): contraste, sin scroll horizontal en 375/768/1024/1440px, foco visible
       navegando con teclado en `/admin/login`, el dashboard, `/admin/salon` y
       `/admin/reservas`, documentado en la descripción del PR.

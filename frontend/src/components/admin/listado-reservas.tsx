@@ -234,7 +234,7 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
       ) : null}
 
       {listado && listado.items.length > 0 ? (
-        <div className="overflow-x-auto" aria-busy={cargando}>
+        <div className="relative overflow-x-auto" aria-busy={cargando}>
           <table className="w-full text-left text-sm">
             <caption className="sr-only">
               Reservas, página {pagina} de {paginas}

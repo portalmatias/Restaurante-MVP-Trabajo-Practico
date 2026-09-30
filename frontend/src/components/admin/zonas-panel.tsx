@@ -58,7 +58,7 @@ export function ZonasPanel({ zonas, onZonaActualizada }: ZonasPanelProps) {
 
   return (
     <Card title="Zonas">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="text-muted-foreground">
             <tr>
