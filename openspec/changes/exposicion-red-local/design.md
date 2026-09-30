@@ -105,7 +105,7 @@ uno de estos:
 - una subred IPv4 en notación simple con prefijo de al menos `/8` (`10.0.0.0/8`).
 
 Cualquier otro elemento hace que el backend **no arranque**, con un mensaje que pide declarar
-los saltos: eso incluye `true`, `*`, un número de saltos, `0.0.0.0/0`, un prefijo IPv4 menor a
+los saltos confiables e indica los formatos admitidos: eso incluye `true`, `*`, un número de saltos, `0.0.0.0/0`, un prefijo IPv4 menor a
 `/8` y **toda notación IPv6** (`::/0`, `::/1`, `::ffff:10.0.0.0/8`, etc.). Validar solo el valor
 completo no alcanza: Express aceptaría `10.0.0.5,0.0.0.0/0` y el catch-all escondido en la lista
 haría confiable a cualquier salto.

@@ -106,7 +106,8 @@ hacen confiable a cualquier origen.
 #### Scenario: Subred en notación IPv6 que parece acotada
 - **WHEN** se intenta arrancar el backend declarando como confiable `::ffff:10.0.0.0/8` o
   `::/1`
-- **THEN** el backend no arranca y el error indica los formatos admitidos
+- **THEN** el backend no arranca y el error pide declarar los saltos confiables e indica los
+  formatos admitidos
 - **AND** ningún cliente puede presentarse como otro origen enviando `X-Forwarded-For`
 
 #### Scenario: Subred IPv4 acotada admitida

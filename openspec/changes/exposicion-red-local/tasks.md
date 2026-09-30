@@ -17,7 +17,8 @@
       vacía o ausente → no llama a `trust proxy`; con valor → lo parte por comas, recorta cada
       elemento y lo valida contra la lista de **formatos permitidos** de D3 (`loopback`,
       `linklocal`, `uniquelocal`, IPv4 simple, subred IPv4 con prefijo `/8` o mayor). Si
-      cualquier elemento no cumple, lanza un `Error` que pide declarar los saltos; si todos
+      cualquier elemento no cumple, lanza un `Error` que pide declarar los saltos confiables e
+      indica los formatos admitidos (los tests verifican las dos partes del mensaje); si todos
       cumplen, pasa la lista a `app.set('trust proxy', lista)`. Verificar con tests unitarios:
       vacía; listas válidas (`loopback`, `10.0.0.5`, `loopback, 10.0.0.0/8`); cada rechazo
       solo (`true`, `*`, `1`, `0.0.0.0/0`, `10.0.0.0/7`, `::/0`, `::/1`,
