@@ -152,13 +152,21 @@ acción para continuar al paso de datos de contacto.
 - **THEN** la pantalla muestra un texto para cada motivo informado, sin omitir ninguno
 
 ### Requirement: El resultado de disponibilidad se reevalúa en cada visita
-El sistema SHALL volver a consultar la disponibilidad real cada vez que se muestra el
-resultado, incluido un refresco de la página o un regreso con el botón "atrás" del navegador,
-en vez de reutilizar un resultado mostrado antes.
+El sistema SHALL volver a consultar la disponibilidad real cada vez que se carga o se refresca
+el resultado, o se llega a él navegando hacia adelante, en vez de reutilizar un resultado
+guardado. Un regreso con el botón "atrás" del navegador PUEDE mostrar el resultado tal como se
+vio antes (el navegador reutiliza la página); el cupo real se vuelve a validar al confirmar la
+reserva, que informa los motivos si ya no hay lugar.
 
 #### Scenario: Refrescar la pantalla de resultado vuelve a consultar
 - **WHEN** la persona refresca la pantalla de resultado de disponibilidad
 - **THEN** el sistema consulta la disponibilidad de nuevo antes de mostrar el resultado
+
+#### Scenario: Volver con "atrás" y confirmar cuando ya no hay lugar
+- **WHEN** la persona vuelve con "atrás" a un resultado que mostraba lugar, y al confirmar la
+  reserva ya no queda cupo
+- **THEN** el sistema informa los motivos por los que no se pudo reservar, sin perder los datos
+  de contacto ya escritos
 
 ### Requirement: Acceso a un paso del asistente sin la selección previa
 Si se accede al resultado de disponibilidad o al paso de datos de contacto sin una selección
