@@ -33,8 +33,8 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     toApiResult(
       apiClient.GET("/disponibilidad", { params: { query: seleccion }, cache: "no-store" }),
     ),
-    toApiResult(apiClient.GET("/zonas")),
-    toApiResult(apiClient.GET("/turnos")),
+    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
+    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
   ]);
 
   const paso1ConSeleccion = urlConSeleccion("/reservas/nueva", seleccion);
@@ -65,6 +65,17 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
 
   if (disponibilidad.error || zonas.error || turnos.error) {
     const error = disponibilidad.error ?? zonas.error ?? turnos.error;
+    // Límite de solicitudes: reintentar enseguida lo agrava, así que solo se informa (como en
+    // ConsultaReserva).
+    if (error?.tipo === "limite-de-intentos") {
+      return (
+        <div className={contenedor}>
+          <Alert variant="error" className="text-base">
+            {error.mensaje}
+          </Alert>
+        </div>
+      );
+    }
     // Solo el mensaje propio del cliente (red o servicio): nunca el texto de un 4xx del servidor.
     const mensaje = error?.tipo === "desconocido" ? error.mensaje : MENSAJE_SERVICIO_NO_DISPONIBLE;
     return (

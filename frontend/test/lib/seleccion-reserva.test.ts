@@ -45,6 +45,8 @@ describe("leerSeleccionDeQuery", () => {
     ["comensales cero", { comensales: "0" }],
     ["comensales no entero", { comensales: "2.5" }],
     ["comensales no numérico", { comensales: "muchos" }],
+    ["comensales que no son un entero seguro", { comensales: "9007199254740993" }],
+    ["comensales que desbordan a Infinity", { comensales: "9".repeat(400) }],
     ["un parámetro repetido", { fecha: ["2026-09-19", "2026-09-20"] }],
   ])("devuelve undefined con %s", (_motivo, cambio) => {
     expect(leerSeleccionDeQuery({ ...VALIDA, ...cambio })).toBeUndefined();

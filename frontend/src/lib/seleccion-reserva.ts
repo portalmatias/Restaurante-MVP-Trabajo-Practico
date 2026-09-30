@@ -52,9 +52,14 @@ export function esFechaElegible(fecha: string, hoy: string): boolean {
   return esFechaDeCalendario(fecha) && fecha >= hoy;
 }
 
-/** Entero positivo escrito en decimal, sin signo, espacios ni parte fraccionaria. */
+/**
+ * Entero positivo escrito en decimal, sin signo, espacios ni parte fraccionaria. Descarta lo que
+ * no es un entero seguro (una cadena enorme de dígitos daría `Infinity` o perdería precisión).
+ */
 function leerEnteroPositivo(texto: string | undefined): number | undefined {
-  return texto !== undefined && /^[1-9]\d*$/.test(texto) ? Number(texto) : undefined;
+  if (texto === undefined || !/^[1-9]\d*$/.test(texto)) return undefined;
+  const numero = Number(texto);
+  return Number.isSafeInteger(numero) ? numero : undefined;
 }
 
 /**
