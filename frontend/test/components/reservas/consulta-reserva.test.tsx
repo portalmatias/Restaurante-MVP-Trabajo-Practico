@@ -6,10 +6,11 @@ import { apiClient } from "../../../src/lib/api/client";
 // producción. Sin red (design.md D10: el componente se prueba con datos de prueba locales).
 jest.mock("../../../src/lib/api/client", () => ({
   ...jest.requireActual("../../../src/lib/api/client"),
-  apiClient: { POST: jest.fn() },
+  apiClient: { POST: jest.fn(), GET: jest.fn() },
 }));
 
 const POST = apiClient.POST as unknown as jest.Mock;
+const GET = apiClient.GET as unknown as jest.Mock;
 
 const RESERVA = {
   codigoReserva: "K7PM3QXA",
@@ -18,6 +19,18 @@ const RESERVA = {
   comensales: 4,
   turno: { id: "t-1", horaInicio: "20:00", horaFin: "23:30" },
   zona: { id: "z-1", nombre: "VIP" },
+};
+
+// Zona de la reserva de prueba (`RESERVA.zona`) como la entrega `GET /zonas`.
+const ZONA = {
+  id: "z-1",
+  nombre: "VIP",
+  minComensales: 2,
+  maxComensales: 12,
+  anticipacionMinHoras: 24,
+  anticipacionMaxDias: 60,
+  ventanaCancelacionHoras: 24,
+  requiereConfirmacionAdmin: true,
 };
 
 function respuestaOk(data: unknown) {
@@ -43,6 +56,8 @@ function enviar() {
 
 beforeEach(() => {
   POST.mockReset();
+  GET.mockReset();
+  GET.mockResolvedValue(respuestaOk([ZONA]));
 });
 
 describe("ConsultaReserva - formulario", () => {
@@ -369,5 +384,170 @@ describe("ConsultaReserva - detalle", () => {
 
     expect(screen.getByRole("button", { name: "Buscar mi reserva" })).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toHaveValue("");
+  });
+});
+
+// La fecha de `RESERVA` ya pasó: "muy por delante" y "dentro de la ventana" se arman con fechas
+// lejanas para que el resultado no dependa del día en que corre la suite.
+const RESERVA_FUTURA = { ...RESERVA, fecha: "2099-01-01" };
+const RESERVA_DENTRO_DE_VENTANA = { ...RESERVA, fecha: "2000-01-01" };
+
+async function verDetalleDe(reserva: Record<string, unknown>) {
+  POST.mockResolvedValue(respuestaOk(reserva));
+  render(<ConsultaReserva />);
+  completarFormulario();
+  enviar();
+  await screen.findByRole("heading", { level: 1, name: /^Tu reserva (está|figura)/ });
+}
+
+const NOMBRE_ALERTA = "No pudimos verificar si todavía podés cancelar. Probá de nuevo en unos minutos.";
+
+describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
+  it.each(["CANCELADA", "NO_SHOW"])("con una reserva %s no se ofrece y no pide las zonas", async (estado) => {
+    await verDetalleDe({ ...RESERVA_FUTURA, estado });
+
+    expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+    expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
+    expect(GET).not.toHaveBeenCalled();
+  });
+
+  it.each(["CONFIRMADA", "PENDIENTE"])(
+    "con una reserva %s muy por delante de la ventana se ofrece",
+    async (estado) => {
+      await verDetalleDe({ ...RESERVA_FUTURA, estado });
+
+      expect(await screen.findByRole("button", { name: "Cancelar mi reserva" })).toBeInTheDocument();
+      expect(GET).toHaveBeenCalledTimes(1);
+      expect(GET).toHaveBeenCalledWith("/zonas", { cache: "no-store" });
+      expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
+    },
+  );
+
+  it("con una reserva CONFIRMADA dentro de la ventana de su zona no se ofrece ni avisa", async () => {
+    await verDetalleDe(RESERVA_DENTRO_DE_VENTANA);
+
+    await waitFor(() => expect(GET).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+    expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
+  });
+
+  it("usa la ventana de la zona de la reserva y no la de otra zona", async () => {
+    // Faltan más de 24 h (la ventana de su zona), pero menos que la ventana enorme de la otra.
+    const fecha = new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    GET.mockResolvedValue(
+      respuestaOk([{ ...ZONA, id: "z-2", ventanaCancelacionHoras: 100000 }, ZONA]),
+    );
+    await verDetalleDe({ ...RESERVA, fecha, turno: { ...RESERVA.turno, horaInicio: "00:00" } });
+
+    await waitFor(() => expect(GET).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("button", { name: "Cancelar mi reserva" })).toBeInTheDocument();
+  });
+
+  it("mientras verifica las zonas no ofrece la acción ni avisa", async () => {
+    GET.mockReturnValue(new Promise(() => {}));
+    await verDetalleDe(RESERVA_FUTURA);
+
+    expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+    expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
+  });
+
+  describe("cuando no se puede verificar la ventana", () => {
+    async function esperarAviso() {
+      expect(await screen.findByText(NOMBRE_ALERTA)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+    }
+
+    function esperarDetalleIntacto() {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tu reserva está confirmada");
+      expect(screen.getByText("K7PM3QXA")).toBeInTheDocument();
+      expect(screen.getByText("VIP")).toBeInTheDocument();
+    }
+
+    it("un error de servidor en GET /zonas avisa, ofrece reintentar y conserva el detalle", async () => {
+      GET.mockResolvedValue(respuestaError(500, { message: "stack interno" }));
+      await verDetalleDe(RESERVA_FUTURA);
+
+      await esperarAviso();
+      esperarDetalleIntacto();
+      expect(screen.queryByText(/stack interno/)).not.toBeInTheDocument();
+    });
+
+    it("una falla de red en GET /zonas avisa igual", async () => {
+      GET.mockRejectedValue(new TypeError("fetch failed"));
+      await verDetalleDe(RESERVA_FUTURA);
+
+      await esperarAviso();
+      esperarDetalleIntacto();
+    });
+
+    it("un 200 sin la zona de la reserva avisa igual", async () => {
+      GET.mockResolvedValue(respuestaOk([{ ...ZONA, id: "otra" }]));
+      await verDetalleDe(RESERVA_FUTURA);
+
+      await esperarAviso();
+      esperarDetalleIntacto();
+    });
+
+    it("una hora de inicio mal formada no rompe el detalle y avisa igual", async () => {
+      await verDetalleDe({ ...RESERVA_FUTURA, turno: { ...RESERVA.turno, horaInicio: "xx" } });
+
+      await esperarAviso();
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tu reserva está confirmada");
+      expect(screen.getByText("VIP")).toBeInTheDocument();
+    });
+
+    it("'Reintentar' vuelve a pedir solo GET /zonas y, si responde bien, reemplaza el aviso por el botón", async () => {
+      GET.mockResolvedValueOnce(respuestaError(500));
+      await verDetalleDe(RESERVA_FUTURA);
+      await esperarAviso();
+
+      fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+
+      expect(await screen.findByRole("button", { name: "Cancelar mi reserva" })).toBeInTheDocument();
+      expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+      expect(GET).toHaveBeenCalledTimes(2);
+      expect(POST).toHaveBeenCalledTimes(1);
+    });
+
+    it("'Reintentar' con la reserva dentro de la ventana quita el aviso sin ofrecer cancelar", async () => {
+      GET.mockResolvedValueOnce(respuestaError(500));
+      await verDetalleDe(RESERVA_DENTRO_DE_VENTANA);
+      await esperarAviso();
+
+      fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+
+      await waitFor(() => expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument());
+      expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+    });
+
+    it("si 'Reintentar' vuelve a fallar, el aviso sigue y el detalle no cambia", async () => {
+      GET.mockResolvedValue(respuestaError(500));
+      await verDetalleDe(RESERVA_FUTURA);
+      await esperarAviso();
+
+      fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+
+      await waitFor(() => expect(GET).toHaveBeenCalledTimes(2));
+      await esperarAviso();
+      esperarDetalleIntacto();
+    });
+
+    it("mientras reintenta deshabilita 'Reintentar' y una doble activación pide una sola vez", async () => {
+      GET.mockResolvedValueOnce(respuestaError(500));
+      await verDetalleDe(RESERVA_FUTURA);
+      const reintentar = await screen.findByRole("button", { name: "Reintentar" });
+
+      GET.mockReturnValue(new Promise(() => {}));
+      act(() => {
+        reintentar.click();
+        reintentar.click();
+      });
+
+      expect(GET).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("button", { name: "Reintentar" })).toBeDisabled();
+      expect(screen.getByText(NOMBRE_ALERTA)).toBeInTheDocument();
+    });
   });
 });

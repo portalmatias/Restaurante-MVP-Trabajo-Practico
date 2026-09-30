@@ -216,10 +216,10 @@
 
 ## 6. Grupo C — Cancelar (depende de `cancelacion-turnos` mergeado; usa `GET /zonas` del Grupo A)
 
-- [ ] 6.1 Confirmar `POST /reservas/{codigo}/cancelar` en `openapi/openapi.yaml` de `main` y
+- [x] 6.1 Confirmar `POST /reservas/{codigo}/cancelar` en `openapi/openapi.yaml` de `main` y
       regenerar `schema.d.ts`. Verificar con
       `grep -n "cancelar" frontend/src/lib/api/schema.d.ts`.
-- [ ] 6.2 Sumar a los tests de "detalle" (5.3) los casos de gating del botón de cancelar (D9):
+- [x] 6.2 Sumar a los tests de "detalle" (5.3) los casos de gating del botón de cancelar (D9):
       con una reserva `CANCELADA` no se ofrece; con una `CONFIRMADA` muy por delante de la
       ventana de su zona, se ofrece; con una `CONFIRMADA` dentro de la ventana, no se ofrece.
       Requiere que "detalle" resuelva `GET /zonas` para la `ventanaCancelacionHoras` de la
@@ -232,7 +232,7 @@
       del resto del detalle. Después del reintento: si responde bien, el `Alert` desaparece y
       el botón se muestra u oculta según `puedeCancelarSegunVentana`; si vuelve a fallar, el
       `Alert` sigue visible y el resto del detalle no cambia. Verificar rojo.
-- [ ] 6.3 Conectar la resolución de `GET /zonas` y `puedeCancelarSegunVentana` (2.9/2.10) en
+- [x] 6.3 Conectar la resolución de `GET /zonas` y `puedeCancelarSegunVentana` (2.9/2.10) en
       "detalle" para decidir si se muestra el botón "Cancelar mi reserva", incluido el `Alert`
       informativo con "Reintentar" de 6.2 cuando `GET /zonas` falla o no trae la zona buscada
       (D9). Verificar que 6.2 pasa.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -10,6 +10,7 @@ import type { ErrorApi } from "../../lib/api/errors";
 import type { components } from "../../lib/api/schema";
 import { formatearFechaLargaEs } from "../../lib/fecha-hora";
 import { esCodigoReservaValido } from "../../lib/reserva-codigo";
+import { puedeCancelarSegunVentana } from "../../lib/ventana-cancelacion";
 
 type ReservaConsultada = components["schemas"]["ReservaConsultadaRespuesta"];
 type Estado = ReservaConsultada["estado"];
@@ -42,6 +43,85 @@ function formatearSinRomper(formatear: (valor: string) => string, valor: string)
   } catch {
     return valor;
   }
+}
+
+const MENSAJE_SIN_VERIFICAR =
+  "No pudimos verificar si todavía podés cancelar. Probá de nuevo en unos minutos.";
+
+// "no-verificada": no hay con qué evaluar la ventana (falla de `GET /zonas`, zona ausente u
+// hora de inicio inválida). Nunca se ofrece una acción cuya condición no se pudo comprobar.
+type VerificacionCancelacion = "pendiente" | "no-verificada" | { puedeCancelar: boolean };
+
+async function resolverVerificacion(
+  fecha: string,
+  horaInicio: string,
+  zonaId: string,
+): Promise<VerificacionCancelacion> {
+  const resultado = await toApiResult(apiClient.GET("/zonas", { cache: "no-store" }));
+  const ventana = resultado.data?.find((zona) => zona.id === zonaId)?.ventanaCancelacionHoras;
+  if (ventana === undefined) {
+    return "no-verificada";
+  }
+  try {
+    return { puedeCancelar: puedeCancelarSegunVentana(fecha, horaInicio, ventana, new Date()) };
+  } catch {
+    // La función lanza ante una fecha u hora inválida: equivale a no poder verificar.
+    return "no-verificada";
+  }
+}
+
+/**
+ * Resuelve, para el detalle consultado, si se ofrece "Cancelar mi reserva" (design.md D9):
+ * pide `GET /zonas`, busca la zona por id y evalúa `puedeCancelarSegunVentana`. Solo pide las
+ * zonas si el estado admite cancelar. `reintentar` vuelve a pedir únicamente las zonas;
+ * `verificando` solo marca el reintento (la primera carga no muestra nada).
+ */
+function useVerificacionCancelacion(reserva: ReservaConsultada) {
+  const { estado, fecha, turno, zona } = reserva;
+  const admiteCancelar = estado === "CONFIRMADA" || estado === "PENDIENTE";
+  const [verificacion, setVerificacion] = useState<VerificacionCancelacion>("pendiente");
+  const [verificando, setVerificando] = useState(false);
+  const enCurso = useRef(false);
+  const ultimaSolicitud = useRef(0);
+
+  const verificar = useCallback(() => {
+    if (enCurso.current) {
+      return;
+    }
+    const solicitud = ++ultimaSolicitud.current;
+    enCurso.current = true;
+    void resolverVerificacion(fecha, turno.horaInicio, zona.id).then((resultado) => {
+      if (solicitud !== ultimaSolicitud.current) {
+        return;
+      }
+      enCurso.current = false;
+      setVerificando(false);
+      setVerificacion(resultado);
+    });
+  }, [fecha, turno.horaInicio, zona.id]);
+
+  useEffect(() => {
+    if (admiteCancelar) {
+      verificar();
+    }
+    return () => {
+      ultimaSolicitud.current += 1;
+      enCurso.current = false;
+    };
+  }, [admiteCancelar, verificar]);
+
+  return {
+    ofrecerCancelar:
+      admiteCancelar && typeof verificacion === "object" && verificacion.puedeCancelar,
+    noVerificada: admiteCancelar && verificacion === "no-verificada",
+    verificando,
+    reintentar: () => {
+      if (!enCurso.current) {
+        setVerificando(true);
+        verificar();
+      }
+    },
+  };
 }
 
 function errorDeCodigo(codigo: string): string | undefined {
@@ -203,6 +283,8 @@ function DetalleReserva({
   reserva: ReservaConsultada;
   onConsultarOtra: () => void;
 }) {
+  const { ofrecerCancelar, noVerificada, verificando, reintentar } =
+    useVerificacionCancelacion(reserva);
   const esPendiente = reserva.estado === "PENDIENTE";
   const claseEtiqueta = esPendiente
     ? "bg-accent text-accent-foreground"
@@ -233,6 +315,21 @@ function DetalleReserva({
           <dd>{reserva.comensales}</dd>
         </dl>
       </Card>
+      {ofrecerCancelar ? (
+        <Button variant="destructive" size="lg">
+          Cancelar mi reserva
+        </Button>
+      ) : null}
+      {noVerificada ? (
+        <div className="flex flex-col gap-3">
+          <Alert variant="info" className="text-base">
+            {MENSAJE_SIN_VERIFICAR}
+          </Alert>
+          <Button variant="secondary" size="lg" disabled={verificando} onClick={reintentar}>
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
       <Button variant="ghost" onClick={onConsultarOtra} className="underline sm:self-start">
         Consultar otra reserva
       </Button>
