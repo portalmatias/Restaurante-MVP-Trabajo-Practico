@@ -49,6 +49,10 @@ type CodigosMotivoFaltantes = Exclude<
 const _codigosMotivoCompletos: [CodigosMotivoFaltantes] extends [never] ? true : never = true;
 void _codigosMotivoCompletos;
 
+/** Mensaje genérico ante un error de servidor o de red: nunca se muestra el del servidor. */
+export const MENSAJE_SERVICIO_NO_DISPONIBLE =
+  "El servicio no está disponible en este momento. Intentá de nuevo más tarde.";
+
 function esRegistro(valor: unknown): valor is Record<string, unknown> {
   return typeof valor === "object" && valor !== null;
 }
@@ -119,7 +123,7 @@ export function mapErrorApi(status: number, body: unknown): ErrorApi {
     // error HTML (no un `ErrorRespuesta` JSON) porque no puede comunicarse con el backend.
     return {
       tipo: "desconocido",
-      mensaje: "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
+      mensaje: MENSAJE_SERVICIO_NO_DISPONIBLE,
     };
   }
 

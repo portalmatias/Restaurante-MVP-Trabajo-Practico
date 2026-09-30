@@ -124,7 +124,7 @@
       lógica de datos. Escribir su test RTL primero (rol de los botones, `href` de cada
       enlace, ausencia de cualquier texto/enlace de administración) y verificar rojo antes de
       escribir la página. Verificar verde con `npm test -w frontend -- reservas/page`.
-- [ ] 4.3 Escribir los tests del formulario del Paso 1 (`FormularioSeleccion`, RTL con zonas y
+- [x] 4.3 Escribir los tests del formulario del Paso 1 (`FormularioSeleccion`, RTL con zonas y
       turnos de fixture, sin red): los cuatro campos son obligatorios para habilitar
       "Ver disponibilidad"; mientras falta algún campo, debajo del botón deshabilitado aparece
       un texto en una región `aria-live="polite"` que lista qué falta completar (ej. "Falta
@@ -142,7 +142,7 @@
       `fecha`, y un `comensales` no entero o fuera del rango de la zona; enviar arma la URL de
       `/reservas/nueva/resultado` con los cuatro parámetros. Verificar que la suite falla
       (rojo) con `npm test -w frontend -- formulario-seleccion`.
-- [ ] 4.4 Implementar `FormularioSeleccion` (D3, Pantalla 2) y el `Server Component`
+- [x] 4.4 Implementar `FormularioSeleccion` (D3, Pantalla 2) y el `Server Component`
       `app/reservas/nueva/page.tsx` que hace `GET /zonas`/`GET /turnos` directo al backend y se
       los pasa como props, más `app/reservas/nueva/loading.tsx`. Verificar que 4.3 pasa y que
       `npm run build -w frontend` no falla por un `searchParams`/fetch mal tipado.
