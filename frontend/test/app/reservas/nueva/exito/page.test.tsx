@@ -190,4 +190,15 @@ describe("/reservas/nueva/exito - el catálogo no responde", () => {
     expect(screen.getByText("K7PM3QXA")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Resumen de tu selección" })).not.toBeInTheDocument();
   });
+
+  it("ante un error de red conserva el código y muestra el mensaje de conexión", async () => {
+    GET.mockRejectedValue(new TypeError("fetch failed"));
+
+    await renderizar();
+
+    expect(screen.getByText("K7PM3QXA")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo conectar con el servidor.");
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Resumen de tu selección" })).not.toBeInTheDocument();
+  });
 });

@@ -20,8 +20,14 @@ export function BotonCopiarCodigo({ codigo }: BotonCopiarCodigoProps) {
   const [resultado, setResultado] = useState<Resultado>();
   const temporizador = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  const montado = useRef(false);
+
   useEffect(() => {
-    return () => clearTimeout(temporizador.current);
+    montado.current = true;
+    return () => {
+      montado.current = false;
+      clearTimeout(temporizador.current);
+    };
   }, []);
 
   async function copiar() {
@@ -32,6 +38,8 @@ export function BotonCopiarCodigo({ codigo }: BotonCopiarCodigoProps) {
       // Sin `navigator.clipboard` (contexto no seguro) o con el permiso denegado.
       siguiente = "fallo";
     }
+    // La copia es asíncrona: si el botón se desmontó mientras tanto, no hay nada que mostrar.
+    if (!montado.current) return;
     setResultado(siguiente);
     clearTimeout(temporizador.current);
     temporizador.current = setTimeout(() => setResultado(undefined), MS_CONFIRMACION);

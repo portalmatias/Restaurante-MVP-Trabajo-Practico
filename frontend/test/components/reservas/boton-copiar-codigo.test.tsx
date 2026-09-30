@@ -77,4 +77,19 @@ describe("BotonCopiarCodigo", () => {
     expect(screen.queryByText("¡Copiado!")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/No pudimos copiarlo/);
   });
+
+  it("si se desmonta mientras la copia está en curso, no deja un temporizador pendiente", async () => {
+    let terminarCopia: () => void = () => undefined;
+    writeText.mockReturnValue(new Promise<void>((resolver) => (terminarCopia = resolver)));
+    const { unmount } = render(<BotonCopiarCodigo codigo="K7PM3QXA" />);
+
+    const antes = jest.getTimerCount();
+    fireEvent.click(screen.getByRole("button", { name: "Copiar código" }));
+    unmount();
+    terminarCopia();
+    // Deja correr las continuaciones pendientes de la copia (microtareas, sin temporizadores).
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(jest.getTimerCount()).toBe(antes);
+  });
 });
