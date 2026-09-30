@@ -216,6 +216,62 @@ describe("FormularioSeleccion - zona", () => {
     expect(opcionZona("VIP")).toHaveAttribute("aria-checked", "true");
     expect(opcionZona("STANDARD")).toHaveAttribute("aria-checked", "false");
   });
+
+  describe("navegación con teclado", () => {
+    // ZONAS = [STANDARD, VIP] (ver fixtures).
+    const zonas = () => screen.getAllByRole("radio");
+
+    it("sin zona elegida solo la primera opción entra en el orden de tabulación", () => {
+      renderizar();
+
+      expect(zonas().map((r) => r.getAttribute("tabindex"))).toEqual(["0", "-1"]);
+    });
+
+    it("con una zona elegida solo esa opción entra en el orden de tabulación", () => {
+      renderizar();
+      elegirZona("VIP");
+
+      expect(zonas().map((r) => r.getAttribute("tabindex"))).toEqual(["-1", "0"]);
+    });
+
+    it.each(["ArrowDown", "ArrowRight"])("%s elige la zona siguiente y le da el foco", (tecla) => {
+      renderizar();
+      elegirZona("STANDARD");
+
+      fireEvent.keyDown(opcionZona("STANDARD"), { key: tecla });
+
+      expect(opcionZona("VIP")).toHaveAttribute("aria-checked", "true");
+      expect(opcionZona("VIP")).toHaveFocus();
+    });
+
+    it.each(["ArrowUp", "ArrowLeft"])("%s elige la zona anterior", (tecla) => {
+      renderizar();
+      elegirZona("VIP");
+
+      fireEvent.keyDown(opcionZona("VIP"), { key: tecla });
+
+      expect(opcionZona("STANDARD")).toHaveAttribute("aria-checked", "true");
+    });
+
+    it("da la vuelta al pasar de la última a la primera y de la primera a la última", () => {
+      renderizar();
+      elegirZona("VIP");
+
+      fireEvent.keyDown(opcionZona("VIP"), { key: "ArrowDown" });
+      expect(opcionZona("STANDARD")).toHaveAttribute("aria-checked", "true");
+
+      fireEvent.keyDown(opcionZona("STANDARD"), { key: "ArrowUp" });
+      expect(opcionZona("VIP")).toHaveAttribute("aria-checked", "true");
+    });
+
+    it("moverse con el teclado ajusta los comensales como al hacer clic", () => {
+      renderizar({ zonaId: ZONA_VIP.id, comensales: "12" });
+
+      fireEvent.keyDown(opcionZona("VIP"), { key: "ArrowUp" });
+
+      expect(cantidad()).toHaveTextContent("8");
+    });
+  });
 });
 
 describe("FormularioSeleccion - comensales", () => {
