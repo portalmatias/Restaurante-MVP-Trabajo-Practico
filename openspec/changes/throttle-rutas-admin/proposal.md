@@ -1,8 +1,10 @@
 ## Why
 
 `auth-admin` registró `ThrottlerGuard` como guard global con el límite por defecto de
-`THROTTLE_TTL`/`THROTTLE_LIMIT` (60 s / 10 solicitudes), pensado para las rutas públicas con
-código de reserva (`config.yaml` §5). De las rutas de administración, solo
+`THROTTLE_TTL`/`THROTTLE_LIMIT` (variables listadas en `config.yaml` §10; 60 s / 10
+solicitudes según `.env.example`), pensado para las rutas públicas de consulta y cancelación
+con código de reserva, que `config.yaml` §5 pide proteger con rate limiting contra la
+enumeración. De las rutas de administración, solo
 `GET /admin/reservas` tiene un límite propio (60 por minuto, D7 de `reserva-consultar`, porque
 "el default global es demasiado bajo para un panel que pagina y cambia filtros"). Las demás
 —`/admin/zonas`, `/admin/mesas`, `/admin/turnos` y las acciones
@@ -14,7 +16,8 @@ ráfaga desde el listado, editar varias Mesas seguidas o volver varias veces a `
 (que vuelve a pedir zonas, mesas y turnos) llega a 11 solicitudes a la misma ruta en un minuto,
 y el admin recibe `429` trabajando normalmente. Además, el frontend llega al backend a través
 del proxy `/api` de Next (D6 de `frontend-base`), así que todas las sesiones comparten el mismo
-origen para el throttler (ver `design.md`), lo que acerca todavía más ese umbral.
+origen para el throttler (ver `design.md`; verificado contra el backend real en
+`exposicion-red-local`, #62), lo que acerca todavía más ese umbral.
 
 ## What Changes
 
@@ -33,8 +36,11 @@ origen para el throttler (ver `design.md`), lo que acerca todavía más ese umbr
   - Las rutas públicas que hoy no tienen límite (`GET /disponibilidad`, `POST /reservas`,
     catálogos públicos) siguen igual.
 - **No** cambia el criterio de rastreo (sigue siendo por IP) ni la configuración de
-  `trust proxy`: ambos quedan analizados en `design.md` como alternativa y como pregunta
-  abierta, respectivamente.
+  `trust proxy`. El rastreo por usuario queda analizado en `design.md` como alternativa; el
+  origen detrás del proxy de Next ya no es una pregunta abierta: lo resuelve el change
+  `exposicion-red-local` (#62), que confirmó que detrás de `/api` todos los clientes comparten
+  cupo y que confiar en `X-Forwarded-For` no sirve, porque Next lo reenvía tal cual lo manda el
+  cliente.
 - No agrega variables de entorno, dependencias ni migraciones.
 
 ## Capabilities

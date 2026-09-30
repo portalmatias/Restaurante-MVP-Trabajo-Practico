@@ -8,10 +8,11 @@ sin relajar los límites que protegen el login y las rutas públicas con código
 
 ### Requirement: Límite de solicitudes común a las rutas de administración
 El sistema SHALL limitar a 60 solicitudes por ventana de 60 segundos, por ruta y por origen,
-cada operación de las rutas de administración: `GET` y `PATCH` de `/admin/zonas`; `GET`,
-`POST`, `PATCH` y `DELETE` de `/admin/mesas`; `GET`, `POST` y `PATCH` de `/admin/turnos`;
-`GET /admin/reservas` y `PATCH` de `/admin/reservas/:id/confirmar`,
-`/admin/reservas/:id/rechazar` y `/admin/reservas/:id/no-show`. Superado el límite, el sistema
+cada operación de las rutas de administración: `GET /admin/zonas`, `PATCH /admin/zonas/:id`,
+`POST /admin/mesas`, `GET /admin/mesas`, `PATCH /admin/mesas/:id`, `DELETE /admin/mesas/:id`,
+`POST /admin/turnos`, `GET /admin/turnos`, `PATCH /admin/turnos/:id`, `GET /admin/reservas`,
+`PATCH /admin/reservas/:id/confirmar`, `PATCH /admin/reservas/:id/rechazar` y
+`PATCH /admin/reservas/:id/no-show`. Superado el límite, el sistema
 SHALL responder `429 Too Many Requests` sin ejecutar la operación, y SHALL volver a aceptar
 solicitudes de ese origen a esa ruta cuando termine la ventana.
 
@@ -38,7 +39,10 @@ solicitudes de ese origen a esa ruta cuando termine la ventana.
 - **THEN** el sistema atiende esa otra solicitud con normalidad
 
 #### Scenario: Ráfaga de acciones del panel no se rechaza
-- **WHEN** el admin confirma o rechaza 20 Reservas seguidas desde el listado en pocos segundos
+- **WHEN** al admin le quedan al menos 20 solicitudes disponibles en la ventana vigente del
+  cupo de cada ruta que usa (`PATCH /admin/reservas/:id/confirmar` y
+  `PATCH /admin/reservas/:id/rechazar`) y confirma o rechaza 20 Reservas seguidas desde el
+  listado en pocos segundos
 - **THEN** el sistema atiende cada una sin responder `429`
 
 ### Requirement: El login y las rutas públicas con código de reserva conservan su límite

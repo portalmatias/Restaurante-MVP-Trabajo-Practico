@@ -52,11 +52,14 @@
       requisito "El login y las rutas públicas con código de reserva conservan su límite". Si
       alguno no existiera en `main`, agregarlo en el archivo de 3.1. Verificación: los tres en
       verde en la corrida de CI del PR.
-- [ ] 3.6 Confirmar que los tests de integración que ya ejercitan rutas de admin
-      (`gestion-salon-admin.integration-spec.ts`, `zonas.integration-spec.ts`,
-      `mesas.integration-spec.ts`, `reservas-admin-guards-aislado.integration-spec.ts`) siguen
-      pasando: arman su propio `ThrottlerModule`, y el decorador de clase ahora les aplica 60
-      en vez de 10. Verificación: `npm run test:integration -w backend` en verde.
+- [ ] 3.6 Confirmar que los tests de integración que ya ejercitan rutas de admin siguen
+      pasando. De ellos, solo `gestion-salon-admin.integration-spec.ts` arma su propio
+      `ThrottlerModule` y registra `ThrottlerGuard` como `APP_GUARD`, así que es el único en el
+      que el decorador de clase pasa a aplicar 60 en vez de 10. `zonas.integration-spec.ts`,
+      `mesas.integration-spec.ts` y `reservas-admin-guards-aislado.integration-spec.ts` no
+      registran el throttler: para ellos `LimiteAdmin()` es solo metadato sin efecto, y siguen
+      cubriendo guardas y cableado, no el límite (que cubren los e2e de 3.1 a 3.4).
+      Verificación: `npm run test:integration -w backend` en verde.
 
 ## 4. Contrato OpenAPI
 

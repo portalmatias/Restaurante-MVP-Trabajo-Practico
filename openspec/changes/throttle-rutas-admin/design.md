@@ -43,8 +43,11 @@ Estado del que se parte (`main` al 2026-09-30, commit `d2abb22`):
   (`next/dist/server/lib/router-utils/proxy-request.js`, `httpxy` sin `xfwd`) no agrega
   `X-Forwarded-For`, y `backend/src/main.ts` no configura `trust proxy`. Por lo tanto, en el
   despliegue actual `req.ip` es la dirección del servidor de Next para **todo** el tráfico del
-  navegador: todos los usuarios comparten el cupo de cada ruta. Esto se verificó leyendo el
-  código, no con una prueba contra la app levantada.
+  navegador: todos los usuarios comparten el cupo de cada ruta. Este change lo había verificado
+  solo leyendo el código; `exposicion-red-local` (#62) lo confirmó después contra el backend
+  real (5 logins fallidos desde `localhost` por `/api` dejaron con `429` a un cliente con otra
+  IP) y midió además que, si el cliente manda su propio `X-Forwarded-For`, Next lo reenvía tal
+  cual.
 - `frontend-admin` (PR #58) ya muestra un mensaje fijo ante un `429`; no hace falta tocarlo.
 
 ## Goals / Non-Goals
@@ -64,8 +67,8 @@ Estado del que se parte (`main` al 2026-09-30, commit `d2abb22`):
   (D5 de `reserva-consultar`, `config.yaml` §5), ni de ninguna otra ruta pública.
 - No cambia `THROTTLE_TTL`/`THROTTLE_LIMIT` ni agrega variables de entorno.
 - No resuelve el origen real detrás del proxy de Next (`trust proxy` / `X-Forwarded-For`):
-  afecta también a las rutas públicas y al login, así que va en su propio change (ver Open
-  Questions).
+  afecta también a las rutas públicas y al login, y lo trata su propio change,
+  `exposicion-red-local` (#62; ver Open Questions).
 - No cambia el almacenamiento del throttler (sigue en memoria, por instancia).
 
 ## Decisions
@@ -117,8 +120,10 @@ guards, y reutiliza el mecanismo que el proyecto ya usa en dos lugares.
 
    Cualquiera de las tres variantes seguras es bastante más código y superficie de revisión
    que D1, para un MVP con un solo rol y un solo usuario admin sembrado. Se descarta **para
-   este change**; queda como candidata natural si el change del origen real (Open Questions)
-   concluye que la IP no es confiable detrás del proxy.
+   este change**. `exposicion-red-local` (#62) concluyó que detrás del proxy no hay una IP de
+   cliente confiable y lo mitigó por exposición (servicios solo en loopback), dejando el
+   rastreo por identidad fuera de su alcance: sigue siendo la candidata natural si el sistema
+   se despliega sin un proxy de borde que provea la IP real.
 4. **`@SkipThrottle()` en las rutas de admin.** Ya descartada por D7 de `reserva-consultar`:
    el JWT protege el acceso, no la extracción ni el abuso con un token comprometido.
 5. **Subir `THROTTLE_LIMIT` global.** Resolvería el panel, pero relajaría también la consulta
@@ -219,9 +224,10 @@ regenerar `frontend/src/lib/api/schema.d.ts` con `npm run api:types -w frontend`
   token** a una ruta de admin también consumen el cupo de esa ruta para ese origen. Detrás del
   proxy de Next todos comparten origen: un tercero sin credenciales podría agotar, por
   ejemplo, el cupo de `GET /admin/mesas` y dejar al admin con `429` durante un minuto →
-  **Mitigación:** este change no lo empeora (pasar de 10 a 60 lo encarece seis veces); la
-  solución de fondo es el origen real o el rastreo por usuario, fuera de alcance (Open
-  Questions). El mismo problema, más grave, ya afecta hoy al login: su cupo de 5 por minuto
+  **Mitigación:** este change no lo empeora (pasar de 10 a 60 lo encarece seis veces); en la
+  topología local de la demo, `exposicion-red-local` (#62) impide que un tercero de la red
+  llegue a los servicios, y para un despliegue la solución de fondo es el origen real o el
+  rastreo por usuario, fuera de alcance de este change (Open Questions). El mismo problema, más grave, ya afecta hoy al login: su cupo de 5 por minuto
   es compartido por todo el tráfico que llega por el proxy.
 - **[Riesgo]** Un controller de admin nuevo que no use `LimiteAdmin()` volvería al límite
   global → **Mitigación:** el decorador vive al lado de `@Roles` y se aplica en la misma línea
@@ -249,16 +255,15 @@ regenerar `frontend/src/lib/api/schema.d.ts` con `npm run api:types -w frontend`
 
 ## Open Questions
 
-- **Origen real detrás del proxy de Next.** Hoy `req.ip` es la dirección del servidor de Next
-  para todo el tráfico del navegador (Context), así que **todos** los límites por IP del
-  sistema —incluidos el del login y el de la consulta pública— son en la práctica cupos
-  compartidos por todos los usuarios. Resolverlo requiere que el proxy reenvíe la IP del
-  cliente (`X-Forwarded-For`) y que el backend confíe solo en ese salto (`trust proxy`
-  acotado), cuidando que un cliente que llegue directo al backend no pueda falsificar el
-  header. Toca rutas públicas y el despliegue, así que va en un change aparte; no cambia el
-  spec ni las tareas de este (el spec habla de "origen", que ese change redefiniría). Si ese
-  change concluye que no hay una IP confiable, es el momento de retomar el rastreo por `sub`
-  (D1, alternativa 3).
+- **Origen real detrás del proxy de Next: resuelta en `exposicion-red-local` (#62).** Quedó
+  verificado que detrás de `/api` todos los clientes comparten el cupo de cada ruta (`req.ip`
+  es la del servidor de Next) y que confiar en `X-Forwarded-For` no sirve: Next lo reenvía tal
+  cual lo manda el cliente, así que habilitaría inventar un origen por pedido. Ese change
+  mantiene el backend sin `trust proxy`, lo fija con un e2e y hace que los servicios escuchen
+  solo en loopback, de modo que en la demo local ningún tercero pueda agotar los cupos
+  compartidos. No cambia el spec ni las tareas de este change. Si en el futuro se despliega
+  sin un proxy de borde confiable, es el momento de retomar el rastreo por `sub` (D1,
+  alternativa 3).
 - **Valor definitivo.** 60 por minuto sale del mismo razonamiento que D7 de
   `reserva-consultar`, no de una medición. Si al usar el panel con datos reales aparece un
   `429`, se ajusta el número en `LimiteAdmin()` y en el spec con un change chico.
