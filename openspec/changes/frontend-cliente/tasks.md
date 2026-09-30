@@ -172,12 +172,12 @@
       Verificar rojo con `npm test -w frontend -- formulario-datos-contacto`.
 - [x] 4.8 Implementar `FormularioDatosContacto` y `app/reservas/nueva/datos/page.tsx` (D3
       Pantalla 4, D8). Verificar que 4.7 pasa.
-- [ ] 4.9 Escribir los tests de `app/reservas/nueva/exito/page.tsx`: sin los parámetros
+- [x] 4.9 Escribir los tests de `app/reservas/nueva/exito/page.tsx`: sin los parámetros
       esperados, redirige a `/reservas/nueva`; `estado=CONFIRMADA` muestra "confirmada" y no
       muestra el aviso de pendiente; `estado=PENDIENTE` muestra el aviso; el texto de la
       pantalla nunca menciona el envío de un email; el código se muestra con la clase de color
       `accent`. Verificar rojo.
-- [ ] 4.10 Implementar la página de éxito y `BotonCopiarCodigo` (D3 Pantalla 5): escribir
+- [x] 4.10 Implementar la página de éxito y `BotonCopiarCodigo` (D3 Pantalla 5): escribir
       primero el test de `BotonCopiarCodigo` (usa `navigator.clipboard.writeText`, muestra
       confirmación momentánea) y verificar rojo antes de implementarlo. Verificar que 4.9 y el
       test del botón de copiar pasan.
