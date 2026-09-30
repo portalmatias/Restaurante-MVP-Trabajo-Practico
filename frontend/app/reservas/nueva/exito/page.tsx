@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BotonCopiarCodigo } from "../../../../src/components/reservas/boton-copiar-codigo";
-import { ErrorConReintento } from "../../../../src/components/reservas/error-con-reintento";
+import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga";
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
 import { Alert } from "../../../../src/components/ui/alert";
 import { buttonVariants } from "../../../../src/components/ui/button";
 import { apiClient, toApiResult } from "../../../../src/lib/api/client";
-import { MENSAJE_SERVICIO_NO_DISPONIBLE } from "../../../../src/lib/api/errors";
 import { leerConfirmacionDeQuery } from "../../../../src/lib/seleccion-reserva";
 
 type ExitoPageProps = {
@@ -56,13 +55,7 @@ export default async function ExitoPage({ searchParams }: ExitoPageProps) {
         reserva.
       </p>
       {errorDeCatalogo ? (
-        <ErrorConReintento
-          mensaje={
-            errorDeCatalogo.tipo === "desconocido"
-              ? errorDeCatalogo.mensaje
-              : MENSAJE_SERVICIO_NO_DISPONIBLE
-          }
-        />
+        <ErrorDeCarga error={errorDeCatalogo} />
       ) : zona && turno ? (
         <ResumenSeleccion
           fecha={confirmacion.fecha}

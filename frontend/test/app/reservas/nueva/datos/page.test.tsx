@@ -110,4 +110,24 @@ describe("/reservas/nueva/datos", () => {
     );
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
+
+  it("ante un 429 del catálogo muestra el mensaje de límite de intentos, sin reintentar", async () => {
+    responder({ turnos: falla(429) });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
+  it("ante un error de red del catálogo muestra el mensaje de conexión y ofrece reintentar", async () => {
+    GET.mockRejectedValue(new TypeError("fetch failed"));
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo conectar con el servidor.");
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+  });
 });

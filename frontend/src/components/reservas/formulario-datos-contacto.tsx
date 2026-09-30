@@ -252,7 +252,7 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
               Volver a empezar
             </Link>
           ) : null}
-          {errorApi.tipo === "desconocido" || errorApi.tipo === "limite-de-intentos" ? (
+          {errorApi.tipo === "desconocido" ? (
             <Button
               variant="secondary"
               size="lg"

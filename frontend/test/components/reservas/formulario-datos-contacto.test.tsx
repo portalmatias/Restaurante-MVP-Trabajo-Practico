@@ -500,5 +500,8 @@ describe("FormularioDatosContacto - error de servidor o de red", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
     );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre")).toHaveValue("Ana Pérez");
+    expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeEnabled();
   });
 });

@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import { ErrorConReintento } from "../../../../src/components/reservas/error-con-reintento";
+import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga";
 import { FormularioDatosContacto } from "../../../../src/components/reservas/formulario-datos-contacto";
 import { PasosReserva } from "../../../../src/components/reservas/pasos-reserva";
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
 import { apiClient, toApiResult } from "../../../../src/lib/api/client";
-import { MENSAJE_SERVICIO_NO_DISPONIBLE } from "../../../../src/lib/api/errors";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
 
 type DatosPageProps = {
@@ -32,11 +31,9 @@ export default async function DatosPage({ searchParams }: DatosPageProps) {
 
   if (zonas.error || turnos.error) {
     const error = zonas.error ?? turnos.error;
-    // Solo el mensaje propio del cliente (red o servicio): nunca el texto de un 4xx del servidor.
-    const mensaje = error?.tipo === "desconocido" ? error.mensaje : MENSAJE_SERVICIO_NO_DISPONIBLE;
     return (
       <div className={contenedor}>
-        <ErrorConReintento mensaje={mensaje} />
+        <ErrorDeCarga error={error} />
       </div>
     );
   }

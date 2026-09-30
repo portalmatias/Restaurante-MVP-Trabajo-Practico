@@ -201,4 +201,17 @@ describe("/reservas/nueva/exito - el catálogo no responde", () => {
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Resumen de tu selección" })).not.toBeInTheDocument();
   });
+
+  it("ante un 429 del catálogo conserva el código y muestra el límite de intentos, sin reintentar", async () => {
+    responder({ turnos: falla(429) });
+
+    await renderizar();
+
+    expect(screen.getByText("K7PM3QXA")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Resumen de tu selección" })).not.toBeInTheDocument();
+  });
 });
