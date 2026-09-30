@@ -177,6 +177,9 @@ describe("MesasPanel", () => {
 
     expect(screen.getByRole("button", { name: "Editar mesa M1" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Agregar mesa" })).toBeDisabled();
+    // El foco pasa al primer campo del formulario, no se pierde en el documento.
+    const formulario = screen.getByRole("form", { name: "Editar mesa M1" });
+    expect(within(formulario).getByLabelText("Zona")).toHaveFocus();
   });
 
   it("confirmar la baja envía el DELETE y quita la fila", async () => {

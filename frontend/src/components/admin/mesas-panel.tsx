@@ -255,7 +255,16 @@ function FormularioMesa({
     <form onSubmit={guardar} noValidate aria-label={titulo} className="flex flex-col gap-4 rounded-md border border-border p-4">
       <h3 className="font-semibold">{titulo}</h3>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Select label="Zona" value={zonaId} disabled={guardando} error={errores.zonaId} onChange={(e) => setZonaId(e.target.value)}>
+        {/* El botón que abrió el formulario queda deshabilitado y suelta el foco: se lleva al
+            primer campo para que quien usa teclado no pierda la posición. */}
+        <Select
+          label="Zona"
+          value={zonaId}
+          disabled={guardando}
+          error={errores.zonaId}
+          autoFocus
+          onChange={(e) => setZonaId(e.target.value)}
+        >
           {zonas.map((zona) => (
             <option key={zona.id} value={zona.id}>
               {zona.nombre}
