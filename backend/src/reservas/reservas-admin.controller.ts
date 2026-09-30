@@ -51,10 +51,10 @@ import { ReservasService } from './reservas.service';
  * parte de la capability `Reservas`, la división en dos archivos es un detalle de
  * implementación de NestJS, no del contrato.
  *
- * Esta clase es también donde deberían vivir las próximas rutas bajo `/admin/reservas/...`
- * de otros changes (`PATCH /admin/reservas/:id/no-show` de `cancelacion-turnos`,
- * `PATCH /admin/reservas/:id/confirmar` y `.../rechazar` de `reserva-vip`): la misma
- * restricción de NestJS les aplica a ellas también.
+ * La misma restricción de NestJS aplica a las demás rutas bajo `/admin/reservas/...` que
+ * agregaron después `cancelacion-turnos` (`PATCH .../no-show`) y `reserva-vip`
+ * (`PATCH .../confirmar`, `.../rechazar`): todas viven en esta clase, no en
+ * `ReservasController`.
  */
 @ApiTags('Reservas')
 @ApiBearerAuth('bearerAuth')
@@ -197,5 +197,88 @@ export class ReservasAdminController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async marcarNoShow(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     await this.reservasService.marcarNoShow(id);
+  }
+
+  /**
+   * `PATCH /admin/reservas/:id/confirmar` (capability `reserva-vip`, design.md "Rutas").
+   * Transiciona una Reserva `PENDIENTE` a `CONFIRMADA` (`ReservasService.confirmar`), sin
+   * revalidar aforo ni Mesa. `operationId` fijado explícito, mismo criterio que `listar` y
+   * `marcarNoShow`.
+   */
+  @ApiOperation({
+    operationId: 'ReservasController_confirmar',
+    summary: 'Confirmar una reserva pendiente',
+    description:
+      'Transiciona una reserva PENDIENTE a CONFIRMADA. Rechaza con 409 si la reserva no está PENDIENTE. No revalida aforo ni disponibilidad de mesa. Requiere un JWT de rol ADMIN.',
+  })
+  @ApiNoContentResponse({
+    description: 'Reserva confirmada; respuesta sin cuerpo.',
+  })
+  @ApiBadRequestResponse({
+    type: ErrorRespuesta,
+    description: 'El identificador de la reserva no es un UUID válido.',
+  })
+  @ApiUnauthorizedResponse({
+    type: ErrorRespuesta,
+    description: 'Token ausente, inválido o expirado.',
+  })
+  @ApiForbiddenResponse({
+    type: ErrorRespuesta,
+    description: 'Token válido sin rol ADMIN.',
+  })
+  @ApiNotFoundResponse({
+    type: ErrorRespuesta,
+    description: 'La reserva indicada no existe.',
+  })
+  @ApiConflictResponse({
+    type: ErrorRespuesta,
+    description: 'La reserva no está PENDIENTE.',
+  })
+  @Patch(':id/confirmar')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async confirmar(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    await this.reservasService.confirmar(id);
+  }
+
+  /**
+   * `PATCH /admin/reservas/:id/rechazar` (capability `reserva-vip`, design.md "Rutas").
+   * Transiciona una Reserva `PENDIENTE` a `CANCELADA` (`ReservasService.rechazar`). A
+   * diferencia de `POST /reservas/:codigo/cancelar` (cliente), solo acepta Reservas
+   * `PENDIENTE`: una Reserva ya `CONFIRMADA` responde `409`, no se rechaza silenciosamente
+   * como si fuera una cancelación.
+   */
+  @ApiOperation({
+    operationId: 'ReservasController_rechazar',
+    summary: 'Rechazar una reserva pendiente',
+    description:
+      'Transiciona una reserva PENDIENTE a CANCELADA. Rechaza con 409 si la reserva no está PENDIENTE (a diferencia de la cancelación del cliente, no acepta reservas CONFIRMADA). Requiere un JWT de rol ADMIN.',
+  })
+  @ApiNoContentResponse({
+    description: 'Reserva rechazada; respuesta sin cuerpo.',
+  })
+  @ApiBadRequestResponse({
+    type: ErrorRespuesta,
+    description: 'El identificador de la reserva no es un UUID válido.',
+  })
+  @ApiUnauthorizedResponse({
+    type: ErrorRespuesta,
+    description: 'Token ausente, inválido o expirado.',
+  })
+  @ApiForbiddenResponse({
+    type: ErrorRespuesta,
+    description: 'Token válido sin rol ADMIN.',
+  })
+  @ApiNotFoundResponse({
+    type: ErrorRespuesta,
+    description: 'La reserva indicada no existe.',
+  })
+  @ApiConflictResponse({
+    type: ErrorRespuesta,
+    description: 'La reserva no está PENDIENTE.',
+  })
+  @Patch(':id/rechazar')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async rechazar(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    await this.reservasService.rechazar(id);
   }
 }

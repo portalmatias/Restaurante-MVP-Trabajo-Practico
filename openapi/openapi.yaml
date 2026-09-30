@@ -1706,3 +1706,105 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorRespuesta'
+  /admin/reservas/{id}/confirmar:
+    patch:
+      operationId: ReservasController_confirmar
+      summary: Confirmar una reserva pendiente
+      description: >-
+        Transiciona una reserva PENDIENTE a CONFIRMADA. Rechaza con 409 si la reserva no
+        está PENDIENTE. No revalida aforo ni disponibilidad de mesa. Requiere un JWT de rol
+        ADMIN.
+      tags:
+        - Reservas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Reserva confirmada; respuesta sin cuerpo.
+        '400':
+          description: El identificador de la reserva no es un UUID válido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '403':
+          description: Token válido sin rol ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '404':
+          description: La reserva indicada no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '409':
+          description: La reserva no está PENDIENTE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+  /admin/reservas/{id}/rechazar:
+    patch:
+      operationId: ReservasController_rechazar
+      summary: Rechazar una reserva pendiente
+      description: >-
+        Transiciona una reserva PENDIENTE a CANCELADA. Rechaza con 409 si la reserva no está
+        PENDIENTE (a diferencia de la cancelación del cliente, no acepta reservas
+        CONFIRMADA). Requiere un JWT de rol ADMIN.
+      tags:
+        - Reservas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Reserva rechazada; respuesta sin cuerpo.
+        '400':
+          description: El identificador de la reserva no es un UUID válido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '403':
+          description: Token válido sin rol ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '404':
+          description: La reserva indicada no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
+        '409':
+          description: La reserva no está PENDIENTE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorRespuesta'
