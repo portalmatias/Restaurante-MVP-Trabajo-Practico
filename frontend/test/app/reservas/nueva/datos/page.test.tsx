@@ -92,8 +92,11 @@ describe("/reservas/nueva/datos", () => {
     expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeInTheDocument();
   });
 
-  it("si el turno o la zona ya no figuran en el catálogo redirige al Paso 1", async () => {
-    responder({ turnos: ok([]) });
+  it.each([
+    ["el turno", { turnos: ok([]) }],
+    ["la zona", { zonas: ok([]) }],
+  ])("si %s ya no figura en el catálogo redirige al Paso 1", async (_que, respuestas) => {
+    responder(respuestas);
 
     expect(await destinoDeRedireccion(SELECCION)).toBe(
       `/reservas/nueva?${new URLSearchParams(SELECCION).toString()}`,

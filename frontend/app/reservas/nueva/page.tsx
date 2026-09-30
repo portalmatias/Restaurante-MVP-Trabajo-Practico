@@ -1,7 +1,6 @@
-import { ErrorConReintento } from "../../../src/components/reservas/error-con-reintento";
+import { ErrorDeCarga } from "../../../src/components/reservas/error-de-carga";
 import { FormularioSeleccion } from "../../../src/components/reservas/formulario-seleccion";
 import { apiClient, toApiResult } from "../../../src/lib/api/client";
-import { MENSAJE_SERVICIO_NO_DISPONIBLE } from "../../../src/lib/api/errors";
 import { fechaLocalDeHoy } from "../../../src/lib/fecha-hora";
 
 type NuevaReservaPageProps = {
@@ -27,10 +26,10 @@ export default async function NuevaReservaPage({ searchParams }: NuevaReservaPag
   ]);
 
   if (zonas.error || turnos.error) {
-    // Nunca se muestra el texto que haya podido mandar el servidor: solo el genérico.
+    const error = zonas.error ?? turnos.error;
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10">
-        <ErrorConReintento mensaje={MENSAJE_SERVICIO_NO_DISPONIBLE} />
+        <ErrorDeCarga error={error} />
       </div>
     );
   }
