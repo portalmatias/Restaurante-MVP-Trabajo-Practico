@@ -113,7 +113,7 @@
 
 ## 4. Grupo A — Reservar (depende de `catalogo-publico` y `reservas-crear` PR #40 mergeados)
 
-- [ ] 4.1 Confirmar que `GET /zonas`, `GET /turnos` y `POST /reservas` están en
+- [x] 4.1 Confirmar que `GET /zonas`, `GET /turnos` y `POST /reservas` están en
       `openapi/openapi.yaml` en `main` (no solo en un `design.md`) y correr
       `npm run api:types -w frontend` para regenerar `schema.d.ts` con esos paths. No seguir
       con las tareas de esta sección si alguno falta: completar 4.1–4.x de las otras
