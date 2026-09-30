@@ -158,7 +158,7 @@
       `GET /disponibilidad`, resuelve `GET /zonas` (nombre y `requiereConfirmacionAdmin` para el
       aviso de pendiente) y `GET /turnos` (horario del resumen), y ante un `404` de
       `GET /disponibilidad` redirige al Paso 1. Verificar que 4.5 pasa.
-- [ ] 4.7 Escribir los tests de `FormularioDatosContacto`: validación en línea al salir de cada
+- [x] 4.7 Escribir los tests de `FormularioDatosContacto`: validación en línea al salir de cada
       campo (nombre vacío, email sin arroba, teléfono vacío); el botón de enviar se deshabilita
       y cambia su texto mientras la promesa está pendiente; un `400` con mensajes que empiezan
       con `emailCliente`/`nombreCliente`/`telefonoCliente` los muestra en línea en el campo
@@ -170,7 +170,7 @@
       un error de servidor o de red conserva los datos tipeados y ofrece reintentar; un envío
       exitoso navega a `/reservas/nueva/exito` con los seis parámetros de la respuesta.
       Verificar rojo con `npm test -w frontend -- formulario-datos-contacto`.
-- [ ] 4.8 Implementar `FormularioDatosContacto` y `app/reservas/nueva/datos/page.tsx` (D3
+- [x] 4.8 Implementar `FormularioDatosContacto` y `app/reservas/nueva/datos/page.tsx` (D3
       Pantalla 4, D8). Verificar que 4.7 pasa.
 - [ ] 4.9 Escribir los tests de `app/reservas/nueva/exito/page.tsx`: sin los parámetros
       esperados, redirige a `/reservas/nueva`; `estado=CONFIRMADA` muestra "confirmada" y no

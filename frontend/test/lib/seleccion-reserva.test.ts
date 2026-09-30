@@ -1,4 +1,9 @@
-import { leerSeleccionDeQuery, urlConSeleccion } from "../../src/lib/seleccion-reserva";
+import {
+  leerConfirmacionDeQuery,
+  leerSeleccionDeQuery,
+  urlConSeleccion,
+  urlDeExito,
+} from "../../src/lib/seleccion-reserva";
 
 const VALIDA = {
   fecha: "2026-09-19",
@@ -54,5 +59,46 @@ describe("leerSeleccionDeQuery", () => {
     expect(leerSeleccionDeQuery({ ...VALIDA, fecha: "2020-01-01" })).toEqual(
       expect.objectContaining({ fecha: "2020-01-01" }),
     );
+  });
+});
+
+describe("urlDeExito", () => {
+  it("arma la query con el código, el estado y los cuatro datos de la selección", () => {
+    expect(
+      urlDeExito({ codigo: "K7PM3QXA", estado: "PENDIENTE", ...VALIDA, comensales: 4 }),
+    ).toBe(
+      `/reservas/nueva/exito?codigo=K7PM3QXA&estado=PENDIENTE&fecha=2026-09-19&turnoId=${VALIDA.turnoId}&zonaId=${VALIDA.zonaId}&comensales=4`,
+    );
+  });
+});
+
+describe("leerConfirmacionDeQuery", () => {
+  const COMPLETA = { codigo: "K7PM3QXA", estado: "CONFIRMADA", ...VALIDA };
+
+  it("lee una confirmación completa y convierte los comensales a número", () => {
+    expect(leerConfirmacionDeQuery(COMPLETA)).toEqual({ ...COMPLETA, comensales: 4 });
+  });
+
+  it("acepta el estado PENDIENTE", () => {
+    expect(leerConfirmacionDeQuery({ ...COMPLETA, estado: "PENDIENTE" })?.estado).toBe("PENDIENTE");
+  });
+
+  it.each(["codigo", "estado", "fecha", "turnoId", "zonaId", "comensales"])(
+    "sin %s devuelve undefined",
+    (campo) => {
+      expect(leerConfirmacionDeQuery({ ...COMPLETA, [campo]: undefined })).toBeUndefined();
+    },
+  );
+
+  it.each(["CANCELADA", "confirmada", ""])("con el estado %j devuelve undefined", (estado) => {
+    expect(leerConfirmacionDeQuery({ ...COMPLETA, estado })).toBeUndefined();
+  });
+
+  it.each(["ABC", "K7PM3QX!", "K7PM3QXAB"])("con el código %j devuelve undefined", (codigo) => {
+    expect(leerConfirmacionDeQuery({ ...COMPLETA, codigo })).toBeUndefined();
+  });
+
+  it("con un parámetro repetido devuelve undefined", () => {
+    expect(leerConfirmacionDeQuery({ ...COMPLETA, codigo: ["K7PM3QXA", "K7PM3QXB"] })).toBeUndefined();
   });
 });
