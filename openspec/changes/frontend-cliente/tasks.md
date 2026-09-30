@@ -119,7 +119,7 @@
       con las tareas de esta sección si alguno falta: completar 4.1–4.x de las otras
       secciones o esperar. Verificar con
       `grep -n "'/zonas'\|'/turnos'\|'/reservas'" frontend/src/lib/api/schema.d.ts`.
-- [ ] 4.2 Reescribir `frontend/app/reservas/page.tsx` (Inicio, D3): título, acción principal
+- [x] 4.2 Reescribir `frontend/app/reservas/page.tsx` (Inicio, D3): título, acción principal
       "Reservá ahora" → `/reservas/nueva`, acción secundaria a `/reservas/consultar`, sin
       lógica de datos. Escribir su test RTL primero (rol de los botones, `href` de cada
       enlace, ausencia de cualquier texto/enlace de administración) y verificar rojo antes de
