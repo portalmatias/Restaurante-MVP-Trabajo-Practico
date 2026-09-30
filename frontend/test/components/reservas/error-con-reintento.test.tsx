@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ErrorConReintento } from "../../../src/components/reservas/error-con-reintento";
 
 const refresh = jest.fn();
@@ -21,5 +21,22 @@ describe("ErrorConReintento", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
 
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("mientras el refresh está en curso deshabilita 'Reintentar' y no repite la solicitud", async () => {
+    // Un refresh que no termina: la transición sigue pendiente mientras no se resuelva.
+    let terminar: () => void = () => undefined;
+    refresh.mockImplementation(() => new Promise<void>((resolver) => (terminar = resolver)));
+    render(<ErrorConReintento mensaje="Algo falló." />);
+    const boton = screen.getByRole("button", { name: "Reintentar" });
+
+    fireEvent.click(boton);
+    await waitFor(() => expect(boton).toBeDisabled());
+    fireEvent.click(boton);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    await act(async () => terminar());
+    await waitFor(() => expect(boton).toBeEnabled());
   });
 });

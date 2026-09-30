@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
@@ -14,13 +15,20 @@ export type ErrorConReintentoProps = {
  */
 export function ErrorConReintento({ mensaje }: ErrorConReintentoProps) {
   const router = useRouter();
+  // `router.refresh()` no devuelve una promesa: la transición marca cuándo termina de recargar.
+  const [recargando, iniciarRecarga] = useTransition();
 
   return (
     <div className="flex flex-col gap-3">
       <Alert variant="error" className="text-base">
         {mensaje}
       </Alert>
-      <Button variant="secondary" size="lg" onClick={() => router.refresh()}>
+      <Button
+        variant="secondary"
+        size="lg"
+        disabled={recargando}
+        onClick={() => iniciarRecarga(() => router.refresh())}
+      >
         Reintentar
       </Button>
     </div>
