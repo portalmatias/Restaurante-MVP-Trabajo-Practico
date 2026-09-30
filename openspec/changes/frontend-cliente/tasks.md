@@ -146,7 +146,7 @@
       `app/reservas/nueva/page.tsx` que hace `GET /zonas`/`GET /turnos` directo al backend y se
       los pasa como props, más `app/reservas/nueva/loading.tsx`. Verificar que 4.3 pasa y que
       `npm run build -w frontend` no falla por un `searchParams`/fetch mal tipado.
-- [ ] 4.5 Escribir los tests de `app/reservas/nueva/resultado/page.tsx`: sin los cuatro
+- [x] 4.5 Escribir los tests de `app/reservas/nueva/resultado/page.tsx`: sin los cuatro
       parámetros de query, redirige a `/reservas/nueva`; con "hay lugar", muestra el resumen,
       los lugares restantes y, si `requiereConfirmacionAdmin`, el aviso de pendiente, sin
       mostrarlo si no; con "no hay lugar", muestra un `Alert` por cada motivo informado y el
@@ -154,7 +154,7 @@
       red, muestra el mensaje genérico y el botón de reintentar. Mockear el cliente tipado a
       nivel de módulo para estos casos (no golpear red real). Verificar rojo con
       `npm test -w frontend -- resultado`.
-- [ ] 4.6 Implementar la página de resultado (D3, Pantalla 3) y su `loading.tsx`: además de
+- [x] 4.6 Implementar la página de resultado (D3, Pantalla 3) y su `loading.tsx`: además de
       `GET /disponibilidad`, resuelve `GET /zonas` (nombre y `requiereConfirmacionAdmin` para el
       aviso de pendiente) y `GET /turnos` (horario del resumen), y ante un `404` de
       `GET /disponibilidad` redirige al Paso 1. Verificar que 4.5 pasa.

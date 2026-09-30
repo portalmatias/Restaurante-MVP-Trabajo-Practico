@@ -34,18 +34,22 @@ export function urlConSeleccion(ruta: string, seleccion: Partial<SeleccionReserv
   return query === "" ? ruta : `${ruta}?${query}`;
 }
 
+function esFechaDeCalendario(fecha: string): boolean {
+  try {
+    leerFechaIso(fecha);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * `true` si `fecha` es una fecha `YYYY-MM-DD` que existe en el calendario y no es anterior a
  * `hoy` (el mínimo que admite el selector). Es una ayuda de navegación: la anticipación de cada
  * zona la valida siempre el servidor.
  */
 export function esFechaElegible(fecha: string, hoy: string): boolean {
-  try {
-    leerFechaIso(fecha);
-  } catch {
-    return false;
-  }
-  return fecha >= hoy;
+  return esFechaDeCalendario(fecha) && fecha >= hoy;
 }
 
 /** Entero positivo escrito en decimal, sin signo, espacios ni parte fraccionaria. */
@@ -85,4 +89,31 @@ export function resolverSeleccionInicial(
     turnoId: turno?.id,
     comensales: comensalesEnRango,
   };
+}
+
+const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Selección completa y con forma válida leída de `searchParams` (Paso 2 en adelante), o
+ * `undefined` si falta algún valor, está repetido o no tiene el formato esperado. Solo mira la
+ * forma: que la fecha sea pasada, o que el turno o la zona ya no existan, lo informa el
+ * servidor al consultar.
+ */
+export function leerSeleccionDeQuery(
+  query: Record<string, string | string[] | undefined>,
+): SeleccionReserva | undefined {
+  const { fecha, turnoId, zonaId } = query;
+  const comensales = leerEnteroPositivo(typeof query.comensales === "string" ? query.comensales : undefined);
+  if (
+    typeof fecha !== "string" ||
+    !esFechaDeCalendario(fecha) ||
+    typeof turnoId !== "string" ||
+    !FORMATO_UUID.test(turnoId) ||
+    typeof zonaId !== "string" ||
+    !FORMATO_UUID.test(zonaId) ||
+    comensales === undefined
+  ) {
+    return undefined;
+  }
+  return { fecha, turnoId, zonaId, comensales };
 }
