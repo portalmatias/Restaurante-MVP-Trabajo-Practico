@@ -236,7 +236,7 @@
       "detalle" para decidir si se muestra el botón "Cancelar mi reserva", incluido el `Alert`
       informativo con "Reintentar" de 6.2 cuando `GET /zonas` falla o no trae la zona buscada
       (D9). Verificar que 6.2 pasa.
-- [ ] 6.4 Escribir los tests de la sub-vista "confirmar cancelación" (usa `Dialog` de 3.3/3.4):
+- [x] 6.4 Escribir los tests de la sub-vista "confirmar cancelación" (usa `Dialog` de 3.3/3.4):
       abrir el diálogo con el resumen visible; cerrarlo sin confirmar no envía ninguna
       solicitud y no cambia el estado mostrado; confirmar envía `{ email }` al código de la
       reserva consultada; mientras está pendiente, "Sí, cancelar" muestra estado de carga; un
@@ -244,7 +244,7 @@
       cancelar; un `404`/`409`/`429`/error de servidor muestra el mensaje dentro del diálogo,
       que permanece abierto y no cambia el estado mostrado. Verificar rojo con
       `npm test -w frontend -- confirmar-cancelacion`.
-- [ ] 6.5 Implementar la sub-vista de confirmación dentro de `ConsultaReserva` (D3 Pantalla
+- [x] 6.5 Implementar la sub-vista de confirmación dentro de `ConsultaReserva` (D3 Pantalla
       8-9). Verificar que 6.4 pasa y que la suite completa de `ConsultaReserva` (5.2, 5.3, 6.2,
       6.4) sigue en verde junta.
 - [ ] 6.6 Prueba manual: cancelar una reserva del seed dentro de la ventana permitida y

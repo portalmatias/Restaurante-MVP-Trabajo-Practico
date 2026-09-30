@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
+import { Dialog } from "../ui/dialog";
 import { Field } from "../ui/field";
 import { apiClient, toApiResult } from "../../lib/api/client";
 import type { ErrorApi } from "../../lib/api/errors";
@@ -124,6 +125,9 @@ function useVerificacionCancelacion(reserva: ReservaConsultada) {
   };
 }
 
+const MENSAJE_NO_CANCELABLE =
+  "No se pudo cancelar la reserva: la ventana para cancelar ya venció o la reserva ya no se puede cancelar.";
+
 function errorDeCodigo(codigo: string): string | undefined {
   if (codigo === "") return "Falta ingresar el código de tu reserva.";
   if (!esCodigoReservaValido(codigo)) return "El código tiene 8 caracteres, entre letras y números.";
@@ -142,6 +146,13 @@ function mensajeDeError(error: ErrorApi): string {
   if (error.tipo === "no-encontrado") return MENSAJE_NO_ENCONTRADA;
   if (error.tipo === "validacion") return "Revisá el código y el email e intentá de nuevo.";
   return error.mensaje;
+}
+
+// Igual que la consulta, nunca se muestra el texto del servidor. Un 409 es la ventana vencida o
+// un estado no cancelable; un 404 no dice cuál dato falló. El resto usa el mensaje de `mapErrorApi`.
+function mensajeDeErrorAlCancelar(error: ErrorApi): string {
+  if (error.tipo === "conflicto") return MENSAJE_NO_CANCELABLE;
+  return mensajeDeError(error);
 }
 
 export type ConsultaReservaProps = {
@@ -220,7 +231,14 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
   }
 
   if (reserva) {
-    return <DetalleReserva reserva={reserva} onConsultarOtra={consultarOtra} />;
+    return (
+      <DetalleReserva
+        reserva={reserva}
+        email={email.trim()}
+        onCancelada={() => setReserva({ ...reserva, estado: "CANCELADA" })}
+        onConsultarOtra={consultarOtra}
+      />
+    );
   }
 
   return (
@@ -276,15 +294,96 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
   );
 }
 
+function ResumenReserva({ reserva }: { reserva: ReservaConsultada }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+      <dt className="text-muted-foreground">Código</dt>
+      <dd className="font-bold tracking-widest text-accent">{reserva.codigoReserva}</dd>
+      <dt className="text-muted-foreground">Fecha</dt>
+      <dd>{formatearSinRomper(formatearFechaLargaEs, reserva.fecha)}</dd>
+      <dt className="text-muted-foreground">Turno</dt>
+      {/* La API entrega `HH:mm` ya en hora local del restaurante: se muestra tal cual. */}
+      <dd>{`${reserva.turno.horaInicio} a ${reserva.turno.horaFin}`}</dd>
+      <dt className="text-muted-foreground">Zona</dt>
+      <dd>{reserva.zona.nombre}</dd>
+      <dt className="text-muted-foreground">Comensales</dt>
+      <dd>{reserva.comensales}</dd>
+    </dl>
+  );
+}
+
 function DetalleReserva({
   reserva,
+  email,
+  onCancelada,
   onConsultarOtra,
 }: {
   reserva: ReservaConsultada;
+  /** Email ya usado para consultar: viaja en el body de la cancelación, nunca se muestra. */
+  email: string;
+  onCancelada: () => void;
   onConsultarOtra: () => void;
 }) {
   const { ofrecerCancelar, noVerificada, verificando, reintentar } =
     useVerificacionCancelacion(reserva);
+  const [dialogoAbierto, setDialogoAbierto] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
+  const [errorAlCancelar, setErrorAlCancelar] = useState<ErrorApi>();
+  const [recienCancelada, setRecienCancelada] = useState(false);
+  // Mismo patrón que la consulta: `enCurso` evita reentradas y `ultimaSolicitud` descarta la
+  // respuesta de una cancelación abandonada (por ejemplo, tras desmontar).
+  const cancelacionEnCurso = useRef(false);
+  const ultimaCancelacion = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      ultimaCancelacion.current += 1;
+    };
+  }, []);
+
+  function abrirDialogo() {
+    setErrorAlCancelar(undefined);
+    setDialogoAbierto(true);
+  }
+
+  // Mientras la cancelación está pendiente el diálogo no se cierra (el `Dialog` ya lo impide);
+  // la guarda evita que un cierre tardío abandone una solicitud en curso.
+  function cerrarDialogo() {
+    if (!cancelacionEnCurso.current) {
+      setDialogoAbierto(false);
+    }
+  }
+
+  async function cancelar() {
+    if (cancelacionEnCurso.current) {
+      return;
+    }
+    const solicitud = ++ultimaCancelacion.current;
+    cancelacionEnCurso.current = true;
+    setErrorAlCancelar(undefined);
+    setCancelando(true);
+    const resultado = await toApiResult(
+      apiClient.POST("/reservas/{codigo}/cancelar", {
+        params: { path: { codigo: reserva.codigoReserva } },
+        body: { email },
+      }),
+    );
+    if (solicitud !== ultimaCancelacion.current) {
+      return;
+    }
+    cancelacionEnCurso.current = false;
+    setCancelando(false);
+
+    if (resultado.error) {
+      setErrorAlCancelar(resultado.error);
+      return;
+    }
+    // El 204 ya confirma el cambio: no se vuelve a consultar al servidor (design.md D3).
+    setDialogoAbierto(false);
+    setRecienCancelada(true);
+    onCancelada();
+  }
+
   const esPendiente = reserva.estado === "PENDIENTE";
   const claseEtiqueta = esPendiente
     ? "bg-accent text-accent-foreground"
@@ -300,23 +399,16 @@ function DetalleReserva({
           {ETIQUETA_POR_ESTADO[reserva.estado]}
         </span>
       </p>
+      {recienCancelada ? (
+        <Alert variant="info" className="text-base">
+          Tu reserva fue cancelada.
+        </Alert>
+      ) : null}
       <Card title="Resumen de tu reserva" className="text-base">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-          <dt className="text-muted-foreground">Código</dt>
-          <dd className="font-bold tracking-widest text-accent">{reserva.codigoReserva}</dd>
-          <dt className="text-muted-foreground">Fecha</dt>
-          <dd>{formatearSinRomper(formatearFechaLargaEs, reserva.fecha)}</dd>
-          <dt className="text-muted-foreground">Turno</dt>
-          {/* La API entrega `HH:mm` ya en hora local del restaurante: se muestra tal cual. */}
-          <dd>{`${reserva.turno.horaInicio} a ${reserva.turno.horaFin}`}</dd>
-          <dt className="text-muted-foreground">Zona</dt>
-          <dd>{reserva.zona.nombre}</dd>
-          <dt className="text-muted-foreground">Comensales</dt>
-          <dd>{reserva.comensales}</dd>
-        </dl>
+        <ResumenReserva reserva={reserva} />
       </Card>
       {ofrecerCancelar ? (
-        <Button variant="destructive" size="lg">
+        <Button variant="destructive" size="lg" onClick={abrirDialogo}>
           Cancelar mi reserva
         </Button>
       ) : null}
@@ -333,6 +425,22 @@ function DetalleReserva({
       <Button variant="ghost" onClick={onConsultarOtra} className="underline sm:self-start">
         Consultar otra reserva
       </Button>
+      <Dialog
+        open={dialogoAbierto}
+        titulo="¿Cancelar tu reserva?"
+        textoConfirmar={cancelando ? "Cancelando…" : "Sí, cancelar"}
+        textoCancelar="Volver"
+        variantConfirmar="destructive"
+        confirmando={cancelando}
+        onConfirm={() => void cancelar()}
+        onCancel={cerrarDialogo}
+      >
+        {/* Cerrado, el diálogo no lleva contenido: no duplica el resumen del detalle. */}
+        {dialogoAbierto ? <ResumenReserva reserva={reserva} /> : null}
+        {dialogoAbierto && errorAlCancelar ? (
+          <Alert variant="error">{mensajeDeErrorAlCancelar(errorAlCancelar)}</Alert>
+        ) : null}
+      </Dialog>
     </div>
   );
 }
