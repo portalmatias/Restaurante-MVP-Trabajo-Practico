@@ -432,8 +432,9 @@ describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
   });
 
   it("usa la ventana de la zona de la reserva y no la de otra zona", async () => {
-    // Faltan más de 24 h (la ventana de su zona), pero menos que la ventana enorme de la otra.
-    const fecha = new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // Faltan unos 30 días: muy lejos de las 24 h de su zona (sin depender de la hora a la que
+    // corre el test), pero mucho menos que la ventana enorme de la otra.
+    const fecha = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     GET.mockResolvedValue(
       respuestaOk([{ ...ZONA, id: "z-2", ventanaCancelacionHoras: 100000 }, ZONA]),
     );
