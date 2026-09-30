@@ -21,8 +21,9 @@ function textoDe(valor: string | string[] | undefined): string | undefined {
 export default async function NuevaReservaPage({ searchParams }: NuevaReservaPageProps) {
   const params = await searchParams;
   const [zonas, turnos] = await Promise.all([
-    toApiResult(apiClient.GET("/zonas")),
-    toApiResult(apiClient.GET("/turnos")),
+    // Sin caché: `router.refresh()` de "Reintentar" tiene que volver a llegar al backend.
+    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
+    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
   ]);
 
   if (zonas.error || turnos.error) {

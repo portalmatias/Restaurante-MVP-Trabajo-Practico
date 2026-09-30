@@ -44,8 +44,8 @@ describe("/reservas/nueva", () => {
 
     await renderizar();
 
-    expect(GET).toHaveBeenCalledWith("/zonas");
-    expect(GET).toHaveBeenCalledWith("/turnos");
+    expect(GET).toHaveBeenCalledWith("/zonas", { cache: "no-store" });
+    expect(GET).toHaveBeenCalledWith("/turnos", { cache: "no-store" });
     expect(screen.getByRole("heading", { level: 1, name: "¿Cuándo y para cuántos?" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /VIP/ })).toBeInTheDocument();
   });

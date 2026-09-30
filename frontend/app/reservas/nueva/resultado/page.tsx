@@ -87,8 +87,9 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
           No hay lugar para esa combinación
         </h1>
         <ul className="flex flex-col gap-3">
-          {disponibilidad.data.motivos.map((motivo) => (
-            <li key={motivo.codigo}>
+          {disponibilidad.data.motivos.map((motivo, indice) => (
+            // El índice desambigua dos motivos con el mismo código; la lista no se reordena.
+            <li key={`${motivo.codigo}-${indice}`}>
               {/* El backend ya manda el texto en español para personas. */}
               <Alert variant="error" className="text-base">
                 {motivo.mensaje}
