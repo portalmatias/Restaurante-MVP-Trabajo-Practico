@@ -95,14 +95,38 @@ consulta pública (la enumeración prueba códigos distintos). Queda fuera de al
 
 ### D3: Confianza en proxies configurable, explícita y nunca total
 
-**Decisión:** variable `TRUST_PROXY` (vacía por defecto → sin confianza). Si se define, se
-pasa a `app.set('trust proxy', ...)` como **lista de direcciones o subredes** separadas por
-coma (por ejemplo `10.0.0.5` o `loopback, 10.0.0.0/8`). La validación se aplica a **cada
-elemento** de la lista, ya recortado: si cualquiera de ellos equivale a confiar en todos
-(`true`, `*`, `0.0.0.0/0`, `::/0`) o es un número de saltos, el backend **no arranca**, con un
-mensaje que pide declarar los saltos. Validar solo el valor completo no alcanza: Express
-aceptaría `10.0.0.5,0.0.0.0/0` o `loopback, ::/0` y el catch-all escondido en la lista haría
-confiable a cualquier salto.
+**Decisión:** variable `TRUST_PROXY` (vacía por defecto → sin confianza). Si se define, es
+una lista separada por coma que se valida **elemento por elemento contra una lista de formatos
+permitidos**, no contra una lista de valores prohibidos. Cada elemento, ya recortado, debe ser
+uno de estos:
+
+- un nombre predefinido de Express: `loopback`, `linklocal` o `uniquelocal`;
+- una dirección IPv4 en notación simple (`10.0.0.5`);
+- una subred IPv4 en notación simple con prefijo de al menos `/8` (`10.0.0.0/8`).
+
+Cualquier otro elemento hace que el backend **no arranque**, con un mensaje que pide declarar
+los saltos: eso incluye `true`, `*`, un número de saltos, `0.0.0.0/0`, un prefijo IPv4 menor a
+`/8` y **toda notación IPv6** (`::/0`, `::/1`, `::ffff:10.0.0.0/8`, etc.). Validar solo el valor
+completo no alcanza: Express aceptaría `10.0.0.5,0.0.0.0/0` y el catch-all escondido en la lista
+haría confiable a cualquier salto.
+
+**Por qué una lista de permitidos y por qué sin IPv6:** `proxy-addr` (la librería que usa
+Express para `trust proxy`) tuvo hasta la 2.0.7 una vulnerabilidad crítica,
+[GHSA-jqcg-44mw-7w3h](https://github.com/jshttp/proxy-addr/security/advisories/GHSA-jqcg-44mw-7w3h)
+(CVE-2026-90711): una subred IPv6 con bits iniciales en cero (`::/1`) o una IPv4 mapeada en IPv6
+con prefijo corto (`::ffff:10.0.0.0/8`) se compila sin error y **coincide con cualquier IPv4**,
+así que cualquier cliente pasa a ser un proxy confiable y `req.ip` toma lo que mande en
+`X-Forwarded-For`. Una lista de valores prohibidos no puede enumerar todas las escrituras
+peligrosas; una de formatos permitidos, sí. La demo local y los despliegues habituales se
+cubren con IPv4 y los nombres predefinidos; si algún día hace falta IPv6, se amplía el formato
+permitido en un change propio, con tests del caso.
+
+**Versión de `proxy-addr`:** el repositorio tiene hoy la 2.0.7 (vía `express` 5.2.1, que pide
+`^2.0.7`). Se actualiza a la 2.0.8, que corrige la vulnerabilidad, antes de habilitar
+`TRUST_PROXY`. Alcanza con actualizar el lockfile, sin `overrides`. Hoy la vulnerabilidad **no
+es explotable** en el código actual, porque el backend no configura `trust proxy`, pero la
+actualización va igual como defensa en profundidad. `npm audit` no la reportó al 2026-09-30:
+la versión se verifica con `npm ls proxy-addr`, no solo con la auditoría.
 
 **Por qué rechazar un número de saltos:** con `trust proxy = N`, un cliente que agrega sus
 propias entradas a `X-Forwarded-For` corre la posición de la que Express toma la IP si la

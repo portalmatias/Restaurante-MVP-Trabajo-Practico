@@ -9,14 +9,20 @@
 
 ## 2. Backend: configuración de red compartida (D2, D3)
 
+- [ ] 2.0 Actualizar `proxy-addr` a 2.0.8 (corrige GHSA-jqcg-44mw-7w3h, design.md D3) con
+      `npm update proxy-addr` desde la raíz: `express` pide `^2.0.7`, así que alcanza el
+      lockfile. Verificar con `npm ls proxy-addr` que todas las instancias son 2.0.8 o superior
+      (no alcanza con `npm audit`, que no lo reportó).
 - [ ] 2.1 Crear `backend/src/configurar-red.ts` con `configurarRed(app)`: lee `TRUST_PROXY`;
       vacía o ausente → no llama a `trust proxy`; con valor → lo parte por comas, recorta cada
-      elemento y rechaza con un `Error` la configuración si **cualquier elemento** es `true`,
-      `*`, `0.0.0.0/0`, `::/0` o un número; si todos son válidos, pasa la lista a
-      `app.set('trust proxy', lista)`. Verificar con tests unitarios de cada caso (vacía,
-      lista válida, cada valor rechazado solo, y listas mixtas que esconden un catch-all o un
-      número, como `10.0.0.5,0.0.0.0/0`, `loopback, ::/0` y `10.0.0.5, 1`), todos con el
-      mensaje que pide declarar saltos.
+      elemento y lo valida contra la lista de **formatos permitidos** de D3 (`loopback`,
+      `linklocal`, `uniquelocal`, IPv4 simple, subred IPv4 con prefijo `/8` o mayor). Si
+      cualquier elemento no cumple, lanza un `Error` que pide declarar los saltos; si todos
+      cumplen, pasa la lista a `app.set('trust proxy', lista)`. Verificar con tests unitarios:
+      vacía; listas válidas (`loopback`, `10.0.0.5`, `loopback, 10.0.0.0/8`); cada rechazo
+      solo (`true`, `*`, `1`, `0.0.0.0/0`, `10.0.0.0/7`, `::/0`, `::/1`,
+      `::ffff:10.0.0.0/8`, `::ffff:10.0.0.0/104`, `::1`); y listas mixtas que esconden un
+      rechazo (`10.0.0.5,0.0.0.0/0`, `loopback, ::/1`, `10.0.0.5, 1`).
 - [ ] 2.2 Usar `configurarRed` en `main.ts` y cambiar `app.listen(PORT)` por
       `app.listen(PORT, HOST || '127.0.0.1')` (con `||`, no `??`: un `HOST=` vacío llega como
       `''` y Node lo toma como todas las interfaces). Verificar levantando el backend, sin

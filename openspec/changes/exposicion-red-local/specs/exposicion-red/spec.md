@@ -69,7 +69,11 @@ la configuración declara de manera explícita qué saltos son confiables, y en 
 confiar solo en esos saltos. El backend SHALL rechazar al arrancar una configuración que
 declare confiables a todos los saltos, que exprese la confianza como un número de saltos, o
 que contenga, en cualquier posición de una lista de saltos, un elemento que equivalga a
-confiar en todos o un número de saltos.
+confiar en todos o un número de saltos. Cada elemento de esa lista SHALL tener uno de los
+formatos admitidos (un nombre predefinido de red local o de loopback, una dirección IPv4 o una
+subred IPv4 acotada) y el backend SHALL rechazar al arrancar cualquier otro formato, incluidas
+las subredes en notación IPv6, porque algunas de sus escrituras, aunque parezcan acotadas,
+hacen confiable a cualquier origen.
 
 #### Scenario: Confianza declarada en un salto
 - **WHEN** la configuración declara confiable la dirección del proxy de borde y una solicitud
@@ -98,6 +102,16 @@ confiar en todos o un número de saltos.
   confía en todos o es un número (por ejemplo `10.0.0.5,0.0.0.0/0` o `loopback, ::/0`)
 - **THEN** el backend no arranca y el error indica que hay que declarar los saltos confiables
   de forma explícita
+
+#### Scenario: Subred en notación IPv6 que parece acotada
+- **WHEN** se intenta arrancar el backend declarando como confiable `::ffff:10.0.0.0/8` o
+  `::/1`
+- **THEN** el backend no arranca y el error indica los formatos admitidos
+- **AND** ningún cliente puede presentarse como otro origen enviando `X-Forwarded-For`
+
+#### Scenario: Subred IPv4 acotada admitida
+- **WHEN** se arranca el backend declarando como confiable `10.0.0.0/8`
+- **THEN** el backend arranca y confía solo en los saltos de ese bloque
 
 ### Requirement: Condición de despliegue documentada
 La documentación del proyecto SHALL indicar que, detrás del proxy `/api` del frontend y sin un
