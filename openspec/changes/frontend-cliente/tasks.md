@@ -247,7 +247,7 @@
 - [x] 6.5 Implementar la sub-vista de confirmación dentro de `ConsultaReserva` (D3 Pantalla
       8-9). Verificar que 6.4 pasa y que la suite completa de `ConsultaReserva` (5.2, 5.3, 6.2,
       6.4) sigue en verde junta.
-- [ ] 6.6 Prueba manual: cancelar una reserva del seed dentro de la ventana permitida y
+- [x] 6.6 Prueba manual: cancelar una reserva del seed dentro de la ventana permitida y
       verificar que el detalle pasa a `CANCELADA`; intentar cancelar una reserva cuyo turno ya
       pasó (o crear una reserva de prueba con anticipación mínima y esperar a que la ventana
       venza, si es viable localmente) y verificar el `409` dentro del diálogo.
