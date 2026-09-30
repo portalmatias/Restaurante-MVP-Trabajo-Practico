@@ -13,6 +13,9 @@ type ResultadoPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const MENSAJE_SELECCION_INVALIDA =
+  "Alguno de los datos de la selección no es válido. Cambiá la fecha, el turno, la zona o los comensales e intentá de nuevo.";
+
 const contenedor = "mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10";
 
 /**
@@ -36,13 +39,28 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
 
   const paso1ConSeleccion = urlConSeleccion("/reservas/nueva", seleccion);
 
-  // Turno o zona que ya no existen, o una selección que el servidor rechaza por inválida (por
-  // ejemplo, un enlace viejo o editado a mano): reintentar no la arregla, el Paso 1 ignora lo inválido.
-  if (
-    disponibilidad.error?.tipo === "no-encontrado" ||
-    disponibilidad.error?.tipo === "validacion"
-  ) {
+  // Turno o zona que ya no existen (por ejemplo, un enlace viejo): reintentar no lo arregla y el
+  // Paso 1 ignora lo inválido.
+  if (disponibilidad.error?.tipo === "no-encontrado") {
     redirect(paso1ConSeleccion);
+  }
+
+  // Selección que el servidor rechaza aunque el Paso 1 la dé por válida: no se redirige (el
+  // usuario volvería sin explicación, en bucle). Se explica con texto propio y se ofrece cambiarla.
+  if (disponibilidad.error?.tipo === "validacion") {
+    return (
+      <div className={contenedor}>
+        <Alert variant="error" className="text-base">
+          {MENSAJE_SELECCION_INVALIDA}
+        </Alert>
+        <Link
+          href={paso1ConSeleccion}
+          className={buttonVariants({ variant: "secondary", size: "lg" })}
+        >
+          Cambiar fecha, turno o zona
+        </Link>
+      </div>
+    );
   }
 
   if (disponibilidad.error || zonas.error || turnos.error) {

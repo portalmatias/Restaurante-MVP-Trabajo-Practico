@@ -223,13 +223,28 @@ describe("/reservas/nueva/resultado - errores", () => {
     expect(destino).toBe(`/reservas/nueva?${new URLSearchParams(SELECCION).toString()}`);
   });
 
-  it("ante un 400 de la disponibilidad (por ejemplo, comensales fuera de rango) redirige al Paso 1", async () => {
+  it("ante un 400 de la disponibilidad no redirige: muestra el error y el enlace para cambiar la selección", async () => {
     const seleccion = { ...SELECCION, comensales: "9999" };
-    responder(falla(400, { statusCode: 400, message: ["comensales must not be greater than 100"], error: "Bad Request" }));
+    responder(
+      falla(400, {
+        statusCode: 400,
+        message: ["comensales must not be greater than 100"],
+        error: "Bad Request",
+      }),
+    );
 
-    const destino = await destinoDeRedireccion(seleccion);
+    await renderizar(seleccion);
 
-    expect(destino).toBe(`/reservas/nueva?${new URLSearchParams(seleccion).toString()}`);
+    // Texto propio del cliente: nunca el del servidor (config.yaml §6).
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Alguno de los datos de la selección no es válido. Cambiá la fecha, el turno, la zona o los comensales e intentá de nuevo.",
+    );
+    expect(screen.queryByText(/must not be greater/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cambiar fecha, turno o zona" })).toHaveAttribute(
+      "href",
+      `/reservas/nueva?${new URLSearchParams(seleccion).toString()}`,
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
   });
 
   it("ante un 429 de la disponibilidad no redirige: muestra el mensaje genérico con reintentar", async () => {
@@ -237,8 +252,18 @@ describe("/reservas/nueva/resultado - errores", () => {
 
     await renderizar();
 
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
+    );
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+  });
+
+  it("si el turno ya no figura en el catálogo redirige al Paso 1", async () => {
+    responder(CON_LUGAR, { turnos: ok([]) });
+
+    const destino = await destinoDeRedireccion(SELECCION);
+
+    expect(destino).toBe(`/reservas/nueva?${new URLSearchParams(SELECCION).toString()}`);
   });
 
   it("si la zona ya no figura en el catálogo redirige al Paso 1", async () => {
