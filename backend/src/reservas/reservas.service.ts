@@ -286,8 +286,23 @@ export class ReservasService {
    * escritura, rompiendo el invariante 5. Para evitarlo, el `update` se condiciona con
    * `updateMany({ where: { id, estado: <el que se validó> } })`: si otra transacción ya
    * cambió el estado entremedio, `count` da 0 y se responde 409 en vez de pisar el estado.
+   *
+   * `desdeEstadoEsperado` restringe además el estado de ORIGEN, más allá de lo que ya permite
+   * `TRANSICIONES_VALIDAS`. Hace falta porque la tabla es genérica por destino, no por quién
+   * llama: `CONFIRMADA → CANCELADA` es una transición válida tanto para `cancelar` (cliente)
+   * como, en teoría, para `rechazar` (admin), pero `rechazar` solo debe aceptar Reservas
+   * `PENDIENTE` (spec de `reserva-vip`: "Rechazo bloqueado si la Reserva no está pendiente").
+   * Sin este chequeo, una Reserva que pasó de `PENDIENTE` a `CONFIRMADA` justo antes de que
+   * `rechazar` leyera su estado (dentro de esta misma transacción, así que no hay ventana
+   * adicional) terminaría cancelándose igual, con el mismo motivo/código de error genérico. Se
+   * valida siempre contra el estado leído dentro de la transacción, nunca contra uno leído
+   * antes de entrar acá, para no reabrir la ventana que ya cierra la lectura+escritura atómica.
    */
-  async transicionarEstado(reservaId: string, nuevoEstado: EstadoReserva) {
+  async transicionarEstado(
+    reservaId: string,
+    nuevoEstado: EstadoReserva,
+    desdeEstadoEsperado?: EstadoReserva,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const reserva = await tx.reserva.findUnique({ where: { id: reservaId } });
       if (!reserva) {
@@ -295,7 +310,11 @@ export class ReservasService {
       }
 
       const permitidas = TRANSICIONES_VALIDAS[reserva.estado];
-      if (!permitidas.includes(nuevoEstado)) {
+      if (
+        !permitidas.includes(nuevoEstado) ||
+        (desdeEstadoEsperado !== undefined &&
+          reserva.estado !== desdeEstadoEsperado)
+      ) {
         throw new ConflictException(
           `No se puede transicionar una reserva de ${reserva.estado} a ${nuevoEstado}.`,
         );
@@ -484,5 +503,28 @@ export class ReservasService {
     }
 
     await this.transicionarEstado(id, 'NO_SHOW');
+  }
+
+  /**
+   * Confirmación de una Reserva `PENDIENTE` por el admin (capability `reserva-vip`). Solo
+   * cambia `estado`: no revalida aforo ni disponibilidad de Mesa (design.md — "Confirmar no
+   * revalida..."). `PENDIENTE` es el único origen que `TRANSICIONES_VALIDAS` permite hacia
+   * `CONFIRMADA`, así que el `409` de "no está PENDIENTE" ya lo da `transicionarEstado` sin
+   * un chequeo aparte.
+   */
+  async confirmar(id: string): Promise<void> {
+    await this.transicionarEstado(id, 'CONFIRMADA');
+  }
+
+  /**
+   * Rechazo de una Reserva `PENDIENTE` por el admin (capability `reserva-vip`). A diferencia
+   * de `confirmar`, `TRANSICIONES_VALIDAS` por sí solo no alcanza acá: `CONFIRMADA →
+   * CANCELADA` también es una transición válida (la usa `cancelar`, del cliente), así que sin
+   * `desdeEstadoEsperado: 'PENDIENTE'` este método rechazaría también una Reserva ya
+   * `CONFIRMADA` en vez de responder `409` (spec: "Rechazo bloqueado si la Reserva no está
+   * pendiente").
+   */
+  async rechazar(id: string): Promise<void> {
+    await this.transicionarEstado(id, 'CANCELADA', 'PENDIENTE');
   }
 }
