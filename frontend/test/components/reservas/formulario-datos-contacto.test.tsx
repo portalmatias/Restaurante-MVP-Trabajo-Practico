@@ -210,6 +210,20 @@ describe("FormularioDatosContacto - envío", () => {
     });
   });
 
+  it("si la navegación no desmonta el formulario, sigue bloqueado y ofrece el enlace a la reserva", async () => {
+    // `push` es un mock que no navega: el formulario queda montado tras el éxito.
+    POST.mockResolvedValue(respuestaOk(CREADA));
+    renderizar();
+
+    completarFormulario();
+    enviar();
+
+    const enlace = await screen.findByRole("link", { name: "Ver mi reserva" });
+    expect(enlace).toHaveAttribute("href", push.mock.calls[0][0]);
+    expect(screen.getByRole("button", { name: "Confirmando…" })).toBeDisabled();
+    expect(POST).toHaveBeenCalledTimes(1);
+  });
+
   it("nunca refleja el nombre, el email ni el teléfono en la URL de destino", async () => {
     POST.mockResolvedValue(respuestaOk(CREADA));
     renderizar();
@@ -235,15 +249,32 @@ describe("FormularioDatosContacto - errores de validación (400)", () => {
     completarFormulario();
     enviar();
 
-    expect(await screen.findByText("emailCliente debe ser un email válido")).toBeInTheDocument();
+    expect(await screen.findByText("Debe ser un email válido")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByLabelText("Email")).toHaveAccessibleDescription(
-      "emailCliente debe ser un email válido",
-    );
-    expect(screen.getByLabelText("Teléfono")).toHaveAccessibleDescription(
-      "telefonoCliente no debe estar vacío",
-    );
+    expect(screen.getByLabelText("Email")).toHaveAccessibleDescription("Debe ser un email válido");
+    expect(screen.getByLabelText("Teléfono")).toHaveAccessibleDescription("No debe estar vacío");
+    expect(screen.queryByText(/emailCliente|telefonoCliente/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Nombre")).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("quita el nombre del campo del DTO y pone la primera letra en mayúscula, también en mensajes largos", async () => {
+    POST.mockResolvedValue(
+      respuestaError(400, {
+        statusCode: 400,
+        message: ["nombreCliente no puede estar vacío ni contener solo espacios."],
+      }),
+    );
+    renderizar();
+
+    completarFormulario();
+    enviar();
+
+    expect(
+      await screen.findByText("No puede estar vacío ni contener solo espacios."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre")).toHaveAccessibleDescription(
+      "No puede estar vacío ni contener solo espacios.",
+    );
   });
 
   it("un mensaje que no es de ningún campo va al resumen de errores, con foco", async () => {
@@ -274,9 +305,7 @@ describe("FormularioDatosContacto - errores de validación (400)", () => {
     enviar();
 
     await screen.findByText("comensales debe ser un entero");
-    expect(screen.getByLabelText("Nombre")).toHaveAccessibleDescription(
-      "nombreCliente no debe estar vacío",
-    );
+    expect(screen.getByLabelText("Nombre")).toHaveAccessibleDescription("No debe estar vacío");
     const resumen = screen.getByText("comensales debe ser un entero").closest('[role="alert"]');
     expect(resumen).not.toHaveTextContent("nombreCliente");
   });
@@ -290,7 +319,7 @@ describe("FormularioDatosContacto - errores de validación (400)", () => {
     completarFormulario();
     enviar();
 
-    await screen.findByText("emailCliente debe ser un email válido");
+    await screen.findByText("Debe ser un email válido");
     expect(screen.getByLabelText("Nombre")).toHaveValue("Ana Pérez");
     expect(screen.getByLabelText("Email")).toHaveValue("ana.perez@example.com");
     expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeEnabled();
@@ -304,10 +333,10 @@ describe("FormularioDatosContacto - errores de validación (400)", () => {
 
     completarFormulario();
     enviar();
-    await screen.findByText("emailCliente debe ser un email válido");
+    await screen.findByText("Debe ser un email válido");
     escribir("Email", "otra@example.com");
 
-    expect(screen.queryByText("emailCliente debe ser un email válido")).not.toBeInTheDocument();
+    expect(screen.queryByText("Debe ser un email válido")).not.toBeInTheDocument();
   });
 });
 

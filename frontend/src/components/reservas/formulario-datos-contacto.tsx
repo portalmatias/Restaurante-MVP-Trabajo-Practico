@@ -8,7 +8,7 @@ import { Button, buttonVariants } from "../ui/button";
 import { Field } from "../ui/field";
 import { apiClient, toApiResult } from "../../lib/api/client";
 import type { ErrorApi } from "../../lib/api/errors";
-import { agruparPorCampo } from "../../lib/agrupar-por-campo";
+import { agruparPorCampo, sinNombreDeCampo } from "../../lib/agrupar-por-campo";
 import {
   urlConSeleccion,
   urlDeExito,
@@ -67,6 +67,9 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
   const [generales, setGenerales] = useState<string[]>([]);
   const [errorApi, setErrorApi] = useState<ErrorApi>();
   const [enviando, setEnviando] = useState(false);
+  // Destino de la pantalla de éxito una vez registrada la reserva: si la navegación no llega a
+  // desmontar el formulario, es la salida para que la persona vea su código.
+  const [destinoExito, setDestinoExito] = useState<string>();
   const resumenErrores = useRef<HTMLDivElement>(null);
   // `enCurso` evita reentradas (el estado tarda un render en reflejarse); `ultimaSolicitud`
   // descarta la respuesta de un envío abandonado (por ejemplo, tras desmontar el componente).
@@ -135,7 +138,9 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
     if (!resultado.error) {
       // El botón sigue deshabilitado hasta que la navegación desmonte el formulario.
       const { codigoReserva, estado, fecha, turnoId, zonaId, comensales } = resultado.data;
-      router.push(urlDeExito({ codigo: codigoReserva, estado, fecha, turnoId, zonaId, comensales }));
+      const destino = urlDeExito({ codigo: codigoReserva, estado, fecha, turnoId, zonaId, comensales });
+      setDestinoExito(destino);
+      router.push(destino);
       return;
     }
 
@@ -146,10 +151,11 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
         resultado.error.mensajes,
         CAMPOS_DEL_DTO,
       );
+      const enLinea = (campo: Campo) => porCampo[campo]?.map(sinNombreDeCampo).join(" ");
       setErroresDelServidor({
-        nombre: porCampo.nombre?.join(" "),
-        email: porCampo.email?.join(" "),
-        telefono: porCampo.telefono?.join(" "),
+        nombre: enLinea("nombre"),
+        email: enLinea("email"),
+        telefono: enLinea("telefono"),
       });
       setGenerales(sinCampo);
       return;
@@ -256,6 +262,17 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
               Reintentar
             </Button>
           ) : null}
+        </div>
+      ) : null}
+      {destinoExito ? (
+        <div className="flex flex-col gap-3">
+          <Alert variant="info" className="text-base">
+            Tu reserva quedó registrada. Si no avanzás solo a la pantalla con tu código, tocá el
+            enlace.
+          </Alert>
+          <Link href={destinoExito} className={buttonVariants({ variant: "primary", size: "lg" })}>
+            Ver mi reserva
+          </Link>
         </div>
       ) : null}
       <Button type="submit" size="lg" disabled={enviando}>
