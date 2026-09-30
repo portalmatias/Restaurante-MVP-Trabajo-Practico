@@ -8,9 +8,7 @@ import { buttonVariants } from "../../../../src/components/ui/button";
 import { apiClient, toApiResult } from "../../../../src/lib/api/client";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
 
-type ResultadoPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
+type ResultadoPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 const MENSAJE_SELECCION_INVALIDA =
   "Alguno de los datos de la selección no es válido. Cambiá la fecha, el turno, la zona o los comensales e intentá de nuevo.";
@@ -62,22 +60,9 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     );
   }
 
-  if (disponibilidad.error || zonas.error || turnos.error) {
-    const error = disponibilidad.error ?? zonas.error ?? turnos.error;
-    return (
-      <div className={contenedor}>
-        <ErrorDeCarga error={error} />
-      </div>
-    );
-  }
-
-  const zona = zonas.data.find((candidata) => candidata.id === seleccion.zonaId);
-  const turno = turnos.data.find((candidato) => candidato.id === seleccion.turnoId);
-  if (!zona || !turno) {
-    redirect(paso1ConSeleccion);
-  }
-
-  if (!disponibilidad.data.disponible) {
+  // Los motivos no dependen del catálogo: GET /turnos devuelve solo los activos y un turno
+  // inactivo responde 200 con TURNO_INACTIVO, así que se listan antes de exigir turno y zona.
+  if (disponibilidad.data && !disponibilidad.data.disponible) {
     return (
       <div className={contenedor}>
         <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
@@ -102,6 +87,21 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
         </Link>
       </div>
     );
+  }
+
+  if (disponibilidad.error || zonas.error || turnos.error) {
+    const error = disponibilidad.error ?? zonas.error ?? turnos.error;
+    return (
+      <div className={contenedor}>
+        <ErrorDeCarga error={error} />
+      </div>
+    );
+  }
+
+  const zona = zonas.data.find((candidata) => candidata.id === seleccion.zonaId);
+  const turno = turnos.data.find((candidato) => candidato.id === seleccion.turnoId);
+  if (!zona || !turno) {
+    redirect(paso1ConSeleccion);
   }
 
   return (

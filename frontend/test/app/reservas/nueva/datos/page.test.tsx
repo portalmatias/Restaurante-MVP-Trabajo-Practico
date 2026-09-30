@@ -28,7 +28,10 @@ const GET = apiClient.GET as unknown as jest.Mock;
 type Respuesta = { data?: unknown; error?: unknown; response: { ok: boolean; status: number } };
 
 const ok = (data: unknown): Respuesta => ({ data, response: { ok: true, status: 200 } });
-const falla = (status: number): Respuesta => ({ response: { ok: false, status } });
+const falla = (status: number, error?: unknown): Respuesta => ({
+  error,
+  response: { ok: false, status },
+});
 
 function responder({ zonas = ok(ZONAS), turnos = ok(TURNOS) }: { zonas?: Respuesta; turnos?: Respuesta } = {}) {
   GET.mockImplementation(async (ruta: string) => (ruta === "/zonas" ? zonas : turnos));
@@ -112,6 +115,23 @@ describe("/reservas/nueva/datos", () => {
       "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
     );
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+  });
+
+  it("ante un 403 del catálogo muestra el mensaje genérico, sin el texto del servidor", async () => {
+    responder({
+      zonas: falla(403, {
+        statusCode: 403,
+        message: "Forbidden resource: internal detail",
+        error: "Forbidden",
+      }),
+    });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
+    );
+    expect(screen.queryByText(/internal detail/)).not.toBeInTheDocument();
   });
 
   it("ante un 429 del catálogo muestra el mensaje de límite de intentos, sin reintentar", async () => {

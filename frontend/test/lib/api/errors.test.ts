@@ -43,10 +43,7 @@ describe("mapErrorApi", () => {
       message: "El turno indicado no existe.",
     });
 
-    expect(resultado).toEqual({
-      tipo: "no-encontrado",
-      mensaje: "El turno indicado no existe.",
-    });
+    expect(resultado).toEqual({ tipo: "no-encontrado", mensaje: "El turno indicado no existe." });
   });
 
   it("409 con message string y sin motivos mapea a conflicto con motivos vacío (forma actual de admin)", () => {
@@ -143,15 +140,19 @@ describe("mapErrorApi", () => {
     });
   });
 
-  it("un 4xx sin mapeo propio (por ejemplo 401) conserva el mensaje del servidor", () => {
-    // Solo los >= 500 ocultan el mensaje; el resto de los errores lo preservan.
-    const resultado = mapErrorApi(401, {
-      statusCode: 401,
-      error: "Unauthorized",
-      message: "Credenciales inválidas.",
-    });
+  it("un 4xx sin mapeo propio (por ejemplo 401 o 403) nunca expone el mensaje del servidor", () => {
+    for (const status of [401, 403, 405, 422]) {
+      const resultado = mapErrorApi(status, {
+        statusCode: status,
+        error: "Forbidden",
+        message: "Forbidden resource: internal detail",
+      });
 
-    expect(resultado).toEqual({ tipo: "desconocido", mensaje: "Credenciales inválidas." });
+      expect(resultado).toEqual({
+        tipo: "desconocido",
+        mensaje: "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
+      });
+    }
   });
 
   it("un 429 (límite de intentos, sin cuerpo) mapea a un mensaje de espera", () => {
