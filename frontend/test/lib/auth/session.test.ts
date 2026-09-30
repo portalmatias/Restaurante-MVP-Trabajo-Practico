@@ -2,7 +2,9 @@ import {
   borrarSesion,
   decodificarExp,
   guardarSesion,
+  haySesionVigente,
   leerSesion,
+  suscribirseASesion,
 } from "../../../src/lib/auth/session";
 
 // Payload `{"sub":"admin-0","rol":"ADMIN","exp":1790000000,"x":"??>>~~"}` en base64url: trae
@@ -87,11 +89,65 @@ describe("guardarSesion / leerSesion / borrarSesion", () => {
     expect(sessionStorage.length).toBe(0);
   });
 
+  it("una sesión guardada con exp infinito se descarta", () => {
+    sessionStorage.setItem("admin-session", `{"accessToken":"${TOKEN}","exp":1e309}`);
+
+    expect(leerSesion(ANTES_DEL_VENCIMIENTO)).toBeNull();
+    expect(sessionStorage.length).toBe(0);
+  });
+
   it("borrarSesion deja sin sesión", () => {
     guardarSesion(TOKEN);
 
     borrarSesion();
 
     expect(leerSesion(ANTES_DEL_VENCIMIENTO)).toBeNull();
+  });
+});
+
+describe("haySesionVigente", () => {
+  it("es true con una sesión vigente y false sin sesión", () => {
+    expect(haySesionVigente(ANTES_DEL_VENCIMIENTO)).toBe(false);
+
+    guardarSesion(TOKEN);
+
+    expect(haySesionVigente(ANTES_DEL_VENCIMIENTO)).toBe(true);
+  });
+
+  it("con una sesión vencida devuelve false sin borrarla ni avisar a los suscriptores", () => {
+    guardarSesion(TOKEN);
+    const alCambiar = jest.fn();
+    const desuscribir = suscribirseASesion(alCambiar);
+
+    expect(haySesionVigente(DESPUES_DEL_VENCIMIENTO)).toBe(false);
+
+    expect(sessionStorage.length).toBe(1);
+    expect(alCambiar).not.toHaveBeenCalled();
+    desuscribir();
+  });
+});
+
+describe("suscribirseASesion", () => {
+  it("avisa al guardar y al borrar, y deja de avisar al desuscribirse", () => {
+    const alCambiar = jest.fn();
+    const desuscribir = suscribirseASesion(alCambiar);
+
+    guardarSesion(TOKEN);
+    borrarSesion();
+    expect(alCambiar).toHaveBeenCalledTimes(2);
+
+    desuscribir();
+    guardarSesion(TOKEN);
+    expect(alCambiar).toHaveBeenCalledTimes(2);
+  });
+
+  it("borrar sin sesión guardada no avisa", () => {
+    const alCambiar = jest.fn();
+    const desuscribir = suscribirseASesion(alCambiar);
+
+    borrarSesion();
+
+    expect(alCambiar).not.toHaveBeenCalled();
+    desuscribir();
   });
 });

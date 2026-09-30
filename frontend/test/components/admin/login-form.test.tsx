@@ -98,6 +98,7 @@ describe("LoginForm", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(MENSAJE_CREDENCIALES_INVALIDAS);
     expect(leerSesion()).toBeNull();
+    expect(screen.getByLabelText("Contraseña")).toHaveValue("");
     expect(replace).not.toHaveBeenCalled();
   });
 

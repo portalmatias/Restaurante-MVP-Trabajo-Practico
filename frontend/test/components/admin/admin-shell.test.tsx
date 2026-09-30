@@ -91,6 +91,8 @@ describe("AdminShell", () => {
     });
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/admin/login"));
+    // El manejador del 401 y el cambio de sesión no navegan dos veces.
+    expect(replace).toHaveBeenCalledTimes(1);
     expect(leerSesion()).toBeNull();
     expect(screen.queryByText("Contenido protegido")).not.toBeInTheDocument();
   });

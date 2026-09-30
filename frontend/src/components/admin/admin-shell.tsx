@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
-import { Button, buttonVariants } from "../ui/button";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { buttonVariants } from "../ui/button";
+import { BotonCompacto } from "./boton-compacto";
 import { registrarManejadorSesionVencida } from "../../lib/api/admin-client";
 import { borrarSesion, haySesionVigente, suscribirseASesion } from "../../lib/auth/session";
 
@@ -40,15 +41,27 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const autenticado = useSyncExternalStore(suscribirseASesion, haySesionVigente, () => false);
   const hidratado = useSyncExternalStore(suscribirseSinCambios, () => true, () => false);
 
+  // Un 401/403 dispara dos avisos a la vez (el manejador de `toAdminApiResult` y el cambio de
+  // sesión): se navega al login una sola vez.
+  const yendoAlLogin = useRef(false);
+
   // Mientras está montado, un 401/403 de cualquier llamada de admin vuelve al login (D4).
   useEffect(
-    () => registrarManejadorSesionVencida(() => router.replace(RUTA_LOGIN)),
+    () =>
+      registrarManejadorSesionVencida(() => {
+        if (yendoAlLogin.current) return;
+        yendoAlLogin.current = true;
+        router.replace(RUTA_LOGIN);
+      }),
     [router],
   );
 
   // Sin sesión (nunca la hubo, venció, se cerró o la borró un 401) se va al login.
   useEffect(() => {
-    if (hidratado && !autenticado) {
+    if (autenticado) {
+      yendoAlLogin.current = false;
+    } else if (hidratado && !yendoAlLogin.current) {
+      yendoAlLogin.current = true;
       router.replace(RUTA_LOGIN);
     }
   }, [hidratado, autenticado, router]);
@@ -82,9 +95,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          <Button variant="secondary" onClick={cerrarSesion} className="w-auto">
+          <BotonCompacto variant="secondary" onClick={cerrarSesion}>
             Cerrar sesión
-          </Button>
+          </BotonCompacto>
         </div>
       </div>
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8">{children}</div>

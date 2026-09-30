@@ -47,11 +47,13 @@ export function registrarManejadorSesionVencida(manejador: ManejadorSesionVencid
  * `toApiResult` sobre `adminClient` (D2): mismo mapeo de errores, más el manejo de la sesión.
  * Un `401` (token ausente, vencido o inválido) o un `403` (token válido sin rol `ADMIN`)
  * descartan la sesión guardada y disparan la redirección al login: con ese token ninguna
- * pantalla de admin puede funcionar.
+ * pantalla de admin puede funcionar. Solo si la sesión guardada sigue siendo la del pedido.
  */
 export async function toAdminApiResult<T>(
   promise: Promise<{ data?: T; error?: unknown; response: Response }>,
 ): Promise<ApiResult<T>> {
+  // Token con el que salió este pedido (la llamada ya se hizo al evaluar el argumento).
+  const tokenDelPedido = leerSesion()?.accessToken;
   let status: number | undefined;
   const resultado = await toApiResult(
     promise.then((crudo) => {
@@ -60,8 +62,14 @@ export async function toAdminApiResult<T>(
     }),
   );
   if (status === 401 || status === 403) {
-    borrarSesion();
-    manejadorSesionVencida?.();
+    // Una respuesta atrasada de un pedido hecho con un token anterior no debe borrar la sesión
+    // nueva (por ejemplo, si el admin volvió a iniciar sesión mientras ese pedido seguía en
+    // curso): solo se descarta si la sesión guardada es la misma con la que salió el pedido.
+    const sesionActual = leerSesion();
+    if (!sesionActual || sesionActual.accessToken === tokenDelPedido) {
+      borrarSesion();
+      manejadorSesionVencida?.();
+    }
   }
   return resultado;
 }

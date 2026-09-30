@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
+import { BotonCompacto } from "./boton-compacto";
 import { Card } from "../ui/card";
 import { Field } from "../ui/field";
 import { Select } from "../ui/select";
@@ -105,7 +106,14 @@ export function MesasPanel({ zonas }: { zonas: Zona[] }) {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="sm:w-64">
-            <Select label="Filtrar por zona" value={filtroZona} onChange={(e) => setFiltroZona(e.target.value)}>
+            {/* Cambiar el filtro con un alta, edición o baja en curso haría que el listado nuevo
+                pisara esa operación: el filtro espera a que termine. */}
+            <Select
+              label="Filtrar por zona"
+              value={filtroZona}
+              disabled={editando !== undefined || eliminando !== undefined}
+              onChange={(e) => setFiltroZona(e.target.value)}
+            >
               <option value="">Todas las zonas</option>
               {zonas.map((zona) => (
                 <option key={zona.id} value={zona.id}>
@@ -114,7 +122,8 @@ export function MesasPanel({ zonas }: { zonas: Zona[] }) {
               ))}
             </Select>
           </div>
-          <Button variant="secondary" className="sm:w-auto" onClick={() => setEditando("nueva")}>
+          {/* Sin listado cargado no se ofrecen altas: su resultado se perdería al llegar el GET. */}
+          <Button variant="secondary" disabled={mesas === undefined} onClick={() => setEditando("nueva")}>
             Agregar mesa
           </Button>
         </div>
@@ -154,19 +163,19 @@ export function MesasPanel({ zonas }: { zonas: Zona[] }) {
                     <td className="py-2 pr-3">{mesa.capacidad}</td>
                     <td className="py-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button
+                        <BotonCompacto
                           variant="ghost"
-                          className="w-auto"
                           aria-label={`Editar mesa ${mesa.etiqueta}`}
+                          disabled={eliminando !== undefined}
                           onClick={() => setEditando(mesa)}
                         >
                           Editar
-                        </Button>
+                        </BotonCompacto>
                         <ConfirmacionEnLinea
                           etiqueta="Dar de baja"
                           pregunta={`¿Confirmás la baja de la mesa ${mesa.etiqueta}?`}
                           confirmar="Sí, dar de baja"
-                          deshabilitado={eliminando === mesa.id}
+                          deshabilitado={eliminando !== undefined || editando !== undefined}
                           onConfirmar={() => void eliminar(mesa)}
                         />
                       </div>

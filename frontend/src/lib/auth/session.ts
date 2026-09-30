@@ -114,6 +114,8 @@ function leerAlmacenada(ahora: Date): Lectura {
     !("exp" in sesion) ||
     typeof sesion.accessToken !== "string" ||
     typeof sesion.exp !== "number" ||
+    // `JSON.parse` convierte `1e309` en `Infinity`: una sesión sin vencimiento finito no vale.
+    !Number.isFinite(sesion.exp) ||
     sesion.exp * 1000 <= ahora.getTime()
   ) {
     return { sesion: null, hayQueBorrar: true };

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, type ButtonVariant } from "../ui/button";
+import type { ButtonVariant } from "../ui/button";
+import { BotonCompacto } from "./boton-compacto";
 
 export type ConfirmacionEnLineaProps = {
   /** Texto del botón inicial (por ejemplo, "Dar de baja"). */
@@ -19,7 +20,8 @@ export type ConfirmacionEnLineaProps = {
  * Confirmación de una acción irreversible en dos pasos, en el mismo lugar del control
  * (design.md D6), sin ventana modal: el botón se reemplaza por la pregunta con "confirmar" y
  * "cancelar". Vuelve al estado inicial al cancelar, con Escape o con un clic afuera. Nada se
- * envía hasta el segundo clic.
+ * envía hasta el segundo clic. Con un clic afuera el foco queda donde se hizo clic: no se lo
+ * mueve de vuelta al botón.
  */
 export function ConfirmacionEnLinea({
   etiqueta,
@@ -31,14 +33,18 @@ export function ConfirmacionEnLinea({
 }: ConfirmacionEnLineaProps) {
   const [abierta, setAbierta] = useState(false);
   const contenedor = useRef<HTMLDivElement>(null);
-  // `Button` no expone `ref`: el foco se mueve buscando el botón dentro de su contenedor.
+  // El botón no expone `ref`: el foco se mueve buscando el botón dentro de su contenedor.
   const contenedorCancelar = useRef<HTMLSpanElement>(null);
   const contenedorInicial = useRef<HTMLSpanElement>(null);
   const volverAlBotonInicial = useRef(false);
 
   useEffect(() => {
     if (!abierta) {
-      if (volverAlBotonInicial.current) {
+      // Tras cancelar o confirmar, el foco vuelve al botón inicial para no perderse. Si la
+      // acción confirmada sigue en curso, el botón está deshabilitado y no puede recibir el
+      // foco: se espera a que `deshabilitado` vuelva a `false` (por ejemplo, tras un error, para
+      // poder reintentar con el teclado). Si la acción cambia la fila, el componente se desmonta.
+      if (volverAlBotonInicial.current && !deshabilitado) {
         volverAlBotonInicial.current = false;
         contenedorInicial.current?.querySelector("button")?.focus();
       }
@@ -53,7 +59,7 @@ export function ConfirmacionEnLinea({
     }
     document.addEventListener("mousedown", alPresionarFuera);
     return () => document.removeEventListener("mousedown", alPresionarFuera);
-  }, [abierta]);
+  }, [abierta, deshabilitado]);
 
   function cancelar() {
     volverAlBotonInicial.current = true;
@@ -63,14 +69,13 @@ export function ConfirmacionEnLinea({
   if (!abierta) {
     return (
       <span ref={contenedorInicial} className="contents">
-        <Button
+        <BotonCompacto
           variant={variante}
-          className="w-auto"
           disabled={deshabilitado}
           onClick={() => setAbierta(true)}
         >
           {etiqueta}
-        </Button>
+        </BotonCompacto>
       </span>
     );
   }
@@ -86,21 +91,21 @@ export function ConfirmacionEnLinea({
       }}
     >
       <span className="text-sm font-medium">{pregunta}</span>
-      <Button
+      <BotonCompacto
         variant={variante}
-        className="w-auto"
         disabled={deshabilitado}
         onClick={() => {
+          volverAlBotonInicial.current = true;
           setAbierta(false);
           onConfirmar();
         }}
       >
         {confirmar}
-      </Button>
+      </BotonCompacto>
       <span ref={contenedorCancelar} className="contents">
-        <Button variant="secondary" className="w-auto" onClick={cancelar}>
+        <BotonCompacto variant="secondary" onClick={cancelar}>
           Cancelar
-        </Button>
+        </BotonCompacto>
       </span>
     </div>
   );

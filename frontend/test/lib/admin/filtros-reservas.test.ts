@@ -12,6 +12,10 @@ describe("filtros del listado de Reservas", () => {
     ).toEqual({ fecha: "2026-10-02", estado: "PENDIENTE", zonaId: "z", pagina: 3 });
   });
 
+  it("un filtro repetido no se descarta: se unen los valores para que la API lo rechace", () => {
+    expect(leerFiltros({ estado: ["PENDIENTE", "CONFIRMADA"] }).estado).toBe("PENDIENTE,CONFIRMADA");
+  });
+
   it("una página inválida vuelve a la primera", () => {
     expect(leerFiltros({ pagina: "-1" }).pagina).toBe(1);
     expect(leerFiltros({ pagina: "abc" }).pagina).toBe(1);

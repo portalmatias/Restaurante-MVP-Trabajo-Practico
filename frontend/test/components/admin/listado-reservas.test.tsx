@@ -4,8 +4,9 @@ import type { FiltrosReservas } from "../../../src/lib/admin/filtros-reservas";
 import { adminClient } from "../../../src/lib/api/admin-client";
 
 const push = jest.fn();
+const replace = jest.fn();
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace }),
 }));
 
 jest.mock("../../../src/lib/api/admin-client", () => {
@@ -55,6 +56,7 @@ let total: number;
 
 beforeEach(() => {
   push.mockReset();
+  replace.mockReset();
   PATCH.mockReset();
   GET.mockReset();
   reservas = [PENDIENTE, CONFIRMADA, CANCELADA, NO_SHOW];
@@ -150,6 +152,41 @@ describe("ListadoReservas - listado, filtros y paginación", () => {
   });
 });
 
+describe("ListadoReservas - casos borde", () => {
+  it("una página más allá de la última lleva a la última con los mismos filtros", async () => {
+    reservas = [];
+    total = 45;
+    await renderizar({ estado: "CONFIRMADA", pagina: 7 });
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith("/admin/reservas?estado=CONFIRMADA&pagina=3"),
+    );
+  });
+
+  it("si falla la carga de zonas y turnos lo avisa y permite reintentar", async () => {
+    GET.mockImplementation((path: string) => {
+      if (path === "/admin/zonas") return error(500, "x");
+      if (path === "/admin/turnos") return ok([]);
+      return ok({ items: reservas, total, limit: 20, offset: 0 });
+    });
+    await renderizar();
+
+    expect(await screen.findByText(/No se pudieron cargar las zonas y los turnos/)).toBeInTheDocument();
+
+    GET.mockImplementation((path: string) => {
+      if (path === "/admin/zonas") return ok([{ id: "z-vip", nombre: "VIP" }]);
+      if (path === "/admin/turnos") return ok([]);
+      return ok({ items: reservas, total, limit: 20, offset: 0 });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/No se pudieron cargar las zonas/)).not.toBeInTheDocument(),
+    );
+    expect(within(screen.getByLabelText("Zona")).getByRole("option", { name: "VIP" })).toBeInTheDocument();
+  });
+});
+
 describe("ListadoReservas - confirmar y rechazar", () => {
   it("solo las pendientes ofrecen confirmar y rechazar", async () => {
     await renderizar();
@@ -189,6 +226,7 @@ describe("ListadoReservas - confirmar y rechazar", () => {
     await renderizar();
     // La otra persona ya la confirmó: al refrescar, la API la devuelve CONFIRMADA.
     reservas = [{ ...PENDIENTE, estado: "CONFIRMADA" }, CONFIRMADA];
+    total = reservas.length;
 
     fireEvent.click(screen.getByRole("button", { name: "Confirmar reserva PEND0001" }));
 

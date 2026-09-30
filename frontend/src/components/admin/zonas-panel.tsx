@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
+import { BotonCompacto } from "./boton-compacto";
 import { Card } from "../ui/card";
 import { Field } from "../ui/field";
 import { adminClient, toAdminApiResult } from "../../lib/api/admin-client";
@@ -81,14 +82,13 @@ export function ZonasPanel({ zonas, onZonaActualizada }: ZonasPanelProps) {
                 <td className="py-2 pr-3">{sinoNo(zona.requiereConfirmacionAdmin)}</td>
                 <td className="py-2 pr-3">{zona.aforoMaximo}</td>
                 <td className="py-2">
-                  <Button
+                  <BotonCompacto
                     variant="ghost"
-                    className="w-auto"
                     aria-label={`Editar zona ${zona.nombre}`}
                     onClick={() => setEditando(zona)}
                   >
                     Editar
-                  </Button>
+                  </BotonCompacto>
                 </td>
               </tr>
             ))}
@@ -102,7 +102,9 @@ export function ZonasPanel({ zonas, onZonaActualizada }: ZonasPanelProps) {
           onCancelar={() => setEditando(undefined)}
           onGuardada={(zona) => {
             onZonaActualizada(zona);
-            setEditando(undefined);
+            // Solo se cierra el formulario de esa misma Zona: si mientras tanto se abrió el de
+            // otra, la respuesta atrasada no lo cierra.
+            setEditando((actual) => (actual?.id === zona.id ? undefined : actual));
           }}
         />
       ) : null}
@@ -133,22 +135,32 @@ function FormularioZona({
     evento.preventDefault();
     if (guardando) return;
 
-    const cuerpo: Partial<Record<CampoNumerico, number>> = {};
+    // Solo viajan los campos que el admin cambió: así una edición no pisa con valores viejos lo
+    // que otra persona haya modificado en otro campo mientras tanto.
+    const cuerpo: Partial<Record<CampoNumerico, number>> & { requiereConfirmacionAdmin?: boolean } =
+      {};
     const nuevosErrores: Partial<Record<CampoNumerico, string>> = {};
     for (const { campo, minimo } of CAMPOS) {
       const numero = leerEntero(valores[campo], minimo);
       if (numero === undefined) nuevosErrores[campo] = REGLAS[campo].textoPorDefecto;
-      else cuerpo[campo] = numero;
+      else if (numero !== zona[campo]) cuerpo[campo] = numero;
+    }
+    if (requiereConfirmacion !== zona.requiereConfirmacionAdmin) {
+      cuerpo.requiereConfirmacionAdmin = requiereConfirmacion;
     }
     setErrores(nuevosErrores);
     setErrorGeneral(undefined);
     if (Object.keys(nuevosErrores).length > 0) return;
+    if (Object.keys(cuerpo).length === 0) {
+      onCancelar();
+      return;
+    }
 
     setGuardando(true);
     const resultado = await toAdminApiResult(
       adminClient.PATCH("/admin/zonas/{id}", {
         params: { path: { id: zona.id } },
-        body: { ...cuerpo, requiereConfirmacionAdmin: requiereConfirmacion },
+        body: cuerpo,
       }),
     );
     setGuardando(false);

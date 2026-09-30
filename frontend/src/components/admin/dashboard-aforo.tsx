@@ -6,6 +6,7 @@ import { Card } from "../ui/card";
 import { Field } from "../ui/field";
 import { Select } from "../ui/select";
 import { adminClient, toAdminApiResult } from "../../lib/api/admin-client";
+import type { ApiResult } from "../../lib/api/errors";
 import type { components } from "../../lib/api/schema";
 import { calcularAforo, type Aforo } from "../../lib/aforo/calcular-aforo";
 import { diaSemanaDeFechaLocal, fechaLocalDeHoy, type DiaSemana } from "../../lib/fecha-hora";
@@ -14,9 +15,40 @@ import { ETIQUETA_DIA, ordenarTurnos, rangoTurno } from "./formato";
 type Zona = components["schemas"]["ZonaRespuestaDto"];
 type Turno = components["schemas"]["TurnoRespuestaDto"];
 
-// Cota real de filas por estado activo (D5): cada Reserva activa suma al menos 1 comensal, así
-// que no puede haber más filas que la suma de aforos de las Zonas.
-const LIMITE_POR_ESTADO = 100;
+// Tamaño de página: el máximo que acepta `GET /admin/reservas`. Una sola página no alcanza
+// siempre (nada garantiza que la suma de aforos de las Zonas quede por debajo), así que se
+// pagina hasta cubrir `total`.
+const TAMANIO_PAGINA = 100;
+
+type ReservaAdmin = components["schemas"]["ReservaAdminRespuesta"];
+type EstadoActivo = "CONFIRMADA" | "PENDIENTE";
+
+/**
+ * Todas las Reservas de un estado activo para una fecha y un Turno, recorriendo las páginas
+ * con `offset` hasta juntar `total`. Si una página llega vacía antes de completar el total
+ * (las Reservas cambiaron entre páginas), se corta ahí en vez de pedir de más.
+ */
+async function reservasActivas(
+  fecha: string,
+  turnoId: string,
+  estado: EstadoActivo,
+): Promise<ApiResult<ReservaAdmin[]>> {
+  const acumuladas: ReservaAdmin[] = [];
+  for (;;) {
+    const pagina = await toAdminApiResult(
+      adminClient.GET("/admin/reservas", {
+        params: {
+          query: { fecha, turnoId, estado, limit: TAMANIO_PAGINA, offset: acumuladas.length },
+        },
+      }),
+    );
+    if (pagina.error) return { error: pagina.error };
+    acumuladas.push(...pagina.data.items);
+    if (pagina.data.items.length === 0 || acumuladas.length >= pagina.data.total) {
+      return { data: acumuladas };
+    }
+  }
+}
 
 function diaSemanaSeguro(fecha: string): DiaSemana | undefined {
   try {
@@ -40,8 +72,8 @@ type ResultadoAforo = { clave: string; aforo?: Aforo; error?: string };
 
 /**
  * Dashboard de aforo (spec "Dashboard de aforo", design.md D5). Las Zonas y los Turnos se
- * piden una sola vez al montar; cada cambio de fecha o de Turno pide solo las Reservas
- * `CONFIRMADA` y `PENDIENTE` de esa combinación y recalcula en el cliente.
+ * piden una sola vez al montar; cada cambio de fecha o de Turno pide todas las Reservas
+ * `CONFIRMADA` y `PENDIENTE` de esa combinación (paginando) y recalcula en el cliente.
  */
 export function DashboardAforo({ hoy }: { hoy?: string }) {
   const [zonas, setZonas] = useState<Zona[]>();
@@ -90,13 +122,10 @@ export function DashboardAforo({ hoy }: { hoy?: string }) {
     }
     let vigente = true;
     const claveConsulta = `${fecha}|${turnoId}`;
-    const pedir = (estado: "CONFIRMADA" | "PENDIENTE") =>
-      toAdminApiResult(
-        adminClient.GET("/admin/reservas", {
-          params: { query: { fecha, turnoId, estado, limit: LIMITE_POR_ESTADO } },
-        }),
-      );
-    void Promise.all([pedir("CONFIRMADA"), pedir("PENDIENTE")]).then(
+    void Promise.all([
+      reservasActivas(fecha, turnoId, "CONFIRMADA"),
+      reservasActivas(fecha, turnoId, "PENDIENTE"),
+    ]).then(
       ([confirmadas, pendientes]) => {
         // La respuesta de una fecha o un Turno que ya no están elegidos no se aplica.
         if (!vigente) return;
@@ -110,7 +139,7 @@ export function DashboardAforo({ hoy }: { hoy?: string }) {
         }
         setResultado({
           clave: claveConsulta,
-          aforo: calcularAforo(zonas, [...confirmadas.data.items, ...pendientes.data.items]),
+          aforo: calcularAforo(zonas, [...confirmadas.data, ...pendientes.data]),
         });
       },
     );

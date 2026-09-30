@@ -28,6 +28,9 @@ export function leerFiltros(parametros: ParametrosUrl): FiltrosReservas {
   for (const clave of CLAVES_FILTRO) {
     const valor = parametros[clave];
     if (typeof valor === "string" && valor !== "") filtros[clave] = valor;
+    // Un filtro repetido (`?estado=A&estado=B`) no se descarta en silencio, que mostraría todo
+    // el listado: se unen los valores y el backend lo rechaza con 400, que la pantalla informa.
+    else if (Array.isArray(valor) && valor.length > 0) filtros[clave] = valor.join(",");
   }
   const pagina = Number(parametros.pagina);
   if (Number.isSafeInteger(pagina) && pagina >= 1) filtros.pagina = pagina;

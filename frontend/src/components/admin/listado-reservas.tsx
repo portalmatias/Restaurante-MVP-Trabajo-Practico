@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert } from "../ui/alert";
-import { Button, buttonVariants } from "../ui/button";
+import { buttonVariants } from "../ui/button";
+import { BotonCompacto } from "./boton-compacto";
 import { Field } from "../ui/field";
 import { Select } from "../ui/select";
 import { adminClient, toAdminApiResult } from "../../lib/api/admin-client";
@@ -70,8 +71,11 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
   const [recargas, setRecargas] = useState(0);
   const [enCurso, setEnCurso] = useState<string>();
   const [avisoFila, setAvisoFila] = useState<{ reservaId: string; mensaje: string }>();
+  const [errorCatalogo, setErrorCatalogo] = useState<string>();
+  const [cargasCatalogo, setCargasCatalogo] = useState(0);
 
-  // Catálogo para los selectores de filtro: una sola vez, no en cada cambio de filtro.
+  // Catálogo para los selectores de filtro: una sola vez (o al reintentar), no en cada cambio
+  // de filtro. Si falla, se avisa: unos selectores vacíos no deben pasar por "sin zonas".
   useEffect(() => {
     let vigente = true;
     void Promise.all([
@@ -81,11 +85,19 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
       if (!vigente) return;
       if (resultadoZonas.data) setZonas(resultadoZonas.data);
       if (resultadoTurnos.data) setTurnos(ordenarTurnos(resultadoTurnos.data));
+      const fallo = resultadoZonas.error ?? resultadoTurnos.error;
+      setErrorCatalogo(
+        fallo
+          ? `No se pudieron cargar las zonas y los turnos para los filtros. ${
+              fallo.tipo === "validacion" ? "" : fallo.mensaje
+            }`.trim()
+          : undefined,
+      );
     });
     return () => {
       vigente = false;
     };
-  }, []);
+  }, [cargasCatalogo]);
 
   const { fecha, estado, zonaId, turnoId, pagina } = filtros;
   const clave = `${aQueryString(filtros)}#${recargas}`;
@@ -118,6 +130,15 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
   // Mientras llega la página nueva se sigue mostrando la anterior, marcada `aria-busy`.
   const listado = respuesta?.listado;
   const error = cargando ? undefined : respuesta?.error;
+
+  // Una `pagina` de la URL más allá de la última (editada a mano, o porque el listado se
+  // achicó) no es "sin reservas": se lleva a la última página que tiene resultados.
+  const ultimaPagina = listado ? totalPaginas(listado.total) : undefined;
+  useEffect(() => {
+    if (!cargando && ultimaPagina !== undefined && pagina > ultimaPagina) {
+      router.replace(`${RUTA_LISTADO}${aQueryString({ ...filtros, pagina: ultimaPagina })}`);
+    }
+  }, [cargando, ultimaPagina, pagina, filtros, router]);
 
   function filtrar(cambio: Partial<Omit<FiltrosReservas, "pagina">>) {
     // Un filtro nuevo vuelve a la primera página.
@@ -223,6 +244,14 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
         </Link>
       ) : null}
 
+      {errorCatalogo ? (
+        <Alert variant="error" className="flex flex-wrap items-center justify-between gap-2">
+          <span>{errorCatalogo}</span>
+          <BotonCompacto variant="secondary" onClick={() => setCargasCatalogo((n) => n + 1)}>
+            Reintentar
+          </BotonCompacto>
+        </Alert>
+      ) : null}
       {error ? <Alert variant="error">{error}</Alert> : null}
       {cargando && !listado ? (
         <p role="status" className="text-sm text-muted-foreground">Cargando reservas…</p>
@@ -271,22 +300,20 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
             Página {pagina} de {paginas} · {listado.total} reservas
           </p>
           <div className="flex gap-2">
-            <Button
+            <BotonCompacto
               variant="secondary"
-              className="w-auto"
               disabled={pagina <= 1 || cargando}
               onClick={() => router.push(`${RUTA_LISTADO}${aQueryString({ ...filtros, pagina: pagina - 1 })}`)}
             >
               Anterior
-            </Button>
-            <Button
+            </BotonCompacto>
+            <BotonCompacto
               variant="secondary"
-              className="w-auto"
               disabled={pagina >= paginas || cargando}
               onClick={() => router.push(`${RUTA_LISTADO}${aQueryString({ ...filtros, pagina: pagina + 1 })}`)}
             >
               Siguiente
-            </Button>
+            </BotonCompacto>
           </div>
         </nav>
       ) : null}
@@ -340,14 +367,13 @@ function FilaReserva({
         <div className="flex flex-wrap items-center gap-2">
           {reserva.estado === "PENDIENTE" ? (
             <>
-              <Button
-                className="w-auto"
+              <BotonCompacto
                 disabled={ocupada}
                 aria-label={`Confirmar reserva ${reserva.codigoReserva}`}
                 onClick={() => onAccion("confirmar")}
               >
                 Confirmar
-              </Button>
+              </BotonCompacto>
               <ConfirmacionEnLinea
                 etiqueta="Rechazar"
                 pregunta={`¿Confirmás el rechazo de ${reserva.codigoReserva}?`}

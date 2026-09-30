@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
+import { BotonCompacto } from "./boton-compacto";
 import { Card } from "../ui/card";
 import { Field } from "../ui/field";
 import { Select } from "../ui/select";
@@ -77,7 +78,8 @@ export function TurnosPanel() {
     <Card title="Turnos">
       <div className="flex flex-col gap-4">
         <div>
-          <Button variant="secondary" className="sm:w-auto" onClick={() => setEditando("nuevo")}>
+          {/* Sin listado cargado no se ofrecen altas: el GET inicial pisaría el turno nuevo. */}
+          <Button variant="secondary" disabled={turnos === undefined} onClick={() => setEditando("nuevo")}>
             Agregar turno
           </Button>
         </div>
@@ -120,23 +122,23 @@ export function TurnosPanel() {
                       <td className="py-2 pr-3">{turno.activo ? "Activo" : "Inactivo"}</td>
                       <td className="py-2">
                         <div className="flex flex-wrap gap-2">
-                          <Button
+                          <BotonCompacto
                             variant="ghost"
-                            className="w-auto"
                             aria-label={`Editar turno ${descripcion}`}
                             onClick={() => setEditando(turno)}
                           >
                             Editar
-                          </Button>
-                          <Button
+                          </BotonCompacto>
+                          <BotonCompacto
                             variant="secondary"
-                            className="w-auto"
-                            disabled={cambiandoEstado === turno.id}
+                            // Un solo cambio de estado a la vez: dos PATCH cruzados
+                            // podrían resolverse en otro orden que el de los clics.
+                            disabled={cambiandoEstado !== undefined}
                             aria-label={`${turno.activo ? "Desactivar" : "Activar"} turno ${descripcion}`}
                             onClick={() => void alternarActivo(turno)}
                           >
                             {turno.activo ? "Desactivar" : "Activar"}
-                          </Button>
+                          </BotonCompacto>
                         </div>
                         {errorEstado?.turnoId === turno.id ? (
                           <Alert variant="error" className="mt-2">{errorEstado.mensaje}</Alert>

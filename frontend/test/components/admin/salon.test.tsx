@@ -67,9 +67,10 @@ describe("ZonasPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() => expect(onZonaActualizada).toHaveBeenCalledWith(actualizada));
+    // Solo viaja el campo modificado.
     expect(PATCH).toHaveBeenCalledWith("/admin/zonas/{id}", {
       params: { path: { id: "z-std" } },
-      body: expect.objectContaining({ aforoMaximo: 45, requiereConfirmacionAdmin: false }),
+      body: { aforoMaximo: 45 },
     });
   });
 
@@ -87,10 +88,19 @@ describe("ZonasPanel", () => {
     expect(onZonaActualizada).not.toHaveBeenCalled();
   });
 
+  it("sin cambios no envía nada y cierra el formulario", () => {
+    editarStandard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(PATCH).not.toHaveBeenCalled();
+    expect(screen.queryByRole("form", { name: "Editar zona STANDARD" })).not.toBeInTheDocument();
+  });
+
   it("un valor no entero se marca sin enviar nada", () => {
     editarStandard();
 
-    fireEvent.change(screen.getByLabelText("Aforo máximo"), { target: { value: "-3" } });
+    fireEvent.change(screen.getByLabelText("Aforo máximo"), { target: { value: "3.5" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
     expect(PATCH).not.toHaveBeenCalled();

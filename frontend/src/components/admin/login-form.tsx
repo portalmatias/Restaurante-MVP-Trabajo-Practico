@@ -91,6 +91,8 @@ export function LoginForm() {
         setErroresCampo(erroresDeValidacion(errorApi.mensajes));
       }
       setError(status === 401 ? MENSAJE_CREDENCIALES_INVALIDAS : mensajeGeneral(errorApi));
+      // La contraseña no queda en memoria ni en el campo después de un intento fallido.
+      setPassword("");
       return;
     }
 
