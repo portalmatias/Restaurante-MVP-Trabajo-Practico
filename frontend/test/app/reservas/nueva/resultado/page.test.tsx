@@ -112,8 +112,8 @@ describe("/reservas/nueva/resultado - hay lugar", () => {
       },
       cache: "no-store",
     });
-    expect(GET).toHaveBeenCalledWith("/zonas");
-    expect(GET).toHaveBeenCalledWith("/turnos");
+    expect(GET).toHaveBeenCalledWith("/zonas", { cache: "no-store" });
+    expect(GET).toHaveBeenCalledWith("/turnos", { cache: "no-store" });
   });
 
   it("muestra el paso 2 de 3, el título y los lugares restantes", async () => {
@@ -270,15 +270,15 @@ describe("/reservas/nueva/resultado - errores", () => {
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
   });
 
-  it("ante un 429 de la disponibilidad no redirige: muestra el mensaje genérico con reintentar", async () => {
+  it("ante un 429 de la disponibilidad no redirige: muestra el mensaje de límite de intentos, sin reintentar", async () => {
     responder(falla(429));
 
     await renderizar();
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
+      "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
     );
-    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
   });
 
   it("si el turno ya no figura en el catálogo redirige al Paso 1", async () => {

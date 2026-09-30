@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "../ui/alert";
 import { Button, buttonVariants } from "../ui/button";
@@ -59,6 +59,7 @@ export function FormularioSeleccion({
 }: FormularioSeleccionProps) {
   const router = useRouter();
   const tituloZonaId = useId();
+  const opcionesZona = useRef<Array<HTMLButtonElement | null>>([]);
   const [inicial] = useState(() => resolverSeleccionInicial(seleccionInicial, { zonas, turnos, hoy }));
   const [fecha, setFecha] = useState(inicial.fecha ?? "");
   const [turnoId, setTurnoId] = useState(inicial.turnoId ?? "");
@@ -76,7 +77,13 @@ export function FormularioSeleccion({
   if (!fechaElegible) faltantes.push("fecha");
   if (!turnoElegido) faltantes.push("turno");
   if (!zona) faltantes.push("zona");
-  else if (comensales === undefined) faltantes.push("comensales");
+  else if (
+    comensales === undefined ||
+    comensales < zona.minComensales ||
+    comensales > zona.maxComensales
+  ) {
+    faltantes.push("comensales");
+  }
 
   function cambiarFecha(nuevaFecha: string) {
     setFecha(nuevaFecha);
@@ -97,6 +104,21 @@ export function FormularioSeleccion({
         ? nuevaZona.minComensales
         : acotar(actual, nuevaZona.minComensales, nuevaZona.maxComensales),
     );
+  }
+
+  // Grupo de radio: las flechas mueven la selección (con vuelta al extremo) y el foco.
+  function moverZona(evento: KeyboardEvent<HTMLButtonElement>, indice: number) {
+    const paso =
+      evento.key === "ArrowDown" || evento.key === "ArrowRight"
+        ? 1
+        : evento.key === "ArrowUp" || evento.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (paso === 0) return;
+    evento.preventDefault();
+    const destino = (indice + paso + zonas.length) % zonas.length;
+    elegirZona(zonas[destino]);
+    opcionesZona.current[destino]?.focus();
   }
 
   function subirComensales() {
@@ -171,8 +193,10 @@ export function FormularioSeleccion({
           Zona
         </span>
         <div role="radiogroup" aria-labelledby={tituloZonaId} className="flex flex-col gap-3">
-          {zonas.map((opcion) => {
+          {zonas.map((opcion, indice) => {
             const elegida = opcion.id === zonaId;
+            // Roving tabindex: solo la opción elegida (o la primera, si no hay) entra con Tab.
+            const enTabulacion = zona ? elegida : indice === 0;
             const borde = elegida
               ? opcion.requiereConfirmacionAdmin
                 ? "border-2 border-accent"
@@ -181,10 +205,15 @@ export function FormularioSeleccion({
             return (
               <button
                 key={opcion.id}
+                ref={(nodo) => {
+                  opcionesZona.current[indice] = nodo;
+                }}
                 type="button"
                 role="radio"
                 aria-checked={elegida}
+                tabIndex={enTabulacion ? 0 : -1}
                 onClick={() => elegirZona(opcion)}
+                onKeyDown={(evento) => moverZona(evento, indice)}
                 className={`flex min-h-11 flex-col gap-1 rounded-lg bg-card p-4 text-left text-base text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${borde}`}
               >
                 <span className="flex items-center justify-between gap-2 text-lg font-semibold">

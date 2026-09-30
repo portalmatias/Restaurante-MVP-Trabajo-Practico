@@ -118,7 +118,7 @@
       `npm run api:types -w frontend` para regenerar `schema.d.ts` con esos paths. No seguir
       con las tareas de esta sección si alguno falta: completar 4.1–4.x de las otras
       secciones o esperar. Verificar con
-      `grep -n "'/zonas'\|'/turnos'\|'/reservas'" frontend/src/lib/api/schema.d.ts`.
+      `grep -n '"/zonas"\|"/turnos"\|"/reservas"' frontend/src/lib/api/schema.d.ts`.
 - [x] 4.2 Reescribir `frontend/app/reservas/page.tsx` (Inicio, D3): título, acción principal
       "Reservá ahora" → `/reservas/nueva`, acción secundaria a `/reservas/consultar`, sin
       lógica de datos. Escribir su test RTL primero (rol de los botones, `href` de cada
@@ -294,11 +294,10 @@
 - Mergeados a `main`: `frontend-base` (PR #43), `reservas-crear` (PR #40), `reserva-consultar`
   (PR #35) y `cancelacion-turnos` (PR #50). `feature/frontend-cliente` se creó desde `main`
   en `f5058bb`.
-- NO mergeado: `catalogo-publico` (PR #51, abierto, CI en verde, pendiente de revisión de un
-  compañero). Sin `GET /zonas` ni `GET /turnos` en `openapi/openapi.yaml` de `main`, las
-  secciones 4 (Grupo A) y 6 (Grupo C, que usa `GET /zonas` para la ventana) no se pueden
-  completar contra el cliente tipado real: quedan con fixtures locales (D10) hasta que ese PR
-  mergee. La sección 5 (Grupo B) ya tiene su endpoint en `main`.
+- `catalogo-publico` (PR #51) ya está mergeado a `main`: `GET /zonas` y `GET /turnos` figuran
+  en `openapi/openapi.yaml` y en el cliente tipado real. La sección 4 (Grupo A) corre contra
+  el backend real; los fixtures locales (D10) quedan solo como dobles de prueba. La sección 5
+  (Grupo B) y la 6 (Grupo C, que usa `GET /zonas` para la ventana) tampoco están bloqueadas.
 
 **Diferencias entre `design.md` y el código real de `frontend-base` (1.2):**
 
