@@ -83,7 +83,9 @@ describe("/reservas/nueva/resultado - sin selección", () => {
   it.each(["fecha", "turnoId", "zonaId", "comensales"])(
     "sin %s redirige al Paso 1 sin consultar al backend",
     async (campo) => {
-      expect(await destinoDeRedireccion({ ...SELECCION, [campo]: undefined })).toBe("/reservas/nueva");
+      expect(await destinoDeRedireccion({ ...SELECCION, [campo]: undefined })).toBe(
+        "/reservas/nueva",
+      );
       expect(GET).not.toHaveBeenCalled();
     },
   );
@@ -172,8 +174,14 @@ describe("/reservas/nueva/resultado - no hay lugar", () => {
     disponible: false,
     lugaresRestantes: 0,
     motivos: [
-      { codigo: "AFORO_ZONA", mensaje: "La zona STANDARD está completa para ese turno y esa fecha." },
-      { codigo: "COMENSALES_FUERA_DE_RANGO", mensaje: "La zona STANDARD admite de 1 a 8 comensales." },
+      {
+        codigo: "AFORO_ZONA",
+        mensaje: "La zona STANDARD está completa para ese turno y esa fecha.",
+      },
+      {
+        codigo: "COMENSALES_FUERA_DE_RANGO",
+        mensaje: "La zona STANDARD admite de 1 a 8 comensales.",
+      },
     ],
   });
 
@@ -211,6 +219,32 @@ describe("/reservas/nueva/resultado - no hay lugar", () => {
       "href",
       `/reservas/nueva?${esperada}`,
     );
+  });
+
+  it("lista todos los motivos aunque el turno inactivo no figure en el catálogo, sin redirigir", async () => {
+    // GET /turnos devuelve solo los activos, pero /disponibilidad de un turno inactivo responde 200.
+    responder(
+      ok({
+        disponible: false,
+        lugaresRestantes: 0,
+        motivos: [
+          { codigo: "TURNO_INACTIVO", mensaje: "El turno no está activo." },
+          {
+            codigo: "COMENSALES_FUERA_DE_RANGO",
+            mensaje: "La zona STANDARD admite de 1 a 8 comensales.",
+          },
+        ],
+      }),
+      { turnos: ok([]) },
+    );
+
+    await renderizar();
+
+    expect(screen.getAllByRole("alert").map((alerta) => alerta.textContent)).toEqual([
+      "El turno no está activo.",
+      "La zona STANDARD admite de 1 a 8 comensales.",
+    ]);
+    expect(screen.getByRole("link", { name: "Cambiar fecha, turno o zona" })).toBeInTheDocument();
   });
 });
 
@@ -256,6 +290,23 @@ describe("/reservas/nueva/resultado - errores", () => {
       "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
     );
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
+  it("ante un 403 de la disponibilidad muestra el mensaje genérico, sin el texto del servidor", async () => {
+    responder(
+      falla(403, {
+        statusCode: 403,
+        message: "Forbidden resource: internal detail",
+        error: "Forbidden",
+      }),
+    );
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
+    );
+    expect(screen.queryByText(/internal detail/)).not.toBeInTheDocument();
   });
 
   it("si el turno ya no figura en el catálogo redirige al Paso 1", async () => {
