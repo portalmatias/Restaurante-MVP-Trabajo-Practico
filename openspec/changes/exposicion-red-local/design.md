@@ -48,7 +48,10 @@ código y el sistema corriendo, que condicionan el enfoque:
 - Frontend: los scripts `dev` y `start` de `frontend/package.json` pasan
   `--hostname 127.0.0.1`. Se agrega `dev:lan` (`--hostname 0.0.0.0`) para probar desde otro
   dispositivo; el README lo documenta con la advertencia de que expone la app a toda la red.
-- Backend: `app.listen(PORT, HOST)` con `HOST` de entorno y `127.0.0.1` como default.
+- Backend: `app.listen(PORT, HOST || '127.0.0.1')` con `HOST` de entorno y `127.0.0.1` como
+  default. Se usa `||` y no `??` a propósito: un `HOST=` vacío (lo que queda al copiar
+  `.env.example` sin completar la variable) llega como `''`, y Node interpreta el host vacío
+  como "todas las interfaces", es decir, expondría el backend justo en el caso por defecto.
 - Postgres: `docker-compose.yml` publica `'127.0.0.1:5432:5432'`.
 
 **Por qué `127.0.0.1` y no `localhost`:** `localhost` puede resolver a `::1` o a `127.0.0.1`
@@ -94,9 +97,12 @@ consulta pública (la enumeración prueba códigos distintos). Queda fuera de al
 
 **Decisión:** variable `TRUST_PROXY` (vacía por defecto → sin confianza). Si se define, se
 pasa a `app.set('trust proxy', ...)` como **lista de direcciones o subredes** separadas por
-coma (por ejemplo `10.0.0.5` o `loopback, 10.0.0.0/8`). Valores que equivalen a confiar en
-todos (`true`, `*`, `0.0.0.0/0`, `::/0`) o un número de saltos hacen que el backend **no
-arranque**, con un mensaje que pide declarar los saltos.
+coma (por ejemplo `10.0.0.5` o `loopback, 10.0.0.0/8`). La validación se aplica a **cada
+elemento** de la lista, ya recortado: si cualquiera de ellos equivale a confiar en todos
+(`true`, `*`, `0.0.0.0/0`, `::/0`) o es un número de saltos, el backend **no arranca**, con un
+mensaje que pide declarar los saltos. Validar solo el valor completo no alcanza: Express
+aceptaría `10.0.0.5,0.0.0.0/0` o `loopback, ::/0` y el catch-all escondido en la lista haría
+confiable a cualquier salto.
 
 **Por qué rechazar un número de saltos:** con `trust proxy = N`, un cliente que agrega sus
 propias entradas a `X-Forwarded-For` corre la posición de la que Express toma la IP si la

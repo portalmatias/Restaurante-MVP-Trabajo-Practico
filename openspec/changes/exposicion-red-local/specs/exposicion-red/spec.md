@@ -40,6 +40,12 @@ indique), nunca como efecto de la configuración por defecto.
 - **THEN** la documentación indica el script explícito que expone el frontend en la red
 - **AND** advierte que, mientras está expuesto, cualquier equipo de esa red puede usarlo
 
+#### Scenario: Exposición explícita responde desde la IP de red
+- **WHEN** se levanta el frontend con el script explícito de red local (`dev:lan`) y el
+  backend con `HOST=0.0.0.0`
+- **THEN** `http://<IP-de-red>:3000` responde desde otro equipo o dispositivo de la misma red
+- **AND** `http://<IP-de-red>:3001/zonas` responde con el backend
+
 ### Requirement: Origen del cliente no falsificable con encabezados
 Con la configuración por defecto, el backend SHALL identificar el origen de cada solicitud por
 la conexión que la trae y SHALL ignorar `X-Forwarded-For`, `X-Real-IP` y `Forwarded` para ese
@@ -61,7 +67,9 @@ solicitudes.
 El backend SHALL tomar el origen del cliente de los encabezados de reenvío únicamente cuando
 la configuración declara de manera explícita qué saltos son confiables, y en ese caso SHALL
 confiar solo en esos saltos. El backend SHALL rechazar al arrancar una configuración que
-declare confiables a todos los saltos.
+declare confiables a todos los saltos, que exprese la confianza como un número de saltos, o
+que contenga, en cualquier posición de una lista de saltos, un elemento que equivalga a
+confiar en todos o un número de saltos.
 
 #### Scenario: Confianza declarada en un salto
 - **WHEN** la configuración declara confiable la dirección del proxy de borde y una solicitud
@@ -76,6 +84,18 @@ declare confiables a todos los saltos.
 
 #### Scenario: Configuración que confía en todos los saltos
 - **WHEN** se intenta arrancar el backend con una configuración que confía en cualquier salto
+- **THEN** el backend no arranca y el error indica que hay que declarar los saltos confiables
+  de forma explícita
+
+#### Scenario: Configuración por número de saltos
+- **WHEN** se intenta arrancar el backend con una configuración de confianza que es un número
+  de saltos (por ejemplo `1`)
+- **THEN** el backend no arranca y el error indica que hay que declarar los saltos confiables
+  de forma explícita
+
+#### Scenario: Catch-all escondido en una lista de saltos
+- **WHEN** se intenta arrancar el backend con una lista de saltos en la que algún elemento
+  confía en todos o es un número (por ejemplo `10.0.0.5,0.0.0.0/0` o `loopback, ::/0`)
 - **THEN** el backend no arranca y el error indica que hay que declarar los saltos confiables
   de forma explícita
 
