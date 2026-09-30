@@ -116,8 +116,11 @@ describe("adminClient y toAdminApiResult", () => {
   it("un 401 atrasado de un token anterior no borra la sesión nueva", async () => {
     // El pedido sale con el token viejo; cuando llega el 401, ya hay otra sesión guardada.
     leerSesionMock
-      .mockReturnValueOnce({ accessToken: "token-viejo", exp: 9_999_999_999 }) // al pedir
-      .mockReturnValueOnce({ accessToken: "token-viejo", exp: 9_999_999_999 }) // onRequest
+      // 1.ª lectura: `onRequest`, al evaluarse `adminClient.GET(...)` (el header que sale).
+      .mockReturnValueOnce({ accessToken: "token-viejo", exp: 9_999_999_999 })
+      // 2.ª: `toAdminApiResult` guarda con qué token salió el pedido.
+      .mockReturnValueOnce({ accessToken: "token-viejo", exp: 9_999_999_999 })
+      // Al llegar el 401 ya hay otra sesión guardada.
       .mockReturnValue({ accessToken: "token-nuevo", exp: 9_999_999_999 });
     fetchMock.mockResolvedValue(respuestaJson(401, { statusCode: 401, message: "x" }));
     const manejador = jest.fn();

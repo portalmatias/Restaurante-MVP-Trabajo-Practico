@@ -123,7 +123,11 @@ export function MesasPanel({ zonas }: { zonas: Zona[] }) {
             </Select>
           </div>
           {/* Sin listado cargado no se ofrecen altas: su resultado se perdería al llegar el GET. */}
-          <Button variant="secondary" disabled={mesas === undefined} onClick={() => setEditando("nueva")}>
+          <Button
+            variant="secondary"
+            disabled={mesas === undefined || editando !== undefined}
+            onClick={() => setEditando("nueva")}
+          >
             Agregar mesa
           </Button>
         </div>
@@ -166,7 +170,9 @@ export function MesasPanel({ zonas }: { zonas: Zona[] }) {
                         <BotonCompacto
                           variant="ghost"
                           aria-label={`Editar mesa ${mesa.etiqueta}`}
-                          disabled={eliminando !== undefined}
+                          // Con un formulario abierto no se reemplaza por otro: se perderían
+                          // sus cambios sin guardar. Hay que guardar o cancelar primero.
+                          disabled={eliminando !== undefined || editando !== undefined}
                           onClick={() => setEditando(mesa)}
                         >
                           Editar

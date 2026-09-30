@@ -170,6 +170,15 @@ describe("MesasPanel", () => {
     expect(within(formulario).getByLabelText("Zona")).toHaveAttribute("aria-invalid", "true");
   });
 
+  it("con un formulario abierto no se puede abrir otro", async () => {
+    await renderizar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar mesa M1" }));
+
+    expect(screen.getByRole("button", { name: "Editar mesa M1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Agregar mesa" })).toBeDisabled();
+  });
+
   it("confirmar la baja envía el DELETE y quita la fila", async () => {
     await renderizar();
     DELETE.mockReturnValue(Promise.resolve({ response: { ok: true, status: 204 } }));
