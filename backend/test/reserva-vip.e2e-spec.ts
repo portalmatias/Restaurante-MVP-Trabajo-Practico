@@ -74,7 +74,7 @@ describe('reserva-vip (e2e)', () => {
   afterAll(async () => {
     await prisma.reserva.deleteMany({ where: { mesaId: { in: mesaIds } } });
     await prisma.mesa.deleteMany({ where: { id: { in: mesaIds } } });
-    await prisma.turno.deleteMany({ where: { id: turnoId } });
+    await prisma.turno.deleteMany({ where: { id: { in: [turnoId] } } });
     await prisma.$disconnect();
   });
 

@@ -310,13 +310,21 @@ export class ReservasService {
       }
 
       const permitidas = TRANSICIONES_VALIDAS[reserva.estado];
-      if (
-        !permitidas.includes(nuevoEstado) ||
-        (desdeEstadoEsperado !== undefined &&
-          reserva.estado !== desdeEstadoEsperado)
-      ) {
+      if (!permitidas.includes(nuevoEstado)) {
         throw new ConflictException(
           `No se puede transicionar una reserva de ${reserva.estado} a ${nuevoEstado}.`,
+        );
+      }
+      // Chequeo aparte del de arriba: acá la transición SÍ es válida en general (por eso no
+      // pasó por el `if` anterior), pero el llamador pidió un origen más específico que el
+      // que tiene la reserva — no es lo mismo "transición inválida" que "válida pero no
+      // desde este estado", y el mensaje se lo dice a quien lo lea (cubic, PR #56).
+      if (
+        desdeEstadoEsperado !== undefined &&
+        reserva.estado !== desdeEstadoEsperado
+      ) {
+        throw new ConflictException(
+          `La reserva está en estado ${reserva.estado}, no ${desdeEstadoEsperado}: no se puede aplicar esta operación.`,
         );
       }
 

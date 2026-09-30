@@ -45,6 +45,11 @@ describe('ReservasService.confirmar / .rechazar', () => {
 
   describe('rechazar', () => {
     it('transiciona a CANCELADA exigiendo que el origen sea PENDIENTE', async () => {
+      // A diferencia de `cancelar` (cliente), pasa un tercer argumento a `transicionarEstado`:
+      // sin él, la tabla genérica de `TRANSICIONES_VALIDAS` permitiría también
+      // `CONFIRMADA -> CANCELADA` (la misma transición que usa `cancelar`). El rechazo real de
+      // una Reserva `CONFIRMADA` contra Postgres real se prueba en
+      // `test/reserva-vip.e2e-spec.ts`, no acá: `transicionarEstado` está mockeado.
       await service.rechazar(RESERVA_ID);
 
       expect(transicionar).toHaveBeenCalledWith(
@@ -63,20 +68,6 @@ describe('ReservasService.confirmar / .rechazar', () => {
 
       await expect(service.rechazar(RESERVA_ID)).rejects.toBeInstanceOf(
         ConflictException,
-      );
-    });
-
-    it('a diferencia de cancelar (cliente), pide el origen PENDIENTE explícito: no acepta CONFIRMADA', () => {
-      // No es un test de comportamiento en runtime (transicionarEstado está mockeado), sino
-      // de la llamada en sí: verifica que rechazar() de verdad pasa el tercer argumento y no
-      // delega ciegamente en la tabla genérica de TRANSICIONES_VALIDAS (que sí permitiría
-      // CONFIRMADA -> CANCELADA, la misma transición que usa `cancelar`).
-      void service.rechazar(RESERVA_ID);
-
-      expect(transicionar).toHaveBeenCalledWith(
-        RESERVA_ID,
-        'CANCELADA',
-        'PENDIENTE',
       );
     });
   });
