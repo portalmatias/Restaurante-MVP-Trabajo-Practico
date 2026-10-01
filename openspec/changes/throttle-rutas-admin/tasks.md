@@ -14,7 +14,7 @@
       (`applyDecorators(SkipThrottle({ default: false }), Throttle({ default: { limit: 60,
       ttl: 60_000 } }))`) y un comentario que explique el valor y remita a D1/D2 de este
       change. Verificación: `npm run lint` y `npm run typecheck -w backend` pasan.
-- [ ] 2.2 Aplicar `@LimiteAdmin()` a nivel de clase en `ZonasController`, `MesasController`,
+- [x] 2.2 Aplicar `@LimiteAdmin()` a nivel de clase en `ZonasController`, `MesasController`,
       `HorariosController` y `ReservasAdminController`, junto a `@UseGuards` y `@Roles`. En
       `ReservasAdminController.listar`, quitar el `@SkipThrottle({ default: false })` y el
       `@Throttle(...)` de método y actualizar su comentario (y el de `marcarNoShow`, que hoy
@@ -24,27 +24,27 @@
 
 ## 3. Tests e2e contra `AppModule` y Postgres real
 
-- [ ] 3.1 Crear `backend/test/throttle-rutas-admin.e2e-spec.ts` con una app nueva por test
+- [x] 3.1 Crear `backend/test/throttle-rutas-admin.e2e-spec.ts` con una app nueva por test
       (patrón de `reserva-consultar-listado.e2e-spec.ts`) y un `it.each` sobre las 12
       operaciones de la tabla de `design.md` → "Contrato OpenAPI": 60 solicitudes con token de
       admin no responden `429` y la 61 responde `429`. Sin efectos secundarios (D4): UUID
       inexistente en `PATCH`/`DELETE`, body vacío en `POST`. Cubre los escenarios
       "Solicitudes dentro del límite se atienden" y "La solicitud 61 se rechaza".
       Verificación: `npm run test:e2e -w backend` en verde contra la base de test.
-- [ ] 3.2 Test: agotar el cupo de `PATCH /admin/reservas/:id/confirmar` con UUID inexistentes y
+- [x] 3.2 Test: agotar el cupo de `PATCH /admin/reservas/:id/confirmar` con UUID inexistentes y
       después confirmar una Reserva `PENDIENTE` creada por el test; responde `429` y la Reserva
       sigue `PENDIENTE` en la base (escenario "Una operación rechazada por el límite no
       modifica datos"). Verificación: el test lee el estado con Prisma después de la
       solicitud.
-- [ ] 3.3 Test: con el cupo de `PATCH /admin/reservas/:id/confirmar` agotado, `GET
+- [x] 3.3 Test: con el cupo de `PATCH /admin/reservas/:id/confirmar` agotado, `GET
       /admin/mesas` responde `200` en la misma app (escenario "El límite de una ruta no consume
       el de otra"). Verificación: test en verde.
-- [ ] 3.4 Test: 20 `PATCH /admin/reservas/:id/confirmar` seguidos sobre 20 Reservas `PENDIENTE`
+- [x] 3.4 Test: 20 `PATCH /admin/reservas/:id/confirmar` seguidos sobre 20 Reservas `PENDIENTE`
       creadas por el test responden `204`, ninguno `429` (escenario "Ráfaga de acciones del
       panel no se rechaza"). Falla con el límite global de hoy (10), lo que confirma que el
       test mide el cambio. Verificación: correrlo una vez sin la tarea 2.2 y ver que falla en
       la solicitud 11; con 2.2, en verde.
-- [ ] 3.5 Regresión de límites que no deben cambiar: confirmar que siguen en verde, sin
+- [x] 3.5 Regresión de límites que no deben cambiar: confirmar que siguen en verde, sin
       modificarlos, `auth.e2e-spec.ts` → "responde 429 al superar los 5 intentos por minuto,
       incluso con credenciales correctas", `reserva-consultar.e2e-spec.ts` → "supera
       THROTTLE_LIMIT y rechaza con 429, incluso con código y email correctos" y
@@ -52,7 +52,7 @@
       requisito "El login y las rutas públicas con código de reserva conservan su límite". Si
       alguno no existiera en `main`, agregarlo en el archivo de 3.1. Verificación: los tres en
       verde en la corrida de CI del PR.
-- [ ] 3.6 Confirmar que los tests de integración que ya ejercitan rutas de admin siguen
+- [x] 3.6 Confirmar que los tests de integración que ya ejercitan rutas de admin siguen
       pasando. De ellos, solo `gestion-salon-admin.integration-spec.ts` arma su propio
       `ThrottlerModule` y registra `ThrottlerGuard` como `APP_GUARD`, así que es el único en el
       que el decorador de clase pasa a aplicar 60 en vez de 10. `zonas.integration-spec.ts`,
@@ -63,7 +63,7 @@
 
 ## 4. Contrato OpenAPI
 
-- [ ] 4.1 Agregar `@ApiTooManyRequestsResponse({ description })` con el texto de `design.md`
+- [x] 4.1 Agregar `@ApiTooManyRequestsResponse({ description })` con el texto de `design.md`
       a los 12 métodos de la tabla, y la respuesta `'429'` correspondiente en
       `openapi/openapi.yaml` (escenario "Toda operación de admin declara la respuesta 429").
       Verificación: `npm run openapi:check` y `npm run openapi:lint` en verde.
