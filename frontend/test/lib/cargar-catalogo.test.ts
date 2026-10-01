@@ -44,11 +44,12 @@ describe("cargarCatalogo", () => {
   });
 
   it("si fallan las dos devuelve el error de las zonas", async () => {
-    responder({ zonas: falla(500), turnos: falla(503) });
+    // Dos estados que se mapean a tipos distintos, para distinguir de cuál petición es el error.
+    responder({ zonas: falla(404), turnos: falla(500) });
 
     const catalogo = await cargarCatalogo();
 
-    expect(catalogo.error).toEqual(expect.objectContaining({ tipo: "desconocido" }));
+    expect(catalogo.error).toEqual(expect.objectContaining({ tipo: "no-encontrado" }));
   });
 
   it.each([
