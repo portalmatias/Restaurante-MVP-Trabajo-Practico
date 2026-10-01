@@ -123,6 +123,41 @@ describe("Dialog", () => {
     expect(screen.getByRole("button", { name: "Cancelando…" })).toBeDisabled();
   });
 
+  describe("mientras confirma", () => {
+    it("deshabilita también el botón de cancelar", () => {
+      const { onCancel } = renderDialog({ confirmando: true });
+
+      const boton = screen.getByRole("button", { name: "Volver" });
+      fireEvent.click(boton);
+
+      expect(boton).toBeDisabled();
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("un cancel cancelable (Escape) se evita y no llama a onCancel", () => {
+      const { onCancel } = renderDialog({ confirmando: true });
+      const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
+
+      const cancelar = new Event("cancel", { cancelable: true });
+      dialogo.dispatchEvent(cancelar);
+
+      expect(cancelar.defaultPrevented).toBe(true);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("si el navegador lo cierra igual, lo vuelve a mostrar sin llamar a onCancel", () => {
+      const { onCancel } = renderDialog({ confirmando: true });
+      const dialogo = screen.getByRole("dialog", { name: "Cancelar reserva" });
+      expect(showModal).toHaveBeenCalledTimes(1);
+
+      dialogo.removeAttribute("open");
+      dialogo.dispatchEvent(new Event("close"));
+
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(showModal).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("muestra el contenido de error dentro del diálogo", () => {
     renderDialog({ children: <p role="alert">No se pudo cancelar</p> });
 
