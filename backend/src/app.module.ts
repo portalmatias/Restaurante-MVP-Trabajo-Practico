@@ -22,7 +22,9 @@ import { HorariosModule } from './horarios/horarios.module';
       envFilePath: ['../.env', '.env'],
     }),
     // THROTTLE_TTL/THROTTLE_LIMIT (config.yaml §10) son el default global; `/auth/login`
-    // lo sobreescribe con un límite más estricto vía @Throttle() (design.md de auth-admin).
+    // lo sobreescribe con un límite más estricto vía @Throttle() (design.md de auth-admin), y
+    // las rutas de `/admin/...` con uno propio más holgado vía `@LimiteAdmin()` (D1 de
+    // throttle-rutas-admin).
     // No necesita PrismaService, así que no le aplica la nota de abajo.
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],

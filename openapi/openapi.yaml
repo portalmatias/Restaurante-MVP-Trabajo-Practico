@@ -1322,6 +1322,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ZonaRespuestaDto'
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/zonas/{id}:
     patch:
       operationId: ZonasController_actualizar
@@ -1358,6 +1362,10 @@ paths:
           description: >-
             No se pudo actualizar la zona por una edición concurrente (conflicto de
             serialización agotando los reintentos).
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/mesas:
     post:
       operationId: MesasController_crear
@@ -1387,6 +1395,10 @@ paths:
           description: La zona indicada no existe.
         '409':
           description: Ya existe una mesa con esa etiqueta.
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
     get:
       operationId: MesasController_listar
       summary: Listado de Mesas
@@ -1411,6 +1423,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/MesaRespuestaDto'
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/mesas/{id}:
     patch:
       operationId: MesasController_actualizar
@@ -1450,6 +1466,10 @@ paths:
             capacidad, reservas activas que impiden cambiarla de zona, ya existe otra
             mesa con la etiqueta indicada, o no se pudo actualizar por una edición
             concurrente (conflicto de serialización agotando los reintentos).
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
     delete:
       operationId: MesasController_eliminar
       summary: Baja de Mesa
@@ -1476,6 +1496,10 @@ paths:
           description: >-
             La mesa tiene reservas asociadas de cualquier estado (PENDIENTE,
             CONFIRMADA, CANCELADA o NO_SHOW): no se puede eliminar.
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/turnos:
     post:
       operationId: HorariosController_crear
@@ -1502,6 +1526,10 @@ paths:
                 $ref: '#/components/schemas/TurnoRespuestaDto'
         '409':
           description: Ya existe un turno para ese día y esa hora de inicio.
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
     get:
       operationId: HorariosController_listar
       summary: Listado de Turnos
@@ -1520,6 +1548,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TurnoRespuestaDto'
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/turnos/{id}:
     patch:
       operationId: HorariosController_actualizar
@@ -1554,6 +1586,10 @@ paths:
           description: El turno indicado no existe.
         '409':
           description: Ya existe un turno para ese día y esa hora de inicio.
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/reservas:
     get:
       summary: Listar reservas
@@ -1706,6 +1742,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorRespuesta'
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/reservas/{id}/confirmar:
     patch:
       operationId: ReservasController_confirmar
@@ -1757,6 +1797,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorRespuesta'
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
   /admin/reservas/{id}/rechazar:
     patch:
       operationId: ReservasController_rechazar
@@ -1808,3 +1852,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorRespuesta'
+        '429':
+          description: >-
+            Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se
+            rechaza antes de validar el token y el body.
