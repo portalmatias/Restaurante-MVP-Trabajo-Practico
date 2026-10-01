@@ -59,8 +59,10 @@
       backend. Si `localhost` resuelve a `::1` y falla contra el backend en `127.0.0.1`,
       cambiar `NEXT_PUBLIC_API_URL` de `.env.example` a `http://127.0.0.1:3001` y repetir.
 - [ ] 4.3 `docker-compose.yml`: publicar Postgres en `'127.0.0.1:5432:5432'`. Verificar con
-      `docker compose up -d --force-recreate` que `Get-NetTCPConnection -LocalPort 5432`
-      muestra `127.0.0.1` y no `0.0.0.0`/`::`, y que `npm run db:migrate` sigue funcionando.
+      `docker compose up -d --force-recreate` que el puerto 5432 escucha en `127.0.0.1` y no en
+      `0.0.0.0`/`::` (en Windows con `Get-NetTCPConnection -LocalPort 5432 -State Listen`; en
+      Linux/macOS con `ss -ltn 'sport = :5432'` o `lsof -iTCP:5432 -sTCP:LISTEN`), y que
+      `npm run db:migrate` sigue funcionando.
 
 ## 5. Documentación (D4)
 
