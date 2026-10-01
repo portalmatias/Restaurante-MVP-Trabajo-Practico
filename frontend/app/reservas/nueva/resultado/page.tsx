@@ -6,6 +6,7 @@ import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-se
 import { Alert } from "../../../../src/components/ui/alert";
 import { buttonVariants } from "../../../../src/components/ui/button";
 import { apiClient, toApiResult } from "../../../../src/lib/api/client";
+import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
 
 type ResultadoPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -26,12 +27,11 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     redirect("/reservas/nueva");
   }
 
-  const [disponibilidad, zonas, turnos] = await Promise.all([
+  const [disponibilidad, catalogo] = await Promise.all([
     toApiResult(
       apiClient.GET("/disponibilidad", { params: { query: seleccion }, cache: "no-store" }),
     ),
-    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
-    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
+    cargarCatalogo(),
   ]);
 
   const paso1ConSeleccion = urlConSeleccion("/reservas/nueva", seleccion);
@@ -89,8 +89,8 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     );
   }
 
-  if (disponibilidad.error || zonas.error || turnos.error) {
-    const error = disponibilidad.error ?? zonas.error ?? turnos.error;
+  if (disponibilidad.error || catalogo.error) {
+    const error = disponibilidad.error ?? catalogo.error;
     return (
       <div className={contenedor}>
         <ErrorDeCarga error={error} />
@@ -98,8 +98,8 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     );
   }
 
-  const zona = zonas.data.find((candidata) => candidata.id === seleccion.zonaId);
-  const turno = turnos.data.find((candidato) => candidato.id === seleccion.turnoId);
+  const zona = catalogo.zonas.find((candidata) => candidata.id === seleccion.zonaId);
+  const turno = catalogo.turnos.find((candidato) => candidato.id === seleccion.turnoId);
   if (!zona || !turno) {
     redirect(paso1ConSeleccion);
   }

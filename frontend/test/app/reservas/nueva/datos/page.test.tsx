@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import DatosPage from "../../../../../app/reservas/nueva/datos/page";
 import { apiClient } from "../../../../../src/lib/api/client";
 import {
+  TURNO_CENA_MARTES,
   TURNO_CENA_SABADO,
   TURNOS,
   ZONA_STANDARD,
@@ -103,6 +104,16 @@ describe("/reservas/nueva/datos", () => {
 
     expect(await destinoDeRedireccion(SELECCION)).toBe(
       `/reservas/nueva?${new URLSearchParams(SELECCION).toString()}`,
+    );
+  });
+
+  it("si el turno existe pero es de otro día de la semana que la fecha redirige al Paso 1", async () => {
+    responder();
+    // 2026-09-19 es sábado y este turno es de los martes.
+    const seleccion = { ...SELECCION, turnoId: TURNO_CENA_MARTES.id };
+
+    expect(await destinoDeRedireccion(seleccion)).toBe(
+      `/reservas/nueva?${new URLSearchParams(seleccion).toString()}`,
     );
   });
 

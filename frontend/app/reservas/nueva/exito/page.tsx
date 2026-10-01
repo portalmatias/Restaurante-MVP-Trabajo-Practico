@@ -5,7 +5,7 @@ import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
 import { Alert } from "../../../../src/components/ui/alert";
 import { buttonVariants } from "../../../../src/components/ui/button";
-import { apiClient, toApiResult } from "../../../../src/lib/api/client";
+import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
 import { leerConfirmacionDeQuery } from "../../../../src/lib/seleccion-reserva";
 
 type ExitoPageProps = {
@@ -24,15 +24,10 @@ export default async function ExitoPage({ searchParams }: ExitoPageProps) {
     redirect("/reservas/nueva");
   }
 
-  // Sin caché: `router.refresh()` de "Reintentar" tiene que volver a llegar al backend.
-  const [zonas, turnos] = await Promise.all([
-    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
-    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
-  ]);
+  const catalogo = await cargarCatalogo();
 
-  const zona = zonas.data?.find((candidata) => candidata.id === confirmacion.zonaId);
-  const turno = turnos.data?.find((candidato) => candidato.id === confirmacion.turnoId);
-  const errorDeCatalogo = zonas.error ?? turnos.error;
+  const zona = catalogo.zonas?.find((candidata) => candidata.id === confirmacion.zonaId);
+  const turno = catalogo.turnos?.find((candidato) => candidato.id === confirmacion.turnoId);
   const pendiente = confirmacion.estado === "PENDIENTE";
 
   return (
@@ -54,8 +49,8 @@ export default async function ExitoPage({ searchParams }: ExitoPageProps) {
         Guardá este código: junto con tu email, es la única forma de consultar o cancelar tu
         reserva.
       </p>
-      {errorDeCatalogo ? (
-        <ErrorDeCarga error={errorDeCatalogo} />
+      {catalogo.error ? (
+        <ErrorDeCarga error={catalogo.error} />
       ) : zona && turno ? (
         <ResumenSeleccion
           fecha={confirmacion.fecha}

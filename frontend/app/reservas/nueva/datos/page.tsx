@@ -3,7 +3,8 @@ import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga
 import { FormularioDatosContacto } from "../../../../src/components/reservas/formulario-datos-contacto";
 import { PasosReserva } from "../../../../src/components/reservas/pasos-reserva";
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
-import { apiClient, toApiResult } from "../../../../src/lib/api/client";
+import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
+import { diaSemanaDeFechaLocal } from "../../../../src/lib/fecha-hora";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
 
 type DatosPageProps = {
@@ -13,7 +14,7 @@ type DatosPageProps = {
 const contenedor = "mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10";
 
 /**
- * Paso 3 del asistente (design.md D3 Pantalla 4): valida la selección de la URL, resuelve el
+ * Paso 3 del asistente (design.md D3 Pantalla 4): valida la selección de la URL (incluido que el turno sea del día de la fecha), resuelve el
  * catálogo para el resumen y renderiza el formulario que crea la reserva. No consulta la
  * disponibilidad: la decide el servidor al crear.
  */
@@ -23,24 +24,19 @@ export default async function DatosPage({ searchParams }: DatosPageProps) {
     redirect("/reservas/nueva");
   }
 
-  // Sin caché: `router.refresh()` de "Reintentar" tiene que volver a llegar al backend.
-  const [zonas, turnos] = await Promise.all([
-    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
-    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
-  ]);
-
-  if (zonas.error || turnos.error) {
-    const error = zonas.error ?? turnos.error;
+  const catalogo = await cargarCatalogo();
+  if (catalogo.error) {
     return (
       <div className={contenedor}>
-        <ErrorDeCarga error={error} />
+        <ErrorDeCarga error={catalogo.error} />
       </div>
     );
   }
 
-  const zona = zonas.data.find((candidata) => candidata.id === seleccion.zonaId);
-  const turno = turnos.data.find((candidato) => candidato.id === seleccion.turnoId);
-  if (!zona || !turno) {
+  const zona = catalogo.zonas.find((candidata) => candidata.id === seleccion.zonaId);
+  const turno = catalogo.turnos.find((candidato) => candidato.id === seleccion.turnoId);
+  // `leerSeleccionDeQuery` ya garantizó una fecha de calendario: el día de la semana no falla.
+  if (!zona || !turno || turno.diaSemana !== diaSemanaDeFechaLocal(seleccion.fecha)) {
     redirect(urlConSeleccion("/reservas/nueva", seleccion));
   }
 

@@ -40,6 +40,8 @@ export function agruparPorCampo(
  * asignó a un campo, es decir, cuya primera palabra es ese nombre.
  */
 export function sinNombreDeCampo(mensaje: string): string {
-  const resto = mensaje.slice(mensaje.indexOf(" ") + 1).trimStart();
+  // Sin espacio no hay nada después del nombre del campo: se devuelve tal cual.
+  const primerEspacio = mensaje.indexOf(" ");
+  const resto = primerEspacio === -1 ? "" : mensaje.slice(primerEspacio + 1).trimStart();
   return resto === "" ? mensaje : resto.charAt(0).toUpperCase() + resto.slice(1);
 }

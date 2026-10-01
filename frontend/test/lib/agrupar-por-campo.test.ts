@@ -1,4 +1,4 @@
-import { agruparPorCampo } from "../../src/lib/agrupar-por-campo";
+import { agruparPorCampo, sinNombreDeCampo } from "../../src/lib/agrupar-por-campo";
 
 const CAMPOS = {
   nombreCliente: "nombre",
@@ -65,5 +65,19 @@ describe("agruparPorCampo", () => {
     const resultado = agruparPorCampo(["emailClienteExtra debe ser texto"], CAMPOS);
 
     expect(resultado).toEqual({ porCampo: {}, generales: ["emailClienteExtra debe ser texto"] });
+  });
+});
+
+describe("sinNombreDeCampo", () => {
+  it("quita el nombre del campo y deja la primera letra en mayúscula", () => {
+    expect(sinNombreDeCampo("emailCliente debe ser un email válido")).toBe("Debe ser un email válido");
+  });
+
+  it("devuelve el mensaje sin cambios si no tiene espacios, para no mostrar el nombre del campo en mayúscula", () => {
+    expect(sinNombreDeCampo("emailCliente")).toBe("emailCliente");
+  });
+
+  it("devuelve el mensaje sin cambios si después del nombre del campo no queda texto", () => {
+    expect(sinNombreDeCampo("emailCliente   ")).toBe("emailCliente   ");
   });
 });

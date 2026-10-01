@@ -106,6 +106,17 @@ describe("/reservas/nueva", () => {
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
   });
 
+  it("si las zonas fallan y los turnos devuelven 429, prioriza el límite de intentos y no ofrece reintentar", async () => {
+    responder({ zonas: falla(500), turnos: falla(429) });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
   it("ante un error de red del catálogo muestra el mensaje de conexión y ofrece reintentar", async () => {
     GET.mockRejectedValue(new TypeError("fetch failed"));
 

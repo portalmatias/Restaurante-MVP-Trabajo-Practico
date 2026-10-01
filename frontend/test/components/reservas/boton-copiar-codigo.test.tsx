@@ -92,4 +92,23 @@ describe("BotonCopiarCodigo", () => {
 
     expect(jest.getTimerCount()).toBe(antes);
   });
+
+  it("con dos clics seguidos, un rechazo tardío del primero no pisa la copia exitosa del segundo", async () => {
+    let rechazarPrimera: (causa: Error) => void = () => undefined;
+    writeText
+      .mockReturnValueOnce(new Promise<void>((_resolver, rechazar) => (rechazarPrimera = rechazar)))
+      .mockResolvedValueOnce(undefined);
+    render(<BotonCopiarCodigo codigo="K7PM3QXA" />);
+
+    await copiar();
+    await copiar();
+    expect(screen.getByRole("status")).toHaveTextContent("¡Copiado!");
+
+    await act(async () => {
+      rechazarPrimera(new Error("denegado"));
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent("¡Copiado!");
+    expect(screen.queryByText(/No pudimos copiarlo/)).not.toBeInTheDocument();
+  });
 });

@@ -1,6 +1,6 @@
 import { ErrorDeCarga } from "../../../src/components/reservas/error-de-carga";
 import { FormularioSeleccion } from "../../../src/components/reservas/formulario-seleccion";
-import { apiClient, toApiResult } from "../../../src/lib/api/client";
+import { cargarCatalogo } from "../../../src/lib/cargar-catalogo";
 import { fechaLocalDeHoy } from "../../../src/lib/fecha-hora";
 
 type NuevaReservaPageProps = {
@@ -19,17 +19,12 @@ function textoDe(valor: string | string[] | undefined): string | undefined {
  */
 export default async function NuevaReservaPage({ searchParams }: NuevaReservaPageProps) {
   const params = await searchParams;
-  const [zonas, turnos] = await Promise.all([
-    // Sin caché: `router.refresh()` de "Reintentar" tiene que volver a llegar al backend.
-    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
-    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
-  ]);
+  const catalogo = await cargarCatalogo();
 
-  if (zonas.error || turnos.error) {
-    const error = zonas.error ?? turnos.error;
+  if (catalogo.error) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10">
-        <ErrorDeCarga error={error} />
+        <ErrorDeCarga error={catalogo.error} />
       </div>
     );
   }
@@ -46,8 +41,8 @@ export default async function NuevaReservaPage({ searchParams }: NuevaReservaPag
       {/* `key`: al volver a esta ruta con otra selección en la URL, el formulario se reinicia. */}
       <FormularioSeleccion
         key={JSON.stringify(seleccionInicial)}
-        zonas={zonas.data}
-        turnos={turnos.data}
+        zonas={catalogo.zonas}
+        turnos={catalogo.turnos}
         hoy={fechaLocalDeHoy(new Date())}
         seleccionInicial={seleccionInicial}
       />
