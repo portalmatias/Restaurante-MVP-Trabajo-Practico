@@ -84,7 +84,8 @@ frontend llega al backend por el proxy `/api` desde tu máquina.
 El navegador nunca llama directo al backend: pasa por el proxy `/api` de Next. Para el
 backend, entonces, **todos los pedidos llegan desde la misma IP, la del servidor de Next**, y
 los límites de solicitudes "por cliente" (5 intentos de login por minuto, `THROTTLE_LIMIT`
-consultas públicas) se cuentan **por máquina**, no por persona. En local es aceptable: con
+consultas o cancelaciones con código de reserva por ventana, y los propios de las rutas de
+admin) se cuentan **por máquina**, no por persona. En local es aceptable: con
 los servicios en loopback, esa máquina es el único cliente posible.
 
 El backend **no confía en `X-Forwarded-For`** (ni en `X-Real-IP` ni en `Forwarded`) para

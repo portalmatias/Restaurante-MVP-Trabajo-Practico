@@ -34,13 +34,13 @@
 
 ## 3. Backend: origen no falsificable (D2)
 
-- [ ] 3.1 E2E `backend/test/exposicion-red.e2e-spec.ts` (Supertest contra Postgres real, app
+- [x] 3.1 E2E `backend/test/exposicion-red.e2e-spec.ts` (Supertest contra Postgres real, app
       con `configurarRed` y el `ThrottlerGuard` real): 6 intentos de login fallidos, cada uno
       con un `X-Forwarded-For` distinto → los 5 primeros `401` y el sexto `429`. Verificar que
       pasa con `npm run test:e2e -w backend`.
-- [ ] 3.2 En el mismo e2e: superar el límite de `POST /reservas/consultar` variando
+- [x] 3.2 En el mismo e2e: superar el límite de `POST /reservas/consultar` variando
       `X-Forwarded-For` → `429` en la misma solicitud que sin el encabezado.
-- [ ] 3.3 En el mismo e2e, con `TRUST_PROXY` apuntando a la dirección de Supertest
+- [x] 3.3 En el mismo e2e, con `TRUST_PROXY` apuntando a la dirección de Supertest
       (`loopback`): un `X-Forwarded-For: <cliente-inventado>, <ip-real>` hace que el límite
       se cuente para `<ip-real>` (agotar el cupo con una IP real no bloquea a otra IP real).
       Verificar que el test falla si se configura `trust proxy` con `true`.

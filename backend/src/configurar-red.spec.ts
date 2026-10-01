@@ -13,17 +13,42 @@ describe('configurarRed', () => {
     return { app: { set } as unknown as NestExpressApplication, set };
   }
 
+  /**
+   * Corre `prueba` con `TRUST_PROXY` fijado en `valor` (o sin definir, con `undefined`) y
+   * después restaura lo que hubiera: así los casos que leen la variable del entorno no
+   * dependen del `TRUST_PROXY` de la terminal o del runner que corre los tests.
+   */
+  function conTrustProxy(valor: string | undefined, prueba: () => void): void {
+    const anterior = process.env.TRUST_PROXY;
+    if (valor === undefined) {
+      delete process.env.TRUST_PROXY;
+    } else {
+      process.env.TRUST_PROXY = valor;
+    }
+    try {
+      prueba();
+    } finally {
+      if (anterior === undefined) {
+        delete process.env.TRUST_PROXY;
+      } else {
+        process.env.TRUST_PROXY = anterior;
+      }
+    }
+  }
+
   describe('sin TRUST_PROXY', () => {
     it.each([
       ['ausente', undefined],
       ['vacía', ''],
       ['solo espacios', '   '],
-    ])('%s: no configura `trust proxy`', (_caso, valor) => {
-      const { app, set } = appFalsa();
+    ])('%s en el entorno: no configura `trust proxy`', (_caso, valor) => {
+      conTrustProxy(valor, () => {
+        const { app, set } = appFalsa();
 
-      configurarRed(app, valor);
+        configurarRed(app);
 
-      expect(set).not.toHaveBeenCalled();
+        expect(set).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -95,19 +120,11 @@ describe('configurarRed', () => {
   });
 
   it('lee TRUST_PROXY del entorno si no se le pasa un valor', () => {
-    const anterior = process.env.TRUST_PROXY;
-    process.env.TRUST_PROXY = 'true';
-    try {
+    conTrustProxy('true', () => {
       const { app } = appFalsa();
       expect(() => configurarRed(app)).toThrow(
         /declarar los saltos confiables/,
       );
-    } finally {
-      if (anterior === undefined) {
-        delete process.env.TRUST_PROXY;
-      } else {
-        process.env.TRUST_PROXY = anterior;
-      }
-    }
+    });
   });
 });
