@@ -49,6 +49,10 @@ type CodigosMotivoFaltantes = Exclude<
 const _codigosMotivoCompletos: [CodigosMotivoFaltantes] extends [never] ? true : never = true;
 void _codigosMotivoCompletos;
 
+/** Mensaje genérico ante un error de servidor o de red: nunca se muestra el del servidor. */
+export const MENSAJE_SERVICIO_NO_DISPONIBLE =
+  "El servicio no está disponible en este momento. Intentá de nuevo más tarde.";
+
 function esRegistro(valor: unknown): valor is Record<string, unknown> {
   return typeof valor === "object" && valor !== null;
 }
@@ -77,7 +81,9 @@ function motivosDe(cuerpo: unknown): MotivoNoDisponible[] {
 
   return cuerpo.motivos.filter((motivo): motivo is MotivoNoDisponible => {
     return (
-      esRegistro(motivo) && esCodigoMotivoValido(motivo.codigo) && typeof motivo.mensaje === "string"
+      esRegistro(motivo) &&
+      esCodigoMotivoValido(motivo.codigo) &&
+      typeof motivo.mensaje === "string"
     );
   });
 }
@@ -113,15 +119,9 @@ export function mapErrorApi(status: number, body: unknown): ErrorApi {
     };
   }
 
-  if (status >= 500) {
-    // Nunca se expone el mensaje del servidor: podría filtrar detalle interno (stack, nombre de
-    // host, etc.). Cubre también el caso en que el proxy `/api` de Next devuelve una página de
-    // error HTML (no un `ErrorRespuesta` JSON) porque no puede comunicarse con el backend.
-    return {
-      tipo: "desconocido",
-      mensaje: "El servicio no está disponible en este momento. Intentá de nuevo más tarde.",
-    };
-  }
-
-  return { tipo: "desconocido", mensaje: mensajeDe(body) };
+  // Nunca se expone el mensaje del servidor en lo que no tiene mapeo propio (5xx ni 4xx como 401,
+  // 403, 405 o 422): podría filtrar detalle interno (stack, nombre de host, nombre de un guard,
+  // etc.). Cubre también el caso en que el proxy `/api` de Next devuelve una página de
+  // error HTML (no un `ErrorRespuesta` JSON) porque no puede comunicarse con el backend.
+  return { tipo: "desconocido", mensaje: MENSAJE_SERVICIO_NO_DISPONIBLE };
 }

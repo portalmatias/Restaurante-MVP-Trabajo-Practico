@@ -131,7 +131,10 @@ disponibilidad él mismo salvo en el paso de creación (D1.1).
   en un flujo de escritorio.
 - El resultado de disponibilidad (Paso 2) se reevalúa en cada visita porque es "una foto del
   momento" (`config.yaml` §6): con la URL como estado, un refresh vuelve a consultar
-  naturalmente, sin lógica de invalidación de caché propia.
+  naturalmente, sin lógica de invalidación de caché propia. Excepción aceptada: al volver con
+  "atrás", Next reutiliza la página ya renderizada (Client Cache, back/forward), así que puede
+  verse un cupo viejo. No se agrega un `router.refresh()` al restaurar la página: el
+  `POST /reservas` vuelve a validar el cupo y su `409` con motivos ya está manejado en el Paso 3.
 - Cada página es un Server Component puro que arma su propia consulta: no hace falta levantar
   un Client Component gigante para todo el asistente ni gestionar hidratación de un estado
   complejo, alineado con "Server Components por defecto" de §7.

@@ -113,18 +113,18 @@
 
 ## 4. Grupo A — Reservar (depende de `catalogo-publico` y `reservas-crear` PR #40 mergeados)
 
-- [ ] 4.1 Confirmar que `GET /zonas`, `GET /turnos` y `POST /reservas` están en
+- [x] 4.1 Confirmar que `GET /zonas`, `GET /turnos` y `POST /reservas` están en
       `openapi/openapi.yaml` en `main` (no solo en un `design.md`) y correr
       `npm run api:types -w frontend` para regenerar `schema.d.ts` con esos paths. No seguir
       con las tareas de esta sección si alguno falta: completar 4.1–4.x de las otras
       secciones o esperar. Verificar con
-      `grep -n "'/zonas'\|'/turnos'\|'/reservas'" frontend/src/lib/api/schema.d.ts`.
-- [ ] 4.2 Reescribir `frontend/app/reservas/page.tsx` (Inicio, D3): título, acción principal
+      `grep -n '"/zonas"\|"/turnos"\|"/reservas"' frontend/src/lib/api/schema.d.ts`.
+- [x] 4.2 Reescribir `frontend/app/reservas/page.tsx` (Inicio, D3): título, acción principal
       "Reservá ahora" → `/reservas/nueva`, acción secundaria a `/reservas/consultar`, sin
       lógica de datos. Escribir su test RTL primero (rol de los botones, `href` de cada
       enlace, ausencia de cualquier texto/enlace de administración) y verificar rojo antes de
       escribir la página. Verificar verde con `npm test -w frontend -- reservas/page`.
-- [ ] 4.3 Escribir los tests del formulario del Paso 1 (`FormularioSeleccion`, RTL con zonas y
+- [x] 4.3 Escribir los tests del formulario del Paso 1 (`FormularioSeleccion`, RTL con zonas y
       turnos de fixture, sin red): los cuatro campos son obligatorios para habilitar
       "Ver disponibilidad"; mientras falta algún campo, debajo del botón deshabilitado aparece
       un texto en una región `aria-live="polite"` que lista qué falta completar (ej. "Falta
@@ -142,11 +142,11 @@
       `fecha`, y un `comensales` no entero o fuera del rango de la zona; enviar arma la URL de
       `/reservas/nueva/resultado` con los cuatro parámetros. Verificar que la suite falla
       (rojo) con `npm test -w frontend -- formulario-seleccion`.
-- [ ] 4.4 Implementar `FormularioSeleccion` (D3, Pantalla 2) y el `Server Component`
+- [x] 4.4 Implementar `FormularioSeleccion` (D3, Pantalla 2) y el `Server Component`
       `app/reservas/nueva/page.tsx` que hace `GET /zonas`/`GET /turnos` directo al backend y se
       los pasa como props, más `app/reservas/nueva/loading.tsx`. Verificar que 4.3 pasa y que
       `npm run build -w frontend` no falla por un `searchParams`/fetch mal tipado.
-- [ ] 4.5 Escribir los tests de `app/reservas/nueva/resultado/page.tsx`: sin los cuatro
+- [x] 4.5 Escribir los tests de `app/reservas/nueva/resultado/page.tsx`: sin los cuatro
       parámetros de query, redirige a `/reservas/nueva`; con "hay lugar", muestra el resumen,
       los lugares restantes y, si `requiereConfirmacionAdmin`, el aviso de pendiente, sin
       mostrarlo si no; con "no hay lugar", muestra un `Alert` por cada motivo informado y el
@@ -154,7 +154,7 @@
       red, muestra el mensaje genérico y el botón de reintentar. Mockear el cliente tipado a
       nivel de módulo para estos casos (no golpear red real). Verificar rojo con
       `npm test -w frontend -- resultado`.
-- [ ] 4.6 Implementar la página de resultado (D3, Pantalla 3) y su `loading.tsx`: además de
+- [x] 4.6 Implementar la página de resultado (D3, Pantalla 3) y su `loading.tsx`: además de
       `GET /disponibilidad`, resuelve `GET /zonas` (nombre y `requiereConfirmacionAdmin` para el
       aviso de pendiente) y `GET /turnos` (horario del resumen), y ante un `404` de
       `GET /disponibilidad` redirige al Paso 1. Verificar que 4.5 pasa.
@@ -294,11 +294,10 @@
 - Mergeados a `main`: `frontend-base` (PR #43), `reservas-crear` (PR #40), `reserva-consultar`
   (PR #35) y `cancelacion-turnos` (PR #50). `feature/frontend-cliente` se creó desde `main`
   en `f5058bb`.
-- NO mergeado: `catalogo-publico` (PR #51, abierto, CI en verde, pendiente de revisión de un
-  compañero). Sin `GET /zonas` ni `GET /turnos` en `openapi/openapi.yaml` de `main`, las
-  secciones 4 (Grupo A) y 6 (Grupo C, que usa `GET /zonas` para la ventana) no se pueden
-  completar contra el cliente tipado real: quedan con fixtures locales (D10) hasta que ese PR
-  mergee. La sección 5 (Grupo B) ya tiene su endpoint en `main`.
+- `catalogo-publico` (PR #51) ya está mergeado a `main`: `GET /zonas` y `GET /turnos` figuran
+  en `openapi/openapi.yaml` y en el cliente tipado real. La sección 4 (Grupo A) corre contra
+  el backend real; los fixtures locales (D10) quedan solo como dobles de prueba. La sección 5
+  (Grupo B) y la 6 (Grupo C, que usa `GET /zonas` para la ventana) tampoco están bloqueadas.
 
 **Diferencias entre `design.md` y el código real de `frontend-base` (1.2):**
 
