@@ -157,9 +157,11 @@ límites por cliente son por máquina, y qué hace falta para desplegar (proxy d
   cambia el default de `.env.example` a `http://127.0.0.1:3001`.
 - **[Riesgo]** Una persona con una base existente sigue con Postgres expuesto hasta recrear
   el contenedor → **Mitigación:** el README indica cómo recrearlo con `docker compose -p
-  <proyecto-del-contenedor> up -d --force-recreate`. Con `-p` se conserva el volumen: sin él,
-  recrear desde otra carpeta (otro clon o worktree) usa otro volumen y deja la base vacía
-  (verificado durante la implementación).
+  <proyecto-del-contenedor> up -d --force-recreate`. Con `-p` se conserva el volumen. Sin él,
+  desde otra carpeta (otro clon o worktree) el primer síntoma es un error del daemon por el
+  `container_name` en uso (verificado durante la implementación); la base vacía aparece si,
+  para salir de ese error, se borra el contenedor y se lo recrea desde esa carpeta, porque
+  Compose usa otro volumen. El README advierte no borrarlo.
 - **[Trade-off]** En local, todos los pedidos del navegador siguen compartiendo el cupo de la
   máquina. Es aceptable porque, con D1, esa máquina es el único cliente posible.
 

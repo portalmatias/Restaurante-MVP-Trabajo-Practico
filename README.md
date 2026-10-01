@@ -63,10 +63,12 @@ red (por ejemplo, el Wi-Fi de la facultad) puede conectarse a ellos:
 **Si tu contenedor de PostgreSQL es anterior a este cambio**, sigue publicado en todas las
 interfaces hasta que lo recrees. Los datos viven en un volumen con el nombre del *proyecto*
 de Docker Compose, que por defecto es el nombre de la carpeta desde la que se creó el
-contenedor. Si lo recreás desde otra carpeta (otro clon, otro worktree), Compose usa **otro**
-volumen y vas a ver una base vacía: los datos no se pierden, quedan en el volumen anterior,
-pero la app deja de verlos. Para recrearlo conservando el mismo volumen, usá el proyecto con
-el que fue creado:
+contenedor. Si corrés `docker compose up -d --force-recreate` desde otra carpeta (otro clon,
+otro worktree), Docker responde que el nombre `reservas-postgres` ya está en uso. **No borres
+el contenedor para salir de ese error**: si lo quitás y lo volvés a crear desde la otra
+carpeta, Compose usa **otro** volumen y vas a ver una base vacía (los datos no se pierden,
+quedan en el volumen anterior, pero la app deja de verlos). Para recrearlo conservando el
+mismo volumen, usá el proyecto con el que fue creado:
 
 ```bash
 # bash
