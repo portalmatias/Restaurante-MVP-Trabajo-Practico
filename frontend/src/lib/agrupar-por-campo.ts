@@ -32,3 +32,16 @@ export function agruparPorCampo(
 
   return { porCampo, generales };
 }
+
+/**
+ * Quita el nombre del campo del DTO con el que empieza un mensaje de `class-validator` y deja la
+ * primera letra en mayúscula, para mostrarlo junto a su campo ("emailCliente debe ser un email
+ * válido" -> "Debe ser un email válido"). Solo se llama con mensajes que `agruparPorCampo` ya
+ * asignó a un campo, es decir, cuya primera palabra es ese nombre.
+ */
+export function sinNombreDeCampo(mensaje: string): string {
+  // Sin espacio no hay nada después del nombre del campo: se devuelve tal cual.
+  const primerEspacio = mensaje.indexOf(" ");
+  const resto = primerEspacio === -1 ? "" : mensaje.slice(primerEspacio + 1).trimStart();
+  return resto === "" ? mensaje : resto.charAt(0).toUpperCase() + resto.slice(1);
+}

@@ -197,6 +197,29 @@ describe("/reservas/nueva/resultado - no hay lugar", () => {
     ]);
   });
 
+  it("muestra ambos motivos aunque compartan el mismo código, sin advertir por claves repetidas", async () => {
+    const consola = jest.spyOn(console, "error").mockImplementation(() => {});
+    responder(
+      ok({
+        disponible: false,
+        lugaresRestantes: 0,
+        motivos: [
+          { codigo: "AFORO_ZONA", mensaje: "Primer motivo." },
+          { codigo: "AFORO_ZONA", mensaje: "Segundo motivo." },
+        ],
+      }),
+    );
+
+    await renderizar();
+
+    expect(screen.getAllByRole("alert").map((alerta) => alerta.textContent)).toEqual([
+      "Primer motivo.",
+      "Segundo motivo.",
+    ]);
+    expect(consola).not.toHaveBeenCalled();
+    consola.mockRestore();
+  });
+
   it("muestra el título de rechazo, sin indicador de paso ni 'Continuar'", async () => {
     responder(SIN_LUGAR);
 

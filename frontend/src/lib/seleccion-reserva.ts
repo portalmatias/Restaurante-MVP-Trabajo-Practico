@@ -1,8 +1,10 @@
 import type { components } from "./api/schema";
 import { diaSemanaDeFechaLocal, leerFechaIso } from "./fecha-hora";
+import { esCodigoReservaValido } from "./reserva-codigo";
 
 type ZonaPublica = components["schemas"]["ZonaPublicaRespuestaDto"];
 type TurnoPublico = components["schemas"]["TurnoPublicoRespuestaDto"];
+type ReservaCreada = components["schemas"]["ReservaCreadaRespuesta"];
 
 /** Selección del asistente de reserva, tal como viaja en la URL de cada paso (design.md D1). */
 export type SeleccionReserva = {
@@ -121,4 +123,41 @@ export function leerSeleccionDeQuery(
     return undefined;
   }
   return { fecha, turnoId, zonaId, comensales };
+}
+
+/** Reserva recién creada, tal como viaja en la URL de la pantalla de éxito (design.md D1). */
+export type ConfirmacionReserva = SeleccionReserva & {
+  codigo: string;
+  estado: ReservaCreada["estado"];
+};
+
+/**
+ * URL de la pantalla de éxito: el código, el estado y la selección que devolvió el servidor.
+ * Nunca lleva datos de contacto (nombre, email, teléfono).
+ */
+export function urlDeExito(confirmacion: ConfirmacionReserva): string {
+  const { codigo, estado, ...seleccion } = confirmacion;
+  const params = new URLSearchParams({ codigo, estado });
+  const query = urlConSeleccion("", seleccion).slice(1);
+  return `/reservas/nueva/exito?${params.toString()}&${query}`;
+}
+
+/**
+ * Confirmación completa y con forma válida leída de `searchParams` (pantalla de éxito), o
+ * `undefined` si falta algún valor, está repetido o no tiene el formato esperado.
+ */
+export function leerConfirmacionDeQuery(
+  query: Record<string, string | string[] | undefined>,
+): ConfirmacionReserva | undefined {
+  const seleccion = leerSeleccionDeQuery(query);
+  const { codigo, estado } = query;
+  if (
+    !seleccion ||
+    typeof codigo !== "string" ||
+    !esCodigoReservaValido(codigo) ||
+    (estado !== "CONFIRMADA" && estado !== "PENDIENTE")
+  ) {
+    return undefined;
+  }
+  return { codigo, estado, ...seleccion };
 }

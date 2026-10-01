@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ErrorConReintento } from "../../../../src/components/reservas/error-con-reintento";
+import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga";
 import { PasosReserva } from "../../../../src/components/reservas/pasos-reserva";
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
 import { Alert } from "../../../../src/components/ui/alert";
 import { buttonVariants } from "../../../../src/components/ui/button";
 import { apiClient, toApiResult } from "../../../../src/lib/api/client";
-import { MENSAJE_SERVICIO_NO_DISPONIBLE } from "../../../../src/lib/api/errors";
+import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
 
 type ResultadoPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -27,12 +27,11 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     redirect("/reservas/nueva");
   }
 
-  const [disponibilidad, zonas, turnos] = await Promise.all([
+  const [disponibilidad, catalogo] = await Promise.all([
     toApiResult(
       apiClient.GET("/disponibilidad", { params: { query: seleccion }, cache: "no-store" }),
     ),
-    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
-    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
+    cargarCatalogo(),
   ]);
 
   const paso1ConSeleccion = urlConSeleccion("/reservas/nueva", seleccion);
@@ -70,8 +69,9 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
           No hay lugar para esa combinación
         </h1>
         <ul className="flex flex-col gap-3">
-          {disponibilidad.data.motivos.map((motivo) => (
-            <li key={motivo.codigo}>
+          {disponibilidad.data.motivos.map((motivo, indice) => (
+            // El índice desambigua dos motivos con el mismo código; la lista no se reordena.
+            <li key={`${motivo.codigo}-${indice}`}>
               {/* El backend ya manda el texto en español para personas. */}
               <Alert variant="error" className="text-base">
                 {motivo.mensaje}
@@ -89,30 +89,17 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     );
   }
 
-  if (disponibilidad.error || zonas.error || turnos.error) {
-    const error = disponibilidad.error ?? zonas.error ?? turnos.error;
-    // Límite de solicitudes: reintentar enseguida lo agrava, así que solo se informa (como en
-    // ConsultaReserva).
-    if (error?.tipo === "limite-de-intentos") {
-      return (
-        <div className={contenedor}>
-          <Alert variant="error" className="text-base">
-            {error.mensaje}
-          </Alert>
-        </div>
-      );
-    }
-    // Solo el mensaje propio del cliente (red o servicio): nunca el texto de un 4xx del servidor.
-    const mensaje = error?.tipo === "desconocido" ? error.mensaje : MENSAJE_SERVICIO_NO_DISPONIBLE;
+  if (disponibilidad.error || catalogo.error) {
+    const error = disponibilidad.error ?? catalogo.error;
     return (
       <div className={contenedor}>
-        <ErrorConReintento mensaje={mensaje} />
+        <ErrorDeCarga error={error} />
       </div>
     );
   }
 
-  const zona = zonas.data.find((candidata) => candidata.id === seleccion.zonaId);
-  const turno = turnos.data.find((candidato) => candidato.id === seleccion.turnoId);
+  const zona = catalogo.zonas.find((candidata) => candidata.id === seleccion.zonaId);
+  const turno = catalogo.turnos.find((candidato) => candidato.id === seleccion.turnoId);
   if (!zona || !turno) {
     redirect(paso1ConSeleccion);
   }

@@ -44,8 +44,8 @@ describe("/reservas/nueva", () => {
 
     await renderizar();
 
-    expect(GET).toHaveBeenCalledWith("/zonas");
-    expect(GET).toHaveBeenCalledWith("/turnos");
+    expect(GET).toHaveBeenCalledWith("/zonas", { cache: "no-store" });
+    expect(GET).toHaveBeenCalledWith("/turnos", { cache: "no-store" });
     expect(screen.getByRole("heading", { level: 1, name: "¿Cuándo y para cuántos?" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /VIP/ })).toBeInTheDocument();
   });
@@ -93,6 +93,37 @@ describe("/reservas/nueva", () => {
     );
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Fecha")).not.toBeInTheDocument();
+  });
+
+  it("ante un 429 del catálogo muestra el mensaje de límite de intentos, sin reintentar", async () => {
+    responder({ turnos: falla(429) });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
+  it("si las zonas fallan y los turnos devuelven 429, prioriza el límite de intentos y no ofrece reintentar", async () => {
+    responder({ zonas: falla(500), turnos: falla(429) });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Hiciste demasiados intentos. Esperá unos minutos antes de volver a intentar.",
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
+  it("ante un error de red del catálogo muestra el mensaje de conexión y ofrece reintentar", async () => {
+    GET.mockRejectedValue(new TypeError("fetch failed"));
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo conectar con el servidor.");
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 
   it("no ofrece ningún enlace a la administración", async () => {

@@ -1,7 +1,6 @@
-import { ErrorConReintento } from "../../../src/components/reservas/error-con-reintento";
+import { ErrorDeCarga } from "../../../src/components/reservas/error-de-carga";
 import { FormularioSeleccion } from "../../../src/components/reservas/formulario-seleccion";
-import { apiClient, toApiResult } from "../../../src/lib/api/client";
-import { MENSAJE_SERVICIO_NO_DISPONIBLE } from "../../../src/lib/api/errors";
+import { cargarCatalogo } from "../../../src/lib/cargar-catalogo";
 import { fechaLocalDeHoy } from "../../../src/lib/fecha-hora";
 
 type NuevaReservaPageProps = {
@@ -20,16 +19,12 @@ function textoDe(valor: string | string[] | undefined): string | undefined {
  */
 export default async function NuevaReservaPage({ searchParams }: NuevaReservaPageProps) {
   const params = await searchParams;
-  const [zonas, turnos] = await Promise.all([
-    toApiResult(apiClient.GET("/zonas")),
-    toApiResult(apiClient.GET("/turnos")),
-  ]);
+  const catalogo = await cargarCatalogo();
 
-  if (zonas.error || turnos.error) {
-    // Nunca se muestra el texto que haya podido mandar el servidor: solo el genérico.
+  if (catalogo.error) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10">
-        <ErrorConReintento mensaje={MENSAJE_SERVICIO_NO_DISPONIBLE} />
+        <ErrorDeCarga error={catalogo.error} />
       </div>
     );
   }
@@ -46,8 +41,8 @@ export default async function NuevaReservaPage({ searchParams }: NuevaReservaPag
       {/* `key`: al volver a esta ruta con otra selección en la URL, el formulario se reinicia. */}
       <FormularioSeleccion
         key={JSON.stringify(seleccionInicial)}
-        zonas={zonas.data}
-        turnos={turnos.data}
+        zonas={catalogo.zonas}
+        turnos={catalogo.turnos}
         hoy={fechaLocalDeHoy(new Date())}
         seleccionInicial={seleccionInicial}
       />
