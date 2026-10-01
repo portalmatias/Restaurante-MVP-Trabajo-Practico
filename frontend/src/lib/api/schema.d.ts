@@ -44,6 +44,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/zonas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catálogo público de Zonas
+         * @description Lista todas las Zonas con los campos no sensibles que necesita el formulario de reserva del cliente, ordenadas por nombre (`STANDARD` antes que `VIP`). No incluye `aforoMaximo` ni las Mesas de la zona. Es una ruta pública, sin autenticación.
+         */
+        get: operations["ZonasPublicasController_listar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/turnos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catálogo público de Turnos activos
+         * @description Lista los Turnos con `activo: true`, ordenados por día de la semana (lunes a domingo) y, dentro del mismo día, por hora de inicio. Es una ruta pública, sin autenticación.
+         */
+        get: operations["TurnosPublicosController_listar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reservas": {
         parameters: {
             query?: never;
@@ -294,6 +334,46 @@ export interface paths {
          * @description Transiciona una reserva CONFIRMADA a NO_SHOW. Rechaza con 409 si la reserva no está CONFIRMADA o si su turno todavía no terminó (el instante exacto de fin también se rechaza). Requiere un JWT de rol ADMIN.
          */
         patch: operations["ReservasController_marcarNoShow"];
+        trace?: never;
+    };
+    "/admin/reservas/{id}/confirmar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Confirmar una reserva pendiente
+         * @description Transiciona una reserva PENDIENTE a CONFIRMADA. Rechaza con 409 si la reserva no está PENDIENTE. No revalida aforo ni disponibilidad de mesa. Requiere un JWT de rol ADMIN.
+         */
+        patch: operations["ReservasController_confirmar"];
+        trace?: never;
+    };
+    "/admin/reservas/{id}/rechazar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rechazar una reserva pendiente
+         * @description Transiciona una reserva PENDIENTE a CANCELADA. Rechaza con 409 si la reserva no está PENDIENTE (a diferencia de la cancelación del cliente, no acepta reservas CONFIRMADA). Requiere un JWT de rol ADMIN.
+         */
+        patch: operations["ReservasController_rechazar"];
         trace?: never;
     };
 }
@@ -795,6 +875,42 @@ export interface components {
              */
             offset: number;
         };
+        /** @description Forma pública de una Zona: sin `aforoMaximo` ni Mesas, datos operativos del salón sin uso para quien todavía no reservó. */
+        ZonaPublicaRespuestaDto: {
+            /** @example 3fa85f64-5717-4562-b3fc-2c963f66afa6 */
+            id: string;
+            /**
+             * @example VIP
+             * @enum {string}
+             */
+            nombre: "STANDARD" | "VIP";
+            /** @example 2 */
+            minComensales: number;
+            /** @example 12 */
+            maxComensales: number;
+            /** @example 24 */
+            anticipacionMinHoras: number;
+            /** @example 60 */
+            anticipacionMaxDias: number;
+            /** @example 24 */
+            ventanaCancelacionHoras: number;
+            /** @example true */
+            requiereConfirmacionAdmin: boolean;
+        };
+        /** @description Forma pública de un Turno activo: sin el campo `activo` (todos los devueltos ya lo son). `horaInicio`/`horaFin` viajan en el mismo formato que ya usa `TurnoRespuestaDto` de `GET /admin/turnos`. */
+        TurnoPublicoRespuestaDto: {
+            /** @example 3fa85f64-5717-4562-b3fc-2c963f66afa6 */
+            id: string;
+            /**
+             * @example SABADO
+             * @enum {string}
+             */
+            diaSemana: "LUNES" | "MARTES" | "MIERCOLES" | "JUEVES" | "VIERNES" | "SABADO" | "DOMINGO";
+            /** @example 1970-01-01T20:00:00.000Z */
+            horaInicio: string;
+            /** @example 1970-01-01T23:30:00.000Z */
+            horaFin: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -862,6 +978,58 @@ export interface operations {
             };
             /** @description El turno o la zona indicados no existen. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ZonasPublicasController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Listado de Zonas. Una lista vacía responde `200`, no `404`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZonaPublicaRespuestaDto"][];
+                };
+            };
+        };
+    };
+    TurnosPublicosController_listar: {
+        parameters: {
+            query?: {
+                /** @description Filtra los Turnos activos devueltos por día de la semana. */
+                diaSemana?: "LUNES" | "MARTES" | "MIERCOLES" | "JUEVES" | "VIERNES" | "SABADO" | "DOMINGO";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Listado de Turnos activos, opcionalmente filtrado por día de la semana. Una lista vacía responde `200`, no `404`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnoPublicoRespuestaDto"][];
+                };
+            };
+            /** @description `diaSemana` no es uno de los siete días válidos. */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1476,6 +1644,136 @@ export interface operations {
                 };
             };
             /** @description La reserva no está CONFIRMADA, o su turno todavía no terminó. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ReservasController_confirmar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reserva confirmada; respuesta sin cuerpo. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description El identificador de la reserva no es un UUID válido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token ausente, inválido o expirado. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token válido sin rol ADMIN. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description La reserva indicada no existe. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description La reserva no está PENDIENTE. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    ReservasController_rechazar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reserva rechazada; respuesta sin cuerpo. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description El identificador de la reserva no es un UUID válido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token ausente, inválido o expirado. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Token válido sin rol ADMIN. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description La reserva indicada no existe. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description La reserva no está PENDIENTE. */
             409: {
                 headers: {
                     [name: string]: unknown;
