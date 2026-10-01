@@ -22,9 +22,14 @@ import {
   ApiQuery,
   ApiConflictResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 
+import {
+  DESCRIPCION_429_ADMIN,
+  LimiteAdmin,
+} from '../auth/decorators/limite-admin.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -38,6 +43,7 @@ import { MesasService } from './mesas.service';
 @ApiBearerAuth('bearerAuth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RolUsuario.ADMIN)
+@LimiteAdmin()
 @Controller('admin/mesas')
 export class MesasController {
   constructor(private readonly mesasService: MesasService) {}
@@ -54,6 +60,7 @@ export class MesasController {
   })
   @ApiNotFoundResponse({ description: 'La zona indicada no existe.' })
   @ApiConflictResponse({ description: 'Ya existe una mesa con esa etiqueta.' })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Post()
   crear(@Body() dto: CrearMesaDto) {
     return this.mesasService.crear(dto);
@@ -78,6 +85,7 @@ export class MesasController {
     type: [MesaRespuestaDto],
     description: 'Listado de Mesas, opcionalmente filtrado por Zona.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Get()
   listar(@Query() query: ListarMesasQueryDto) {
     return this.mesasService.listar(query.zonaId);
@@ -102,6 +110,7 @@ export class MesasController {
       'etiqueta indicada, o no se pudo actualizar por una edición concurrente ' +
       '(conflicto de serialización agotando los reintentos).',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Patch(':id')
   actualizar(
     @Param('id', ParseUUIDPipe) id: string,
@@ -127,6 +136,7 @@ export class MesasController {
       'La mesa tiene reservas asociadas de cualquier estado (PENDIENTE, CONFIRMADA, ' +
       'CANCELADA o NO_SHOW): no se puede eliminar.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminar(@Param('id', ParseUUIDPipe) id: string): Promise<void> {

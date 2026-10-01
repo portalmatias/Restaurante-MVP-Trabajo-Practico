@@ -14,9 +14,14 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 
+import {
+  DESCRIPCION_429_ADMIN,
+  LimiteAdmin,
+} from '../auth/decorators/limite-admin.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -32,6 +37,7 @@ import { ZonasService } from './zonas.service';
 @ApiBearerAuth('bearerAuth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RolUsuario.ADMIN)
+@LimiteAdmin()
 @Controller('admin/zonas')
 export class ZonasController {
   constructor(private readonly zonasService: ZonasService) {}
@@ -43,6 +49,7 @@ export class ZonasController {
       'hay lectura y actualización de configuración.',
   })
   @ApiOkResponse({ type: [ZonaRespuestaDto], description: 'Listado de Zonas.' })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Get()
   listar() {
     return this.zonasService.listar();
@@ -64,6 +71,7 @@ export class ZonasController {
       'No se pudo actualizar la zona por una edición concurrente (conflicto de ' +
       'serialización agotando los reintentos).',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Patch(':id')
   actualizar(
     @Param('id', ParseUUIDPipe) id: string,

@@ -1254,6 +1254,13 @@ export interface operations {
                     "application/json": components["schemas"]["ZonaRespuestaDto"][];
                 };
             };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ZonasController_actualizar: {
@@ -1294,6 +1301,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     MesasController_listar: {
@@ -1316,6 +1330,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MesaRespuestaDto"][];
                 };
+            };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1355,6 +1376,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     MesasController_eliminar: {
@@ -1384,6 +1412,13 @@ export interface operations {
             };
             /** @description La mesa tiene reservas asociadas de cualquier estado (PENDIENTE, CONFIRMADA, CANCELADA o NO_SHOW): no se puede eliminar. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1429,6 +1464,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     HorariosController_listar: {
@@ -1448,6 +1490,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TurnoRespuestaDto"][];
                 };
+            };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1475,6 +1524,13 @@ export interface operations {
             };
             /** @description Ya existe un turno para ese día y esa hora de inicio. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1515,6 +1571,13 @@ export interface operations {
             };
             /** @description Ya existe un turno para ese día y esa hora de inicio. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1652,6 +1715,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorRespuesta"];
                 };
             };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ReservasController_confirmar: {
@@ -1717,6 +1787,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorRespuesta"];
                 };
             };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ReservasController_rechazar: {
@@ -1781,6 +1858,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorRespuesta"];
                 };
+            };
+            /** @description Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se rechaza antes de validar el token y el body. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -9,7 +9,6 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -26,6 +25,10 @@ import {
 } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 
+import {
+  DESCRIPCION_429_ADMIN,
+  LimiteAdmin,
+} from '../auth/decorators/limite-admin.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -60,20 +63,18 @@ import { ReservasService } from './reservas.service';
 @ApiBearerAuth('bearerAuth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RolUsuario.ADMIN)
+@LimiteAdmin()
 @Controller('admin/reservas')
 export class ReservasAdminController {
   constructor(private readonly reservasService: ReservasService) {}
 
   /**
-   * `@SkipThrottle({ default: false })` + `@Throttle(...)`: un límite propio de 60
-   * solicitudes por minuto (D7) — el default global (10) es demasiado bajo para un panel
-   * que pagina y cambia filtros. Esta clase no hereda el `@SkipThrottle()` sin argumentos de
-   * `ReservasController` (son clases distintas), así que en principio ya estaría sujeta al
-   * límite global; el `@SkipThrottle({ default: false })` queda de todos modos, explícito,
-   * para que la intención no dependa de ese detalle.
+   * Límite de 60 solicitudes por minuto (D7 de `reserva-consultar`): el default global (10)
+   * es demasiado bajo para un panel que pagina y cambia filtros. Desde `throttle-rutas-admin`
+   * (D1) el valor ya no se declara en este método sino en `@LimiteAdmin()` de la clase, que
+   * lo extiende a todas las rutas de admin con el mismo número. Su `429` conserva la
+   * descripción que ya estaba publicada en el contrato.
    */
-  @SkipThrottle({ default: false })
-  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @ApiOperation({
     operationId: 'ReservasController_listar',
     summary: 'Listar reservas',
@@ -155,8 +156,8 @@ export class ReservasAdminController {
    * `PATCH /admin/reservas/:id/no-show` (capability `cancelacion-turnos`, design.md
    * "Rutas"). Marca `NO_SHOW` solo si la Reserva está `CONFIRMADA` y su Turno ya terminó
    * (`ReservasService.marcarNoShow`); `204` sin cuerpo al completarse, igual que las bajas
-   * de `gestion-salon`. Sin throttling propio: usa el límite global de la app, a diferencia
-   * de `listar` (que sí necesita uno más alto por ser un panel que pagina y filtra).
+   * de `gestion-salon`. Comparte el límite de `@LimiteAdmin()` de la clase (60 por minuto,
+   * D1/D2 de `throttle-rutas-admin`), igual que `listar`, `confirmar` y `rechazar`.
    *
    * `operationId` fijado explícito como `ReservasController_marcarNoShow` (en vez del
    * `ReservasAdminController_marcarNoShow` que generaría Swagger por default): mismo
@@ -193,6 +194,7 @@ export class ReservasAdminController {
     description:
       'La reserva no está CONFIRMADA, o su turno todavía no terminó.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Patch(':id/no-show')
   @HttpCode(HttpStatus.NO_CONTENT)
   async marcarNoShow(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
@@ -234,6 +236,7 @@ export class ReservasAdminController {
     type: ErrorRespuesta,
     description: 'La reserva no está PENDIENTE.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Patch(':id/confirmar')
   @HttpCode(HttpStatus.NO_CONTENT)
   async confirmar(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
@@ -276,6 +279,7 @@ export class ReservasAdminController {
     type: ErrorRespuesta,
     description: 'La reserva no está PENDIENTE.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Patch(':id/rechazar')
   @HttpCode(HttpStatus.NO_CONTENT)
   async rechazar(@Param('id', ParseUUIDPipe) id: string): Promise<void> {

@@ -16,9 +16,14 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 
+import {
+  DESCRIPCION_429_ADMIN,
+  LimiteAdmin,
+} from '../auth/decorators/limite-admin.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -36,6 +41,7 @@ import { HorariosService } from './horarios.service';
 @ApiBearerAuth('bearerAuth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RolUsuario.ADMIN)
+@LimiteAdmin()
 @Controller('admin/turnos')
 export class HorariosController {
   constructor(private readonly horariosService: HorariosService) {}
@@ -52,6 +58,7 @@ export class HorariosController {
   @ApiConflictResponse({
     description: 'Ya existe un turno para ese día y esa hora de inicio.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Post()
   crear(@Body() dto: CrearTurnoDto) {
     return this.horariosService.crear(dto);
@@ -65,6 +72,7 @@ export class HorariosController {
     type: [TurnoRespuestaDto],
     description: 'Listado de Turnos, incluidos los inactivos.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Get()
   listar() {
     return this.horariosService.listar();
@@ -84,6 +92,7 @@ export class HorariosController {
   @ApiConflictResponse({
     description: 'Ya existe un turno para ese día y esa hora de inicio.',
   })
+  @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Patch(':id')
   actualizar(
     @Param('id', ParseUUIDPipe) id: string,
