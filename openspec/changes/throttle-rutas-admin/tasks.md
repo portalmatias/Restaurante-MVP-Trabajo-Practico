@@ -1,6 +1,6 @@
 ## 1. Prerrequisitos
 
-- [ ] 1.1 Confirmar sobre `main` actualizado que la clave del throttler sigue siendo por
+- [x] 1.1 Confirmar sobre `main` actualizado que la clave del throttler sigue siendo por
       controller + método + IP (`generateKey` y `getTracker` en
       `node_modules/@nestjs/throttler/dist/throttler.guard.js`, versión de `package-lock.json`)
       y que los cuatro controllers de admin siguen siendo `ZonasController`, `MesasController`,
@@ -10,7 +10,7 @@
 
 ## 2. Límite común de admin
 
-- [ ] 2.1 Crear `backend/src/auth/decorators/limite-admin.decorator.ts` con `LimiteAdmin()`
+- [x] 2.1 Crear `backend/src/auth/decorators/limite-admin.decorator.ts` con `LimiteAdmin()`
       (`applyDecorators(SkipThrottle({ default: false }), Throttle({ default: { limit: 60,
       ttl: 60_000 } }))`) y un comentario que explique el valor y remita a D1/D2 de este
       change. Verificación: `npm run lint` y `npm run typecheck -w backend` pasan.
@@ -67,7 +67,7 @@
       a los 12 métodos de la tabla, y la respuesta `'429'` correspondiente en
       `openapi/openapi.yaml` (escenario "Toda operación de admin declara la respuesta 429").
       Verificación: `npm run openapi:check` y `npm run openapi:lint` en verde.
-- [ ] 4.2 Regenerar `frontend/src/lib/api/schema.d.ts` con `npm run api:types -w frontend`.
+- [x] 4.2 Regenerar `frontend/src/lib/api/schema.d.ts` con `npm run api:types -w frontend`.
       Verificación: `npm run api:types:check -w frontend` en verde y `npm run typecheck -w
       frontend` sin errores nuevos.
 
@@ -78,6 +78,6 @@
       veces una Mesa en `/admin/salon` sin ver el aviso de límite; y comprobar que
       `/admin/login` sigue mostrando el `429` al sexto intento fallido en un minuto.
       Verificación: capturas o nota en el PR.
-- [ ] 5.2 Correr `openspec validate throttle-rutas-admin --strict`, `npm run lint` y
+- [x] 5.2 Correr `openspec validate throttle-rutas-admin --strict`, `npm run lint` y
       `npm run typecheck` en limpio, y confirmar que no hicieron falta variables de entorno nuevas
       ni migraciones de Prisma.
