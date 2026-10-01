@@ -387,10 +387,11 @@ describe("ConsultaReserva - detalle", () => {
   });
 });
 
-// La fecha de `RESERVA` ya pasó: "muy por delante" y "dentro de la ventana" se arman con fechas
-// lejanas para que el resultado no dependa del día en que corre la suite.
+// La fecha de `RESERVA` ya pasó: "muy por delante" y "turno ya pasado" se arman con fechas
+// lejanas para que el resultado no dependa del día en que corre la suite. El caso intermedio
+// (turno futuro pero más cerca que la ventana) fija el reloj en su propio test.
 const RESERVA_FUTURA = { ...RESERVA, fecha: "2099-01-01" };
-const RESERVA_DENTRO_DE_VENTANA = { ...RESERVA, fecha: "2000-01-01" };
+const RESERVA_CON_TURNO_PASADO = { ...RESERVA, fecha: "2000-01-01" };
 
 async function verDetalleDe(reserva: Record<string, unknown>) {
   POST.mockResolvedValue(respuestaOk(reserva));
@@ -423,12 +424,53 @@ describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
     },
   );
 
-  it("con una reserva CONFIRMADA dentro de la ventana de su zona no se ofrece ni avisa", async () => {
-    await verDetalleDe(RESERVA_DENTRO_DE_VENTANA);
+  it("con una reserva CONFIRMADA cuyo turno ya pasó no se ofrece ni avisa", async () => {
+    await verDetalleDe(RESERVA_CON_TURNO_PASADO);
 
     await waitFor(() => expect(GET).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
     expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
+  });
+
+  describe("con el reloj fijado", () => {
+    // Solo se fija `Date`: los timers reales siguen para que `findBy*` y `waitFor` funcionen.
+    beforeEach(() => {
+      jest.useFakeTimers({
+        now: new Date("2026-09-18T12:00:00.000Z"),
+        doNotFake: [
+          "setTimeout",
+          "clearTimeout",
+          "setInterval",
+          "clearInterval",
+          "setImmediate",
+          "clearImmediate",
+          "nextTick",
+          "queueMicrotask",
+          "performance",
+        ],
+      });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("con el turno futuro pero más cerca que la ventana de su zona no se ofrece ni avisa", async () => {
+      // Ahora: 2026-09-18 09:00 en Argentina. El turno es el 19 a las 20:00: faltan 35 h, pero la
+      // ventana de la zona es de 48 h. Todavía no pasó, así que solo la ventana lo excluye.
+      GET.mockResolvedValue(respuestaOk([{ ...ZONA, ventanaCancelacionHoras: 48 }]));
+      await verDetalleDe(RESERVA);
+
+      await waitFor(() => expect(GET).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+      expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
+    });
+
+    it("con el mismo turno y una ventana menor a lo que falta sí se ofrece", async () => {
+      await verDetalleDe(RESERVA);
+
+      expect(await screen.findByRole("button", { name: "Cancelar mi reserva" })).toBeInTheDocument();
+    });
   });
 
   it("usa la ventana de la zona de la reserva y no la de otra zona", async () => {
@@ -512,9 +554,9 @@ describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
       expect(POST).toHaveBeenCalledTimes(1);
     });
 
-    it("'Reintentar' con la reserva dentro de la ventana quita el aviso sin ofrecer cancelar", async () => {
+    it("'Reintentar' con el turno ya pasado quita el aviso sin ofrecer cancelar", async () => {
       GET.mockResolvedValueOnce(respuestaError(500));
-      await verDetalleDe(RESERVA_DENTRO_DE_VENTANA);
+      await verDetalleDe(RESERVA_CON_TURNO_PASADO);
       await esperarAviso();
 
       fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
