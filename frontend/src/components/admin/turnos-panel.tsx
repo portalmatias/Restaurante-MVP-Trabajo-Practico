@@ -79,7 +79,11 @@ export function TurnosPanel() {
       <div className="flex flex-col gap-4">
         <div>
           {/* Sin listado cargado no se ofrecen altas: el GET inicial pisaría el turno nuevo. */}
-          <Button variant="secondary" disabled={turnos === undefined} onClick={() => setEditando("nuevo")}>
+          <Button
+            variant="secondary"
+            disabled={turnos === undefined || editando !== undefined}
+            onClick={() => setEditando("nuevo")}
+          >
             Agregar turno
           </Button>
         </div>
@@ -91,7 +95,10 @@ export function TurnosPanel() {
             onCancelar={() => setEditando(undefined)}
             onGuardado={(turno) => {
               reemplazar(turno);
-              setEditando(undefined);
+              // Solo se cierra el formulario que originó el guardado: una respuesta atrasada no
+              // cierra otro que se haya abierto mientras tanto.
+              const origen = editando;
+              setEditando((actual) => (actual === origen ? undefined : actual));
             }}
           />
         ) : null}
@@ -125,6 +132,9 @@ export function TurnosPanel() {
                           <BotonCompacto
                             variant="ghost"
                             aria-label={`Editar turno ${descripcion}`}
+                            // Con un formulario abierto no se reemplaza por otro: se perderían
+                            // sus cambios sin guardar. Hay que guardar o cancelar primero.
+                            disabled={editando !== undefined}
                             onClick={() => setEditando(turno)}
                           >
                             Editar
@@ -215,7 +225,10 @@ function FormularioTurno({
     <form onSubmit={guardar} noValidate aria-label={titulo} className="flex flex-col gap-4 rounded-md border border-border p-4">
       <h3 className="font-semibold">{titulo}</h3>
       <div className="grid gap-4 sm:grid-cols-3">
+        {/* El botón que abrió el formulario queda deshabilitado y suelta el foco: se lleva al
+            primer campo para que quien usa teclado no pierda la posición. */}
         <Select
+          autoFocus
           label="Día"
           value={diaSemana}
           disabled={guardando}

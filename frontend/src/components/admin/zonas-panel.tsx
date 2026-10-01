@@ -85,6 +85,9 @@ export function ZonasPanel({ zonas, onZonaActualizada }: ZonasPanelProps) {
                   <BotonCompacto
                     variant="ghost"
                     aria-label={`Editar zona ${zona.nombre}`}
+                    // Con un formulario abierto no se reemplaza por otro: se perderían sus
+                    // cambios sin guardar. Hay que guardar o cancelar primero.
+                    disabled={editando !== undefined}
                     onClick={() => setEditando(zona)}
                   >
                     Editar
@@ -186,6 +189,8 @@ function FormularioZona({
         {CAMPOS.map(({ campo, etiqueta, minimo }) => (
           <Field
             key={campo}
+            // El botón "Editar" queda deshabilitado y suelta el foco: va al primer campo.
+            autoFocus={campo === CAMPOS[0].campo}
             label={etiqueta}
             type="number"
             inputMode="numeric"

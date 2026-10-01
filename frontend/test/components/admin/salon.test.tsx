@@ -52,6 +52,13 @@ describe("ZonasPanel", () => {
     return onZonaActualizada;
   }
 
+  it("con un formulario abierto no se puede abrir el de otra Zona, y el foco va al primer campo", () => {
+    editarStandard();
+
+    expect(screen.getByRole("button", { name: "Editar zona VIP" })).toBeDisabled();
+    expect(screen.getByLabelText("Mínimo de comensales")).toHaveFocus();
+  });
+
   it("no ofrece alta ni baja de Zona", () => {
     render(<ZonasPanel zonas={[ZONA_STD]} onZonaActualizada={jest.fn()} />);
 
@@ -273,6 +280,31 @@ describe("TurnosPanel", () => {
       expect(within(formulario).getByLabelText("Día")).toHaveAttribute("aria-invalid", "true"),
     );
     expect(within(formulario).getByLabelText("Hora de inicio")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("con un formulario abierto no se puede abrir otro, y el foco va al primer campo", async () => {
+    await renderizar();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Editar turno Viernes/ }));
+
+    expect(screen.getByRole("button", { name: /^Editar turno Viernes/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Agregar turno" })).toBeDisabled();
+    const formulario = screen.getByRole("form", { name: /^Editar turno Viernes/ });
+    expect(within(formulario).getByLabelText("Día")).toHaveFocus();
+  });
+
+  it("guardar cierra el formulario y deja habilitado abrir otro", async () => {
+    await renderizar();
+    PATCH.mockReturnValue(ok({ ...VIERNES, horaFin: "1970-01-01T23:45:00.000Z" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /^Editar turno Viernes/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("form", { name: /^Editar turno/ })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("20:00 a 23:45")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agregar turno" })).toBeEnabled();
   });
 
   it("desactivar un Turno lo deja en el listado marcado como inactivo", async () => {
