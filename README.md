@@ -61,11 +61,25 @@ red (por ejemplo, el Wi-Fi de la facultad) puede conectarse a ellos:
 `http://localhost:3000` y `http://localhost:3001` siguen funcionando desde la propia máquina.
 
 **Si tu contenedor de PostgreSQL es anterior a este cambio**, sigue publicado en todas las
-interfaces hasta que lo recrees. Los datos viven en el volumen y se conservan:
+interfaces hasta que lo recrees. Los datos viven en un volumen con el nombre del *proyecto*
+de Docker Compose, que por defecto es el nombre de la carpeta desde la que se creó el
+contenedor. Si lo recreás desde otra carpeta (otro clon, otro worktree), Compose usa **otro**
+volumen y vas a ver una base vacía: los datos no se pierden, quedan en el volumen anterior,
+pero la app deja de verlos. Para recrearlo conservando el mismo volumen, usá el proyecto con
+el que fue creado:
 
 ```bash
-docker compose up -d --force-recreate
+# bash
+docker compose -p "$(docker inspect reservas-postgres -f '{{index .Config.Labels "com.docker.compose.project"}}')" up -d --force-recreate
 ```
+
+```powershell
+# PowerShell
+docker compose -p (docker inspect reservas-postgres -f '{{index .Config.Labels \"com.docker.compose.project\"}}') up -d --force-recreate
+```
+
+Para comprobarlo: `docker ps` tiene que mostrar `127.0.0.1:5432->5432/tcp`, y tus datos
+tienen que seguir ahí (por ejemplo, las reservas del seed en el listado de admin).
 
 ### Probar desde otro dispositivo (`dev:lan`)
 

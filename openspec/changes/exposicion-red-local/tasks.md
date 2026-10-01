@@ -3,7 +3,7 @@
 - [x] 1.1 Crear `feature/exposicion-red-local` desde `main` y confirmar que `backend/src/main.ts`,
       `frontend/package.json` y `docker-compose.yml` siguen como los describe `design.md`
       (Context). Si algo cambió, anotarlo en la descripción del PR.
-- [ ] 1.2 Reproducir el síntoma antes de tocar nada: con backend y frontend levantados, 5
+- [x] 1.2 Reproducir el síntoma antes de tocar nada: con backend y frontend levantados, 5
       intentos fallidos de login por `http://localhost:3000/api` y 1 por
       `http://<IP-de-red>:3000/api` → el último responde `429`. Guardar la salida para el PR.
 
@@ -24,7 +24,7 @@
       solo (`true`, `*`, `1`, `0.0.0.0/0`, `10.0.0.0/7`, `::/0`, `::/1`,
       `::ffff:10.0.0.0/8`, `::ffff:10.0.0.0/104`, `::1`); y listas mixtas que esconden un
       rechazo (`10.0.0.5,0.0.0.0/0`, `loopback, ::/1`, `10.0.0.5, 1`).
-- [ ] 2.2 Usar `configurarRed` en `main.ts` y cambiar `app.listen(PORT)` por
+- [x] 2.2 Usar `configurarRed` en `main.ts` y cambiar `app.listen(PORT)` por
       `app.listen(PORT, HOST || '127.0.0.1')` (con `||`, no `??`: un `HOST=` vacío llega como
       `''` y Node lo toma como todas las interfaces). Verificar levantando el backend, sin
       `HOST` y con `HOST=` vacío: en los dos casos responde en `http://127.0.0.1:3001/zonas` y
@@ -54,11 +54,11 @@
       IPv4: si `localhost` resuelve a `::1` y no responde, anotarlo y aplicar el mismo criterio
       que 4.2 (documentar y usar `http://127.0.0.1:3000` como URL de referencia en el README y
       en `.env.example`).
-- [ ] 4.2 Verificar el flujo completo con los nuevos defaults: login de admin, dashboard y una
+- [x] 4.2 Verificar el flujo completo con los nuevos defaults: login de admin, dashboard y una
       consulta pública desde el navegador, y una página con Server Component que llama al
       backend. Si `localhost` resuelve a `::1` y falla contra el backend en `127.0.0.1`,
       cambiar `NEXT_PUBLIC_API_URL` de `.env.example` a `http://127.0.0.1:3001` y repetir.
-- [ ] 4.3 `docker-compose.yml`: publicar Postgres en `'127.0.0.1:5432:5432'`. Verificar con
+- [x] 4.3 `docker-compose.yml`: publicar Postgres en `'127.0.0.1:5432:5432'`. Verificar con
       `docker compose up -d --force-recreate` que el puerto 5432 escucha en `127.0.0.1` y no en
       `0.0.0.0`/`::` (en Windows con `Get-NetTCPConnection -LocalPort 5432 -State Listen`; en
       Linux/macOS con `ss -ltn 'sport = :5432'` o `lsof -iTCP:5432 -sTCP:LISTEN`), y que
@@ -77,9 +77,9 @@
 
 ## 6. Cierre (Definition of Done, `config.yaml` §13)
 
-- [ ] 6.1 Repetir la reproducción de 1.2: desde la IP de red, la conexión se rechaza (ya no
+- [x] 6.1 Repetir la reproducción de 1.2: desde la IP de red, la conexión se rechaza (ya no
       hay un tercero que pueda agotar el cupo). Adjuntar antes/después al PR.
-- [ ] 6.2 `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e -w backend`
+- [x] 6.2 `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e -w backend`
       y `openspec validate exposicion-red-local --strict` en verde.
 - [x] 6.3 `git diff main --stat -- openapi backend/prisma` vacío (sin cambios de contrato ni de
       schema ni de migraciones, que viven en `backend/prisma`).
