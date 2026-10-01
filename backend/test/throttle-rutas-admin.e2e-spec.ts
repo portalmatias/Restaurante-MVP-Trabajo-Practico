@@ -82,6 +82,9 @@ const OPERACIONES_ADMIN: OperacionAdmin[] = [
   },
 ];
 
+// Banda propia de esta suite (ver el setup): la limpieza la usa para reconocer su Turno.
+const HORA_INICIO_TURNO = new Date(Date.UTC(1970, 0, 1, 16, 15, 0));
+
 describe('throttle-rutas-admin (e2e)', () => {
   let prisma: PrismaService;
   let adminToken: string;
@@ -111,12 +114,15 @@ describe('throttle-rutas-admin (e2e)', () => {
     );
 
     await configurarZonasYConfiguracionDeSeed(prisma);
+    // Si una corrida anterior se cortó antes del `afterAll`, sus filas siguen en la base y el
+    // `create` de abajo chocaría con los índices únicos (P2002): se limpian antes de crear.
+    await limpiarRestos();
 
     // Banda horaria 16:15-17:30: no la usa ninguna otra suite e2e ni de integración.
     const turno = await prisma.turno.create({
       data: {
         diaSemana: diaDe(FECHA),
-        horaInicio: new Date(Date.UTC(1970, 0, 1, 16, 15, 0)),
+        horaInicio: HORA_INICIO_TURNO,
         horaFin: new Date(Date.UTC(1970, 0, 1, 17, 30, 0)),
         activo: true,
       },
@@ -127,11 +133,35 @@ describe('throttle-rutas-admin (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.reserva.deleteMany({ where: { mesaId: { in: mesaIds } } });
-    await prisma.mesa.deleteMany({ where: { id: { in: mesaIds } } });
-    await prisma.turno.deleteMany({ where: { id: { in: [turnoId] } } });
+    // Por los mismos campos que el setup, no por ids: así limpia aunque el setup haya fallado
+    // a la mitad.
+    await limpiarRestos();
     await prisma.$disconnect();
   });
+
+  /**
+   * Borra lo que crea esta suite, identificado por campos propios (etiqueta `THR-` de las
+   * Mesas y la banda horaria del Turno), no por los ids de la corrida actual.
+   */
+  async function limpiarRestos() {
+    const turnosPropios = await prisma.turno.findMany({
+      where: { diaSemana: diaDe(FECHA), horaInicio: HORA_INICIO_TURNO },
+      select: { id: true },
+    });
+    const idsTurnos = turnosPropios.map((t) => t.id);
+    await prisma.reserva.deleteMany({
+      where: {
+        OR: [
+          { mesa: { etiqueta: { startsWith: 'THR-' } } },
+          { turnoId: { in: idsTurnos } },
+        ],
+      },
+    });
+    await prisma.mesa.deleteMany({
+      where: { etiqueta: { startsWith: 'THR-' } },
+    });
+    await prisma.turno.deleteMany({ where: { id: { in: idsTurnos } } });
+  }
 
   /** Una Reserva `PENDIENTE` en una Mesa propia, para no chocar con el índice único parcial. */
   async function crearReservaPendiente(codigoReserva: string) {
