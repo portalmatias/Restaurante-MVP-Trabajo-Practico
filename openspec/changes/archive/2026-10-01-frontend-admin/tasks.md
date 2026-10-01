@@ -190,11 +190,11 @@
       `frontend-base`): contraste, sin scroll horizontal en 375/768/1024/1440px, foco visible
       navegando con teclado en `/admin/login`, el dashboard, `/admin/salon` y
       `/admin/reservas`, documentado en la descripción del PR.
-- [ ] 10.6 CI en verde en el PR `feature/frontend-admin`.
-- [ ] 10.7 PR con descripción en español, enlazado a `openspec/changes/frontend-admin/`, con
+- [x] 10.6 CI en verde en el PR `feature/frontend-admin`.
+- [x] 10.7 PR con descripción en español, enlazado a `openspec/changes/frontend-admin/`, con
       la nota de 10.1 sobre los grupos bloqueados si corresponde, y aprobado por un
       compañero distinto del autor.
-- [ ] 10.8 Después del merge, archivar el change con `openspec archive frontend-admin` en su
+- [x] 10.8 Después del merge, archivar el change con `openspec archive frontend-admin` en su
       propio PR **solo si los grupos 8 y 9 quedaron completos**; si quedaron bloqueados,
       dejar el change activo con sus tareas pendientes hasta que `reserva-vip` y
       `cancelacion-turnos` mergeen y se pueda completarlas en un PR de seguimiento.
