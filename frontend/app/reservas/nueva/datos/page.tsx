@@ -3,7 +3,7 @@ import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga
 import { FormularioDatosContacto } from "../../../../src/components/reservas/formulario-datos-contacto";
 import { PasosReserva } from "../../../../src/components/reservas/pasos-reserva";
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
-import { apiClient, toApiResult } from "../../../../src/lib/api/client";
+import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
 import { diaSemanaDeFechaLocal } from "../../../../src/lib/fecha-hora";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
 
@@ -24,23 +24,17 @@ export default async function DatosPage({ searchParams }: DatosPageProps) {
     redirect("/reservas/nueva");
   }
 
-  // Sin caché: `router.refresh()` de "Reintentar" tiene que volver a llegar al backend.
-  const [zonas, turnos] = await Promise.all([
-    toApiResult(apiClient.GET("/zonas", { cache: "no-store" })),
-    toApiResult(apiClient.GET("/turnos", { cache: "no-store" })),
-  ]);
-
-  if (zonas.error || turnos.error) {
-    const error = zonas.error ?? turnos.error;
+  const catalogo = await cargarCatalogo();
+  if (catalogo.error) {
     return (
       <div className={contenedor}>
-        <ErrorDeCarga error={error} />
+        <ErrorDeCarga error={catalogo.error} />
       </div>
     );
   }
 
-  const zona = zonas.data.find((candidata) => candidata.id === seleccion.zonaId);
-  const turno = turnos.data.find((candidato) => candidato.id === seleccion.turnoId);
+  const zona = catalogo.zonas.find((candidata) => candidata.id === seleccion.zonaId);
+  const turno = catalogo.turnos.find((candidato) => candidato.id === seleccion.turnoId);
   // `leerSeleccionDeQuery` ya garantizó una fecha de calendario: el día de la semana no falla.
   if (!zona || !turno || turno.diaSemana !== diaSemanaDeFechaLocal(seleccion.fecha)) {
     redirect(urlConSeleccion("/reservas/nueva", seleccion));
