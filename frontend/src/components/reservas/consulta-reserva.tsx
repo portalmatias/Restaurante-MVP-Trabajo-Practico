@@ -91,14 +91,18 @@ function useVerificacionCancelacion(reserva: ReservaConsultada) {
     }
     const solicitud = ++ultimaSolicitud.current;
     enCurso.current = true;
-    void resolverVerificacion(fecha, turno.horaInicio, zona.id).then((resultado) => {
-      if (solicitud !== ultimaSolicitud.current) {
-        return;
-      }
-      enCurso.current = false;
-      setVerificando(false);
-      setVerificacion(resultado);
-    });
+    // Si la verificación rechazara, `enCurso` quedaría en `true` y "Reintentar" sería un no-op:
+    // el rechazo equivale a no poder verificar y deja la misma pantalla para reintentar.
+    void resolverVerificacion(fecha, turno.horaInicio, zona.id)
+      .catch((): VerificacionCancelacion => "no-verificada")
+      .then((resultado) => {
+        if (solicitud !== ultimaSolicitud.current) {
+          return;
+        }
+        enCurso.current = false;
+        setVerificando(false);
+        setVerificacion(resultado);
+      });
   }, [fecha, turno.horaInicio, zona.id]);
 
   useEffect(() => {

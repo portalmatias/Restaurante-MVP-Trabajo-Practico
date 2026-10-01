@@ -524,6 +524,21 @@ describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
       esperarDetalleIntacto();
     });
 
+    it("si la verificación rechaza, avisa igual y 'Reintentar' vuelve a verificar", async () => {
+      // Un lanzamiento síncrono de `GET` no pasa por `toApiResult`: la verificación rechaza.
+      GET.mockImplementationOnce(() => {
+        throw new Error("falla inesperada");
+      });
+      await verDetalleDe(RESERVA_FUTURA);
+      await esperarAviso();
+      esperarDetalleIntacto();
+
+      fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+
+      expect(await screen.findByRole("button", { name: "Cancelar mi reserva" })).toBeInTheDocument();
+      expect(GET).toHaveBeenCalledTimes(2);
+    });
+
     it("un 200 sin la zona de la reserva avisa igual", async () => {
       GET.mockResolvedValue(respuestaOk([{ ...ZONA, id: "otra" }]));
       await verDetalleDe(RESERVA_FUTURA);
