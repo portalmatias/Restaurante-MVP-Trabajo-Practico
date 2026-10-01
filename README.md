@@ -46,6 +46,73 @@ Las dos bases viven en el mismo contenedor de PostgreSQL y se crean solas la pri
 levantás `docker compose up -d`. El usuario y la contraseña de desarrollo local son
 `postgres` / `postgres`: son credenciales de juguete para tu máquina, no secretos.
 
+## Red y límites de solicitudes
+
+El sistema corre **solo en local** para la demo. Por eso, con la configuración por defecto,
+los tres servicios escuchan únicamente en loopback (`127.0.0.1`) y ningún otro equipo de la
+red (por ejemplo, el Wi-Fi de la facultad) puede conectarse a ellos:
+
+| Servicio | Dónde escucha | Cómo se cambia |
+|---|---|---|
+| Frontend | `127.0.0.1:3000` (`npm run dev` y `npm run start -w frontend`) | `npm run dev:lan -w frontend` |
+| Backend | `127.0.0.1:3001` | `HOST=0.0.0.0` en el `.env` |
+| PostgreSQL | `127.0.0.1:5432` (`docker-compose.yml`) | no se expone |
+
+`http://localhost:3000` y `http://localhost:3001` siguen funcionando desde la propia máquina.
+
+**Si tu contenedor de PostgreSQL es anterior a este cambio**, sigue publicado en todas las
+interfaces hasta que lo recrees. Los datos viven en el volumen y se conservan:
+
+```bash
+docker compose up -d --force-recreate
+```
+
+### Probar desde otro dispositivo (`dev:lan`)
+
+Para abrir la app desde un celular de la misma red, levantá el frontend con
+`npm run dev:lan -w frontend` (escucha en `0.0.0.0`) y entrá a `http://<IP-de-tu-máquina>:3000`.
+El backend no hace falta exponerlo: el navegador del celular le habla al frontend, y el
+frontend llega al backend por el proxy `/api` desde tu máquina.
+
+> **Advertencia:** mientras `dev:lan` está levantado, **cualquier equipo de esa red** puede
+> usar la app, incluido el login de admin y la consulta pública de reservas, y agotar sus
+> límites de solicitudes. Usalo solo en una red de confianza y cortalo apenas termines.
+> Lo mismo vale para `HOST=0.0.0.0` en el backend.
+
+### Límites por cliente detrás de `/api`
+
+El navegador nunca llama directo al backend: pasa por el proxy `/api` de Next. Para el
+backend, entonces, **todos los pedidos llegan desde la misma IP, la del servidor de Next**, y
+los límites de solicitudes "por cliente" (5 intentos de login por minuto, `THROTTLE_LIMIT`
+consultas públicas) se cuentan **por máquina**, no por persona. En local es aceptable: con
+los servicios en loopback, esa máquina es el único cliente posible.
+
+El backend **no confía en `X-Forwarded-For`** (ni en `X-Real-IP` ni en `Forwarded`) para
+identificar al cliente: Next reenvía ese encabezado tal cual lo manda el navegador, así que
+confiar en él permitiría inventar una IP en cada pedido y saltear el límite contra la fuerza
+bruta del login. `backend/test/exposicion-red.e2e-spec.ts` lo fija.
+
+### Condición para desplegar
+
+Desplegar el sistema fuera de una máquina local **no está soportado tal como está**. Hace
+falta, como mínimo:
+
+1. Un **proxy de borde** (nginx, Caddy, el balanceador de la plataforma) delante de Next que
+   **sobrescriba** `X-Forwarded-For` con la IP real del cliente (no que la agregue a la que
+   mandó el cliente).
+2. Declarar como confiables en el backend, con `TRUST_PROXY`, los saltos que hay entre ese
+   proxy de borde y el backend (el servidor de Next, que es quien se conecta al backend; por
+   ejemplo `loopback` si corren en la misma máquina). El formato es una lista separada por
+   coma de `loopback`, `linklocal`, `uniquelocal`, direcciones IPv4 (`10.0.0.5`) o subredes
+   IPv4 con prefijo `/8` o mayor (`10.0.0.0/8`). El backend **no arranca** con cualquier otro
+   valor: `true`, `*`, un número de saltos, una subred demasiado amplia o cualquier notación
+   IPv6 (algunas, como `::/1`, coinciden con cualquier IPv4 — ver GHSA-jqcg-44mw-7w3h).
+3. Que nadie pueda llegar a Next ni al backend salteando el proxy de borde: si un cliente
+   habla directo con Next, el `X-Forwarded-For` que manda llega intacto al backend (el proxy
+   `/api` lo reenvía tal cual) y el backend lo tomaría como cierto.
+
+El detalle de las decisiones está en `openspec/changes/exposicion-red-local/design.md`.
+
 ## Comandos
 
 Todo se corre desde la raíz del repo.

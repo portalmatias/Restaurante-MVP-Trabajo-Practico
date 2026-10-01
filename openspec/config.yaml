@@ -333,6 +333,12 @@ context: |
   Variables mínimas: `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PORT`,
   `NEXT_PUBLIC_API_URL`, `THROTTLE_TTL`, `THROTTLE_LIMIT`.
 
+  Variables opcionales de red (change `exposicion-red-local`): `HOST` (interfaz donde escucha
+  el backend; sin definir o vacía, `127.0.0.1`) y `TRUST_PROXY` (saltos confiables para leer
+  `X-Forwarded-For`; vacía, ninguno). Con la configuración por defecto, frontend, backend y
+  PostgreSQL escuchan solo en loopback. `TRUST_PROXY` nunca es `true`, `*` ni un número de
+  saltos: el backend no arranca si no es una lista de formatos admitidos.
+
   ### Base de datos
   - PostgreSQL corre en Docker, nunca instalado directo en la máquina — así los tres tienen
     la misma versión.

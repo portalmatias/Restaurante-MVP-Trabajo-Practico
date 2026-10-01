@@ -1,6 +1,6 @@
 ## 1. Prerrequisitos
 
-- [ ] 1.1 Crear `feature/exposicion-red-local` desde `main` y confirmar que `backend/src/main.ts`,
+- [x] 1.1 Crear `feature/exposicion-red-local` desde `main` y confirmar que `backend/src/main.ts`,
       `frontend/package.json` y `docker-compose.yml` siguen como los describe `design.md`
       (Context). Si algo cambió, anotarlo en la descripción del PR.
 - [ ] 1.2 Reproducir el síntoma antes de tocar nada: con backend y frontend levantados, 5
@@ -9,11 +9,11 @@
 
 ## 2. Backend: configuración de red compartida (D2, D3)
 
-- [ ] 2.0 Actualizar `proxy-addr` a 2.0.8 (corrige GHSA-jqcg-44mw-7w3h, design.md D3) con
+- [x] 2.0 Actualizar `proxy-addr` a 2.0.8 (corrige GHSA-jqcg-44mw-7w3h, design.md D3) con
       `npm update proxy-addr` desde la raíz: `express` pide `^2.0.7`, así que alcanza el
       lockfile. Verificar con `npm ls proxy-addr` que todas las instancias son 2.0.8 o superior
       (no alcanza con `npm audit`, que no lo reportó).
-- [ ] 2.1 Crear `backend/src/configurar-red.ts` con `configurarRed(app)`: lee `TRUST_PROXY`;
+- [x] 2.1 Crear `backend/src/configurar-red.ts` con `configurarRed(app)`: lee `TRUST_PROXY`;
       vacía o ausente → no llama a `trust proxy`; con valor → lo parte por comas, recorta cada
       elemento y lo valida contra la lista de **formatos permitidos** de D3 (`loopback`,
       `linklocal`, `uniquelocal`, IPv4 simple, subred IPv4 con prefijo `/8` o mayor). Si
@@ -29,7 +29,7 @@
       `''` y Node lo toma como todas las interfaces). Verificar levantando el backend, sin
       `HOST` y con `HOST=` vacío: en los dos casos responde en `http://127.0.0.1:3001/zonas` y
       la conexión a `http://<IP-de-red>:3001/zonas` se rechaza.
-- [ ] 2.3 Arrancar con `TRUST_PROXY=true` y verificar que el proceso termina con el error de
+- [x] 2.3 Arrancar con `TRUST_PROXY=true` y verificar que el proceso termina con el error de
       2.1 sin escuchar en el puerto.
 
 ## 3. Backend: origen no falsificable (D2)
@@ -47,7 +47,7 @@
 
 ## 4. Frontend y base de datos (D1)
 
-- [ ] 4.1 `frontend/package.json`: `dev` y `start` con `--hostname 127.0.0.1`; nuevo `dev:lan`
+- [x] 4.1 `frontend/package.json`: `dev` y `start` con `--hostname 127.0.0.1`; nuevo `dev:lan`
       con `--hostname 0.0.0.0`. Verificar: con `npm run dev -w frontend`,
       `http://127.0.0.1:3000` y `http://localhost:3000` responden y `http://<IP-de-red>:3000`
       se rechaza; con `dev:lan`, los tres responden. `--hostname 127.0.0.1` escucha solo en
@@ -66,10 +66,10 @@
 
 ## 5. Documentación (D4)
 
-- [ ] 5.1 `.env.example`: agregar `HOST` (comentado, default `127.0.0.1`) y `TRUST_PROXY`
+- [x] 5.1 `.env.example`: agregar `HOST` (comentado, default `127.0.0.1`) y `TRUST_PROXY`
       (vacío), con la advertencia de no usar `true`. `config.yaml` §10: sumar las dos
       variables. Verificar que `openspec validate --all --strict` sigue pasando.
-- [ ] 5.2 README: sección "Red y límites de solicitudes" (loopback por defecto, `dev:lan` y su
+- [x] 5.2 README: sección "Red y límites de solicitudes" (loopback por defecto, `dev:lan` y su
       riesgo, límites por máquina detrás de `/api`, condición de despliegue con proxy de borde
       que sobrescriba `X-Forwarded-For` y `TRUST_PROXY`, y el paso de recrear el contenedor).
       Verificar releyendo que cubre cada escenario del requisito "Condición de despliegue
@@ -81,7 +81,7 @@
       hay un tercero que pueda agotar el cupo). Adjuntar antes/después al PR.
 - [ ] 6.2 `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e -w backend`
       y `openspec validate exposicion-red-local --strict` en verde.
-- [ ] 6.3 `git diff main --stat -- openapi backend/prisma` vacío (sin cambios de contrato ni de
+- [x] 6.3 `git diff main --stat -- openapi backend/prisma` vacío (sin cambios de contrato ni de
       schema ni de migraciones, que viven en `backend/prisma`).
 - [ ] 6.4 PR en español enlazado a `openspec/changes/exposicion-red-local/`, aprobado por un
       compañero, y CI en verde.
