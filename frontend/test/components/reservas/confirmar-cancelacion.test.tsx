@@ -208,9 +208,16 @@ describe("ConsultaReserva - confirmar cancelación", () => {
     });
 
     it("una segunda confirmación no dispara otra solicitud", async () => {
-      await conCancelacionPendiente();
+      mockearPost(new Promise(() => {}));
+      await verDetalle();
+      await abrirDialogo();
 
-      fireEvent.click(screen.getByRole("button", { name: "Cancelando…" }));
+      // Dos confirmaciones dentro del mismo `act`, antes de que React deshabilite el botón: así
+      // se ejercita la guarda de `cancelar()` (un clic sobre el botón ya deshabilitado no llega).
+      act(() => {
+        confirmar();
+        confirmar();
+      });
 
       expect(llamadasACancelar()).toHaveLength(1);
     });
