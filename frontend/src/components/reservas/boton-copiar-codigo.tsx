@@ -21,6 +21,8 @@ export function BotonCopiarCodigo({ codigo }: BotonCopiarCodigoProps) {
   const temporizador = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const montado = useRef(false);
+  // Número del último intento: con dos clics seguidos solo cuenta el resultado del más reciente.
+  const ultimoIntento = useRef(0);
 
   useEffect(() => {
     montado.current = true;
@@ -31,6 +33,7 @@ export function BotonCopiarCodigo({ codigo }: BotonCopiarCodigoProps) {
   }, []);
 
   async function copiar() {
+    const intento = ++ultimoIntento.current;
     let siguiente: Resultado = "copiado";
     try {
       await navigator.clipboard.writeText(codigo);
@@ -39,7 +42,8 @@ export function BotonCopiarCodigo({ codigo }: BotonCopiarCodigoProps) {
       siguiente = "fallo";
     }
     // La copia es asíncrona: si el botón se desmontó mientras tanto, no hay nada que mostrar.
-    if (!montado.current) return;
+    // Un intento anterior que termina tarde no pisa el resultado del más reciente.
+    if (!montado.current || intento !== ultimoIntento.current) return;
     setResultado(siguiente);
     clearTimeout(temporizador.current);
     temporizador.current = setTimeout(() => setResultado(undefined), MS_CONFIRMACION);
