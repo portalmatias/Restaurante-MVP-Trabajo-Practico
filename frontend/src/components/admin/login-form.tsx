@@ -11,7 +11,8 @@ import { guardarSesion, leerSesion } from "../../lib/auth/session";
 
 // Un 401 no dice si el email existe o si la contraseña es la incorrecta (spec "Login de
 // administrador"): el backend tampoco lo distingue. `mapErrorApi` no tiene un tipo propio para
-// el 401 (cae en `desconocido` con el `message` del backend), así que se decide por el status.
+// el 401 (cae en `desconocido` con el mensaje genérico de servicio no disponible, sin el texto
+// del backend), así que se decide por el status para mostrar el mensaje de credenciales.
 export const MENSAJE_CREDENCIALES_INVALIDAS = "El email o la contraseña no son correctos.";
 export const MENSAJE_LIMITE_INTENTOS =
   "Se superó el límite de intentos de inicio de sesión. Esperá un minuto antes de volver a intentar.";
