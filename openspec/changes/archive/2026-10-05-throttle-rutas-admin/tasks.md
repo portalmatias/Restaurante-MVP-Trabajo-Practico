@@ -73,7 +73,7 @@
 
 ## 5. Verificación final
 
-- [ ] 5.1 Prueba manual con la app levantada (`npm run dev`, admin del seed): desde
+- [x] 5.1 Prueba manual con la app levantada (`npm run dev`, admin del seed): desde
       `/admin/reservas`, confirmar o rechazar más de 10 Reservas seguidas y editar más de 10
       veces una Mesa en `/admin/salon` sin ver el aviso de límite; y comprobar que
       `/admin/login` sigue mostrando el `429` al sexto intento fallido en un minuto.
