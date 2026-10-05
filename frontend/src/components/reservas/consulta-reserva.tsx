@@ -132,6 +132,8 @@ function useVerificacionCancelacion(reserva: ReservaConsultada) {
 const MENSAJE_NO_CANCELABLE =
   "No se pudo cancelar la reserva: la ventana para cancelar ya venció o la reserva ya no se puede cancelar.";
 
+const MENSAJE_YA_NO_CANCELABLE = "Esta reserva ya no se puede cancelar.";
+
 function errorDeCodigo(codigo: string): string | undefined {
   if (codigo === "") return "Falta ingresar el código de tu reserva.";
   if (!esCodigoReservaValido(codigo)) return "El código tiene 8 caracteres, entre letras y números.";
@@ -334,6 +336,9 @@ function DetalleReserva({
   const [cancelando, setCancelando] = useState(false);
   const [errorAlCancelar, setErrorAlCancelar] = useState<ErrorApi>();
   const [recienCancelada, setRecienCancelada] = useState(false);
+  // Un 409 es definitivo para esta reserva (ventana vencida o estado no cancelable): el detalle
+  // deja de ofrecer la acción. Los demás errores pueden ser pasajeros y permiten reintentar.
+  const [rechazadaPorConflicto, setRechazadaPorConflicto] = useState(false);
   // Mismo patrón que la consulta: `enCurso` evita reentradas y `ultimaSolicitud` descarta la
   // respuesta de una cancelación abandonada (por ejemplo, tras desmontar).
   const cancelacionEnCurso = useRef(false);
@@ -380,9 +385,11 @@ function DetalleReserva({
 
     if (resultado.error) {
       setErrorAlCancelar(resultado.error);
+      setRechazadaPorConflicto(resultado.error.tipo === "conflicto");
       return;
     }
     // El 204 ya confirma el cambio: no se vuelve a consultar al servidor (design.md D3).
+    setRechazadaPorConflicto(false);
     setDialogoAbierto(false);
     setRecienCancelada(true);
     onCancelada();
@@ -411,10 +418,16 @@ function DetalleReserva({
       <Card title="Resumen de tu reserva" className="text-base">
         <ResumenReserva reserva={reserva} />
       </Card>
-      {ofrecerCancelar ? (
+      {ofrecerCancelar && !rechazadaPorConflicto ? (
         <Button variant="destructive" size="lg" onClick={abrirDialogo}>
           Cancelar mi reserva
         </Button>
+      ) : null}
+      {/* Con el diálogo abierto el rechazo ya se lee ahí: el aviso aparece al cerrarlo. */}
+      {rechazadaPorConflicto && !dialogoAbierto ? (
+        <Alert variant="info" className="text-base">
+          {MENSAJE_YA_NO_CANCELABLE}
+        </Alert>
       ) : null}
       {noVerificada ? (
         <div className="flex flex-col gap-3">

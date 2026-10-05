@@ -333,8 +333,43 @@ describe("ConsultaReserva - confirmar cancelación", () => {
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
-    it("el error no queda al cerrar y volver a abrir el diálogo", async () => {
+    it("tras un 409, al cerrar el diálogo el detalle ya no ofrece cancelar y lo avisa", async () => {
       mockearPost(respuestaError(409, { statusCode: 409, message: "x" }));
+      await verDetalle();
+      const dialogo = await abrirDialogo();
+      confirmar();
+      await within(dialogo).findByRole("alert");
+
+      fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Esta reserva ya no se puede cancelar.");
+      // El 409 no dice en qué estado quedó la reserva: el detalle no lo cambia.
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "Tu reserva está confirmada",
+      );
+      expect(llamadasACancelar()).toHaveLength(1);
+    });
+
+    it.each([[404], [429], [500]])(
+      "tras un %i, al cerrar el diálogo el detalle sigue ofreciendo cancelar",
+      async (status) => {
+        mockearPost(respuestaError(status));
+        await verDetalle();
+        const dialogo = await abrirDialogo();
+        confirmar();
+        await within(dialogo).findByRole("alert");
+
+        fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+
+        expect(screen.getByRole("button", { name: "Cancelar mi reserva" })).toBeInTheDocument();
+        expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      },
+    );
+
+    it("el error no queda al cerrar y volver a abrir el diálogo", async () => {
+      mockearPost(respuestaError(500, { statusCode: 500, message: "x" }));
       await verDetalle();
       const dialogo = await abrirDialogo();
       confirmar();
