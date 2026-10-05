@@ -156,14 +156,19 @@ límites por cliente son por máquina, y qué hace falta para desplegar (proxy d
   (`autoSelectFamily`); igual se verifica en las tareas con el flujo real y, si falla, se
   cambia el default de `.env.example` a `http://127.0.0.1:3001`.
 - **[Riesgo]** Una persona con una base existente sigue con Postgres expuesto hasta recrear
-  el contenedor → **Mitigación:** el README indica `docker compose up -d --force-recreate`
-  (los datos viven en el volumen y se conservan).
+  el contenedor → **Mitigación:** el README indica cómo recrearlo con `docker compose -p
+  <proyecto-del-contenedor> up -d --force-recreate`. Con `-p` se conserva el volumen. Sin él,
+  desde otra carpeta (otro clon o worktree) el primer síntoma es un error del daemon por el
+  `container_name` en uso (verificado durante la implementación); la base vacía aparece si,
+  para salir de ese error, se borra el contenedor y se lo recrea desde esa carpeta, porque
+  Compose usa otro volumen. El README advierte no borrarlo.
 - **[Trade-off]** En local, todos los pedidos del navegador siguen compartiendo el cupo de la
   máquina. Es aceptable porque, con D1, esa máquina es el único cliente posible.
 
 ## Migration Plan
 
 1. Merge del PR: cambian defaults de escucha; sin migraciones de base.
-2. Cada integrante recrea el contenedor de Postgres (`docker compose up -d --force-recreate`)
+2. Cada integrante recrea el contenedor de Postgres con el proyecto de Compose que lo creó
+   (`docker compose -p <proyecto> up -d --force-recreate`, ver README)
    y agrega `HOST`/`TRUST_PROXY` a su `.env` solo si necesita cambiar el default.
 3. Rollback: revertir el PR; los servicios vuelven a escuchar en todas las interfaces.
