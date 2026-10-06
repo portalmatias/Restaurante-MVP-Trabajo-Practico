@@ -216,8 +216,13 @@ validó el CI.
    (D3). Expone como salida los dos digests.
 3. `desplegar`: `environment: produccion`, `permissions: id-token: write, contents: read`, y
    `aws-actions/configure-aws-credentials` con `role-to-assume`. Llama a `aws ssm send-command`
-   con el documento `reservas-desplegar` y los parámetros `sha`, `digestBackend`,
-   `digestFrontend` y `modo=despliegue`. Espera el resultado y lo muestra.
+   con el documento `reservas-desplegar`, espera el resultado y lo muestra. Los parámetros
+   dependen del modo:
+   - **`modo=despliegue`** (automático o manual): `sha` y los dos digests que expone
+     `imagenes`;
+   - **`modo=vuelta-atras`** (solo manual): el job `imagenes` **no corre** (condición sobre el
+     input `modo`), y se envían `sha` y `modo`, con los digests vacíos. `desplegar.sh` toma los
+     digests de `historial`, nunca del workflow ni del tag.
 
 - `concurrency: { group: despliegue-produccion, cancel-in-progress: false }` hace que los
   despliegues corran de a uno sin cortar uno a la mitad. GitHub deja **una sola ejecución en
@@ -247,7 +252,262 @@ lo crea y lo actualiza):
 - Recibe cuatro parámetros validados por SSM antes de llegar a la instancia (spec: "Despliegue
   con un identificador inválido"):
   - `sha`, con `allowedPattern: ^[0-9a-f]{40}$`;
-  - `digestBackend` y `digestFrontend`, con `^sha256:[0-9a-f]{64}$`;
+  - `digestBackend` y `digestFrontend`, con `^(sha256:[0-9a-f]{64})?## Context
+
+La motivación está en `proposal.md`. El enfoque depende de estos hechos del repositorio
+(verificados el 2026-10-05 sobre `main` en `625f8f3`):
+
+- **No hay contenedores de la aplicación.** `docker-compose.yml` levanta solo PostgreSQL de
+  desarrollo (`postgres:16.4-alpine`, publicado en `127.0.0.1:5432`). Ni el backend ni el
+  frontend tienen `Dockerfile`.
+- **El navegador nunca llama directo al backend.** Usa `/api/...` del mismo origen, que el
+  frontend reescribe hacia `NEXT_PUBLIC_API_URL` (`frontend/next.config.ts`, D6 de
+  `frontend-base`). Los Server Components llaman al backend directamente por esa misma URL. Next
+  arma las reescrituras **en el build**, así que la URL del backend queda fija en la imagen del
+  frontend. `next.config.ts` corta el build si falta.
+- **Identificación del cliente** (`exposicion-red-local`, D2 y D3): Next completa
+  `X-Forwarded-For` con `??=`, es decir, conserva el del cliente si existe. El backend ya
+  admite `TRUST_PROXY` con una lista validada de IPv4 y subredes, y por defecto no confía en
+  nadie. Ese change dejó escrito que un despliegue necesita un proxy de borde que
+  **sobrescriba** el encabezado.
+- **Escucha:** el backend usa `HOST || '127.0.0.1'`. El script `start` del frontend fija
+  `--hostname 127.0.0.1`. Dentro de un contenedor, los dos tienen que escuchar en la interfaz de
+  la red de Docker.
+- **Seed:** `backend/prisma/seed.ts` crea un admin con `admin@restaurante-mvp.local` y una
+  contraseña documentada en el README, además de reservas de ejemplo. Se ejecuta con `ts-node`,
+  que es devDependency. `prisma` y `@prisma/client` son dependencias de producción.
+- **CI** (`ci.yml`): corre en cada PR y en cada push a `main`, y no ejecuta los tests del
+  frontend.
+- **Repositorio público:** todo lo versionado, y los logs de Actions, los puede leer
+  cualquiera.
+- **AWS en el Tier gratuito** (propuesta de la docente; ver `proposal.md`). El único tipo de
+  instancia elegible tanto en cuentas anteriores al 15 de julio de 2025 como en las del plan
+  Free es `t3.micro`: 2 vCPU con ráfagas y **1 GB de RAM**. En el plan Free, todo consumo
+  descuenta créditos y la cuenta se cierra a los 6 meses.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Que nada que viva en GitHub (código, imágenes, logs o configuración del workflow) alcance
+  para acceder a la cuenta de AWS, a la instancia o a los datos.
+- Que el rol del despliegue pueda hacer **una sola cosa**: correr el procedimiento versionado
+  de despliegue con un SHA.
+- Que activar HTTPS con el subdominio de la docente no requiera tocar código de la aplicación.
+
+**Non-Goals:**
+- Despliegue sin cortes: con una sola instancia hay unos segundos de corte por despliegue, y se
+  acepta.
+- Rollback de migraciones: la vuelta atrás automática revierte imágenes, no el schema (ver
+  Risks).
+- Backups gestionados fuera de la instancia: el runbook configura snapshots del disco. Una
+  política de backups más completa queda para otro change.
+
+## Decisions
+
+### D1: Topología: una instancia, Docker Compose y un único servicio público
+
+```
+internet ──:80/:443──> [caddy] ──> [frontend :3000] ──/api──> [backend :3001] ──> [postgres :5432]
+                          red "borde"           red "interna" (sin salida a puertos del host)
+```
+
+- `deploy/docker-compose.prod.yml` define cuatro servicios. **Solo `caddy` publica puertos**
+  (`80:80` y `443:443`, en las dos etapas). Los demás no tienen `ports:`: no se publican en la
+  interfaz de la instancia, así que no se pueden alcanzar desde internet. El propio host sí
+  llega a ellos por la red de Docker, lo que se acepta: en el host solo entra SSM.
+- Caddy guarda certificados y claves en un volumen con nombre (`caddy_data`), que se conserva
+  entre despliegues y reinicios. Sin él, cada despliegue pediría un certificado nuevo y
+  chocaría con los límites de emisión de Let's Encrypt.
+- La red `interna` tiene una subred fija (`172.30.0.0/24`) y el frontend una IP fija
+  (`172.30.0.10`). Es la única dirección que el backend declara en `TRUST_PROXY` (ver D5).
+- Caddy reenvía **todo** al frontend; el backend no tiene ruta propia en el proxy. Esto
+  reproduce exactamente la topología de desarrollo (mismo origen, `/api` reescrito por Next), y
+  así no hace falta CORS ni cambiar el cliente.
+- PostgreSQL usa la misma imagen que el desarrollo y CI (`postgres:16.4-alpine`), con un volumen
+  con nombre y sin `init-databases.sql`: en producción no hay base `_test`.
+- Todos los servicios usan `restart: unless-stopped`, para que la aplicación vuelva sola tras un
+  reinicio de la instancia. Además tienen healthcheck y logs `json-file` con rotación
+  (`max-size: 10m`, `max-file: 3`), para que los logs no llenen el disco.
+- Los contenedores corren como usuario no root (`node` en las imágenes propias) y con
+  `read_only` donde la imagen lo permite.
+- **Memoria (1 GB en `t3.micro`):** cada servicio tiene `mem_limit`, como valor inicial:
+  - PostgreSQL: 256 MB, con `shared_buffers=64MB` y `max_connections=20`;
+  - backend: 256 MB, con `NODE_OPTIONS=--max-old-space-size=192`;
+  - frontend: 320 MB, con `--max-old-space-size=256`;
+  - Caddy: 64 MB.
+
+  La instancia tiene además un *swapfile* de 2 GB. Así, un pico se resuelve con swap o
+  reiniciando un solo contenedor, en lugar de que el kernel mate PostgreSQL. Los límites se
+  ajustan con las mediciones de la tarea 6.2. Nada se compila en la instancia (D3), y eso es
+  lo que permite que entre en 1 GB.
+
+**Alternativa considerada: RDS para la base.** El equipo decidió un despliegue monolítico.
+RDS además suma costo y una superficie de red más que configurar.
+
+**Alternativa considerada: exponer el backend por Caddy en `/api`.** Saltearía la reescritura
+de Next, pero la cadena de `X-Forwarded-For` quedaría distinta según la ruta, y aparecería una
+diferencia con desarrollo que no está probada. Se descarta.
+
+### D2: Caddy como proxy de borde
+
+**Decisión:** imagen oficial de Caddy con versión fija (`caddy:2.10-alpine`; se confirma el tag
+al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale de una variable,
+`SITE_ADDRESS`, que define la etapa:
+
+- **Etapa HTTP (transitoria):** `SITE_ADDRESS=:80`, mientras el subdominio no apunte a la IP
+  elástica.
+- **Etapa HTTPS:** `SITE_ADDRESS=<subdominio>`. Caddy obtiene el certificado de Let's Encrypt
+  con el desafío HTTP-01 por el puerto 80, lo renueva solo, redirige HTTP a HTTPS y sirve por
+  443.
+
+`SITE_ADDRESS` no es secreto: va como parámetro no secreto en SSM (`/reservas/prod/config/`),
+para que activar HTTPS sea cambiar ese valor y redesplegar, sin tocar el repositorio.
+
+**Control del certificado:** Let's Encrypt dejó de mandar avisos de vencimiento por mail el 4
+de junio de 2025, así que no alcanza con configurar un correo. Un workflow programado
+(`.github/workflows/certificado.yml`, diario) se conecta a `https://<subdominio>`, verifica que
+el certificado sea válido para ese nombre y que le queden 21 días o más, y **falla** si no; la
+falla le llega al equipo como notificación de GitHub. Se activa solo cuando existe la variable
+`SUBDOMINIO` del repositorio (etapa HTTPS); no usa credenciales. Caddy renueva a los 30 días del
+vencimiento, así que un aviso a los 21 días indica que la renovación falló al menos una vez.
+
+**Por qué Caddy y no nginx:**
+- **`X-Forwarded-For`:** desde la versión 2.5, `reverse_proxy` ignora los `X-Forwarded-*`
+  entrantes de clientes que no figuran en `trusted_proxies` y escribe la IP de la conexión.
+  Por defecto ya hace lo que exige `exposicion-red` ("un proxy de borde que **sobrescriba**
+  `X-Forwarded-For`"). En nginx hay que acordarse de configurarlo, y el error típico
+  (`$proxy_add_x_forwarded_for`) **agrega** el valor en lugar de reemplazarlo.
+- **HTTPS:** con `SITE_ADDRESS` igual a un nombre de dominio, Caddy pide y renueva solo el
+  certificado de Let's Encrypt. Es exactamente el "un cambio de configuración" que pide la
+  spec, y no hace falta ningún cliente ACME aparte ni una tarea programada de renovación.
+
+Es una imagen nueva, no una dependencia npm. Se justifica según §2 de `config.yaml`.
+
+**Encabezados** (en el `Caddyfile`, porque no dependen de HTTPS):
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY` y `Content-Security-Policy: frame-ancestors 'none'`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- quitar `Server` y `X-Powered-By`
+
+En la etapa HTTPS se agrega `Strict-Transport-Security: max-age=31536000` (sin
+`includeSubDomains` ni `preload`: el dominio padre es de la docente y no le corresponde a este
+proyecto fijar política para sus otros subdominios). Sobre HTTP no se envía HSTS.
+
+### D3: Imágenes construidas en Actions y publicadas en GHCR con el SHA
+
+- `backend/Dockerfile` (multi-stage):
+  - `npm ci` de los workspaces, `prisma generate` y `nest build`.
+  - Compila `prisma/seed-produccion.ts` a JS con `tsc`, porque en runtime no hay `ts-node`.
+  - `npm prune --omit=dev`.
+  - Etapa final `node:20-alpine` (con versión fija), usuario `node`, `HOST=0.0.0.0`.
+  - Incluye `prisma/` (migraciones y schema) y el CLI de Prisma, que ya es dependencia de
+    producción, para `migrate deploy`.
+- `frontend/Dockerfile`: `next.config.ts` suma `output: "standalone"` y el build recibe
+  `NEXT_PUBLIC_API_URL=http://backend:3001` como build-arg. Ese valor es el nombre interno del
+  servicio, no un secreto; queda fijo en la imagen, como exige Next. La etapa final copia
+  `.next/standalone` y `.next/static`, corre como `node` con `HOSTNAME=0.0.0.0` y no usa el
+  script `start` (que fija loopback para desarrollo).
+- `.dockerignore` excluye `.env*`, `node_modules`, `.git`, `openspec/` y los tests. Ningún
+  `ARG` ni `ENV` lleva secretos: los secretos llegan solo en runtime (D6).
+- **Tags y digests:** las imágenes se publican como `ghcr.io/<owner>/reservas-backend:<sha>` y
+  `reservas-frontend:<sha>`, sin `latest`. Pero un tag de GHCR **se puede volver a publicar**, así
+  que la inmutabilidad no puede depender de él:
+  - el job de imágenes **no sobrescribe** un tag existente: si `:<sha>` ya está publicado, toma
+    su digest y no reconstruye;
+  - el despliegue usa siempre la imagen **por digest** (`image@sha256:...`), nunca por tag;
+  - la instancia guarda cada versión como la terna SHA + digest del backend + digest del
+    frontend (ver D7), y una vuelta atrás vuelve a esa terna exacta.
+
+  Así, desplegar dos veces la misma versión ejecuta lo mismo, aunque alguien vuelva a
+  publicar el tag (spec: "Versiones trazables e inmutables").
+- **Paquetes públicos en GHCR:** el repositorio es público y las imágenes no contienen
+  secretos, así que la instancia las descarga sin credenciales de registro. Publicarlas como
+  privadas obligaría a guardar un token de GitHub en la instancia, y eso sí sería un secreto
+  más.
+
+**Alternativa considerada: construir en la instancia** (`git pull` + `docker compose build`).
+El build de Next necesita más memoria que la que usa la aplicación, y no entra en el 1 GB de
+una `t3.micro` del Tier gratuito. Además no deja versiones anteriores listas para una vuelta
+atrás. Se descarta (decisión del equipo).
+
+**Arquitectura `amd64`:** `t3.micro` es x86. Las instancias `t4g` (ARM) serían más baratas en
+créditos, pero solo son elegibles en el plan Free, y construir imágenes `arm64` en los
+runners de GitHub requiere emulación. Se descarta.
+
+### D4: Workflow de CD, OIDC y SSM con un documento propio
+
+**Disparo:** `.github/workflows/cd.yml` con `on: workflow_run` (workflow `CI`, tipo
+`completed`). El job corre solo si se cumplen las tres condiciones:
+- `conclusion == 'success'`
+- `event == 'push'`
+- `head_branch == 'main'`
+
+El SHA se toma de `workflow_run.head_sha`, no de `github.sha`: la variable apunta al commit que
+validó el CI.
+
+**Jobs:**
+1. `decidir`: decide si el SHA se despliega, con una función pura
+   (`scripts/cd/decidir-despliegue.mjs`) que recibe los datos de la API de GitHub y tiene tests
+   propios (D10). Las reglas son estas:
+   - **Por `workflow_run`:** si **otro commit posterior de `main` tiene el CI en verde**, termina
+     **en verde, sin desplegar**, con el aviso "versión superada por `<sha>`". Si el posterior
+     está en rojo o todavía corriendo, despliega: un commit verde nunca se queda sin desplegar
+     por un posterior que falla. Esto evita que un CI viejo que termina después de uno nuevo
+     redespliegue una versión anterior (`workflow_run` conserva el `head_sha` de cada
+     ejecución).
+   - **Por `workflow_dispatch` con `modo=despliegue`:** exige que el SHA esté en la historia de
+     `main`, que su CI de push haya terminado en verde y que no exista un commit posterior
+     verde. Si no se cumple, rechaza y el workflow termina en error. Así, el despacho manual
+     tiene los mismos controles que el automático.
+   - **Por `workflow_dispatch` con `modo=vuelta-atras`:** no aplica la regla de "superada" (una
+     vuelta atrás es, por definición, a una versión anterior). Exige que el SHA esté en la
+     historia de `main`; la instancia exige además que figure en `historial` (D7).
+
+   La ancestría se resuelve con la API `compare` de GitHub, y el estado del CI con las
+   ejecuciones del workflow `CI` de evento `push` sobre `main`.
+2. `imagenes`: checkout de ese SHA y `docker/build-push-action` de las dos imágenes a GHCR, con
+   `permissions: packages: write` y el `GITHUB_TOKEN`. Si el tag ya existe, no se reconstruye
+   (D3). Expone como salida los dos digests.
+3. `desplegar`: `environment: produccion`, `permissions: id-token: write, contents: read`, y
+   `aws-actions/configure-aws-credentials` con `role-to-assume`. Llama a `aws ssm send-command`
+   con el documento `reservas-desplegar`, espera el resultado y lo muestra. Los parámetros
+   dependen del modo:
+   - **`modo=despliegue`** (automático o manual): `sha` y los dos digests que expone
+     `imagenes`;
+   - **`modo=vuelta-atras`** (solo manual): el job `imagenes` **no corre** (condición sobre el
+     input `modo`), y se envían `sha` y `modo`, con los digests vacíos. `desplegar.sh` toma los
+     digests de `historial`, nunca del workflow ni del tag.
+
+- `concurrency: { group: despliegue-produccion, cancel-in-progress: false }` hace que los
+  despliegues corran de a uno sin cortar uno a la mitad. GitHub deja **una sola ejecución en
+  espera** por grupo: si llegan varias, la más nueva reemplaza a la que esperaba. Por eso la spec
+  garantiza que se despliegue **el commit verde más reciente**, no cada commit intermedio.
+- **Segunda barrera en la instancia:** `desplegar.sh` rechaza en modo `despliegue` un SHA que
+  sea ancestro de la versión actual (D7).
+- Las acciones de terceros se fijan por **SHA de commit**, no por tag: el workflow maneja
+  credenciales de producción.
+
+**Confianza de IAM (OIDC):** el rol `reservas-github-despliegue` solo confía en
+`token.actions.githubusercontent.com` con `aud = sts.amazonaws.com` y
+`sub = repo:<owner>/Restaurante-MVP-Trabajo-Practico:environment:produccion`. Además, el
+environment `produccion` de GitHub admite **solo la rama `main`**. Un PR, una rama o un fork no
+consiguen un token con ese `sub`. Así se cumple "Credenciales de despliegue temporales y
+acotadas" sin claves permanentes.
+
+**Permisos del rol** (los mínimos):
+- `ssm:SendCommand` sobre **dos** recursos: el ARN de la instancia y el ARN del documento
+  `reservas-desplegar`. **No** se permite `AWS-RunShellScript`, así que el rol no puede
+  ejecutar comandos arbitrarios.
+- `ssm:GetCommandInvocation` y `ssm:ListCommandInvocations`, para leer el resultado.
+- Nada más: sin `ssm:GetParameter*`, sin EC2 y sin IAM.
+
+**Documento SSM `reservas-desplegar`** (versionado en `deploy/ssm-desplegar.json`; el runbook
+lo crea y lo actualiza):
+- Recibe cuatro parámetros validados por SSM antes de llegar a la instancia (spec: "Despliegue
+  con un identificador inválido"):
+  - `sha`, con `allowedPattern: ^[0-9a-f]{40}$`;
+ (vacíos en
+    `modo=vuelta-atras`; `desplegar.sh` exige que no estén vacíos en `modo=despliegue`);
   - `modo`, con `allowedValues: [despliegue, vuelta-atras]`.
 - Ejecuta `/opt/reservas/repo/deploy/desplegar.sh` con esos cuatro valores.
 
@@ -442,8 +702,10 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
   4. verificar el certificado, la redirección y HSTS (tarea 6.6).
 
   Si Caddy no logra emitir el certificado (DNS todavía no propagado), sigue reintentando y el
-  sitio no responde por HTTPS hasta lograrlo. En ese caso se vuelve a `SITE_ADDRESS=:80` y se
-  reintenta más tarde.
+  sitio no responde por HTTPS hasta lograrlo. En ese caso se vuelve a la etapa HTTP **completa**:
+  primero se restringe otra vez el security group a las IPs del equipo, después se vuelve a
+  `SITE_ADDRESS=:80` y se redespliega. Volver a `:80` sin restringir el security group dejaría
+  el login en claro abierto a internet. Se reintenta cuando el DNS resuelva.
 - **Riesgo aceptado de la etapa HTTP** y su alcance, según la spec.
 
 ### D10: Tests del frontend y de la decisión de despliegue en CI

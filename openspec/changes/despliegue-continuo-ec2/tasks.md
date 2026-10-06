@@ -128,6 +128,8 @@
       - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
         y `modo` validados;
       - job `decidir`, que usa la función de 5.6;
+      - en `modo=vuelta-atras`, el job `imagenes` no corre y se envían `sha` y `modo` con los
+        digests vacíos;
       - job `imagenes` con `packages: write`, que no sobrescribe un tag existente y expone los
         digests; job `desplegar` con `environment: produccion` e `id-token: write`;
       - acciones fijadas por SHA y `concurrency` sin cancelar.
@@ -165,7 +167,8 @@
         `0.0.0.0/0` en 80 y 443 al activar HTTPS;
       - vuelta atrás manual, rotación de la contraseña del admin y backups;
       - activación de HTTPS con el subdominio de la docente (pasarle la IP, esperar el DNS,
-        cambiar `SITE_ADDRESS`, verificar) y cómo volver a la IP si el DNS falla;
+        cambiar `SITE_ADDRESS`, verificar) y cómo volver a la IP si el DNS falla (restringiendo
+        primero el security group a las IPs del equipo);
       - la sección "Etapa transitoria en HTTP" con el riesgo aceptado;
       - cómo apagar y eliminar los recursos.
 
