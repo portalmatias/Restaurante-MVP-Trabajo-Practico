@@ -1,0 +1,39 @@
+name: Certificado
+
+# Control diario del certificado HTTPS de producción (D2 de
+# openspec/changes/despliegue-continuo-ec2/design.md). Let's Encrypt ya no avisa por correo los
+# vencimientos: si el certificado no es válido para el subdominio o le quedan menos de 21 días,
+# este workflow falla y el equipo recibe la notificación de GitHub.
+#
+# Solo corre en la etapa HTTPS: cuando existe la variable de repositorio `SUBDOMINIO`. No usa
+# credenciales.
+
+on:
+  schedule:
+    # Todos los días a las 12:17 UTC (09:17 en Argentina).
+    - cron: '17 12 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  verificar:
+    name: Verificar el certificado
+    if: vars.SUBDOMINIO != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Certificado válido y con 21 días o más
+        env:
+          SUBDOMINIO: ${{ vars.SUBDOMINIO }}
+        run: |
+          if ! salida="$(bash scripts/cd/verificar-certificado.sh "$SUBDOMINIO" 21 2>&1)"; then
+            echo "::error title=Certificado de producción::$salida"
+            exit 1
+          fi
+          echo "$salida"

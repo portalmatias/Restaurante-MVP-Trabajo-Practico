@@ -148,7 +148,7 @@
       - vuelta atrás manual a un SHA de `main` (se acepta aunque esté superado).
 
       Verificar que fallan sin la implementación y que pasan con `npm run test:scripts`.
-- [ ] 5.7 Escribir `.github/workflows/certificado.yml` (D2): ejecución diaria y manual, que
+- [x] 5.7 Escribir `.github/workflows/certificado.yml` (D2): ejecución diaria y manual, que
       solo corre si existe la variable `SUBDOMINIO`, y falla si el certificado no es válido para
       ese nombre o le quedan menos de 21 días. Verificar con `actionlint`, y probar el chequeo
       contra un sitio con certificado válido y contra uno vencido (por ejemplo,
