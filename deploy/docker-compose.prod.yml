@@ -1,0 +1,184 @@
+# Composición de producción (D1, D2, D5 y D6 de openspec/changes/despliegue-continuo-ec2).
+#
+# La levanta deploy/desplegar.sh en la instancia, siempre con el .env que genera ese script:
+#
+#   docker compose -f deploy/docker-compose.prod.yml --env-file /opt/reservas/.env up -d
+#
+# Ese .env tiene los secretos (POSTGRES_PASSWORD, JWT_SECRET), la configuración no secreta de
+# SSM (SITE_ADDRESS) y las imágenes propias por digest. Nada de eso vive en el
+# repositorio. Ver docs/despliegue.md.
+#
+#   internet ──:80/:443──> caddy ──borde──> frontend (172.30.0.10) ──interna──> backend ──> postgres
+#
+# IMPORTANTE: solo `caddy` publica puertos. frontend, backend y postgres NO tienen `ports:` y
+# no deben tenerlo. El backend confía en el `X-Forwarded-For` que le llega desde el frontend
+# (TRUST_PROXY=172.30.0.10) porque el frontend solo recibe tráfico de Caddy, que lo
+# sobrescribe con la IP real del cliente. Si alguien publicara el puerto del frontend o del
+# backend, un cliente podría inventar su IP y saltear los límites de solicitudes (D5).
+
+name: reservas
+
+x-logs: &logs
+  # Rotación de logs para que no llenen el disco (D1).
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
+services:
+  postgres:
+    # Misma versión que desarrollo y CI (D1), fijada además por digest.
+    image: postgres:16.4-alpine@sha256:5660c2cbfea50c7a9127d17dc4e48543eedd3d7a41a595a2dfa572471e37e64c
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reservas
+      POSTGRES_DB: reservas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en el .env de producción}
+    # Memoria acotada para la t3.micro de 1 GB (D1).
+    command: ['postgres', '-c', 'shared_buffers=64MB', '-c', 'max_connections=20']
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+    read_only: true
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - interna
+    mem_limit: 256m
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U reservas -d reservas']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: *logs
+
+  backend:
+    image: ${IMAGEN_BACKEND:?falta IMAGEN_BACKEND}@${DIGEST_BACKEND:?falta DIGEST_BACKEND}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # POSTGRES_PASSWORD se genera solo con caracteres seguros para una URL (ver
+      # docs/despliegue.md); desplegar.sh lo verifica antes de escribir el .env.
+      DATABASE_URL: postgresql://reservas:${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}@postgres:5432/reservas?schema=public
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET en el .env de producción}
+      JWT_EXPIRES_IN: 60m
+      THROTTLE_TTL: '60'
+      THROTTLE_LIMIT: '10'
+      HOST: 0.0.0.0
+      PORT: '3001'
+      # Único salto confiable: el frontend, que es quien se conecta al backend (D5).
+      TRUST_PROXY: 172.30.0.10
+      NODE_OPTIONS: --max-old-space-size=192
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - interna
+    # Sin `ports:` a propósito (ver el comentario de arriba).
+    mem_limit: 256m
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3001/zonas']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging: *logs
+
+  frontend:
+    image: ${IMAGEN_FRONTEND:?falta IMAGEN_FRONTEND}@${DIGEST_FRONTEND:?falta DIGEST_FRONTEND}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Ya viene fijo en la imagen (build-arg, D3); se repite para el código de servidor.
+      NEXT_PUBLIC_API_URL: http://backend:3001
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+      NODE_OPTIONS: --max-old-space-size=256
+    read_only: true
+    tmpfs:
+      - /tmp
+      # Caché de Next (por ejemplo, optimización de imágenes): el código es de solo lectura.
+      - /app/frontend/.next/cache:uid=1000,gid=1000
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      borde: {}
+      interna:
+        # IP fija: es la única dirección que el backend declara en TRUST_PROXY (D5).
+        ipv4_address: 172.30.0.10
+    # Sin `ports:` a propósito (ver el comentario de arriba).
+    mem_limit: 320m
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3000/']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging: *logs
+
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:d76116d819d5162f464b0f2cd09bd28c568a86148c7bc539ce17c33eb22d8bbb
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+    # El único servicio con puertos publicados (D1). 80 queda abierto también en la etapa
+    # HTTPS: lo usan el desafío HTTP-01 de Let's Encrypt y la redirección a HTTPS.
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?falta SITE_ADDRESS (:80 o el subdominio)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados y claves: se conservan entre despliegues y reinicios, para no pedir uno
+      # nuevo cada vez y no chocar con los límites de Let's Encrypt (D1).
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - borde
+    mem_limit: 64m
+    healthcheck:
+      # La API de administración de Caddy escucha solo en el loopback del propio contenedor.
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    logging: *logs
+
+networks:
+  borde: {}
+  interna:
+    # Sin salida a internet ni a los puertos del host: solo se hablan los contenedores.
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  datos_postgres:
+  caddy_data:
+  caddy_config:

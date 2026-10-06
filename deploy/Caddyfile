@@ -1,0 +1,46 @@
+# Proxy de borde de producción (D2 de openspec/changes/despliegue-continuo-ec2).
+#
+# SITE_ADDRESS define la etapa (sale de /reservas/prod/config/SITE_ADDRESS en SSM):
+# - `:80`: etapa transitoria en HTTP, en la IP pública, mientras el subdominio no apunte a la
+#   instancia. Sin certificado ni HSTS.
+# - `<subdominio>`: etapa HTTPS. Caddy obtiene y renueva solo el certificado de Let's Encrypt
+#   (desafío HTTP-01 por el puerto 80), redirige HTTP a HTTPS y sirve por 443.
+#
+# X-Forwarded-For: `reverse_proxy` ignora los X-Forwarded-* que manda el cliente (no hay
+# `trusted_proxies`) y escribe la IP de la conexión. Es la condición de despliegue de
+# exposicion-red: el proxy de borde SOBRESCRIBE el encabezado. Ver
+# https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
+{
+	# Sin `email`: Let's Encrypt ya no manda avisos de vencimiento por correo (desde el 4 de
+	# junio de 2025). El vencimiento lo controla .github/workflows/certificado.yml (D2).
+
+	servers {
+		# Sin HTTP/3: el security group solo abre TCP 80 y 443, y anunciar h3 por UDP haría
+		# que los navegadores intenten una conexión que no llega.
+		protocols h1 h2
+	}
+}
+
+{$SITE_ADDRESS} {
+	# Encabezados de seguridad que no dependen de HTTPS (spec: "Encabezados de seguridad").
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# No exponer la versión del servidor ni del framework. Borrar un encabezado difiere la
+		# operación hasta la respuesta, así que también quita el X-Powered-By que pone Next.
+		-Server
+		-X-Powered-By
+		-Via
+	}
+
+	# HSTS solo en la etapa HTTPS. Sin includeSubDomains ni preload: el dominio padre es de la
+	# docente y no le corresponde a este proyecto fijar política para sus otros subdominios.
+	@https protocol https
+	header @https Strict-Transport-Security "max-age=31536000"
+
+	# Todo va al frontend; el backend no tiene ruta propia en el proxy (D1). Next reescribe
+	# /api hacia el backend por la red interna.
+	reverse_proxy frontend:3000
+}

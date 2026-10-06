@@ -4,7 +4,7 @@
       hechos de `design.md` (Context): sin Dockerfiles, `next.config.ts` con el rewrite de
       `/api`, `main.ts` con `HOST || '127.0.0.1'` y `configurarRed`, y `prisma` como
       dependencia de producción. Si algo cambió, anotarlo en la descripción del PR.
-- [ ] 1.2 Confirmar y fijar los tags de las imágenes base (`node:20-alpine` con versión de
+- [x] 1.2 Confirmar y fijar los tags de las imágenes base (`node:20-alpine` con versión de
       parche, `caddy:2.x-alpine`, `postgres:16.4-alpine`). Confirmar en la documentación de
       Caddy de ese tag que `reverse_proxy` ignora los `X-Forwarded-For` entrantes de orígenes no
       confiables (D2). Anotar los tags y el enlace a la documentación en el PR.
@@ -63,7 +63,7 @@
 
 ## 4. Composición de producción (D1, D2, D5, D6)
 
-- [ ] 4.1 Escribir `deploy/docker-compose.prod.yml`:
+- [x] 4.1 Escribir `deploy/docker-compose.prod.yml`:
       - redes `borde` e `interna` (`172.30.0.0/24`, frontend en `172.30.0.10`);
       - **solo** `caddy` con `ports: ["80:80", "443:443"]` y el volumen `caddy_data` (D1);
       - las imágenes propias **por digest** (`image@${DIGEST_BACKEND}`), nunca por tag;
@@ -74,7 +74,7 @@
 
       Verificar con `docker compose -f deploy/docker-compose.prod.yml config` que ningún otro
       servicio publica puertos.
-- [ ] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`,
+- [x] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`,
       `reverse_proxy frontend:3000`, los encabezados de D2 (incluido quitar `Server` y
       `X-Powered-By`) y HSTS solo en la etapa HTTPS. Verificar localmente, levantando la
       composición con imágenes locales y un `.env` de prueba con `SITE_ADDRESS=:80`:
@@ -86,7 +86,7 @@
       Para la etapa HTTPS, verificar con `caddy adapt` que con `SITE_ADDRESS=ejemplo.test` la
       configuración incluye la redirección de HTTP a HTTPS y el encabezado HSTS (la emisión real
       del certificado se prueba en 6.6).
-- [ ] 4.3 Probar la IP real del cliente con la composición local: 6 logins fallidos desde el
+- [x] 4.3 Probar la IP real del cliente con la composición local: 6 logins fallidos desde el
       host con un `X-Forwarded-For` distinto cada uno → el sexto responde `429`. Después, un
       login desde otro contenedor de la red `borde` (otra IP) → responde `401`, no `429`.
       Guardar la salida para el PR (spec: "Límites de solicitudes por IP real del cliente").
