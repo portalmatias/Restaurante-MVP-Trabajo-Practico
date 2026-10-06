@@ -120,7 +120,7 @@
       - una migración rota corta antes del `up`.
 
       Guardar las salidas para el PR.
-- [ ] 5.3 Escribir `deploy/ssm-desplegar.json` (documento SSM con `sha`, `digestBackend`,
+- [x] 5.3 Escribir `deploy/ssm-desplegar.json` (documento SSM con `sha`, `digestBackend`,
       `digestFrontend` y `modo`, cada uno con su `allowedPattern` o `allowedValues` de D4).
       Verificar que es JSON válido y que el comando que ejecuta es solo `desplegar.sh` con esos
       parámetros.

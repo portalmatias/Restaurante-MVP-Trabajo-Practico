@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "2.2",
+  "description": "Despliega una versión de main del sistema de reservas (deploy/desplegar.sh, D4 y D7 de despliegue-continuo-ec2). Solo ejecuta ese script: cada parámetro está acotado por un patrón o una lista de valores, así que no admite comandos arbitrarios.",
+  "parameters": {
+    "sha": {
+      "type": "String",
+      "description": "SHA completo del commit de main (40 caracteres hexadecimales en minúscula).",
+      "allowedPattern": "^[0-9a-f]{40}$"
+    },
+    "digestBackend": {
+      "type": "String",
+      "description": "Digest de la imagen del backend (sha256:...). Obligatorio en modo despliegue; vacío en vuelta-atras, donde se usa el del historial.",
+      "default": "",
+      "allowedPattern": "^(sha256:[0-9a-f]{64})?$"
+    },
+    "digestFrontend": {
+      "type": "String",
+      "description": "Digest de la imagen del frontend (sha256:...). Obligatorio en modo despliegue; vacío en vuelta-atras, donde se usa el del historial.",
+      "default": "",
+      "allowedPattern": "^(sha256:[0-9a-f]{64})?$"
+    },
+    "modo": {
+      "type": "String",
+      "description": "despliegue o vuelta-atras.",
+      "allowedValues": ["despliegue", "vuelta-atras"]
+    }
+  },
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "desplegar",
+      "precondition": {
+        "StringEquals": ["platformType", "Linux"]
+      },
+      "inputs": {
+        "timeoutSeconds": "1800",
+        "runCommand": [
+          "/opt/reservas/repo/deploy/desplegar.sh '{{ sha }}' '{{ digestBackend }}' '{{ digestFrontend }}' '{{ modo }}'"
+        ]
+      }
+    }
+  ]
+}
