@@ -61,8 +61,8 @@ fuera de pruebas, y el paso a HTTPS es un cambio de configuración, sin tocar c�
 
 ### AWS en el Tier gratuito (propuesta de la docente)
 
-La docente propuso AWS dentro del **Tier gratuito**, así que el despliegue tiene que entrar en
-sus límites. Desde el 15 de julio de 2025, una cuenta nueva elige entre el plan Free y el pago,
+La docente propuso AWS dentro del **Tier gratuito** en la clase del 2026-10-05, de forma oral:
+no hay un registro escrito que enlazar. Por eso el despliegue tiene que entrar en sus límites. Desde el 15 de julio de 2025, una cuenta nueva elige entre el plan Free y el pago,
 y en los dos recibe créditos (USD 100, más hasta USD 100 por actividades). Las cuentas creadas
 antes de esa fecha tenían 12 meses de Tier gratuito, que al 2026-10-06 ya vencieron. **En la
 práctica, el Tier gratuito disponible es el de una cuenta nueva:**
