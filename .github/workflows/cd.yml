@@ -1,0 +1,276 @@
+name: CD
+
+# Despliegue continuo a la instancia EC2 de producción (D4 de
+# openspec/changes/despliegue-continuo-ec2/design.md; runbook en docs/despliegue.md).
+#
+# - Automático: cuando el workflow CI termina en verde sobre un push a main.
+# - Manual (workflow_dispatch): `modo=despliegue` con los mismos controles que el automático, o
+#   `modo=vuelta-atras` a un SHA ya desplegado con éxito (sin reconstruir nada).
+#
+# Seguridad:
+# - Sin claves de AWS: credenciales temporales por OIDC, solo en el job `desplegar`, que corre
+#   en el environment `produccion` (restringido a main). El rol solo puede ejecutar el
+#   documento SSM `reservas-desplegar` sobre la instancia; no lee secretos.
+# - Permisos mínimos por job y acciones de terceros fijadas por SHA de commit.
+# - Los inputs del usuario llegan a los pasos por variables de entorno, nunca interpolados en
+#   el código de un `run`.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: SHA completo del commit de main (40 caracteres hexadecimales en minúscula)
+        required: true
+        type: string
+      modo:
+        description: despliegue (mismos controles que el automático) o vuelta-atras (a un SHA ya desplegado)
+        required: true
+        type: choice
+        options: [despliegue, vuelta-atras]
+        default: despliegue
+
+permissions: {}
+
+# De a un despliegue por vez, sin cortar uno a la mitad. GitHub deja una sola ejecución en
+# espera por grupo (la más nueva reemplaza a la que esperaba): se despliega el commit verde más
+# reciente, no cada commit intermedio.
+concurrency:
+  group: despliegue-produccion
+  cancel-in-progress: false
+
+jobs:
+  decidir:
+    name: Decidir si se despliega
+    # Por workflow_run, solo un CI en verde de un push a main de este mismo repositorio.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      desplegar: ${{ steps.decision.outputs.desplegar }}
+      sha: ${{ steps.datos.outputs.sha }}
+      modo: ${{ steps.datos.outputs.modo }}
+    steps:
+      - name: Datos del pedido
+        id: datos
+        env:
+          SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.sha || github.event.workflow_run.head_sha }}
+          MODO: ${{ github.event_name == 'workflow_dispatch' && inputs.modo || 'despliegue' }}
+        run: |
+          # El SHA solo se pasa a las salidas si tiene el formato correcto; la decisión
+          # rechaza cualquier otro valor.
+          if [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then echo "sha=$SHA" >> "$GITHUB_OUTPUT"; fi
+          if [[ "$MODO" =~ ^(despliegue|vuelta-atras)$ ]]; then echo "modo=$MODO" >> "$GITHUB_OUTPUT"; fi
+
+      # La función de decisión sale siempre de main, no de la rama desde la que se despachó.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Decidir (scripts/cd/decidir-despliegue.mjs)
+        id: decision
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENTO: ${{ github.event_name }}
+          SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.sha || github.event.workflow_run.head_sha }}
+          MODO: ${{ github.event_name == 'workflow_dispatch' && inputs.modo || 'despliegue' }}
+        run: node scripts/cd/decidir.mjs
+
+  imagenes:
+    name: Imágenes en GHCR
+    needs: decidir
+    # En una vuelta atrás no se construye ni se consulta nada: los digests salen del
+    # historial de la instancia.
+    if: needs.decidir.outputs.desplegar == 'true' && needs.decidir.outputs.modo == 'despliegue'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest-backend: ${{ steps.backend.outputs.digest }}
+      digest-frontend: ${{ steps.frontend.outputs.digest }}
+    env:
+      SHA: ${{ needs.decidir.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decidir.outputs.sha }}
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Nombres de las imágenes y tags ya publicados
+        id: existentes
+        run: |
+          registro="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          echo "registro=$registro" >> "$GITHUB_OUTPUT"
+          # Un tag publicado no se sobrescribe (D3): si ya existe, se usa su digest.
+          for imagen in backend frontend; do
+            if digest="$(docker buildx imagetools inspect "$registro/reservas-$imagen:$SHA" --format '{{json .Manifest.Digest}}' 2> /dev/null)"; then
+              digest="${digest//\"/}"
+              echo "$imagen=$digest" >> "$GITHUB_OUTPUT"
+              echo "::notice title=Imagen ya publicada::reservas-$imagen:$SHA ya existe ($digest); no se reconstruye."
+            fi
+          done
+
+      - name: Construir y publicar el backend
+        id: build-backend
+        if: steps.existentes.outputs.backend == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.existentes.outputs.registro }}/reservas-backend:${{ needs.decidir.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.decidir.outputs.sha }}
+
+      - name: Construir y publicar el frontend
+        id: build-frontend
+        if: steps.existentes.outputs.frontend == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: NEXT_PUBLIC_API_URL=http://backend:3001
+          tags: ${{ steps.existentes.outputs.registro }}/reservas-frontend:${{ needs.decidir.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.decidir.outputs.sha }}
+
+      - name: Digest del backend
+        id: backend
+        env:
+          EXISTENTE: ${{ steps.existentes.outputs.backend }}
+          CONSTRUIDO: ${{ steps.build-backend.outputs.digest }}
+        run: |
+          digest="${EXISTENTE:-$CONSTRUIDO}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest del backend inválido: '$digest'"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Digest del frontend
+        id: frontend
+        env:
+          EXISTENTE: ${{ steps.existentes.outputs.frontend }}
+          CONSTRUIDO: ${{ steps.build-frontend.outputs.digest }}
+        run: |
+          digest="${EXISTENTE:-$CONSTRUIDO}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest del frontend inválido: '$digest'"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+  desplegar:
+    name: Desplegar en la instancia (SSM)
+    needs: [decidir, imagenes]
+    # `imagenes` se saltea en una vuelta atrás; en un despliegue tiene que haber terminado bien.
+    if: >-
+      always() &&
+      needs.decidir.outputs.desplegar == 'true' &&
+      (needs.imagenes.result == 'success' ||
+       (needs.decidir.outputs.modo == 'vuelta-atras' && needs.imagenes.result == 'skipped'))
+    runs-on: ubuntu-latest
+    environment: produccion
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      SHA: ${{ needs.decidir.outputs.sha }}
+      MODO: ${{ needs.decidir.outputs.modo }}
+      # Vacíos en una vuelta atrás: desplegar.sh usa los del historial.
+      DIGEST_BACKEND: ${{ needs.imagenes.outputs.digest-backend }}
+      DIGEST_FRONTEND: ${{ needs.imagenes.outputs.digest-frontend }}
+      INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+    steps:
+      - name: Verificar la configuración del environment
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          faltan=()
+          [ -n "$AWS_ROLE_ARN" ] || faltan+=(AWS_ROLE_ARN)
+          [ -n "$AWS_REGION" ] || faltan+=(AWS_REGION)
+          [ -n "$INSTANCE_ID" ] || faltan+=(INSTANCE_ID)
+          if [ "${#faltan[@]}" -gt 0 ]; then
+            echo "::error title=Infraestructura sin configurar::Faltan las variables ${faltan[*]} del environment produccion. Ver docs/despliegue.md."
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: cd-${{ github.run_id }}
+
+      - name: Ejecutar reservas-desplegar en la instancia
+        run: |
+          parametros="$(printf '{"sha":["%s"],"digestBackend":["%s"],"digestFrontend":["%s"],"modo":["%s"]}' \
+            "$SHA" "$DIGEST_BACKEND" "$DIGEST_FRONTEND" "$MODO")"
+          comando="$(aws ssm send-command \
+            --document-name reservas-desplegar \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters "$parametros" \
+            --comment "CD ${MODO} ${SHA:0:12} (run ${GITHUB_RUN_ID})" \
+            --query Command.CommandId --output text)"
+          echo "Comando SSM: $comando"
+
+          # Espera propia: el waiter de la CLI corta a los 100 s, y un despliegue tarda más.
+          estado=Pending
+          for _ in $(seq 1 180); do
+            sleep 10
+            estado="$(aws ssm get-command-invocation --command-id "$comando" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2> /dev/null || echo Pending)"
+            case "$estado" in
+              Pending | InProgress | Delayed) continue ;;
+              *) break ;;
+            esac
+          done
+
+          echo "::group::Salida de desplegar.sh"
+          aws ssm get-command-invocation --command-id "$comando" --instance-id "$INSTANCE_ID" \
+            --query StandardOutputContent --output text
+          echo "::endgroup::"
+          errores="$(aws ssm get-command-invocation --command-id "$comando" --instance-id "$INSTANCE_ID" \
+            --query StandardErrorContent --output text)"
+          if [ -n "$errores" ] && [ "$errores" != "None" ]; then
+            echo "::group::Errores de desplegar.sh"
+            echo "$errores"
+            echo "::endgroup::"
+          fi
+
+          if [ "$estado" != "Success" ]; then
+            echo "::error title=Despliegue fallido::Estado del comando SSM: $estado. Si dice VUELTA ATRÁS, producción sigue en la versión anterior."
+            exit 1
+          fi
+          {
+            echo "### Desplegado en producción"
+            echo
+            echo "- Modo: \`$MODO\`"
+            echo "- SHA: \`$SHA\`"
+            if [ -n "$DIGEST_BACKEND" ]; then
+              echo "- Backend: \`$DIGEST_BACKEND\`"
+              echo "- Frontend: \`$DIGEST_FRONTEND\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

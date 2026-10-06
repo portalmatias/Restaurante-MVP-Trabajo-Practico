@@ -124,7 +124,7 @@
       `digestFrontend` y `modo`, cada uno con su `allowedPattern` o `allowedValues` de D4).
       Verificar que es JSON válido y que el comando que ejecuta es solo `desplegar.sh` con esos
       parámetros.
-- [ ] 5.4 Escribir `.github/workflows/cd.yml` según D4:
+- [x] 5.4 Escribir `.github/workflows/cd.yml` según D4:
       - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
         y `modo` validados;
       - job `decidir`, que usa la función de 5.6;
