@@ -1,0 +1,40 @@
+# Contexto de build de las imágenes de producción (backend/Dockerfile y frontend/Dockerfile se
+# construyen desde la raíz del repo). D3 de despliegue-continuo-ec2: nada de acá puede llevar
+# secretos a una imagen, y las imágenes son públicas en GHCR.
+
+# Variables de entorno y credenciales locales: nunca entran a una imagen. Los secretos de
+# producción llegan solo en runtime (D6).
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+
+# Dependencias y salidas de build locales: la imagen instala y compila las suyas.
+**/node_modules
+**/dist
+**/dist-seed
+**/.next
+**/coverage
+**/*.tsbuildinfo
+
+# Historial, herramientas y documentación que la aplicación no necesita.
+.git
+.github
+.claude
+.atl
+openspec
+docs
+openapi
+scripts
+deploy
+docker
+docker-compose.yml
+README.md
+**/*.md
+
+# Tests: no se ejecutan en la imagen.
+backend/test
+frontend/test
+**/*.spec.ts
+**/*.e2e-spec.ts
+**/*.integration-spec.ts

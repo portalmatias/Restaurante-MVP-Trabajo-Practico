@@ -47,7 +47,7 @@
 
 ## 3. Imágenes de contenedor (D3)
 
-- [ ] 3.1 Escribir `.dockerignore` y `backend/Dockerfile` (multi-stage, usuario `node`,
+- [x] 3.1 Escribir `.dockerignore` y `backend/Dockerfile` (multi-stage, usuario `node`,
       `HOST=0.0.0.0`, con `dist-seed/seed-produccion.js` compilado y `prisma/`). Verificar que
       `docker build -f backend/Dockerfile .` construye, que `docker run --rm <img> id -u` no da
       `0`, que `docker history --no-trunc` y `docker inspect` no muestran ningún valor de
