@@ -20,11 +20,13 @@ máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar d
 ## What Changes
 
 - **Despliegue monolítico en una EC2:** PostgreSQL, backend, frontend y un proxy de borde
-  corren en la misma instancia, orquestados con Docker Compose. Solo el proxy publica un
-  puerto (`80`). Base, backend y frontend quedan en una red interna de Docker.
+  corren en la misma instancia, orquestados con Docker Compose. Solo el proxy publica puertos
+  (`80` y, con el subdominio, `443`). Base, backend y frontend quedan en una red interna de
+  Docker.
 - **Imágenes de contenedor versionadas:** GitHub Actions construye las imágenes de backend y
   frontend en cada push a `main`, las etiqueta con el SHA del commit y las publica en GitHub
-  Container Registry. Las imágenes no contienen secretos.
+  Container Registry. Se despliegan por digest, así que una versión no cambia aunque alguien
+  vuelva a publicar su tag. Las imágenes no contienen secretos.
 - **Workflow de CD** (`.github/workflows/cd.yml`): corre solo cuando el CI terminó en verde
   sobre un push a `main`. Se autentica en AWS por OIDC, sin claves permanentes, con un rol que
   solo puede ejecutar el procedimiento de despliegue en esa instancia, vía SSM. No hay SSH.
@@ -43,14 +45,18 @@ máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar d
 - **Runbook** para crear la infraestructura de AWS a mano, documentado en el repositorio con
   los permisos exactos.
 
-### Riesgo aceptado: HTTP sin cifrar
+### HTTPS con un subdominio de la docente (HTTP solo como etapa transitoria)
 
-El equipo no tiene todavía dominio ni certificado, y decidió desplegar en **HTTP plano**,
-aceptando el riesgo. Con eso, el email y la contraseña del login de admin, el JWT y los datos
-de contacto de las reservas viajan sin cifrar y pueden interceptarse en la red. El change
-documenta el riesgo, lo mitiga en lo posible (contraseña de admin única y fuerte, JWT de vida
-corta, encabezados de seguridad) y deja el paso a HTTPS en un único cambio de configuración.
-**Antes de usar el sistema con datos reales de clientes hay que habilitar HTTPS.**
+La docente va a proveer un **subdominio** que apuntará a la IP elástica de la instancia, en
+cuanto se la pasemos. Con el nombre apuntado, el proxy de borde obtiene y renueva solo un
+certificado de Let's Encrypt, y producción se sirve **por HTTPS**: HTTP queda solo para
+redirigir y para el desafío de validación del certificado.
+
+Entre que existe la instancia y la docente configura el DNS, producción responde por **HTTP
+plano en la IP**. El equipo acepta ese riesgo **solo durante esa etapa transitoria**: el email
+y la contraseña del login de admin, el JWT y los datos de contacto de las reservas viajarían
+sin cifrar. Por eso, en esa etapa no se carga ningún dato real ni se usa el login de admin
+fuera de pruebas, y el paso a HTTPS es un cambio de configuración, sin tocar código.
 
 ### AWS en el Tier gratuito (propuesta de la docente)
 
@@ -81,7 +87,7 @@ credenciales. El change actualiza `config.yaml` para registrar la excepción.
 
 ### Fuera de alcance
 
-- HTTPS y dominio propio (queda preparado y documentado, no habilitado).
+- Dominio propio: se usa el subdominio que provee la docente. Su DNS lo administra ella.
 - Infraestructura como código (Terraform, CloudFormation): la infraestructura se crea a mano
   siguiendo el runbook.
 - Alta disponibilidad, balanceador, autoescalado o RDS: el despliegue es de una sola instancia
@@ -89,7 +95,8 @@ credenciales. El change actualiza `config.yaml` para registrar la excepción.
 - Mantener producción más allá del plazo del Tier gratuito: queda documentado qué hacer, pero
   la continuidad es una decisión del equipo para ese momento.
 - Entornos de staging o de vista previa por PR.
-- Monitoreo y alertas más allá de los logs de los contenedores.
+- Monitoreo y alertas operativas de la aplicación (disponibilidad, errores, latencia) más allá
+  de los logs de los contenedores. La alerta de costos de AWS Budgets sí está incluida.
 
 ## Capabilities
 
@@ -127,8 +134,8 @@ a contarse por la IP real.
 - **CI/CD:** `.github/workflows/cd.yml` nuevo. `ci.yml` suma los tests del frontend.
 - **Variables de entorno:** `.env.example` documenta `ADMIN_EMAIL` y `ADMIN_PASSWORD`, que
   solo usa el seed de producción.
-- **Documentación:** `docs/despliegue.md` (runbook de AWS, rollback, paso a HTTPS y riesgo de
-  HTTP), README y `config.yaml` (§2, §4, §10, §12).
+- **Documentación:** `docs/despliegue.md` (runbook de AWS, rollback, activación de HTTPS con
+  el subdominio y riesgo de la etapa en HTTP), README y `config.yaml` (§2, §4, §10, §12).
 - **Dependencias npm:** ninguna nueva. **Imagen nueva:** Caddy como proxy de borde
   (justificado en `design.md`).
 - **Costos:** dentro del Tier gratuito. En una cuenta del plan Free, la instancia, el disco,

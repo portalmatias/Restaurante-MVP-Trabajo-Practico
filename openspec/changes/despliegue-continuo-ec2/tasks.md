@@ -50,18 +50,23 @@
 - [ ] 3.1 Escribir `.dockerignore` y `backend/Dockerfile` (multi-stage, usuario `node`,
       `HOST=0.0.0.0`, con `dist-seed/seed-produccion.js` compilado y `prisma/`). Verificar que
       `docker build -f backend/Dockerfile .` construye, que `docker run --rm <img> id -u` no da
-      `0` y que `docker history --no-trunc` y `docker inspect` no muestran ningún valor de
-      `.env`.
+      `0`, que `docker history --no-trunc` y `docker inspect` no muestran ningún valor de
+      `.env`, y que el **sistema de archivos** de la imagen tampoco: exportarlo
+      (`docker create` + `docker export`) y verificar que no contiene ningún archivo `.env*` y que
+      `grep` no encuentra ninguno de los valores del `.env` local. Repetir la misma verificación
+      sobre la imagen del frontend en 3.2.
 - [ ] 3.2 Agregar `output: "standalone"` a `frontend/next.config.ts` y escribir
       `frontend/Dockerfile` (build-arg `NEXT_PUBLIC_API_URL=http://backend:3001`,
       `HOSTNAME=0.0.0.0`, usuario `node`). Verificar que construye, que `npm run dev` y
-      `npm run test -w frontend` siguen funcionando en local, y que el usuario no es root.
+      `npm run test -w frontend` siguen funcionando en local, que el usuario no es root, y la
+      verificación de secretos de 3.1 (historial, configuración y sistema de archivos).
 
 ## 4. Composición de producción (D1, D2, D5, D6)
 
 - [ ] 4.1 Escribir `deploy/docker-compose.prod.yml`:
       - redes `borde` e `interna` (`172.30.0.0/24`, frontend en `172.30.0.10`);
-      - **solo** `caddy` con `ports: ["80:80"]`;
+      - **solo** `caddy` con `ports: ["80:80", "443:443"]` y el volumen `caddy_data` (D1);
+      - las imágenes propias **por digest** (`image@${DIGEST_BACKEND}`), nunca por tag;
       - healthchecks, `restart: unless-stopped`, rotación de logs y `mem_limit` por servicio,
         con los parámetros de memoria de PostgreSQL y Node de D1;
       - `TRUST_PROXY=172.30.0.10` en el backend y `DATABASE_URL` armada con
@@ -69,12 +74,18 @@
 
       Verificar con `docker compose -f deploy/docker-compose.prod.yml config` que ningún otro
       servicio publica puertos.
-- [ ] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`, `reverse_proxy frontend:3000` y los
-      encabezados de D2 (incluido quitar `Server` y `X-Powered-By`). Verificar localmente,
-      levantando la composición con imágenes locales y un `.env` de prueba:
+- [ ] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`, `ACME_EMAIL`,
+      `reverse_proxy frontend:3000`, los encabezados de D2 (incluido quitar `Server` y
+      `X-Powered-By`) y HSTS solo en la etapa HTTPS. Verificar localmente, levantando la
+      composición con imágenes locales y un `.env` de prueba con `SITE_ADDRESS=:80`:
       - `curl -I http://127.0.0.1/` muestra los encabezados esperados y no muestra `Server` ni
         `X-Powered-By`;
-      - `curl http://127.0.0.1/api/zonas` responde `200`.
+      - `curl http://127.0.0.1/api/zonas` responde `200`;
+      - en la etapa HTTP no se envía `Strict-Transport-Security`.
+
+      Para la etapa HTTPS, verificar con `caddy adapt` que con `SITE_ADDRESS=ejemplo.test` la
+      configuración incluye la redirección de HTTP a HTTPS y el encabezado HSTS (la emisión real
+      del certificado se prueba en 6.6).
 - [ ] 4.3 Probar la IP real del cliente con la composición local: 6 logins fallidos desde el
       host con un `X-Forwarded-For` distinto cada uno → el sexto responde `429`. Después, un
       login desde otro contenedor de la red `borde` (otra IP) → responde `401`, no `429`.
@@ -83,30 +94,42 @@
 ## 5. Despliegue en la instancia y workflow de CD (D4, D7, D10)
 
 - [ ] 5.1 Escribir `deploy/desplegar.sh` según D7:
-      - validación del SHA y `flock`;
-      - checkout, generación de `.env` con modo `600`, pull, migraciones, seed, `up` y
-        comprobación;
-      - vuelta atrás y `prune`.
+      - validación de `sha`, digests y `modo`, y `flock`;
+      - `version_previa` leída al inicio, chequeo de ancestro en modo `despliegue` y búsqueda
+        en `historial` en modo `vuelta-atras`;
+      - checkout, generación de `.env` con modo `600` e imágenes por digest, pull,
+        migraciones, seed, `up` y comprobación;
+      - vuelta atrás a `version_previa`, registro en `VERSION_ACTUAL` e `historial`, y
+        limpieza explícita de imágenes (no `docker image prune` solo).
 
-      Verificar con `shellcheck` sin advertencias. Verificar también que con un SHA inválido
-      (`abc`, 39 caracteres o mayúsculas) termina en error sin tocar nada.
+      Verificar con `shellcheck` sin advertencias. Verificar también que termina en error sin
+      tocar nada con un SHA inválido (`abc`, 39 caracteres o mayúsculas), con un digest
+      inválido y con un `modo` desconocido.
 - [ ] 5.2 Probar `desplegar.sh` contra una máquina local o una VM con Docker, apuntando a un
       remoto de prueba:
-      - un SHA sano termina en 0 y escribe `VERSION_ACTUAL`;
-      - una imagen que no responde (por ejemplo, el frontend con un comando que sale
-        enseguida) dispara la vuelta atrás y termina en 1, con la versión anterior
-        respondiendo;
+      - un SHA sano termina en 0, escribe `VERSION_ACTUAL` y lo agrega a `historial`;
+      - con dos versiones ya desplegadas (A y después B), una versión C que no responde
+        vuelve a **B** (la que estaba sirviendo), no a A, y termina en 1;
+      - en modo `despliegue`, un SHA ancestro de la versión actual termina en 0 sin cambiar
+        nada;
+      - en modo `vuelta-atras`, un SHA que está en `historial` vuelve con sus digests
+        registrados, aunque el tag se haya vuelto a publicar con otra imagen; uno que no está
+        en `historial` se rechaza;
+      - después de tres despliegues, solo quedan en disco las imágenes de la versión actual y
+        de la anterior;
       - una migración rota corta antes del `up`.
 
       Guardar las salidas para el PR.
-- [ ] 5.3 Escribir `deploy/ssm-desplegar.json` (documento SSM con `sha` y
-      `allowedPattern: ^[0-9a-f]{40}$`). Verificar que es JSON válido y que el comando que
-      ejecuta es solo `desplegar.sh` con el parámetro.
+- [ ] 5.3 Escribir `deploy/ssm-desplegar.json` (documento SSM con `sha`, `digestBackend`,
+      `digestFrontend` y `modo`, cada uno con su `allowedPattern` o `allowedValues` de D4).
+      Verificar que es JSON válido y que el comando que ejecuta es solo `desplegar.sh` con esos
+      parámetros.
 - [ ] 5.4 Escribir `.github/workflows/cd.yml` según D4:
-      - `workflow_run` con las tres condiciones, más `workflow_dispatch` con el input `sha`
-        validado;
-      - job `imagenes` con `packages: write` y job `desplegar` con `environment: produccion`
-        e `id-token: write`;
+      - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
+        y `modo` validados;
+      - job `vigente`, que termina sin desplegar si `main` ya avanzó;
+      - job `imagenes` con `packages: write`, que no sobrescribe un tag existente y expone los
+        digests; job `desplegar` con `environment: produccion` e `id-token: write`;
       - acciones fijadas por SHA y `concurrency` sin cancelar.
 
       Verificar con `actionlint` sin errores.
@@ -122,8 +145,9 @@
         Budgets, `t3.micro` con créditos de CPU `standard`, swap, y fecha de vencimiento del
         plan Free con exportación previa por `pg_dump`;
       - vuelta atrás manual, rotación de la contraseña del admin y backups;
-      - paso a HTTPS;
-      - la sección "Riesgo aceptado: HTTP sin cifrar";
+      - activación de HTTPS con el subdominio de la docente (pasarle la IP, esperar el DNS,
+        cambiar `SITE_ADDRESS`, verificar) y cómo volver a la IP si el DNS falla;
+      - la sección "Etapa transitoria en HTTP" con el riesgo aceptado;
       - cómo apagar y eliminar los recursos.
 
       Verificar que cada recurso que usa el workflow o el script figura en el runbook.
@@ -151,6 +175,19 @@
 - [ ] 6.5 Mergear un cambio trivial a `main` y verificar que se despliega solo y que una reserva
       creada antes del despliegue sigue consultable. Reiniciar la instancia y verificar que la
       app vuelve sola con los mismos datos.
+- [ ] 6.6 Activar HTTPS cuando la docente confirme el subdominio: pasarle la IP elástica,
+      verificar con `dig +short <subdominio>` que resuelve a esa IP, cambiar
+      `/reservas/prod/config/SITE_ADDRESS` y redesplegar. Verificar:
+      - `curl -I https://<subdominio>/` responde `200` con un certificado válido (sin `-k`) y
+        con `Strict-Transport-Security`;
+      - `curl -I http://<subdominio>/reservas` responde con una redirección permanente a
+        HTTPS;
+      - después de redesplegar y de reiniciar la instancia, Caddy reutiliza el certificado (los
+        logs no muestran una emisión nueva);
+      - se rota la contraseña del admin (runbook), porque pudo haber viajado en claro en la
+        etapa HTTP.
+
+      Actualizar la documentación para indicar que producción ya está en la etapa HTTPS.
 
 ## 7. Documentación y cierre
 

@@ -8,9 +8,12 @@ se vuelve a una versión anterior.
 ## ADDED Requirements
 
 ### Requirement: Despliegue automático solo desde main con CI en verde
-El sistema SHALL desplegar a producción, sin intervención manual, cada commit que llegue a
-`main` por push y cuyo CI haya terminado en verde. SHALL NOT desplegar commits de otras ramas,
-de pull requests ni de forks, ni un commit cuyo CI haya fallado o se haya cancelado.
+El sistema SHALL desplegar a producción, sin intervención manual, el commit más reciente de
+`main` cuyo CI haya terminado en verde. Si llegan varios commits seguidos, SHALL desplegar el
+último y MAY omitir los intermedios. SHALL NOT desplegar commits de otras ramas, de pull
+requests ni de forks, ni un commit cuyo CI haya fallado o se haya cancelado. SHALL NOT
+reemplazar la versión en producción por una más vieja, salvo una vuelta atrás pedida
+explícitamente.
 
 #### Scenario: Merge a main con CI en verde
 - **WHEN** se mergea un pull request a `main` y el CI de ese commit termina en verde
@@ -31,16 +34,28 @@ de pull requests ni de forks, ni un commit cuyo CI haya fallado o se haya cancel
 - **THEN** los despliegues corren de a uno, sin superponerse
 - **AND** producción termina sirviendo el commit más reciente
 
+#### Scenario: CI viejo que termina después de uno nuevo
+- **WHEN** el CI de un commit termina en verde después de que `main` avanzó a un commit más
+  nuevo, que ya se desplegó o se va a desplegar
+- **THEN** no se despliega el commit viejo
+- **AND** el workflow informa que la versión fue superada
+
 ### Requirement: Versiones trazables e inmutables
 Cada despliegue SHALL corresponder a un único commit de `main`, identificado por su SHA
-completo. Los artefactos que se despliegan SHALL estar etiquetados con ese SHA y SHALL NOT
-modificarse después de publicados, de modo que desplegar el mismo SHA dos veces ejecute
-exactamente lo mismo.
+completo. Los artefactos que se despliegan SHALL identificarse por su contenido (digest), no
+solo por un nombre que se pueda volver a publicar. El servidor SHALL registrar qué artefactos
+exactos corresponden a cada SHA desplegado, de modo que desplegar o volver a la misma versión
+ejecute exactamente lo mismo.
 
 #### Scenario: Identificar qué versión está en producción
 - **WHEN** alguien del equipo necesita saber qué versión corre en producción
 - **THEN** el último despliegue exitoso del workflow de CD informa el SHA desplegado
 - **AND** en el servidor queda registrado el mismo SHA
+
+#### Scenario: Tag vuelto a publicar
+- **WHEN** alguien vuelve a publicar la imagen de un SHA ya desplegado con otro contenido y
+  después se vuelve a esa versión
+- **THEN** el servidor usa los artefactos registrados para ese SHA, no los del tag nuevo
 
 #### Scenario: Despliegue con un identificador inválido
 - **WHEN** el procedimiento de despliegue recibe un valor que no es un SHA completo de commit
@@ -61,9 +76,15 @@ terminar en error.
 - **THEN** el servidor vuelve a levantar la versión anterior
 - **AND** el workflow de CD termina en error, indicando que hubo vuelta atrás
 
+#### Scenario: Vuelta atrás a la versión que estaba sirviendo
+- **WHEN** falla la comprobación de una versión nueva
+- **THEN** el servidor vuelve a la versión que estaba sirviendo justo antes de ese intento, no
+  a una más vieja
+
 #### Scenario: Vuelta atrás manual
 - **WHEN** el equipo necesita volver a una versión anterior ya desplegada
-- **THEN** la documentación indica cómo desplegar ese SHA anterior sin reconstruir nada
+- **THEN** la documentación indica cómo pedir esa vuelta atrás, que no reconstruye nada
+- **AND** solo se acepta un SHA que figure entre las versiones desplegadas con éxito
 
 ### Requirement: Migraciones antes de servir la versión nueva
 El despliegue SHALL aplicar las migraciones de base de datos versionadas del commit antes de
@@ -80,8 +101,8 @@ SHALL detenerse sin levantar la versión nueva.
   en error
 
 ### Requirement: Superficie de red mínima
-Desde internet, el servidor de producción SHALL aceptar conexiones únicamente en el puerto
-HTTP del proxy de borde. La base de datos, el backend y el frontend SHALL NOT aceptar
+Desde internet, el servidor de producción SHALL aceptar conexiones únicamente en los puertos
+HTTP y HTTPS del proxy de borde. La base de datos, el backend y el frontend SHALL NOT aceptar
 conexiones directas desde fuera del servidor, y el servidor SHALL NOT exponer acceso remoto
 por SSH.
 
@@ -99,7 +120,7 @@ por SSH.
 - **THEN** la conexión no se establece
 
 #### Scenario: Acceso normal
-- **WHEN** un cliente abre `http://<IP-pública>/`
+- **WHEN** un cliente abre la dirección pública de producción
 - **THEN** recibe la aplicación servida a través del proxy de borde
 
 ### Requirement: Secretos fuera del repositorio, las imágenes y los logs
@@ -110,9 +131,9 @@ contenedor, en los argumentos del workflow ni en sus logs. En el servidor, el ar
 contiene SHALL ser legible solo por el administrador del sistema.
 
 #### Scenario: Inspeccionar una imagen publicada
-- **WHEN** alguien descarga una imagen publicada y revisa su contenido, sus capas y su
-  configuración
-- **THEN** no encuentra ningún secreto de producción
+- **WHEN** alguien descarga una imagen publicada y revisa su sistema de archivos, sus capas y
+  su configuración
+- **THEN** no encuentra ningún archivo `.env` ni ningún secreto de producción
 
 #### Scenario: Revisar los logs del workflow de CD
 - **WHEN** alguien con acceso de lectura al repositorio revisa los logs de un despliegue
@@ -193,17 +214,42 @@ cliente no puede falsificarla.
   distinto en cada intento
 - **THEN** recibe `429` en el mismo intento que si no hubiera mandado el encabezado
 
-### Requirement: Riesgo de HTTP documentado y camino a HTTPS
-Mientras producción se sirva por HTTP sin cifrar, la documentación SHALL indicar el riesgo
-aceptado (credenciales del admin, JWT y datos de contacto de las reservas viajan sin cifrar) y
-SHALL describir el paso a HTTPS como un cambio de configuración del proxy de borde y del
-firewall, sin cambios de código en la aplicación. Las respuestas SHALL incluir encabezados de
-seguridad que no dependan de HTTPS.
+### Requirement: HTTPS con el subdominio de producción
+Cuando el subdominio de producción apunte a la IP pública del servidor, el proxy de borde SHALL
+servir la aplicación por HTTPS con un certificado válido que obtiene y renueva solo. SHALL
+redirigir a HTTPS toda solicitud HTTP que no sea la validación del certificado, y las
+respuestas por HTTPS SHALL incluir `Strict-Transport-Security`. Activar HTTPS SHALL ser un
+cambio de configuración, sin cambios de código en la aplicación. Los certificados SHALL
+conservarse entre despliegues y reinicios.
+
+#### Scenario: Acceso por el subdominio
+- **WHEN** un cliente abre `https://<subdominio>/`
+- **THEN** la conexión usa un certificado válido para ese nombre y recibe la aplicación
+- **AND** la respuesta incluye `Strict-Transport-Security`
+
+#### Scenario: Acceso por HTTP con el subdominio activo
+- **WHEN** un cliente abre `http://<subdominio>/reservas`
+- **THEN** recibe una redirección permanente a `https://<subdominio>/reservas`
+
+#### Scenario: Despliegue con el certificado ya emitido
+- **WHEN** se despliega una versión nueva o se reinicia la instancia
+- **THEN** el proxy de borde reutiliza el certificado guardado, sin pedir uno nuevo
+
+### Requirement: Etapa transitoria en HTTP documentada
+Mientras el subdominio no apunte al servidor, producción MAY servirse por HTTP en la IP
+pública. La documentación SHALL indicar el riesgo aceptado para esa etapa (las credenciales del
+admin, el JWT y los datos de contacto de las reservas viajan sin cifrar) y que en ella no se
+cargan datos reales. También SHALL indicar los pasos para activar HTTPS cuando el subdominio
+esté listo.
 
 #### Scenario: Consultar el estado de seguridad del despliegue
 - **WHEN** alguien del equipo o la docente lee la documentación de despliegue
-- **THEN** encuentra que producción usa HTTP, qué datos quedan expuestos por eso y qué hace
-  falta para pasar a HTTPS
+- **THEN** encuentra si producción está en la etapa HTTP o en HTTPS, qué datos quedan
+  expuestos en la etapa HTTP y cómo se activa HTTPS con el subdominio
+
+### Requirement: Encabezados de seguridad
+Todas las respuestas de producción SHALL incluir encabezados de seguridad básicos y SHALL NOT
+exponer la versión del servidor ni del framework.
 
 #### Scenario: Encabezados de seguridad
 - **WHEN** un cliente pide cualquier página de producción

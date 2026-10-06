@@ -37,9 +37,15 @@ parezcan acotadas, hacen confiable a cualquier origen.
 - **AND** la documentación advierte que esa configuración deja los límites por máquina
 
 #### Scenario: Encabezado agregado por un cliente detrás del salto confiable
-- **WHEN** con un salto confiable declarado, el cliente envía su propio `X-Forwarded-For` y el
-  proxy de borde agrega la IP real al final
-- **THEN** el backend usa la IP que agregó el proxy, no la que inventó el cliente
+- **WHEN** con un salto confiable declarado, el cliente, cuya IP no pertenece a ningún salto
+  confiable, envía su propio `X-Forwarded-For` y el salto confiable agrega la IP real al final
+- **THEN** el backend usa la IP que agregó el salto, no la que inventó el cliente
+
+#### Scenario: Proxy de borde que reemplaza el encabezado
+- **WHEN** el proxy de borde reemplaza el `X-Forwarded-For` del cliente por la IP de la
+  conexión, como exige la condición de despliegue
+- **THEN** el backend usa esa IP aunque el cliente esté dentro de una subred declarada
+  confiable
 
 #### Scenario: Configuración que confía en todos los saltos
 - **WHEN** se intenta arrancar el backend con una configuración que confía en cualquier salto

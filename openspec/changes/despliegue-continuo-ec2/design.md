@@ -38,7 +38,7 @@ La motivación está en `proposal.md`. El enfoque depende de estos hechos del re
   para acceder a la cuenta de AWS, a la instancia o a los datos.
 - Que el rol del despliegue pueda hacer **una sola cosa**: correr el procedimiento versionado
   de despliegue con un SHA.
-- Que el paso a HTTPS no requiera tocar código de la aplicación.
+- Que activar HTTPS con el subdominio de la docente no requiera tocar código de la aplicación.
 
 **Non-Goals:**
 - Despliegue sin cortes: con una sola instancia hay unos segundos de corte por despliegue, y se
@@ -50,16 +50,19 @@ La motivación está en `proposal.md`. El enfoque depende de estos hechos del re
 
 ## Decisions
 
-### D1: Topología: una instancia, Docker Compose y un único puerto público
+### D1: Topología: una instancia, Docker Compose y un único servicio público
 
 ```
-internet ──:80──> [caddy] ──> [frontend :3000] ──/api──> [backend :3001] ──> [postgres :5432]
-                     red "borde"           red "interna" (sin salida a puertos del host)
+internet ──:80/:443──> [caddy] ──> [frontend :3000] ──/api──> [backend :3001] ──> [postgres :5432]
+                          red "borde"           red "interna" (sin salida a puertos del host)
 ```
 
-- `deploy/docker-compose.prod.yml` define cuatro servicios. **Solo `caddy` publica un puerto**
-  (`80:80`). Los demás no tienen `ports:`, así que no se pueden alcanzar desde el host ni desde
-  internet.
+- `deploy/docker-compose.prod.yml` define cuatro servicios. **Solo `caddy` publica puertos**
+  (`80:80` y `443:443`). Los demás no tienen `ports:`, así que no se pueden alcanzar desde el
+  host ni desde internet.
+- Caddy guarda certificados y claves en un volumen con nombre (`caddy_data`), que se conserva
+  entre despliegues y reinicios. Sin él, cada despliegue pediría un certificado nuevo y
+  chocaría con los límites de emisión de Let's Encrypt.
 - La red `interna` tiene una subred fija (`172.30.0.0/24`) y el frontend una IP fija
   (`172.30.0.10`). Es la única dirección que el backend declara en `TRUST_PROXY` (ver D5).
 - Caddy reenvía **todo** al frontend; el backend no tiene ruta propia en el proxy. Esto
@@ -93,8 +96,19 @@ diferencia con desarrollo que no está probada. Se descarta.
 ### D2: Caddy como proxy de borde
 
 **Decisión:** imagen oficial de Caddy con versión fija (`caddy:2.10-alpine`; se confirma el tag
-al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale de una variable
-(`SITE_ADDRESS`, hoy `:80`).
+al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale de una variable,
+`SITE_ADDRESS`, que define la etapa:
+
+- **Etapa HTTP (transitoria):** `SITE_ADDRESS=:80`, mientras el subdominio no apunte a la IP
+  elástica.
+- **Etapa HTTPS:** `SITE_ADDRESS=<subdominio>`. Caddy obtiene el certificado de Let's Encrypt
+  con el desafío HTTP-01 por el puerto 80, lo renueva solo, redirige HTTP a HTTPS y sirve por
+  443.
+
+`SITE_ADDRESS` no es secreto: va como parámetro no secreto en SSM (`/reservas/prod/config/`),
+para que activar HTTPS sea cambiar ese valor y redesplegar, sin tocar el repositorio. También se
+define `ACME_EMAIL` (el correo para avisos de vencimiento de Let's Encrypt), con una casilla del
+equipo.
 
 **Por qué Caddy y no nginx:**
 - **`X-Forwarded-For`:** desde la versión 2.5, `reverse_proxy` ignora los `X-Forwarded-*`
@@ -102,9 +116,9 @@ al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale
   Por defecto ya hace lo que exige `exposicion-red` ("un proxy de borde que **sobrescriba**
   `X-Forwarded-For`"). En nginx hay que acordarse de configurarlo, y el error típico
   (`$proxy_add_x_forwarded_for`) **agrega** el valor en lugar de reemplazarlo.
-- **HTTPS:** cambiar `SITE_ADDRESS` por un nombre de dominio hace que Caddy pida y renueve solo
-  el certificado de Let's Encrypt. Es exactamente el "un cambio de configuración" que pide la
-  spec.
+- **HTTPS:** con `SITE_ADDRESS` igual a un nombre de dominio, Caddy pide y renueva solo el
+  certificado de Let's Encrypt. Es exactamente el "un cambio de configuración" que pide la
+  spec, y no hace falta ningún cliente ACME aparte ni una tarea programada de renovación.
 
 Es una imagen nueva, no una dependencia npm. Se justifica según §2 de `config.yaml`.
 
@@ -114,7 +128,9 @@ Es una imagen nueva, no una dependencia npm. Se justifica según §2 de `config.
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - quitar `Server` y `X-Powered-By`
 
-HSTS **no** se envía sobre HTTP; se agrega al pasar a HTTPS.
+En la etapa HTTPS se agrega `Strict-Transport-Security: max-age=31536000` (sin
+`includeSubDomains` ni `preload`: el dominio padre es de la docente y no le corresponde a este
+proyecto fijar política para sus otros subdominios). Sobre HTTP no se envía HSTS.
 
 ### D3: Imágenes construidas en Actions y publicadas en GHCR con el SHA
 
@@ -132,8 +148,17 @@ HSTS **no** se envía sobre HTTP; se agrega al pasar a HTTPS.
   script `start` (que fija loopback para desarrollo).
 - `.dockerignore` excluye `.env*`, `node_modules`, `.git`, `openspec/` y los tests. Ningún
   `ARG` ni `ENV` lleva secretos: los secretos llegan solo en runtime (D6).
-- **Tags:** `ghcr.io/<owner>/reservas-backend:<sha>` y `reservas-frontend:<sha>`, sin `latest`.
-  El despliegue siempre nombra el SHA (spec: "Versiones trazables e inmutables").
+- **Tags y digests:** las imágenes se publican como `ghcr.io/<owner>/reservas-backend:<sha>` y
+  `reservas-frontend:<sha>`, sin `latest`. Pero un tag de GHCR **se puede volver a publicar**, así
+  que la inmutabilidad no puede depender de él:
+  - el job de imágenes **no sobrescribe** un tag existente: si `:<sha>` ya está publicado, toma
+    su digest y no reconstruye;
+  - el despliegue usa siempre la imagen **por digest** (`image@sha256:...`), nunca por tag;
+  - la instancia guarda cada versión como la terna SHA + digest del backend + digest del
+    frontend (ver D7), y una vuelta atrás vuelve a esa terna exacta.
+
+  Así, desplegar dos veces la misma versión ejecuta lo mismo, aunque alguien vuelva a
+  publicar el tag (spec: "Versiones trazables e inmutables").
 - **Paquetes públicos en GHCR:** el repositorio es público y las imágenes no contienen
   secretos, así que la instancia las descarga sin credenciales de registro. Publicarlas como
   privadas obligaría a guardar un token de GitHub en la instancia, y eso sí sería un secreto
@@ -160,14 +185,25 @@ El SHA se toma de `workflow_run.head_sha`, no de `github.sha`: la variable apunt
 validó el CI.
 
 **Jobs:**
-1. `imagenes`: checkout de ese SHA y `docker/build-push-action` de las dos imágenes a GHCR, con
-   `permissions: packages: write` y el `GITHUB_TOKEN`.
-2. `desplegar`: `environment: produccion`, `permissions: id-token: write, contents: read`, y
+1. `vigente`: compara el SHA con la punta actual de `main` (API de GitHub). Si `main` ya avanzó,
+   el workflow termina **en verde, sin desplegar**, con el aviso "versión superada por
+   `<sha-nuevo>`": ese commit más nuevo dispara su propio despliegue. Esto evita que un CI viejo
+   que termina después de uno nuevo vuelva a desplegar una versión anterior (`workflow_run`
+   conserva el `head_sha` de cada ejecución).
+2. `imagenes`: checkout de ese SHA y `docker/build-push-action` de las dos imágenes a GHCR, con
+   `permissions: packages: write` y el `GITHUB_TOKEN`. Si el tag ya existe, no se reconstruye
+   (D3). Expone como salida los dos digests.
+3. `desplegar`: `environment: produccion`, `permissions: id-token: write, contents: read`, y
    `aws-actions/configure-aws-credentials` con `role-to-assume`. Llama a `aws ssm send-command`
-   con el documento `reservas-desplegar` y el parámetro `sha`, espera el resultado y lo muestra.
+   con el documento `reservas-desplegar` y los parámetros `sha`, `digestBackend`,
+   `digestFrontend` y `modo=despliegue`. Espera el resultado y lo muestra.
 
 - `concurrency: { group: despliegue-produccion, cancel-in-progress: false }` hace que los
-  despliegues corran de a uno sin cortar uno a la mitad.
+  despliegues corran de a uno sin cortar uno a la mitad. GitHub deja **una sola ejecución en
+  espera** por grupo: si llegan varias, la más nueva reemplaza a la que esperaba. Por eso la spec
+  garantiza que se despliegue **el commit verde más reciente**, no cada commit intermedio.
+- **Segunda barrera en la instancia:** `desplegar.sh` rechaza en modo `despliegue` un SHA que
+  sea ancestro de la versión actual (D7).
 - Las acciones de terceros se fijan por **SHA de commit**, no por tag: el workflow maneja
   credenciales de producción.
 
@@ -187,9 +223,12 @@ acotadas" sin claves permanentes.
 
 **Documento SSM `reservas-desplegar`** (versionado en `deploy/ssm-desplegar.json`; el runbook
 lo crea y lo actualiza):
-- Recibe `sha` con `allowedPattern: ^[0-9a-f]{40}$`, así que un valor inválido se rechaza antes
-  de llegar a la instancia (spec: "Despliegue con un identificador inválido").
-- Ejecuta `/opt/reservas/repo/deploy/desplegar.sh "<sha>"`.
+- Recibe cuatro parámetros validados por SSM antes de llegar a la instancia (spec: "Despliegue
+  con un identificador inválido"):
+  - `sha`, con `allowedPattern: ^[0-9a-f]{40}$`;
+  - `digestBackend` y `digestFrontend`, con `^sha256:[0-9a-f]{64}$`;
+  - `modo`, con `allowedValues: [despliegue, vuelta-atras]`.
+- Ejecuta `/opt/reservas/repo/deploy/desplegar.sh` con esos cuatro valores.
 
 **Alternativa considerada: SSH con una clave en un secreto de GitHub.** Los runners de GitHub no
 tienen IP fija, así que el puerto 22 quedaría abierto a internet. Además, la clave sería una
@@ -236,6 +275,10 @@ entre clientes. Queda documentado en Risks.
 
 El runbook indica cómo generarlos sin que pasen por el historial del shell.
 
+**Parámetros no secretos** (`String`) bajo `/reservas/prod/config/`: `SITE_ADDRESS` (`:80` o el
+subdominio, ver D2) y `ACME_EMAIL`. Viven en SSM, y no en el repositorio, porque cambian según
+la etapa y no con el código.
+
 - **Perfil de la instancia:** `AmazonSSMManagedInstanceCore` (para recibir comandos), más una
   política propia con `ssm:GetParametersByPath` sobre `/reservas/prod/*` y `kms:Decrypt`
   condicionado a `kms:ViaService = ssm.<región>.amazonaws.com`. El rol de GitHub **no** puede
@@ -243,7 +286,7 @@ El runbook indica cómo generarlos sin que pasen por el historial del shell.
 - `desplegar.sh` escribe `/opt/reservas/.env` con `umask 077`, dueño `root` y modo `600`, y lo
   pasa a Compose con `--env-file`. Ningún secreto se imprime: el script corre sin `set -x`.
 - **Valores no secretos:** `JWT_EXPIRES_IN=60m`, `THROTTLE_*`, `TRUST_PROXY`, `HOST`, `PORT`,
-  `SITE_ADDRESS` y los tags de las imágenes. Van fijos en `docker-compose.prod.yml` o los arma el
+  y los digests de las imágenes. Van fijos en `docker-compose.prod.yml` o los arma el
   script.
 - `DATABASE_URL` lo arma Compose con `POSTGRES_PASSWORD`; no es un parámetro aparte.
 
@@ -256,32 +299,47 @@ el rol de GitHub tendría que manejar los secretos. Se descarta.
 El script corre como root vía SSM, con `set -euo pipefail` y un lock (`flock`) como segunda
 barrera contra despliegues simultáneos.
 
-1. Valida el formato del SHA otra vez (defensa en profundidad).
-2. `git -C /opt/reservas/repo fetch origin main` y `git checkout --detach <sha>`. El clon es del
-   repositorio público, sin credenciales. Así, `docker-compose.prod.yml`, el `Caddyfile` y el
-   propio script salen del mismo commit que las imágenes.
-3. Genera `.env` (D6) con los tags `<sha>`.
-4. `docker compose pull`.
-5. Levanta `postgres` y espera su healthcheck.
-6. **Migraciones:** `docker compose run --rm backend npx prisma migrate deploy`. Si falla, corta:
+Cada versión se registra como una línea `<sha> <digestBackend> <digestFrontend>`.
+`/opt/reservas/VERSION_ACTUAL` guarda la que está sirviendo, y `/opt/reservas/historial` todas
+las que se desplegaron con éxito, en orden.
+
+1. Valida el formato de los parámetros otra vez (defensa en profundidad).
+2. Lee `VERSION_ACTUAL` y la guarda como **`version_previa`**. Esa es la versión que está
+   sirviendo y a la que se vuelve si algo falla.
+3. `git -C /opt/reservas/repo fetch origin main`. En modo `despliegue`, si `<sha>` es ancestro
+   del SHA de `version_previa` (`git merge-base --is-ancestor`), termina en 0 sin tocar nada:
+   la versión está superada. Si no, `git checkout --detach <sha>`. El clon es del repositorio
+   público, sin credenciales. Así, `docker-compose.prod.yml`, el `Caddyfile` y el propio script
+   salen del mismo commit que las imágenes.
+4. Genera `.env` (D6) con las imágenes **por digest**.
+5. `docker compose pull`.
+6. Levanta `postgres` y espera su healthcheck.
+7. **Migraciones:** `docker compose run --rm backend npx prisma migrate deploy`. Si falla, corta:
    los contenedores viejos siguen arriba.
-7. **Datos iniciales:** `docker compose run --rm backend node dist-seed/seed-produccion.js`
+8. **Datos iniciales:** `docker compose run --rm backend node dist-seed/seed-produccion.js`
    (D8). Si falla, corta.
-8. `docker compose up -d --remove-orphans`.
-9. **Comprobación:** hasta 90 s de reintentos contra `http://127.0.0.1/` (espera `200`) y
-   `http://127.0.0.1/api/zonas` (espera `200` y un JSON).
-10. Si la comprobación pasa, escribe `<sha>` en `/opt/reservas/VERSION_ACTUAL` y la anterior en
-    `VERSION_ANTERIOR`. Termina en 0.
-11. Si falla, hace `checkout` de `VERSION_ANTERIOR`, regenera `.env` con esos tags y repite los
-    pasos 8 y 9. Termina en 1 con el mensaje `VUELTA ATRÁS a <sha-anterior>`, que el workflow
-    muestra.
+9. `docker compose up -d --remove-orphans`.
+10. **Comprobación:** hasta 90 s de reintentos contra el proxy de borde: la página principal
+    (espera `200`) y `/api/zonas` (espera `200` y un JSON).
+11. Si la comprobación pasa, escribe la versión nueva en `VERSION_ACTUAL`, la agrega a
+    `historial` y hace la limpieza de imágenes (abajo). Termina en 0.
+12. Si falla, vuelve a **`version_previa`**: hace su `checkout`, regenera `.env` con sus
+    digests y repite los pasos 9 y 10. `VERSION_ACTUAL` no cambia. Termina en 1 con el mensaje
+    `VUELTA ATRÁS a <sha-previo>`, que el workflow muestra.
 
-**Vuelta atrás manual:** se relanza el workflow de CD con `workflow_dispatch` y un SHA. El input
-se valida con la misma expresión y solo se acepta un SHA que tenga imágenes publicadas. No se
-reconstruye nada.
+**Limpieza de imágenes:** `docker image prune` sin `-a` solo borra imágenes sin tag, y las
+anteriores conservan su tag `<sha>`. El script borra explícitamente las imágenes de
+`reservas-backend` y `reservas-frontend` cuyo digest no sea el de `VERSION_ACTUAL` ni el de la
+versión inmediatamente anterior en `historial`. Así siempre queda lista una vuelta atrás sin
+descargar nada.
 
-**Primer despliegue:** sin `VERSION_ANTERIOR` no hay a dónde volver. El script lo informa y
-termina en 1.
+**Vuelta atrás manual:** se relanza el workflow de CD con `workflow_dispatch`, un SHA y
+`modo=vuelta-atras`. El SHA debe figurar en `historial`. El workflow no reconstruye nada:
+`desplegar.sh` toma los digests registrados en `historial` para ese SHA, no los del tag, y
+rechaza un SHA que no esté ahí. En este modo no se aplica el chequeo de ancestro del paso 3.
+
+**Primer despliegue:** sin `VERSION_ACTUAL` no hay a dónde volver. Si la comprobación falla, el
+script lo informa, deja los contenedores detenidos y termina en 1.
 
 ### D8: Seed de producción
 
@@ -327,8 +385,10 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
 - **Metadatos:** IMDSv2 obligatorio (`HttpTokens=required`), para que un SSRF no pueda leer las
   credenciales del perfil.
 - **IP elástica**, para que la URL no cambie al reiniciar.
-- **Security group:** entrada **solo TCP 80 desde `0.0.0.0/0`**. Sin 22, sin 5432, sin 3000 ni
-  3001. Salida abierta, necesaria para descargar imágenes y paquetes.
+- **Security group:** entrada **solo TCP 80 y 443 desde `0.0.0.0/0`**. El 80 sigue abierto en
+  la etapa HTTPS, porque lo usan el desafío del certificado y la redirección. Sin 22, sin 5432,
+  sin 3000 ni 3001. Salida abierta, necesaria para descargar imágenes y paquetes, y para hablar
+  con Let's Encrypt.
 - **Docker, Compose y git** instalados, y clon del repositorio en `/opt/reservas/repo`.
 - **IAM:**
   - el proveedor OIDC de GitHub;
@@ -342,9 +402,16 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
     snapshots son incrementales, pero consumen créditos);
   - un procedimiento para exportar la base con `pg_dump` y descargarla vía SSM, que se usa
     sí o sí **antes del vencimiento del plan Free**.
-- **Paso a HTTPS:** registrar un dominio, apuntarlo a la IP elástica, abrir 443 (y mantener 80
-  para el desafío ACME y la redirección), cambiar `SITE_ADDRESS` y agregar HSTS.
-- **Riesgo aceptado de HTTP** y su alcance, según la spec.
+- **Activar HTTPS con el subdominio:**
+  1. pasarle a la docente la IP elástica;
+  2. esperar a que el registro `A` del subdominio resuelva a esa IP (`dig +short <subdominio>`);
+  3. cambiar `/reservas/prod/config/SITE_ADDRESS` al subdominio y redesplegar;
+  4. verificar el certificado, la redirección y HSTS (tarea 6.6).
+
+  Si Caddy no logra emitir el certificado (DNS todavía no propagado), sigue reintentando y el
+  sitio no responde por HTTPS hasta lograrlo. En ese caso se vuelve a `SITE_ADDRESS=:80` y se
+  reintenta más tarde.
+- **Riesgo aceptado de la etapa HTTP** y su alcance, según la spec.
 
 ### D10: Tests del frontend en CI
 
@@ -355,13 +422,17 @@ una línea en un workflow, dentro de un change que justamente trata del pipeline
 
 ## Risks / Trade-offs
 
-- **[Riesgo aceptado] HTTP sin cifrar:** las credenciales del admin, el JWT y los datos de
-  contacto viajan en claro, y alguien en la misma red del cliente (por ejemplo, un Wi-Fi
-  público) puede leerlos o robar una sesión de admin.
-  → **Mitigación:** contraseña de admin única de 16 caracteres o más, que no se reutiliza en
-  ningún otro lado; JWT de 60 minutos; el admin evita loguearse desde redes públicas; no se
-  cargan datos reales de clientes hasta tener HTTPS; y el paso a HTTPS ya está preparado (D2 y
-  D9).
+- **[Riesgo aceptado, transitorio] HTTP sin cifrar** hasta que el subdominio apunte a la
+  instancia: las credenciales del admin, el JWT y los datos de contacto viajan en claro.
+  → **Mitigación:** la etapa dura solo hasta que la docente configure el DNS; en ella no se
+  cargan datos reales y el admin no se loguea desde redes públicas; la contraseña del admin es
+  única, de 16 caracteres o más; el JWT dura 60 minutos; y activar HTTPS es un cambio de
+  configuración (D2 y D9). Conviene **rotar la contraseña del admin al pasar a HTTPS**, porque
+  pudo haber viajado en claro.
+- **[Riesgo] El subdominio depende de la docente:** si el registro DNS cambia o se borra, el
+  certificado deja de renovarse y el sitio deja de responder por el nombre.
+  → **Mitigación:** Caddy avisa por mail (`ACME_EMAIL`) antes del vencimiento, y el runbook
+  indica cómo volver temporalmente a la IP.
 - **[Riesgo] Migración incompatible con la versión anterior:** la vuelta atrás automática
   levanta imágenes viejas sobre un schema ya migrado.
   → **Mitigación:** las migraciones se escriben compatibles hacia atrás (agregar antes que
@@ -370,8 +441,8 @@ una línea en un workflow, dentro de un change que justamente trata del pipeline
 - **[Riesgo] Corte de unos segundos en cada despliegue** (recreación de contenedores).
   → Se acepta para el MVP.
 - **[Riesgo] Disco o memoria agotados** (imágenes viejas, logs).
-  → **Mitigación:** rotación de logs (D1) y `docker image prune` en `desplegar.sh`, que conserva
-  las imágenes de `VERSION_ACTUAL` y `VERSION_ANTERIOR`.
+  → **Mitigación:** rotación de logs (D1) y la limpieza explícita de imágenes de D7, que solo
+  conserva la versión actual y la inmediatamente anterior.
 - **[Riesgo] Una acción de terceros comprometida** en el workflow de CD.
   → **Mitigación:** acciones fijadas por SHA, permisos mínimos por job, y un rol que no puede
   leer secretos ni ejecutar comandos arbitrarios.
@@ -404,10 +475,11 @@ una línea en un workflow, dentro de un change que justamente trata del pipeline
    que exista la infraestructura: sin `INSTANCE_ID` en el environment, el job `desplegar`
    termina en error con un mensaje claro y no afecta al CI.
 2. Crear la infraestructura siguiendo `docs/despliegue.md` y cargar los parámetros.
-3. Primer despliegue manual con `workflow_dispatch` usando el SHA de `main`, y verificación de
-   la tarea 6.
-4. Desde ahí, cada merge a `main` se despliega solo.
-5. **Rollback del change completo:** deshabilitar el workflow de CD desde GitHub (la instancia
+3. Primer despliegue manual con `workflow_dispatch` usando el SHA de `main`, en la etapa HTTP, y
+   verificación de la tarea 6.
+4. Pasarle a la docente la IP elástica y, cuando el subdominio resuelva, activar HTTPS (D9).
+5. Desde ahí, el commit verde más reciente de `main` se despliega solo.
+6. **Rollback del change completo:** deshabilitar el workflow de CD desde GitHub (la instancia
    sigue sirviendo la última versión) y, si hace falta, detener la instancia.
 
 ## Open Questions
