@@ -111,7 +111,7 @@ Hay tres tipos de valores, y cada uno se guarda y viaja distinto:
 |---|---|---|
 | Instantes (por ejemplo, cuándo se creó una reserva) | ISO 8601 en **UTC** | un momento exacto |
 | `fecha` de una reserva | `YYYY-MM-DD` | un día del calendario local del restaurante, sin hora ni zona |
-| `horaInicio` y `horaFin` de un turno | `HH:mm` | una hora local del restaurante, sin fecha ni zona |
+| `horaInicio` y `horaFin` de un turno | `HH:mm` en las respuestas de reservas; en `GET /turnos` y `/admin/turnos`, ISO 8601 con fecha fija `1970-01-01` (por ejemplo `1970-01-01T20:00:00.000Z`) | una hora local del restaurante, sin fecha ni zona: en el formato ISO solo vale la parte de la hora, y la `Z` no indica UTC |
 
 Para validar anticipación, ventana de cancelación y no-show, el backend combina la `fecha` y
 la hora del turno con el offset fijo de Argentina (UTC−3, `America/Argentina/Buenos_Aires`) y
