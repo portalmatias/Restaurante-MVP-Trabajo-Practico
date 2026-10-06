@@ -144,6 +144,11 @@ jobs:
       - name: Tests de integracion del backend (contra Postgres real)
         run: npm run test:integration -w backend
 
+      # D10 de despliegue-continuo-ec2: el CD despliega lo que pasa este CI, así que un PR
+      # no puede romper el frontend sin que nada lo frene antes de producción.
+      - name: Tests del frontend
+        run: npm run test:frontend
+
       # La comparacion de contratos de scripts/openapi-diff.mjs es logica pura y sutil
       # (que diferencias de orden son deriva y cuales no). Se testea aparte, sin build.
       - name: Tests de las utilidades de scripts/
