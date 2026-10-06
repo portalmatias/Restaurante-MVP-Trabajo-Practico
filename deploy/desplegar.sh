@@ -8,11 +8,12 @@
 #   desplegar.sh <sha> <digestBackend> <digestFrontend> <modo>
 #
 #   sha             SHA completo del commit de main (40 caracteres hexadecimales en minúscula).
-#   digestBackend   digest de la imagen del backend  (sha256:<64 hex>).
-#   digestFrontend  digest de la imagen del frontend (sha256:<64 hex>).
-#   modo            `despliegue` o `vuelta-atras`. En `vuelta-atras` el SHA tiene que figurar
-#                   en el historial y se usan los digests registrados ahí; los recibidos se
-#                   ignoran.
+#   digestBackend   digest de la imagen del backend  (sha256:<64 hex>, o vacío).
+#   digestFrontend  digest de la imagen del frontend (sha256:<64 hex>, o vacío).
+#   modo            `despliegue` o `vuelta-atras`. En `despliegue` los dos digests son
+#                   obligatorios. En `vuelta-atras` el workflow los manda vacíos: el SHA tiene
+#                   que figurar en el historial y se usan los digests registrados ahí (si
+#                   llegara alguno, se ignora).
 #
 # Códigos de salida: 0 desplegado (o versión ya superada, sin cambios); 1 falló (con vuelta
 # atrás si había una versión previa); 2 parámetros inválidos (no se tocó nada).
@@ -55,12 +56,18 @@ main() {
     error "SHA inválido: tiene que ser el SHA completo del commit (40 caracteres hexadecimales en minúscula)."
     return 2
   fi
-  if ! [[ "$digest_backend" =~ ^sha256:[0-9a-f]{64}$ ]] || ! [[ "$digest_frontend" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  # Los digests pueden llegar vacíos (el documento SSM los admite así para la vuelta atrás),
+  # pero si vienen, con el formato exacto.
+  if ! [[ "$digest_backend" =~ ^(sha256:[0-9a-f]{64})?$ ]] || ! [[ "$digest_frontend" =~ ^(sha256:[0-9a-f]{64})?$ ]]; then
     error "digest inválido: el formato esperado es sha256:<64 caracteres hexadecimales>."
     return 2
   fi
   if [ "$modo" != "despliegue" ] && [ "$modo" != "vuelta-atras" ]; then
     error "modo inválido: tiene que ser 'despliegue' o 'vuelta-atras'."
+    return 2
+  fi
+  if [ "$modo" = "despliegue" ] && { [ -z "$digest_backend" ] || [ -z "$digest_frontend" ]; }; then
+    error "en modo despliegue hacen falta los dos digests (los publica el job imagenes del workflow)."
     return 2
   fi
 
