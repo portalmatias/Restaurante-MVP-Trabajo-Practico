@@ -1,6 +1,6 @@
 ## 1. Prerrequisitos
 
-- [ ] 1.1 Crear `feature/despliegue-continuo-ec2` desde `main` y confirmar que se cumplen los
+- [x] 1.1 Crear `feature/despliegue-continuo-ec2` desde `main` y confirmar que se cumplen los
       hechos de `design.md` (Context): sin Dockerfiles, `next.config.ts` con el rewrite de
       `/api`, `main.ts` con `HOST || '127.0.0.1'` y `configurarRed`, y `prisma` como
       dependencia de producción. Si algo cambió, anotarlo en la descripción del PR.
@@ -16,7 +16,7 @@
       cursada. Anotar el resultado, sin datos de la cuenta, en el PR. Si no entra, frenar y
       decidirlo con el equipo antes de seguir.
 
-- [ ] 1.4 Cubrir los escenarios modificados de `exposicion-red`:
+- [x] 1.4 Cubrir los escenarios modificados de `exposicion-red`:
       - confirmar que los tests unitarios de `configurar-red` ya rechazan `10.0.0.0/7` y
         admiten `10.0.0.0/8`;
       - agregar en `backend/test/exposicion-red.e2e-spec.ts` el caso "Confianza declarada solo
