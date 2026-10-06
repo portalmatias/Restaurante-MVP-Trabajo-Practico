@@ -55,7 +55,7 @@
       (`docker create` + `docker export`) y verificar que no contiene ningún archivo `.env*` y que
       `grep` no encuentra ninguno de los valores del `.env` local. Repetir la misma verificación
       sobre la imagen del frontend en 3.2.
-- [ ] 3.2 Agregar `output: "standalone"` a `frontend/next.config.ts` y escribir
+- [x] 3.2 Agregar `output: "standalone"` a `frontend/next.config.ts` y escribir
       `frontend/Dockerfile` (build-arg `NEXT_PUBLIC_API_URL=http://backend:3001`,
       `HOSTNAME=0.0.0.0`, usuario `node`). Verificar que construye, que `npm run dev` y
       `npm run test -w frontend` siguen funcionando en local, que el usuario no es root, y la

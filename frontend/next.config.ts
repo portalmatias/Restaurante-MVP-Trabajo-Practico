@@ -21,6 +21,11 @@ if (existsSync(envRaiz)) {
 }
 
 const nextConfig: NextConfig = {
+  // D3 de despliegue-continuo-ec2: el build deja en `.next/standalone` un `server.js` mínimo
+  // con solo las dependencias que usa, para la imagen de producción (frontend/Dockerfile).
+  // No cambia `next dev` ni `next start`. Verificado contra
+  // node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md.
+  output: "standalone",
   // D6 de openspec/changes/frontend-base/design.md: proxy de mismo origen para que el
   // navegador nunca llame directo al backend (evita configurar CORS en backend/). Verificado
   // contra node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/
