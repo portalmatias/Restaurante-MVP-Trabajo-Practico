@@ -10,10 +10,11 @@ se vuelve a una versión anterior.
 ### Requirement: Despliegue automático solo desde main con CI en verde
 El sistema SHALL desplegar a producción, sin intervención manual, el commit más reciente de
 `main` cuyo CI haya terminado en verde. Si llegan varios commits seguidos, SHALL desplegar el
-último y MAY omitir los intermedios. SHALL NOT desplegar commits de otras ramas, de pull
-requests ni de forks, ni un commit cuyo CI haya fallado o se haya cancelado. SHALL NOT
-reemplazar la versión en producción por una más vieja, salvo una vuelta atrás pedida
-explícitamente.
+último que tenga el CI en verde y MAY omitir los intermedios. Un commit verde SHALL omitirse
+solo si un commit posterior de `main` también tiene el CI en verde. SHALL NOT desplegar commits
+de otras ramas, de pull requests ni de forks, ni un commit cuyo CI haya fallado o se haya
+cancelado, tampoco a pedido manual. SHALL NOT reemplazar la versión en producción por una más
+vieja, salvo una vuelta atrás pedida explícitamente.
 
 #### Scenario: Merge a main con CI en verde
 - **WHEN** se mergea un pull request a `main` y el CI de ese commit termina en verde
@@ -35,10 +36,21 @@ explícitamente.
 - **AND** producción termina sirviendo el commit más reciente
 
 #### Scenario: CI viejo que termina después de uno nuevo
-- **WHEN** el CI de un commit termina en verde después de que `main` avanzó a un commit más
-  nuevo, que ya se desplegó o se va a desplegar
+- **WHEN** el CI de un commit termina en verde después de que un commit posterior de `main` ya
+  tiene el CI en verde
 - **THEN** no se despliega el commit viejo
 - **AND** el workflow informa que la versión fue superada
+
+#### Scenario: Commit posterior con CI en rojo o todavía corriendo
+- **WHEN** el CI de un commit termina en verde y el único commit posterior de `main` tiene el
+  CI en rojo o todavía no terminó
+- **THEN** se despliega el commit verde
+- **AND** si el posterior termina después en verde, se despliega también
+
+#### Scenario: Despliegue manual de un commit no válido
+- **WHEN** alguien pide a mano un despliegue (no una vuelta atrás) de un commit que no está en
+  `main`, cuyo CI no terminó en verde, o que es más viejo que otro commit verde de `main`
+- **THEN** el pedido se rechaza sin modificar producción
 
 ### Requirement: Versiones trazables e inmutables
 Cada despliegue SHALL corresponder a un único commit de `main`, identificado por su SHA
@@ -102,7 +114,8 @@ SHALL detenerse sin levantar la versión nueva.
 
 ### Requirement: Superficie de red mínima
 Desde internet, el servidor de producción SHALL aceptar conexiones únicamente en los puertos
-HTTP y HTTPS del proxy de borde. La base de datos, el backend y el frontend SHALL NOT aceptar
+HTTP y HTTPS del proxy de borde. Mientras producción esté en la etapa HTTP, SHALL aceptarlas
+solo desde las direcciones del equipo. La base de datos, el backend y el frontend SHALL NOT aceptar
 conexiones directas desde fuera del servidor, y el servidor SHALL NOT exponer acceso remoto
 por SSH.
 
@@ -117,6 +130,11 @@ por SSH.
 
 #### Scenario: Intento de SSH
 - **WHEN** desde internet se intenta abrir una sesión SSH contra la IP pública
+- **THEN** la conexión no se establece
+
+#### Scenario: Acceso de un tercero en la etapa HTTP
+- **WHEN** en la etapa HTTP alguien fuera de las direcciones del equipo intenta conectarse al
+  puerto HTTP
 - **THEN** la conexión no se establece
 
 #### Scenario: Acceso normal
@@ -138,6 +156,15 @@ contiene SHALL ser legible solo por el administrador del sistema.
 #### Scenario: Revisar los logs del workflow de CD
 - **WHEN** alguien con acceso de lectura al repositorio revisa los logs de un despliegue
 - **THEN** no encuentra ningún secreto de producción
+
+### Requirement: Credenciales de la instancia fuera del alcance de los contenedores
+Los contenedores de la aplicación SHALL NOT poder obtener las credenciales del rol de la
+instancia, que leen los secretos de producción.
+
+#### Scenario: Contenedor que consulta los metadatos de la instancia
+- **WHEN** desde cualquier contenedor se pide un token o credenciales al servicio de metadatos
+  de la instancia
+- **THEN** la solicitud no obtiene respuesta
 
 ### Requirement: Credenciales de despliegue temporales y acotadas
 El workflow de CD SHALL autenticarse en AWS con credenciales temporales emitidas para cada
@@ -216,7 +243,8 @@ cliente no puede falsificarla.
 
 ### Requirement: HTTPS con el subdominio de producción
 Cuando el subdominio de producción apunte a la IP pública del servidor, el proxy de borde SHALL
-servir la aplicación por HTTPS con un certificado válido que obtiene y renueva solo. SHALL
+servir la aplicación por HTTPS con un certificado válido que obtiene y renueva solo. Un control
+automático SHALL avisar al equipo si el certificado está por vencer o deja de ser válido. SHALL
 redirigir a HTTPS toda solicitud HTTP que no sea la validación del certificado, y las
 respuestas por HTTPS SHALL incluir `Strict-Transport-Security`. Activar HTTPS SHALL ser un
 cambio de configuración, sin cambios de código en la aplicación. Los certificados SHALL
@@ -230,6 +258,11 @@ conservarse entre despliegues y reinicios.
 #### Scenario: Acceso por HTTP con el subdominio activo
 - **WHEN** un cliente abre `http://<subdominio>/reservas`
 - **THEN** recibe una redirección permanente a `https://<subdominio>/reservas`
+
+#### Scenario: Certificado por vencer
+- **WHEN** al certificado de producción le quedan menos de 21 días de validez o deja de ser
+  válido
+- **THEN** el control automático falla y el equipo recibe el aviso de GitHub
 
 #### Scenario: Despliegue con el certificado ya emitido
 - **WHEN** se despliega una versión nueva o se reinicia la instancia

@@ -9,8 +9,8 @@
       Caddy de ese tag que `reverse_proxy` ignora los `X-Forwarded-For` entrantes de orígenes no
       confiables (D2). Anotar los tags y el enlace a la documentación en el PR.
 - [ ] 1.3 Confirmar el régimen del Tier gratuito de la cuenta de AWS que se va a usar: fecha de
-      creación (antes o después del 15 de julio de 2025), plan (Free o pago), saldo de créditos
-      y fecha de vencimiento. Estimar con la AWS Pricing Calculator el consumo mensual de
+      creación, plan (Free o pago), saldo de créditos y fecha de vencimiento del plan, y
+      **compararla con la fecha de entrega del TP**. Estimar con la AWS Pricing Calculator el consumo mensual de
       `t3.micro` + EBS de 20 GB + IPv4 pública + snapshots en la región elegida (D9), y
       verificar que entra en los créditos o en los límites gratuitos hasta el fin de la
       cursada. Anotar el resultado, sin datos de la cuenta, en el PR. Si no entra, frenar y
@@ -74,7 +74,7 @@
 
       Verificar con `docker compose -f deploy/docker-compose.prod.yml config` que ningún otro
       servicio publica puertos.
-- [ ] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`, `ACME_EMAIL`,
+- [ ] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`,
       `reverse_proxy frontend:3000`, los encabezados de D2 (incluido quitar `Server` y
       `X-Powered-By`) y HSTS solo en la etapa HTTPS. Verificar localmente, levantando la
       composición con imágenes locales y un `.env` de prueba con `SITE_ADDRESS=:80`:
@@ -127,7 +127,7 @@
 - [ ] 5.4 Escribir `.github/workflows/cd.yml` según D4:
       - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
         y `modo` validados;
-      - job `vigente`, que termina sin desplegar si `main` ya avanzó;
+      - job `decidir`, que usa la función de 5.6;
       - job `imagenes` con `packages: write`, que no sobrescribe un tag existente y expone los
         digests; job `desplegar` con `environment: produccion` e `id-token: write`;
       - acciones fijadas por SHA y `concurrency` sin cancelar.
@@ -135,6 +135,22 @@
       Verificar con `actionlint` sin errores.
 - [ ] 5.5 Agregar `npm run test:frontend` al job de tests de `ci.yml` (D10). Verificar en el
       PR que el job lo ejecuta y queda en verde.
+- [ ] 5.6 Escribir primero los tests y después `scripts/cd/decidir-despliegue.mjs` (D4, D10),
+      con un caso por escenario del requisito "Despliegue automático solo desde main con CI en
+      verde":
+      - "CI en rojo sobre main" (no despliega);
+      - "Dos merges seguidos" y "CI viejo que termina después de uno nuevo" (el viejo se omite
+        si hay un posterior verde);
+      - "Commit posterior con CI en rojo o todavía corriendo" (el verde se despliega);
+      - "Despliegue manual de un commit no válido" (fuera de `main`, CI no verde o superado);
+      - vuelta atrás manual a un SHA de `main` (se acepta aunque esté superado).
+
+      Verificar que fallan sin la implementación y que pasan con `npm run test:scripts`.
+- [ ] 5.7 Escribir `.github/workflows/certificado.yml` (D2): ejecución diaria y manual, que
+      solo corre si existe la variable `SUBDOMINIO`, y falla si el certificado no es válido para
+      ese nombre o le quedan menos de 21 días. Verificar con `actionlint`, y probar el chequeo
+      contra un sitio con certificado válido y contra uno vencido (por ejemplo,
+      `expired.badssl.com`).
 
 ## 6. Infraestructura y primer despliegue (D9)
 
@@ -143,7 +159,10 @@
         de la instancia), el security group y los parámetros de SSM;
       - cuenta y costos: MFA en root, usuarios IAM con MFA, sin Organizations, alerta de
         Budgets, `t3.micro` con créditos de CPU `standard`, swap, y fecha de vencimiento del
-        plan Free con exportación previa por `pg_dump`;
+        plan Free (comparada con la entrega del TP) con exportación previa por `pg_dump`;
+      - metadatos: IMDSv2 obligatorio y límite de saltos 1;
+      - security group por etapa: IPs del equipo en la etapa HTTP (y cómo actualizarlas),
+        `0.0.0.0/0` en 80 y 443 al activar HTTPS;
       - vuelta atrás manual, rotación de la contraseña del admin y backups;
       - activación de HTTPS con el subdominio de la docente (pasarle la IP, esperar el DNS,
         cambiar `SITE_ADDRESS`, verificar) y cómo volver a la IP si el DNS falla;
@@ -161,6 +180,12 @@
 - [ ] 6.3 Verificar desde afuera de AWS la superficie y las credenciales, y guardar las salidas
       (sin IPs ni ARNs que no hagan falta) en el PR:
       - `nc -zv <IP> 22`, `5432`, `3000` y `3001` no conectan;
+      - en la etapa HTTP, `curl http://<IP>/` desde una red fuera de las IPs del equipo (por
+        ejemplo, datos del celular) no conecta;
+      - `aws ec2 describe-instances` muestra `HttpTokens=required` y
+        `HttpPutResponseHopLimit=1`, y desde un contenedor
+        (`docker compose exec backend`) un `PUT` a `http://169.254.169.254/latest/api/token`
+        no obtiene respuesta;
       - login con las credenciales del README → `401`;
       - login con las de producción → `200`;
       - `GET /api/reservas/...` de una reserva de ejemplo → no existe;
@@ -185,15 +210,15 @@
       - después de redesplegar y de reiniciar la instancia, Caddy reutiliza el certificado (los
         logs no muestran una emisión nueva);
       - se rota la contraseña del admin (runbook), porque pudo haber viajado en claro en la
-        etapa HTTP.
+        etapa HTTP;
+      - se crea la variable `SUBDOMINIO` y una ejecución manual de `certificado.yml` termina en
+        verde.
 
       Actualizar la documentación para indicar que producción ya está en la etapa HTTPS.
 
 ## 7. Documentación y cierre
 
 - [ ] 7.1 Actualizar `config.yaml`:
-      - §2: excepción de AWS como infraestructura de despliegue, a propuesta de la docente y
-        dentro del Tier gratuito;
       - §4: `deploy/`, los Dockerfiles y `cd.yml`;
       - §10: `ADMIN_EMAIL` y `ADMIN_PASSWORD` solo para el seed de producción;
       - §12: workflow de CD.
