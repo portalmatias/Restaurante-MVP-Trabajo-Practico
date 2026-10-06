@@ -50,6 +50,10 @@ WORKDIR /app/backend
 COPY --from=build --chown=root:root /app/node_modules /app/node_modules
 COPY --from=build --chown=root:root /app/package.json /app/package.json
 COPY --from=build --chown=root:root /app/backend/package.json ./package.json
+# Dependencias que npm no puede elevar a la raíz (por ejemplo, @nestjs/config, que pide otra
+# versión de dotenv que la del resto del monorepo) quedan en backend/node_modules. Sin esta
+# copia la app no arranca: "Cannot find module '@nestjs/config'".
+COPY --from=build --chown=root:root /app/backend/node_modules ./node_modules
 COPY --from=build --chown=root:root /app/backend/dist ./dist
 COPY --from=build --chown=root:root /app/backend/dist-seed ./dist-seed
 COPY --from=build --chown=root:root /app/backend/prisma ./prisma
@@ -57,6 +61,12 @@ COPY --from=build --chown=root:root /app/backend/prisma ./prisma
 # Los archivos quedan de root y de solo lectura para el proceso: `node` no puede modificar el
 # código ni las dependencias aunque el contenedor no sea read_only.
 USER node
+
+# Prueba de humo: cargar el módulo raíz de la app y el seed de producción resuelve todas sus
+# dependencias sin conectarse a nada. Si falta un paquete en la imagen, el build falla acá y no
+# en el despliegue (pasó con backend/node_modules; ver la copia de arriba).
+RUN node -e "require('./dist/src/app.module.js'); require('./dist-seed/seed-produccion.js')"
+
 EXPOSE 3001
 
 # `nest build` deja la entrada en dist/src/main.js (compila también prisma/, así que la raíz
