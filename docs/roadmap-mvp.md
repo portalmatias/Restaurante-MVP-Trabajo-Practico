@@ -4,76 +4,72 @@
 > deja asentados los huecos que hoy bloquean la Definition of Done de `openspec/config.yaml` §13.
 > Las referencias con "§" apuntan a secciones del campo `context:` de `openspec/config.yaml`.
 
-## Estado al 2026-09-22
+## Estado al 2026-10-06
 
-Foto de GitHub al 2026-09-22 (actualizada por última vez ese día; el resto del documento
-puede tener fecha de redacción anterior). Distingue código mergeado, PRs abiertos y trabajo pendiente;
-un check verde o una aprobación no significa que una funcionalidad esté habilitada.
-Las secciones siguientes conservan la secuencia y el reparto original, con sus estados
-actualizados. Los estados de los PRs deben volver a consultarse antes de integrar cambios.
+Foto de GitHub y de `main` (`ada5c76`) al 2026-10-06. GitHub es la fuente de verdad para el
+estado de cada PR: antes de integrar, volvé a consultarlo con `gh pr list --state open` y
+`gh pr checks <numero>`. El estado del check de cubic no implica que sus observaciones estén
+resueltas.
 
-### Entregas y dependencias
+### Resumen
 
-| Change / etapa | Responsable | Estado comprobado | Próximo paso |
+- **Backend del MVP completo:** disponibilidad, creación, consulta y cancelación de reservas,
+  flujo VIP, gestión del salón, autenticación de admin y límites de solicitudes. Todo está
+  mergeado y archivado; sus requisitos viven en `openspec/specs/` (13 capacidades).
+- **Frontend:** el panel de admin está terminado y archivado. Al frontend del cliente le
+  falta solo el cierre (sección 7 de su `tasks.md`).
+- **Abierto:** despliegue continuo a AWS (`despliegue-continuo-ec2`, spec en revisión en
+  #71).
+
+### Changes
+
+| Change | Responsable | Estado | Próximo paso |
 |---|---|---|---|
-| Fundación | portalmatias | Implementación #10/#11 mergeada; archivada en #13. Consigna y requerimientos incorporados en #4. | Mantener CI y reconfirmar opciones de revisión de `main` (ver abajo). |
-| `modelo-dominio` | FedeWerk | Spec #7 e implementación #12 mergeadas: schema, migraciones, seed, invariantes y helpers horarios. | Verificar DoD antes de archivar; todavía figura como change activo. |
-| `ci-integracion-db` | FedeWerk | Spec #26 e implementación #28 mergeadas (2026-09-21). PostgreSQL corre en el job `test` de `main`: migra, seedea y ejecuta unitarios, e2e e integración. | Cerrado. Verificar DoD antes de archivar. |
-| `auth-admin` | FedeWerk | Spec #9 e implementación #25 mergeadas (2026-09-21). El registro en `AppModule` y el contrato OpenAPI de `/auth/login`, pendientes de ese PR, los completó #33 (`feature/auth-registro-contrato`, mergeado 2026-09-21): `main` ya tiene `AuthModule` importado en `app.module.ts` y `/auth/login` en `openapi/openapi.yaml`. Cerrado. | Verificar DoD antes de archivar. |
-| `disponibilidad` | portalmatias | Specs #19/#21 e implementación #36 mergeadas (2026-09-22): `GET /disponibilidad` con el validador compartido, ya reutilizado por `reservas-crear`. Cerrado. | Verificar DoD antes de archivar. |
-| `gestion-salon` | lussofacundo-iresm | Spec #15 y corrección de baja histórica #20 mergeadas; services/DTOs/tests en #24. #27 (abierto) agrega los tres controllers y registra `ZonasModule`/`MesasModule`/`HorariosModule` en `AppModule` (ya no bloqueado, con Postgres en CI) y su contrato OpenAPI. **Nota de coordinación:** #27 y #33 tocaron el registro de `AuthModule` en paralelo sin saberlo — #33 mergeó primero; #27 se rebaseó sobre `main` después y no duplica ese trabajo, solo agrega sus propios módulos. | Obtener revisión de #27 y mergear. |
-| `reservas-crear` | portalmatias | Spec #22 e implementación #40 mergeadas (2026-09-28): `POST /reservas` sobre el validador compartido de `disponibilidad`. Cerrado. | Verificar DoD antes de archivar. |
-| `reserva-consultar` | FedeWerk | Spec #32 mergeada (2026-09-21): define `POST /reservas/consultar` (código + email en el body, no `GET`, para no exponer el email en la URL ni en logs de acceso) y `GET /admin/reservas`. Implementación completa en #35 (2026-09-28, tras el merge de `reservas-crear` #40): controller, listado de admin y contrato OpenAPI, con `GET /admin/reservas` en un `ReservasAdminController` propio (`/admin/reservas` no puede vivir dentro de `ReservasController`, que ya tiene el prefijo `/reservas` — ver design.md). | Obtener revisión de #35 y mergear. |
-| `cancelacion-turnos` | lussofacundo-iresm | Spec #16 y ajuste UTC−3 #23 mergeados; implementación pendiente. Ya no bloqueada: `reservas-crear` (#40) mergeó. | Reutilizar `ReservasService.buscarPorCodigoYEmail` (de #35) y sumar `PATCH /admin/reservas/:id/no-show` a `ReservasAdminController`, no a `ReservasController` (ver design.md de `reserva-consultar`, D6). |
-| `reserva-vip` | lussofacundo-iresm | Spec #17 mergeada; implementación pendiente. Ya no bloqueada: `reservas-crear` (#40) mergeó y auth ya está registrado. | Sumar `.../confirmar` y `.../rechazar` a `ReservasAdminController`, no a `ReservasController` (ver design.md de `reserva-consultar`, D6). |
-| `catalogo-publico` | portalmatias | Spec en curso (`openspec/changes/catalogo-publico/`): `GET /zonas` y `GET /turnos`, públicos y de solo lectura, para que `frontend-cliente` obtenga los ids de zona y turno sin usar los endpoints de `/admin`. | Implementar antes de `frontend-cliente`; no bloquea a `disponibilidad` ni a `reservas-crear`. |
-| Frontend funcional | portalmatias (`frontend-base`, `frontend-cliente`) / FedeWerk (`frontend-admin`) | Solo base generada de Next.js; sin PRs abiertos de pantallas. | Preparar `frontend-base` y contratos/tipos según §9. |
-| `entrega-final` | lussofacundo-iresm | Pendiente. | Preparar checklist; no cerrar hasta completar los flujos y la DoD. |
+| `diseno-general-app`, `fundacion-repo` | equipo / portalmatias | Archivados (2026-09-07 y 2026-09-14). | — |
+| `modelo-dominio` | FedeWerk | Archivado (#46). | — |
+| `ci-integracion-db` | FedeWerk | Archivado (#46). | — |
+| `auth-admin` | FedeWerk | Archivado (#46). | — |
+| `gestion-salon` | lussofacundo-iresm | Archivado (#46). | — |
+| `disponibilidad` | portalmatias | Archivado (#39). | — |
+| `reservas-crear` | portalmatias | Archivado (#46). | — |
+| `reserva-consultar` | FedeWerk | Archivado (#47). | — |
+| `frontend-base` | portalmatias | Archivado (#47). | — |
+| `catalogo-publico` | portalmatias | Archivado (#55). | — |
+| `cancelacion-turnos` | lussofacundo-iresm | Implementado en #50 y #49; archivado (#59). | — |
+| `reserva-vip` | lussofacundo-iresm | Implementado en #56; archivado (#59). | — |
+| `frontend-admin` | FedeWerk | Implementado en #58; archivado (#64). | — |
+| `throttle-rutas-admin` | FedeWerk | Spec #60, implementación #66; archivado (#70). | — |
+| `exposicion-red-local` | FedeWerk | Spec #62, implementación #68; archivado (#69). | — |
+| `frontend-cliente` | portalmatias | 44/53 tareas: tramos 1 a 6 mergeados (#52, #53, #54, #57, #61, #67). | Sección 7 (cierre: accesibilidad, DoD) y archivar. |
+| `despliegue-continuo-ec2` | FedeWerk | Spec en revisión (#71). Incluye una delta MODIFIED de `exposicion-red` que precisa el salto confiable y el prefijo mínimo (observaciones de cubic en #69). | Aprobar #71; después, PR de implementación y creación de la infraestructura en AWS (Tier gratuito). |
+| `entrega-final` | lussofacundo-iresm | Pendiente. | Checklist contra la consigna: README con arquitectura, specs completas y válidas, historial de PRs y de ejecuciones verdes de CI. |
 
-### PRs abiertos y revisión
+### Orden recomendado
 
-**Nota de mantenimiento (agregada 2026-09-22, a pedido de portalmatias):** esta sección
-detallaba el estado individual de cada PR abierto, y se desactualizó sola en cuestión de
-horas — #25/#26/#28 pasaron de "abiertos, pedir revisión" a mergeados entre que se escribió
-y que se revisó. GitHub es la fuente de verdad para qué PR está abierto, aprobado o
-mergeado; esta sección ya no intenta duplicarla en detalle, solo linkea:
+1. **Revisión de #71** (spec de despliegue): la puede revisar portalmatias o
+   lussofacundo-iresm.
+2. **Cierre de `frontend-cliente`** (portalmatias): sección 7 y archivado.
+3. **Implementación de `despliegue-continuo-ec2`** (FedeWerk), recién con #71 aprobado
+   (`config.yaml` §14). El dominio será un subdominio que provee la docente: se le pasa la IP
+   elástica cuando exista la instancia.
+4. **`entrega-final`** (lussofacundo-iresm), cuando estén cerrados los dos changes anteriores.
 
-```bash
-gh pr list --state open
-gh pr checks <numero>       # el estado del check de Cubic no implica que sus observaciones estén resueltas
-```
+### Reparto del trabajo
 
-Quedan abiertos: [#27 — controllers y contrato de `gestion-salon`](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/27)
-(esperando revisión de un compañero) y este mismo roadmap
-([#29](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/29)).
-
-### Orden recomendado y trabajo disponible
-
-1. ~~**Matías:** revisar #28 ya corregido; coordinar con Fede la integración de #26/#28.~~
-   **Cerrado el 2026-09-21:** #26 y #28 mergeados a `main`.
-2. **Compañero revisor:** revisar #27 (controllers y contrato de `gestion-salon`, ya
-   desbloqueado por el merge de #28).
-3. ~~**Fede:** atender pendientes de #25 y probar auth contra PostgreSQL en CI.~~
-   **Cerrado el 2026-09-21:** #25 mergeado. El registro en `AppModule` y el contrato
-   OpenAPI de `/auth/login`, que quedaban pendientes de ese PR, los completó #33.
-4. ~~**Matías:** abrir/revisar disponibilidad y después implementar `reservas-crear`.~~
-   **Cerrado el 2026-09-28:** #36 (disponibilidad) y #40 (`reservas-crear`) mergeados.
-5. **Facundo:** implementar cancelación y VIP. Ya no bloqueado: #27 (salón) mergeó el
-   2026-09-22 y `reservas-crear` (#40) mergeó el 2026-09-28. Reutilizar
-   `ReservasService.buscarPorCodigoYEmail` (de `reserva-consultar`, #35) y sumar las rutas
-   de admin a `ReservasAdminController`, no a `ReservasController` (ver design.md de
-   `reserva-consultar`, D6). Modificar PRs ajenos solo con autorización del responsable,
-   como se acordó para #28.
+La consigna evalúa la distribución equitativa del trabajo en el historial. Al 2026-10-06, los
+commits en `main` (sin contar merges) se reparten así: portalmatias 105, FedeWerk 39 y
+lussofacundo-iresm 6. Conviene tenerlo en cuenta al asignar lo que queda.
 
 ### Fundación y protección de main
 
 - `fundacion-repo` mergeado (#10, #11) y archivado (#13).
-- La protección de `main` se documentó como aplicada el 2026-09-14 (0.2 y 0.4).
-  El 2026-09-19 el endpoint de la rama confirmó `protected: true` y los tres checks
-  requeridos con enforcement para todos. **Pendiente de reconfirmación por portalmatias:**
-  las opciones detalladas de aprobación, descarte de reviews y force-push; la consulta de
-  protección clásica devolvió `404` con este acceso y la de reglas aplicables una lista
-  vacía. Eso no demuestra ausencia de protección. No se cambiaron permisos.
+- La protección de `main` se documentó como aplicada el 2026-09-14 (0.2 y 0.4). La consulta
+  de la rama, hecha el 2026-09-19 y repetida el 2026-10-06, confirma `protected: true`, los
+  tres checks requeridos y `enforcement: everyone`. Además, un PR sin aprobación figura como
+  `REVIEW_REQUIRED` y `BLOCKED`, y una aprobación se descartó al entrar un commit nuevo (#67).
+  La consulta de la protección clásica en detalle sigue devolviendo `404` con este acceso,
+  así que la regla de force-push se confirma desde la configuración del repositorio. No se
+  cambiaron permisos.
   Configuración documentada/esperada:
 
   | Regla | Valor |
