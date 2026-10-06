@@ -18,7 +18,7 @@
     "test:frontend": "npm run test -w frontend",
     "test:e2e": "npm run test:e2e -w backend",
     "test:integration": "npm run test:integration -w backend",
-    "test:scripts": "node --test scripts/openapi-diff.test.mjs",
+    "test:scripts": "node --test scripts/openapi-diff.test.mjs scripts/cd/decidir-despliegue.test.mjs",
     "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run start:dev -w backend\" \"npm run dev -w frontend\"",
     "db:migrate": "npm run db:migrate -w backend",
     "db:seed": "npm run db:seed -w backend",
