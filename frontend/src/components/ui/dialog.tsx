@@ -14,7 +14,10 @@ export type DialogProps = {
   onConfirm: () => void;
   /** Se llama al apretar el botón de cancelar o al pedir cerrarlo (Escape en el navegador). */
   onCancel: () => void;
-  /** Deshabilita el botón de confirmar mientras la acción está en curso. */
+  /**
+   * Mientras la acción está en curso deshabilita los dos botones y no deja cerrar el diálogo:
+   * Escape no llama a `onCancel` y, si el navegador lo cierra igual, se vuelve a mostrar.
+   */
   confirmando?: boolean;
   variantConfirmar?: ButtonVariant;
 };
@@ -31,6 +34,8 @@ export type DialogProps = {
  * abierto pero `open` sigue en true, se llama a `onCancel`, una vez, para que el padre lo
  * cierre). Con eso cada Escape llama a `onCancel` exactamente una vez, y un `open=true` posterior
  * vuelve a mostrar el diálogo porque el efecto revisa el estado nativo en cada render.
+ * Con `confirmando` el cierre no se puede pedir: no se llama a `onCancel` y el diálogo se
+ * vuelve a mostrar al instante, sin esperar un render del padre.
  */
 export function Dialog({
   open,
@@ -89,7 +94,9 @@ export function Dialog({
         // resincroniza (ver arriba), así `onCancel` no se llama dos veces.
         if (evento.cancelable) {
           evento.preventDefault();
-          onCancel();
+          if (!confirmando) {
+            onCancel();
+          }
         }
       }}
       onClose={(evento) => {
@@ -100,7 +107,11 @@ export function Dialog({
           return;
         }
         if (open && !evento.currentTarget.open) {
-          onCancel();
+          if (confirmando) {
+            evento.currentTarget.showModal();
+          } else {
+            onCancel();
+          }
         }
       }}
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-border bg-card p-6 text-foreground backdrop:bg-black/50"
@@ -110,7 +121,7 @@ export function Dialog({
       </h2>
       <div className="mt-4 flex flex-col gap-4 text-base">{children}</div>
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="secondary" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel} disabled={confirmando}>
           {textoCancelar}
         </Button>
         <Button variant={variantConfirmar} onClick={onConfirm} disabled={confirmando}>
