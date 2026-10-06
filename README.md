@@ -61,7 +61,7 @@ flowchart LR
    - el controller, que delega en un service; las reglas de negocio viven en los services.
 4. Los services acceden a la base solo por Prisma. Las operaciones que tienen que ser atómicas
    (crear una reserva) corren en una transacción, y la base refuerza el invariante de "una
-   reserva activa por mesa y turno" con un índice único parcial.
+   reserva activa por mesa, fecha y turno" con un índice único parcial.
 
 ### Backend por módulo de dominio
 
@@ -83,14 +83,16 @@ El detalle de cada endpoint, con sus esquemas y respuestas, está en
   caracteres. Para consultar o cancelar presenta **código + email**, que tienen que coincidir.
   Como el código no es un secreto criptográfico, esas rutas tienen límite de solicitudes contra
   la enumeración.
-- **Administrador:** login con email y contraseña (hash con bcrypt), que devuelve un JWT de 60
-  minutos con su rol. Viaja en `Authorization: Bearer` y protege todas las rutas `/admin/...`.
+- **Administrador:** login con email y contraseña (hash con bcrypt), que devuelve un JWT con
+  su rol. Vence a los 60 minutos por defecto (`JWT_EXPIRES_IN`). Viaja en
+  `Authorization: Bearer` y protege todas las rutas `/admin/...`.
 
 ### Controles de seguridad
 
 - **Límites de solicitudes por origen:**
   - login: 5 por minuto;
-  - consulta y cancelación públicas: `THROTTLE_LIMIT` por minuto;
+  - consulta y cancelación públicas: `THROTTLE_LIMIT` por ventana de `THROTTLE_TTL` segundos
+    (por defecto, 10 cada 60 segundos);
   - cada ruta de admin: 60 por minuto.
 - **Validación estricta de entrada:** los campos que no declara el DTO se rechazan con `400`.
 - **Exposición mínima:** en local, los tres servicios escuchan solo en loopback, y el backend no
@@ -103,10 +105,18 @@ El detalle de cada endpoint, con sus esquemas y respuestas, está en
 
 ### Fechas y horas
 
-Las fechas y horas se guardan y viajan en **UTC**. Los turnos son horas locales del
-restaurante (`America/Argentina/Buenos_Aires`, UTC−3 fijo), y el backend las combina con la
-fecha de la reserva para validar anticipación, ventana de cancelación y no-show. La conversión
-para mostrar es responsabilidad del frontend.
+Hay tres tipos de valores, y cada uno se guarda y viaja distinto:
+
+| Valor | Formato | Qué representa |
+|---|---|---|
+| Instantes (por ejemplo, cuándo se creó una reserva) | ISO 8601 en **UTC** | un momento exacto |
+| `fecha` de una reserva | `YYYY-MM-DD` | un día del calendario local del restaurante, sin hora ni zona |
+| `horaInicio` y `horaFin` de un turno | `HH:mm` | una hora local del restaurante, sin fecha ni zona |
+
+Para validar anticipación, ventana de cancelación y no-show, el backend combina la `fecha` y
+la hora del turno con el offset fijo de Argentina (UTC−3, `America/Argentina/Buenos_Aires`) y
+obtiene un instante UTC, que compara con el momento actual. La conversión de instantes para
+mostrarlos es responsabilidad del frontend.
 
 ### Cómo se construye
 

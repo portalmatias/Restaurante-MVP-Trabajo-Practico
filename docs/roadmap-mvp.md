@@ -56,9 +56,18 @@ resueltas.
 
 ### Reparto del trabajo
 
-La consigna evalúa la distribución equitativa del trabajo en el historial. Al 2026-10-06, los
-commits en `main` (sin contar merges) se reparten así: portalmatias 105, FedeWerk 39 y
-lussofacundo-iresm 6. Conviene tenerlo en cuenta al asignar lo que queda.
+La consigna evalúa la distribución equitativa del trabajo en el historial. Al 2026-10-06
+(`main` en `ada5c76`), los commits sin contar merges se reparten así:
+
+| Autor (nombre y mail del commit) | Commits |
+|---|---|
+| portalmatias (`portalmatias@iresm.edu.ar`) | 139 |
+| FedeWerk (`fedewerk@gmail.com`) | 79 |
+| Facundo (`faculusso@gmail.com`) | 37 |
+
+Contado con `git shortlog -sne --no-merges ada5c76`. Los commits de Facundo usan un mail
+que GitHub asocia a otra cuenta (`facu087`), no a `lussofacundo-iresm`: un conteo por usuario
+de GitHub lo deja casi afuera. Conviene tenerlo en cuenta al asignar lo que queda.
 
 ### Fundación y protección de main
 
@@ -129,8 +138,9 @@ quién**.
 
 Los siguientes hallazgos motivaron el plan inicial; **no describen el estado actual**.
 La documentación, CI, contrato y participación de los tres integrantes ya existen; #3 está
-mergeado. Las opciones detalladas de revisión de `main` requieren la reconfirmación indicada
-al inicio; la rama sí figura protegida.
+mergeado. La protección de `main` está confirmada (ver "Fundación y protección de main", al
+inicio); la regla de force-push sigue pendiente de confirmar desde la configuración del
+repositorio.
 
 Tres restricciones que entonces no se cumplían:
 
@@ -194,8 +204,8 @@ Nada de esto necesita un change de OpenSpec: no son features y no cambian compor
 
 El reparto inicial asignaba 0.3 a Facundo; los documentos los incorporó Fede en #4.
 Facundo ya contribuyó las specs de salón, cancelación y VIP y la implementación de salón.
-Las tareas 0.2/0.4 constan como cerradas: protección y checks confirmados actualmente;
-opciones detalladas de aprobación pendientes de reconfirmación.
+Las tareas 0.2/0.4 constan como cerradas: protección, checks y aprobación obligatoria
+confirmados el 2026-10-06; solo queda confirmar la regla de force-push.
 
 ## 5. Fase 1 — Fundación (secuencial, bloquea todo)
 
@@ -462,7 +472,9 @@ ls docs/requerimientos-mvp.docx .gitignore
 Confirmar `protected: true` y los checks requeridos en la respuesta de la rama.
 El endpoint detallado `branches/main/protection` puede devolver `404` según los permisos
 o el mecanismo de reglas: no interpretarlo por sí solo como ausencia de protección.
-Portalmatias debe reconfirmar las opciones detalladas de aprobación indicadas al inicio.
+Al 2026-10-06 ya están confirmadas la aprobación obligatoria y el descarte de aprobaciones viejas
+(ver "Fundación y protección de main", al inicio); queda confirmar la regla de force-push desde
+la configuración del repositorio.
 
 **Fase 1** — el PR debe mostrar los tres jobs de CI en verde, y en limpio:
 
