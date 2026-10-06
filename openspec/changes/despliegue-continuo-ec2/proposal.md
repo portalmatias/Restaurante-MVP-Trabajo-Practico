@@ -21,8 +21,9 @@ máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar d
 
 - **Despliegue monolítico en una EC2:** PostgreSQL, backend, frontend y un proxy de borde
   corren en la misma instancia, orquestados con Docker Compose. Solo el proxy publica puertos
-  (`80` y, con el subdominio, `443`). Base, backend y frontend quedan en una red interna de
-  Docker.
+  (`80` y `443`, siempre). El `443` empieza a servir HTTPS cuando el subdominio apunta a la
+  instancia. Base, backend y frontend quedan en una red interna de Docker, sin puertos
+  publicados.
 - **Imágenes de contenedor versionadas:** GitHub Actions construye las imágenes de backend y
   frontend en cada push a `main`, las etiqueta con el SHA del commit y las publica en GitHub
   Container Registry. Se despliegan por digest, así que una versión no cambia aunque alguien
@@ -61,20 +62,20 @@ fuera de pruebas, y el paso a HTTPS es un cambio de configuración, sin tocar c�
 ### AWS en el Tier gratuito (propuesta de la docente)
 
 La docente propuso AWS dentro del **Tier gratuito**, así que el despliegue tiene que entrar en
-sus límites. Desde el 15 de julio de 2025 hay dos regímenes, según la fecha de creación de la
-cuenta:
+sus límites. Desde el 15 de julio de 2025, una cuenta nueva elige entre el plan Free y el pago,
+y en los dos recibe créditos (USD 100, más hasta USD 100 por actividades). Las cuentas creadas
+antes de esa fecha tenían 12 meses de Tier gratuito, que al 2026-10-06 ya vencieron. **En la
+práctica, el Tier gratuito disponible es el de una cuenta nueva:**
 
-- **Cuentas nuevas (plan Free):** reciben créditos (USD 100, más hasta USD 100 por actividades)
-  que **se consumen** con la instancia, el disco, la IP pública y los snapshots. El plan dura 6
-  meses o hasta agotar los créditos, lo que ocurra primero. Al terminar, **la cuenta se cierra
-  sola**; AWS conserva los datos 90 días y después los borra, salvo que se pase al plan pago.
-- **Cuentas anteriores:** tienen 750 horas por mes de `t2.micro`/`t3.micro` durante 12 meses.
-  Lo que exceda esos límites se cobra al precio normal.
+- los créditos **se consumen** con la instancia, el disco, la IP pública y los snapshots;
+- en el **plan Free**, el plan dura 6 meses o hasta agotar los créditos, lo que ocurra primero.
+  Al terminar, **la cuenta se cierra sola**; AWS conserva los datos 90 días y después los borra,
+  salvo que se pase al plan pago.
 
-Para que sirva en los dos casos, el change elige recursos elegibles en ambos (`t3.micro`) y
-mínimos en consumo, desactiva lo que puede generar cargos inesperados (modo *unlimited* de CPU
-de las instancias `t3`) y suma una alerta de presupuesto. Además documenta la fecha de
-vencimiento del plan y cómo exportar los datos antes. **Nada de este change puede requerir
+Por eso el change elige recursos mínimos en consumo (`t3.micro`), desactiva lo que puede
+generar cargos inesperados (modo *unlimited* de CPU de las instancias `t3`) y suma una alerta de
+presupuesto. Además documenta la fecha de vencimiento del plan, la compara con la fecha de
+entrega del TP y explica cómo exportar los datos antes. **Nada de este change puede requerir
 pasar al plan pago.** Por ejemplo, no se usa AWS Organizations ni IAM Identity Center, porque
 unirse a Organizations pasa la cuenta al plan pago de forma automática.
 
@@ -83,7 +84,8 @@ unirse a Organizations pasa la cuenta al plan pago de forma automática.
 §2 prohíbe "servicios externos de pago". AWS se usa a propuesta de la docente, dentro del Tier
 gratuito, y como infraestructura de despliegue, no como dependencia de la aplicación: el
 sistema se sigue levantando en local sin AWS ni ninguna API key, y el repositorio no contiene
-credenciales. El change actualiza `config.yaml` para registrar la excepción.
+credenciales. Este mismo PR actualiza `config.yaml` §2 para registrar la excepción, de modo que
+aprobar la spec y escribirla en la constitución vayan juntos.
 
 ### Fuera de alcance
 
@@ -131,7 +133,7 @@ a contarse por la IP real.
 - **Backend:** seed de producción (`backend/prisma/seed-produccion.ts`) y extracción del
   catálogo compartido con el seed de desarrollo. La API, `openapi.yaml` y el schema de Prisma
   no cambian.
-- **CI/CD:** `.github/workflows/cd.yml` nuevo. `ci.yml` suma los tests del frontend.
+- **CI/CD:** `.github/workflows/cd.yml` y `certificado.yml` nuevos, y `scripts/cd/` con la decisión de despliegue y sus tests. `ci.yml` suma los tests del frontend.
 - **Variables de entorno:** `.env.example` documenta `ADMIN_EMAIL` y `ADMIN_PASSWORD`, que
   solo usa el seed de producción.
 - **Documentación:** `docs/despliegue.md` (runbook de AWS, rollback, activación de HTTPS con

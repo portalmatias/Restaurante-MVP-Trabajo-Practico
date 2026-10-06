@@ -44,6 +44,11 @@ context: |
   - **No** introducir librerías nuevas sin justificarlo en el `design.md` del cambio correspondiente.
   - **No** usar ORMs, query builders ni acceso SQL directo por fuera de Prisma.
   - **No** agregar servicios externos de pago ni que requieran API keys privadas (el repo es público / evaluable).
+    **Excepción (change `despliegue-continuo-ec2`):** el despliegue usa AWS (EC2, SSM, IAM) dentro
+    del Tier gratuito, a propuesta de la docente. Es infraestructura de despliegue, no una
+    dependencia de la aplicación: el sistema se levanta en local sin AWS ni ninguna API key, y
+    ninguna credencial vive en el repositorio. Ningún otro servicio de pago queda habilitado
+    por esta excepción.
   - Preferir lo que ya viene en NestJS antes que sumar dependencias (validación con `class-validator`, config con `@nestjs/config`, etc.).
 
   ---

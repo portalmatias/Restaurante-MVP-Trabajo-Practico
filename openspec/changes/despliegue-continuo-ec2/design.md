@@ -58,8 +58,9 @@ internet ──:80/:443──> [caddy] ──> [frontend :3000] ──/api──
 ```
 
 - `deploy/docker-compose.prod.yml` define cuatro servicios. **Solo `caddy` publica puertos**
-  (`80:80` y `443:443`). Los demás no tienen `ports:`, así que no se pueden alcanzar desde el
-  host ni desde internet.
+  (`80:80` y `443:443`, en las dos etapas). Los demás no tienen `ports:`: no se publican en la
+  interfaz de la instancia, así que no se pueden alcanzar desde internet. El propio host sí
+  llega a ellos por la red de Docker, lo que se acepta: en el host solo entra SSM.
 - Caddy guarda certificados y claves en un volumen con nombre (`caddy_data`), que se conserva
   entre despliegues y reinicios. Sin él, cada despliegue pediría un certificado nuevo y
   chocaría con los límites de emisión de Let's Encrypt.
@@ -106,9 +107,15 @@ al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale
   443.
 
 `SITE_ADDRESS` no es secreto: va como parámetro no secreto en SSM (`/reservas/prod/config/`),
-para que activar HTTPS sea cambiar ese valor y redesplegar, sin tocar el repositorio. También se
-define `ACME_EMAIL` (el correo para avisos de vencimiento de Let's Encrypt), con una casilla del
-equipo.
+para que activar HTTPS sea cambiar ese valor y redesplegar, sin tocar el repositorio.
+
+**Control del certificado:** Let's Encrypt dejó de mandar avisos de vencimiento por mail el 4
+de junio de 2025, así que no alcanza con configurar un correo. Un workflow programado
+(`.github/workflows/certificado.yml`, diario) se conecta a `https://<subdominio>`, verifica que
+el certificado sea válido para ese nombre y que le queden 21 días o más, y **falla** si no; la
+falla le llega al equipo como notificación de GitHub. Se activa solo cuando existe la variable
+`SUBDOMINIO` del repositorio (etapa HTTPS); no usa credenciales. Caddy renueva a los 30 días del
+vencimiento, así que un aviso a los 21 días indica que la renovación falló al menos una vez.
 
 **Por qué Caddy y no nginx:**
 - **`X-Forwarded-For`:** desde la versión 2.5, `reverse_proxy` ignora los `X-Forwarded-*`
@@ -185,11 +192,25 @@ El SHA se toma de `workflow_run.head_sha`, no de `github.sha`: la variable apunt
 validó el CI.
 
 **Jobs:**
-1. `vigente`: compara el SHA con la punta actual de `main` (API de GitHub). Si `main` ya avanzó,
-   el workflow termina **en verde, sin desplegar**, con el aviso "versión superada por
-   `<sha-nuevo>`": ese commit más nuevo dispara su propio despliegue. Esto evita que un CI viejo
-   que termina después de uno nuevo vuelva a desplegar una versión anterior (`workflow_run`
-   conserva el `head_sha` de cada ejecución).
+1. `decidir`: decide si el SHA se despliega, con una función pura
+   (`scripts/cd/decidir-despliegue.mjs`) que recibe los datos de la API de GitHub y tiene tests
+   propios (D10). Las reglas son estas:
+   - **Por `workflow_run`:** si **otro commit posterior de `main` tiene el CI en verde**, termina
+     **en verde, sin desplegar**, con el aviso "versión superada por `<sha>`". Si el posterior
+     está en rojo o todavía corriendo, despliega: un commit verde nunca se queda sin desplegar
+     por un posterior que falla. Esto evita que un CI viejo que termina después de uno nuevo
+     redespliegue una versión anterior (`workflow_run` conserva el `head_sha` de cada
+     ejecución).
+   - **Por `workflow_dispatch` con `modo=despliegue`:** exige que el SHA esté en la historia de
+     `main`, que su CI de push haya terminado en verde y que no exista un commit posterior
+     verde. Si no se cumple, rechaza y el workflow termina en error. Así, el despacho manual
+     tiene los mismos controles que el automático.
+   - **Por `workflow_dispatch` con `modo=vuelta-atras`:** no aplica la regla de "superada" (una
+     vuelta atrás es, por definición, a una versión anterior). Exige que el SHA esté en la
+     historia de `main`; la instancia exige además que figure en `historial` (D7).
+
+   La ancestría se resuelve con la API `compare` de GitHub, y el estado del CI con las
+   ejecuciones del workflow `CI` de evento `push` sobre `main`.
 2. `imagenes`: checkout de ese SHA y `docker/build-push-action` de las dos imágenes a GHCR, con
    `permissions: packages: write` y el `GITHUB_TOKEN`. Si el tag ya existe, no se reconstruye
    (D3). Expone como salida los dos digests.
@@ -275,9 +296,9 @@ entre clientes. Queda documentado en Risks.
 
 El runbook indica cómo generarlos sin que pasen por el historial del shell.
 
-**Parámetros no secretos** (`String`) bajo `/reservas/prod/config/`: `SITE_ADDRESS` (`:80` o el
-subdominio, ver D2) y `ACME_EMAIL`. Viven en SSM, y no en el repositorio, porque cambian según
-la etapa y no con el código.
+**Parámetro no secreto** (`String`) bajo `/reservas/prod/config/`: `SITE_ADDRESS` (`:80` o el
+subdominio, ver D2). Vive en SSM, y no en el repositorio, porque cambia según la etapa y no con
+el código.
 
 - **Perfil de la instancia:** `AmazonSSMManagedInstanceCore` (para recibir comandos), más una
   política propia con `ssm:GetParametersByPath` sobre `/reservas/prod/*` y `kms:Decrypt`
@@ -380,15 +401,26 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
   **especificación de créditos de CPU `standard`**. En `unlimited`, el valor por defecto de las
   `t3`, el uso sostenido por encima de la línea base se cobra aparte. En `standard`, la
   instancia se ralentiza, pero no genera cargos. Más el *swapfile* de 2 GB (D1).
-- **Disco:** EBS `gp3` cifrado de 20 GB, dentro de los 30 GB del Tier gratuito para cuentas
-  anteriores.
+- **Disco:** EBS `gp3` cifrado de 20 GB.
 - **Metadatos:** IMDSv2 obligatorio (`HttpTokens=required`), para que un SSRF no pueda leer las
-  credenciales del perfil.
+  credenciales del perfil, y **límite de saltos en 1** (`HttpPutResponseHopLimit=1`). Un
+  contenedor en la red bridge de Docker está a un salto más que el host; con límite 1, la
+  respuesta del token de IMDSv2 no le llega, y no puede obtener las credenciales del rol, que
+  lee todos los secretos. Algunas configuraciones de AL2023 usan 2 para que los contenedores sí
+  lleguen, así que se fija de forma explícita. Ningún contenedor necesita IMDS: los secretos
+  los lee `desplegar.sh` en el host.
 - **IP elástica**, para que la URL no cambie al reiniciar.
-- **Security group:** entrada **solo TCP 80 y 443 desde `0.0.0.0/0`**. El 80 sigue abierto en
-  la etapa HTTPS, porque lo usan el desafío del certificado y la redirección. Sin 22, sin 5432,
-  sin 3000 ni 3001. Salida abierta, necesaria para descargar imágenes y paquetes, y para hablar
-  con Let's Encrypt.
+- **Security group:** entrada **solo TCP 80 y 443**. Sin 22, sin 5432, sin 3000 ni 3001. El
+  origen depende de la etapa:
+  - **etapa HTTP:** solo las IPs públicas del equipo (`/32` cada una). Así, el login del admin en
+    claro no queda expuesto a internet. Como las IPs domésticas pueden cambiar, el runbook
+    indica cómo actualizarlas. El despliegue no necesita entrada: llega por SSM;
+  - **etapa HTTPS:** `0.0.0.0/0` en los dos puertos. Let's Encrypt valida desde direcciones que
+    no se publican, así que el 80 tiene que estar abierto a todos para emitir y renovar el
+    certificado, y también sirve para la redirección.
+
+  Salida abierta, necesaria para descargar imágenes y paquetes, y para hablar con Let's
+  Encrypt.
 - **Docker, Compose y git** instalados, y clon del repositorio en `/opt/reservas/repo`.
 - **IAM:**
   - el proveedor OIDC de GitHub;
@@ -405,7 +437,8 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
 - **Activar HTTPS con el subdominio:**
   1. pasarle a la docente la IP elástica;
   2. esperar a que el registro `A` del subdominio resuelva a esa IP (`dig +short <subdominio>`);
-  3. cambiar `/reservas/prod/config/SITE_ADDRESS` al subdominio y redesplegar;
+  3. abrir el security group a `0.0.0.0/0` en 80 y 443, cambiar
+     `/reservas/prod/config/SITE_ADDRESS` al subdominio y redesplegar;
   4. verificar el certificado, la redirección y HSTS (tarea 6.6).
 
   Si Caddy no logra emitir el certificado (DNS todavía no propagado), sigue reintentando y el
@@ -413,26 +446,33 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
   reintenta más tarde.
 - **Riesgo aceptado de la etapa HTTP** y su alcance, según la spec.
 
-### D10: Tests del frontend en CI
+### D10: Tests del frontend y de la decisión de despliegue en CI
 
 Se agrega `npm run test:frontend` al job de tests de `ci.yml`. El CD depende del CI en verde, y
 hoy un PR podría romper el frontend sin que nada lo frene antes de producción. Es un cambio de
 una línea en un workflow, dentro de un change que justamente trata del pipeline (§14 de
 `config.yaml`).
 
+La función de decisión del job `decidir` (D4) vive en `scripts/cd/` con sus tests de
+`node --test`, que ya corre el paso `test:scripts` del CI. Sus tests cubren los escenarios del
+requisito "Despliegue automático solo desde main con CI en verde" que no se pueden provocar a
+mano en `main` sin romperlo: CI en rojo, dos merges seguidos, CI viejo que termina tarde, commit
+posterior en rojo o corriendo, y despacho manual inválido.
+
 ## Risks / Trade-offs
 
 - **[Riesgo aceptado, transitorio] HTTP sin cifrar** hasta que el subdominio apunte a la
   instancia: las credenciales del admin, el JWT y los datos de contacto viajan en claro.
-  → **Mitigación:** la etapa dura solo hasta que la docente configure el DNS; en ella no se
-  cargan datos reales y el admin no se loguea desde redes públicas; la contraseña del admin es
+  → **Mitigación:** la etapa dura solo hasta que la docente configure el DNS; en ella el
+  security group admite solo las IPs del equipo, no se cargan datos reales y el admin no se
+  loguea desde redes públicas; la contraseña del admin es
   única, de 16 caracteres o más; el JWT dura 60 minutos; y activar HTTPS es un cambio de
   configuración (D2 y D9). Conviene **rotar la contraseña del admin al pasar a HTTPS**, porque
   pudo haber viajado en claro.
 - **[Riesgo] El subdominio depende de la docente:** si el registro DNS cambia o se borra, el
   certificado deja de renovarse y el sitio deja de responder por el nombre.
-  → **Mitigación:** Caddy avisa por mail (`ACME_EMAIL`) antes del vencimiento, y el runbook
-  indica cómo volver temporalmente a la IP.
+  → **Mitigación:** el control diario del certificado (D2) avisa con 21 días de margen, y el
+  runbook indica cómo volver temporalmente a la IP.
 - **[Riesgo] Migración incompatible con la versión anterior:** la vuelta atrás automática
   levanta imágenes viejas sobre un schema ya migrado.
   → **Mitigación:** las migraciones se escriben compatibles hacia atrás (agregar antes que
