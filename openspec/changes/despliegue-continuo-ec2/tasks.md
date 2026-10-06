@@ -33,7 +33,7 @@
       mesas y turnos) a `backend/prisma/catalogo.ts`, sin cambiar el comportamiento. Exportar
       las constantes del admin de desarrollo. Verificar que `npm run db:seed -w backend` dos
       veces seguidas deja los mismos conteos, y que los tests de integración siguen en verde.
-- [ ] 2.2 Escribir los tests de `seed-produccion` contra la base de test (integración):
+- [x] 2.2 Escribir los tests de `seed-produccion` contra la base de test (integración):
       - sin `ADMIN_EMAIL` o `ADMIN_PASSWORD`, falla;
       - con una contraseña de 15 caracteres, falla;
       - con la contraseña o el email de desarrollo, falla;
