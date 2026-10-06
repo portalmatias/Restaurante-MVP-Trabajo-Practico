@@ -105,7 +105,7 @@
       Verificar con `shellcheck` sin advertencias. Verificar también que termina en error sin
       tocar nada con un SHA inválido (`abc`, 39 caracteres o mayúsculas), con un digest
       inválido y con un `modo` desconocido.
-- [ ] 5.2 Probar `desplegar.sh` contra una máquina local o una VM con Docker, apuntando a un
+- [x] 5.2 Probar `desplegar.sh` contra una máquina local o una VM con Docker, apuntando a un
       remoto de prueba:
       - un SHA sano termina en 0, escribe `VERSION_ACTUAL` y lo agrega a `historial`;
       - con dos versiones ya desplegadas (A y después B), una versión C que no responde
