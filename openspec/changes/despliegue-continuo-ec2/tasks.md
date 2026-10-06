@@ -137,7 +137,7 @@
       Verificar con `actionlint` sin errores.
 - [ ] 5.5 Agregar `npm run test:frontend` al job de tests de `ci.yml` (D10). Verificar en el
       PR que el job lo ejecuta y queda en verde.
-- [ ] 5.6 Escribir primero los tests y después `scripts/cd/decidir-despliegue.mjs` (D4, D10),
+- [x] 5.6 Escribir primero los tests y después `scripts/cd/decidir-despliegue.mjs` (D4, D10),
       con un caso por escenario del requisito "Despliegue automático solo desde main con CI en
       verde":
       - "CI en rojo sobre main" (no despliega);
