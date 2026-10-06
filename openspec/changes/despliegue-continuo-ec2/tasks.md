@@ -29,7 +29,7 @@
 
 ## 2. Seed de producción (D8)
 
-- [ ] 2.1 Extraer las funciones del catálogo de `backend/prisma/seed.ts` (configuración, zonas,
+- [x] 2.1 Extraer las funciones del catálogo de `backend/prisma/seed.ts` (configuración, zonas,
       mesas y turnos) a `backend/prisma/catalogo.ts`, sin cambiar el comportamiento. Exportar
       las constantes del admin de desarrollo. Verificar que `npm run db:seed -w backend` dos
       veces seguidas deja los mismos conteos, y que los tests de integración siguen en verde.

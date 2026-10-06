@@ -20,31 +20,15 @@
 import { PrismaClient, DiaSemana, EstadoReserva } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
+import {
+  ADMIN_EMAIL_DESARROLLO as ADMIN_EMAIL,
+  ADMIN_PASSWORD_DESARROLLO as ADMIN_PASSWORD,
+} from './admin-desarrollo';
+import { seedCatalogo } from './catalogo';
+
 const prisma = new PrismaClient();
 
 const BCRYPT_SALT_ROUNDS = 10;
-
-// Credenciales del admin de seed. No son secretas: están documentadas en el README para
-// que cualquiera del equipo pueda loguearse en su entorno local (config.yaml §10).
-const ADMIN_EMAIL = 'admin@restaurante-mvp.local';
-const ADMIN_PASSWORD = 'AdminMVP2026!';
-
-// Días en los que el salón abre (config.yaml §6: "activos de martes a domingo").
-const DIAS_ABIERTOS: DiaSemana[] = [
-  DiaSemana.MARTES,
-  DiaSemana.MIERCOLES,
-  DiaSemana.JUEVES,
-  DiaSemana.VIERNES,
-  DiaSemana.SABADO,
-  DiaSemana.DOMINGO,
-];
-const DIAS_CERRADOS: DiaSemana[] = [DiaSemana.LUNES];
-
-// Turno se persiste como hora del día (@db.Time); la parte de fecha es irrelevante y se
-// fija a un valor arbitrario fijo para que Prisma la serialice de forma consistente.
-function hora(hh: number, mm: number): Date {
-  return new Date(Date.UTC(1970, 0, 1, hh, mm, 0));
-}
 
 async function seedAdmin() {
   // Buscar primero y hashear solo si no existe: `bcrypt.hash` es trabajo costoso que no
@@ -64,161 +48,6 @@ async function seedAdmin() {
       rol: 'ADMIN',
     },
   });
-}
-
-async function seedZonas() {
-  // Valores de config.yaml §6, incluido aforoMaximo (confirmado, ver nota de cabecera).
-  const standard = await prisma.zona.upsert({
-    where: { nombre: 'STANDARD' },
-    update: {
-      minComensales: 1,
-      maxComensales: 8,
-      anticipacionMinHoras: 2,
-      anticipacionMaxDias: 30,
-      ventanaCancelacionHoras: 2,
-      requiereConfirmacionAdmin: false,
-      aforoMaximo: 40,
-    },
-    create: {
-      nombre: 'STANDARD',
-      minComensales: 1,
-      maxComensales: 8,
-      anticipacionMinHoras: 2,
-      anticipacionMaxDias: 30,
-      ventanaCancelacionHoras: 2,
-      requiereConfirmacionAdmin: false,
-      aforoMaximo: 40,
-    },
-  });
-
-  const vip = await prisma.zona.upsert({
-    where: { nombre: 'VIP' },
-    update: {
-      minComensales: 2,
-      maxComensales: 12,
-      anticipacionMinHoras: 24,
-      anticipacionMaxDias: 60,
-      ventanaCancelacionHoras: 24,
-      requiereConfirmacionAdmin: true,
-      aforoMaximo: 20,
-    },
-    create: {
-      nombre: 'VIP',
-      minComensales: 2,
-      maxComensales: 12,
-      anticipacionMinHoras: 24,
-      anticipacionMaxDias: 60,
-      ventanaCancelacionHoras: 24,
-      requiereConfirmacionAdmin: true,
-      aforoMaximo: 20,
-    },
-  });
-
-  return { standard, vip };
-}
-
-async function seedConfiguracionGlobal() {
-  // Fila única (id fijo = 1). Ver nota de cabecera sobre el valor ilustrativo.
-  return prisma.configuracionNegocio.upsert({
-    where: { id: 1 },
-    update: { aforoGlobal: 60 },
-    create: { id: 1, aforoGlobal: 60 },
-  });
-}
-
-async function seedMesas(zonaStandardId: string, zonaVipId: string) {
-  // Capacidades variadas dentro del rango de comensales de cada zona (config.yaml §6),
-  // para poder ejercitar la asignación best fit en capabilities futuras.
-  const mesasStandard = [
-    { etiqueta: 'S1', capacidad: 2 },
-    { etiqueta: 'S2', capacidad: 2 },
-    { etiqueta: 'S3', capacidad: 4 },
-    { etiqueta: 'S4', capacidad: 6 },
-    { etiqueta: 'S5', capacidad: 8 },
-  ];
-  const mesasVip = [
-    { etiqueta: 'V1', capacidad: 2 },
-    { etiqueta: 'V2', capacidad: 4 },
-    { etiqueta: 'V3', capacidad: 6 },
-    { etiqueta: 'V4', capacidad: 12 },
-  ];
-
-  const creadas: Record<
-    string,
-    { id: string; zonaId: string; capacidad: number }
-  > = {};
-
-  // Clave natural: etiqueta, respaldada por un índice único real en la base
-  // (schema.prisma: Mesa.etiqueta @unique). El upsert es atómico: dos corridas
-  // concurrentes del seed ya no pueden crear la misma mesa duplicada.
-  for (const mesa of mesasStandard) {
-    const row = await prisma.mesa.upsert({
-      where: { etiqueta: mesa.etiqueta },
-      update: { capacidad: mesa.capacidad, zonaId: zonaStandardId },
-      create: {
-        etiqueta: mesa.etiqueta,
-        capacidad: mesa.capacidad,
-        zonaId: zonaStandardId,
-      },
-    });
-    creadas[mesa.etiqueta] = row;
-  }
-
-  for (const mesa of mesasVip) {
-    const row = await prisma.mesa.upsert({
-      where: { etiqueta: mesa.etiqueta },
-      update: { capacidad: mesa.capacidad, zonaId: zonaVipId },
-      create: {
-        etiqueta: mesa.etiqueta,
-        capacidad: mesa.capacidad,
-        zonaId: zonaVipId,
-      },
-    });
-    creadas[mesa.etiqueta] = row;
-  }
-
-  return creadas;
-}
-
-async function seedTurnos() {
-  // Turnos base del MVP (config.yaml §6): almuerzo 12:00–15:00 y cena 20:00–23:30,
-  // activos de martes a domingo. Lunes queda con las mismas franjas pero `activo=false`
-  // (día de cierre), útil para ejercitar el invariante 3 con datos reales del seed.
-  const turnos: Record<string, { id: string }> = {};
-
-  for (const dia of [...DIAS_ABIERTOS, ...DIAS_CERRADOS]) {
-    const activo = DIAS_ABIERTOS.includes(dia);
-
-    const almuerzo = await prisma.turno.upsert({
-      where: {
-        diaSemana_horaInicio: { diaSemana: dia, horaInicio: hora(12, 0) },
-      },
-      update: { horaFin: hora(15, 0), activo },
-      create: {
-        diaSemana: dia,
-        horaInicio: hora(12, 0),
-        horaFin: hora(15, 0),
-        activo,
-      },
-    });
-    turnos[`${dia}_ALMUERZO`] = almuerzo;
-
-    const cena = await prisma.turno.upsert({
-      where: {
-        diaSemana_horaInicio: { diaSemana: dia, horaInicio: hora(20, 0) },
-      },
-      update: { horaFin: hora(23, 30), activo },
-      create: {
-        diaSemana: dia,
-        horaInicio: hora(20, 0),
-        horaFin: hora(23, 30),
-        activo,
-      },
-    });
-    turnos[`${dia}_CENA`] = cena;
-  }
-
-  return turnos;
 }
 
 /** Próxima fecha (a partir de mañana) que cae en el día de semana pedido. */
@@ -348,17 +177,9 @@ async function main() {
   console.log('Seed: usuario admin...');
   await seedAdmin();
 
-  console.log('Seed: zonas...');
-  const { standard, vip } = await seedZonas();
-
-  console.log('Seed: configuración global...');
-  await seedConfiguracionGlobal();
-
-  console.log('Seed: mesas...');
-  const mesas = await seedMesas(standard.id, vip.id);
-
-  console.log('Seed: turnos...');
-  const turnos = await seedTurnos();
+  // Catálogo compartido con el seed de producción (prisma/catalogo.ts, D8 de
+  // despliegue-continuo-ec2): zonas, configuración global, mesas y turnos.
+  const { mesas, turnos } = await seedCatalogo(prisma);
 
   console.log('Seed: reservas de ejemplo...');
   await seedReservas(mesas, turnos);
