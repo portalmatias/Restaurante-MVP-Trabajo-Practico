@@ -8,6 +8,124 @@ Trabajo Práctico grupal. Las reglas del proyecto —stack, reglas de negocio, c
 flujo de trabajo— viven en [`openspec/config.yaml`](openspec/config.yaml), que es la
 constitución del repo. El orden de trabajo está en [`docs/roadmap-mvp.md`](docs/roadmap-mvp.md).
 
+## Arquitectura
+
+El sistema es un monorepo con dos aplicaciones que solo se comunican por HTTP, a través de un
+contrato OpenAPI escrito antes que el código:
+
+```mermaid
+flowchart LR
+  nav["Navegador<br/>(cliente o admin)"]
+  subgraph front["frontend/ — Next.js (App Router)"]
+    paginas["Páginas<br/>/reservas/... y /admin/..."]
+    proxy["Proxy de mismo origen<br/>/api/* → backend"]
+  end
+  subgraph back["backend/ — NestJS"]
+    guards["ThrottlerGuard (global)<br/>JwtAuthGuard + RolesGuard (admin)"]
+    modulos["Módulos de dominio<br/>controllers → services"]
+    prisma["PrismaService"]
+  end
+  db[("PostgreSQL")]
+  contrato[/"openapi/openapi.yaml<br/>(contrato)"/]
+
+  nav -- "páginas (HTML)" --> paginas
+  nav -- "/api/*" --> proxy
+  paginas -- "Server Components" --> guards
+  proxy --> guards --> modulos --> prisma --> db
+  contrato -. "tipos del cliente" .-> front
+  contrato -. "chequeo de deriva en CI" .-> back
+```
+
+### Componentes
+
+| Componente | Tecnología | Responsabilidad |
+|---|---|---|
+| `frontend/` | Next.js 16 (App Router) + React, TypeScript | Interfaz del cliente (`/reservas/...`) y panel del admin (`/admin/...`). Server Components por defecto; `"use client"` solo donde hay interacción. |
+| `backend/` | NestJS 11 sobre Node.js, TypeScript | API REST. Toda la lógica de negocio y la validación de reglas e invariantes. |
+| Base de datos | PostgreSQL 16 con Prisma | Persistencia. El schema solo cambia por migraciones versionadas en `backend/prisma/migrations/`. |
+| Contrato | OpenAPI 3.1 (`openapi/openapi.yaml`) | Única dependencia entre frontend y backend: el frontend genera sus tipos desde el contrato y CI verifica que el backend no se desvíe. |
+
+### Cómo viaja una solicitud
+
+1. El navegador nunca llama directo al backend: pide `/api/...` **al mismo origen** del
+   frontend, y Next lo reescribe hacia `NEXT_PUBLIC_API_URL`. Así no hace falta habilitar
+   CORS en el backend.
+2. Los Server Components, que corren en el servidor de Next, llaman al backend directamente por
+   esa misma URL.
+3. En el backend, cada solicitud pasa en este orden por:
+   - el límite de solicitudes (`ThrottlerGuard`, global);
+   - en las rutas `/admin/...`, la verificación del JWT y del rol (`JwtAuthGuard` y
+     `RolesGuard`);
+   - la validación del body o la query con DTOs y `class-validator` (`ValidationPipe` global
+     con `whitelist`);
+   - el controller, que delega en un service; las reglas de negocio viven en los services.
+4. Los services acceden a la base solo por Prisma. Las operaciones que tienen que ser atómicas
+   (crear una reserva) corren en una transacción, y la base refuerza el invariante de "una
+   reserva activa por mesa, fecha y turno" con un índice único parcial.
+
+### Backend por módulo de dominio
+
+| Módulo | Endpoints | Acceso |
+|---|---|---|
+| `disponibilidad/` | `GET /disponibilidad` | público |
+| `zonas/`, `horarios/` | `GET /zonas`, `GET /turnos` (catálogo); `/admin/zonas`, `/admin/turnos` | público / admin |
+| `mesas/` | `/admin/mesas` | admin |
+| `reservas/` | `POST /reservas`, `POST /reservas/consultar`, `POST /reservas/{codigo}/cancelar`; `/admin/reservas` (listado, confirmar, rechazar, no-show) | público con límite / admin |
+| `auth/` | `POST /auth/login` | público con límite |
+| `prisma/`, `common/` | — | acceso a datos y utilidades de zona horaria (UTC−3) |
+
+El detalle de cada endpoint, con sus esquemas y respuestas, está en
+[`openapi/openapi.yaml`](openapi/openapi.yaml).
+
+### Identidad y acceso
+
+- **Cliente sin cuenta:** reserva con nombre, email y teléfono, y recibe un código de 8
+  caracteres. Para consultar o cancelar presenta **código + email**, que tienen que coincidir.
+  Como el código no es un secreto criptográfico, esas rutas tienen límite de solicitudes contra
+  la enumeración.
+- **Administrador:** login con email y contraseña (hash con bcrypt), que devuelve un JWT con
+  su rol. Vence a los 60 minutos por defecto (`JWT_EXPIRES_IN`). Viaja en
+  `Authorization: Bearer` y protege todas las rutas `/admin/...`.
+
+### Controles de seguridad
+
+- **Límites de solicitudes por origen:**
+  - login: 5 por minuto;
+  - consulta y cancelación públicas: `THROTTLE_LIMIT` por ventana de `THROTTLE_TTL` segundos
+    (por defecto, 10 cada 60 segundos);
+  - cada ruta de admin: 60 por minuto.
+- **Validación estricta de entrada:** los campos que no declara el DTO se rechazan con `400`.
+- **Exposición mínima:** en local, los tres servicios escuchan solo en loopback, y el backend no
+  confía en `X-Forwarded-For` salvo que se declare explícitamente el salto confiable (ver
+  [Red y límites de solicitudes](#red-y-límites-de-solicitudes)).
+- **Secretos fuera del repositorio:** el secreto del JWT y las credenciales salen de variables
+  de entorno; `.env` nunca se commitea.
+- **Datos personales:** ningún endpoint público expone datos de otras reservas. La consulta
+  responde `404` sin aclarar si falló el código o el email.
+
+### Fechas y horas
+
+Hay tres tipos de valores, y cada uno se guarda y viaja distinto:
+
+| Valor | Formato | Qué representa |
+|---|---|---|
+| Instantes (por ejemplo, cuándo se creó una reserva) | ISO 8601 en **UTC** | un momento exacto |
+| `fecha` de una reserva | `YYYY-MM-DD` | un día del calendario local del restaurante, sin hora ni zona |
+| `horaInicio` y `horaFin` de un turno | `HH:mm` en las respuestas de reservas; en `GET /turnos` y `/admin/turnos`, ISO 8601 con fecha fija `1970-01-01` (por ejemplo `1970-01-01T20:00:00.000Z`) | una hora local del restaurante, sin fecha ni zona: en el formato ISO solo vale la parte de la hora, y la `Z` no indica UTC |
+
+Para validar anticipación, ventana de cancelación y no-show, el backend combina la `fecha` y
+la hora del turno con el offset fijo de Argentina (UTC−3, `America/Argentina/Buenos_Aires`) y
+obtiene un instante UTC, que compara con el momento actual. La conversión de instantes para
+mostrarlos es responsabilidad del frontend.
+
+### Cómo se construye
+
+Cada funcionalidad nace como un *change* de OpenSpec en `openspec/changes/`, con propuesta,
+specs, diseño y tareas. Los changes terminados se archivan, y sus requisitos pasan a
+`openspec/specs/`, que describe el comportamiento vigente del sistema. CI valida las specs, el
+contrato, el lint, los tipos y los tests en cada PR (ver
+[Integración continua](#integración-continua)).
+
 ## Requisitos
 
 - Node.js 20.12 o superior (20 LTS)
@@ -234,11 +352,10 @@ Un PR con CI en rojo no se mergea, aunque funcione localmente.
 
 ## Cómo se trabaja acá
 
-- Todo entra a `main` por Pull Request, con al menos una aprobación de un compañero.
-  La protección de rama y los *required status checks* todavía **no están activados** en
-  GitHub — son las tareas 0.2 y 0.4 de `docs/roadmap-mvp.md`, y recién se pueden completar
-  ahora que los checks de CI corrieron al menos una vez. Hasta entonces la regla es
-  acuerdo del equipo, no algo que el repositorio haga cumplir.
+- Todo entra a `main` por Pull Request, con al menos una aprobación de un compañero. GitHub lo
+  hace cumplir: `main` está protegida, exige la aprobación y los tres checks de CI
+  (`Especificación (OpenSpec + OpenAPI)`, `Lint y tipos` y `Tests (backend)`), y la regla
+  aplica también a los administradores.
 - Una rama por cambio: `feature/spec-<nombre>` para las specs, `feature/<nombre>` para el código.
 - Commits en Conventional Commits, con la descripción en español: `feat: agregar validación de aforo`.
 - Toda feature nace como un change de OpenSpec en `openspec/changes/` antes de escribir código.
