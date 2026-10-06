@@ -42,7 +42,7 @@
       - con otra contraseña en la segunda corrida, no cambia el hash del admin existente.
 
       Verificar que fallan sin la implementación (rojo).
-- [ ] 2.3 Implementar `backend/prisma/seed-produccion.ts` y verificar que pasan los tests de
+- [x] 2.3 Implementar `backend/prisma/seed-produccion.ts` y verificar que pasan los tests de
       2.2 con `npm run test:integration -w backend`.
 
 ## 3. Imágenes de contenedor (D3)
