@@ -83,7 +83,7 @@
       y `openspec validate exposicion-red-local --strict` en verde.
 - [x] 6.3 `git diff main --stat -- openapi backend/prisma` vacío (sin cambios de contrato ni de
       schema ni de migraciones, que viven en `backend/prisma`).
-- [ ] 6.4 PR en español enlazado a `openspec/changes/exposicion-red-local/`, aprobado por un
+- [x] 6.4 PR en español enlazado a `openspec/changes/exposicion-red-local/`, aprobado por un
       compañero, y CI en verde.
-- [ ] 6.5 Después del merge, avisar al equipo que recree el contenedor de Postgres y archivar
+- [x] 6.5 Después del merge, avisar al equipo que recree el contenedor de Postgres y archivar
       el change con `openspec archive exposicion-red-local` en su propio PR.
