@@ -100,10 +100,19 @@ credenciales. El change actualiza `config.yaml` para registrar la excepción.
   de solicitudes; y cómo se vuelve a una versión anterior.
 
 ### Modified Capabilities
-_Ninguna._ `exposicion-red` (todavía en el change `exposicion-red-local`, sin archivar) ya
-prevé la confianza explícita en un proxy de borde. Este change la usa sin cambiar sus
-requisitos. `auth-admin` y `reserva-consultar` mantienen sus límites "por origen", que en
-producción pasan a contarse por la IP real.
+- `exposicion-red`: se precisan dos requisitos, a partir de las observaciones de la revisión
+  de #69.
+  - **"Confianza en proxies solo explícita y acotada"**: el salto que se declara confiable es
+    el que se conecta al backend (detrás de `/api`, el frontend), no el proxy de borde. Las
+    subredes IPv4 admitidas tienen prefijo `/8` o mayor, como ya valida el backend.
+  - **"Condición de despliegue documentada"**: exige además que el frontend no sea accesible
+    salteando el proxy de borde.
+
+  Las dos precisiones no cambian el comportamiento implementado ni el README, que ya
+  describían así la cadena de confianza. Solo alinean el texto de la spec.
+
+`auth-admin` y `reserva-consultar` mantienen sus límites "por origen", que en producción pasan
+a contarse por la IP real.
 
 ## Impact
 

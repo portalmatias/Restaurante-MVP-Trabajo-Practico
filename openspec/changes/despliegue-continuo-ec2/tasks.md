@@ -16,6 +16,17 @@
       cursada. Anotar el resultado, sin datos de la cuenta, en el PR. Si no entra, frenar y
       decidirlo con el equipo antes de seguir.
 
+- [ ] 1.4 Cubrir los escenarios modificados de `exposicion-red`:
+      - confirmar que los tests unitarios de `configurar-red` ya rechazan `10.0.0.0/7` y
+        admiten `10.0.0.0/8`;
+      - agregar en `backend/test/exposicion-red.e2e-spec.ts` el caso "Confianza declarada solo
+        en el proxy de borde detrás de /api": con `TRUST_PROXY` apuntando a una dirección que
+        no es la de la conexión, variar `X-Forwarded-For` no evita el `429`;
+      - releer la sección "Red y límites de solicitudes" del README contra el requisito
+        "Condición de despliegue documentada" modificado.
+
+      Verificar con `npm run test -w backend` y `npm run test:e2e -w backend`.
+
 ## 2. Seed de producción (D8)
 
 - [ ] 2.1 Extraer las funciones del catálogo de `backend/prisma/seed.ts` (configuración, zonas,
