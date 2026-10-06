@@ -1,0 +1,4 @@
+# Los scripts de shell y la configuración de despliegue corren en Linux: siempre con LF, aunque
+# se hagan checkout en Windows con core.autocrlf (un CRLF rompe bash).
+*.sh text eol=lf
+deploy/** text eol=lf

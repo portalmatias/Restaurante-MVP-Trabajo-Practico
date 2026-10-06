@@ -93,7 +93,7 @@
 
 ## 5. Despliegue en la instancia y workflow de CD (D4, D7, D10)
 
-- [ ] 5.1 Escribir `deploy/desplegar.sh` según D7:
+- [x] 5.1 Escribir `deploy/desplegar.sh` según D7:
       - validación de `sha`, digests y `modo`, y `flock`;
       - `version_previa` leída al inicio, chequeo de ancestro en modo `despliegue` y búsqueda
         en `historial` en modo `vuelta-atras`;
