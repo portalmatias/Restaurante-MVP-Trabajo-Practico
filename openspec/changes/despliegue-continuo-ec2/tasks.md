@@ -156,7 +156,7 @@
 
 ## 6. Infraestructura y primer despliegue (D9)
 
-- [ ] 6.1 Escribir `docs/despliegue.md`:
+- [x] 6.1 Escribir `docs/despliegue.md`:
       - runbook de AWS con las políticas JSON completas (confianza OIDC, rol de GitHub y perfil
         de la instancia), el security group y los parámetros de SSM;
       - cuenta y costos: MFA en root, usuarios IAM con MFA, sin Organizations, alerta de
@@ -221,7 +221,7 @@
 
 ## 7. Documentación y cierre
 
-- [ ] 7.1 Actualizar `config.yaml`:
+- [x] 7.1 Actualizar `config.yaml`:
       - §4: `deploy/`, los Dockerfiles y `cd.yml`;
       - §10: `ADMIN_EMAIL` y `ADMIN_PASSWORD` solo para el seed de producción;
       - §12: workflow de CD.

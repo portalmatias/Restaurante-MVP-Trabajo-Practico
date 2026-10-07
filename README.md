@@ -130,6 +130,22 @@ falta, como mínimo:
 
 El detalle de las decisiones está en `openspec/changes/exposicion-red-local/design.md`.
 
+La configuración de producción (`deploy/`) cumple las tres condiciones: Caddy sobrescribe
+`X-Forwarded-For`, el backend declara `TRUST_PROXY=172.30.0.10` (la IP fija del frontend, el único
+salto que le habla) y solo Caddy publica puertos. Ver [Despliegue](#despliegue).
+
+## Despliegue
+
+Producción corre en **una instancia EC2** del Tier gratuito de AWS, con Docker Compose y un
+único servicio público (Caddy, en los puertos 80 y 443). Cada commit con CI en verde sobre
+`main` se despliega solo (`.github/workflows/cd.yml`), con credenciales temporales por OIDC y
+sin SSH. Si la versión nueva no responde, el script vuelve solo a la anterior.
+
+Cómo se crea la infraestructura, en qué etapa está producción (HTTP o HTTPS), qué datos quedan
+expuestos en la etapa HTTP, cómo volver atrás, rotar la contraseña del admin y apagar todo:
+[`docs/despliegue.md`](docs/despliegue.md). El diseño está en
+`openspec/changes/despliegue-continuo-ec2/design.md`.
+
 ## Comandos
 
 Todo se corre desde la raíz del repo.
@@ -213,9 +229,12 @@ Si agregás o cambiás un endpoint: **primero el YAML, después el código.**
 |---|---|
 | `spec` | `openspec validate --all --strict`, Spectral, y el chequeo de deriva del contrato |
 | `lint` | ESLint y chequeo de tipos |
-| `test` | Tests unitarios, e2e, de integración (contra Postgres real) y los de `scripts/` |
+| `test` | Tests unitarios, e2e, de integración (contra Postgres real), los del frontend y los de `scripts/` |
 
 Un PR con CI en rojo no se mergea, aunque funcione localmente.
+
+Cuando el CI termina en verde sobre `main`, `cd.yml` despliega a producción (ver
+[Despliegue](#despliegue)).
 
 > El job `test` levanta un service container de PostgreSQL (`postgres:16.4-alpine`, una sola
 > base `reservas_test` — no hace falta separar dev de test en CI), aplica las migraciones

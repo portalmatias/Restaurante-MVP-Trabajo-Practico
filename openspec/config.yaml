@@ -85,21 +85,28 @@ context: |
   ├── package.json              # workspaces: ["backend", "frontend"]
   ├── docker-compose.yml        # solo PostgreSQL para desarrollo local
   ├── .env.example              # plantilla, sin valores reales
-  ├── .github/workflows/ci.yml
+  ├── .github/workflows/
+  │   ├── ci.yml
+  │   ├── cd.yml            # despliegue continuo a EC2 (change despliegue-continuo-ec2)
+  │   └── certificado.yml   # control diario del certificado HTTPS
+  ├── deploy/               # composición de producción, Caddyfile, desplegar.sh, documento SSM
+  ├── docs/
+  │   └── despliegue.md     # runbook de AWS
   ├── openapi/
   │   └── openapi.yaml          # contrato formal de la API
   ├── openspec/
   │   ├── config.yaml           # este archivo (constitución del proyecto)
   │   ├── specs/                # specs vigentes (post-archive)
   │   └── changes/              # cambios en curso
-  ├── backend/                  # NestJS
+  ├── backend/                  # NestJS (con su Dockerfile)
   │   ├── prisma/
   │   │   ├── schema.prisma
   │   │   ├── migrations/
-  │   │   └── seed.ts
+  │   │   ├── seed.ts             # desarrollo: catálogo, admin del README y reservas de ejemplo
+  │   │   └── seed-produccion.ts  # producción: catálogo y admin propio, sin reservas
   │   ├── src/
   │   └── test/
-  └── frontend/                 # Next.js
+  └── frontend/                 # Next.js (con su Dockerfile)
       ├── src/
       └── test/
   ```
@@ -344,6 +351,14 @@ context: |
   PostgreSQL escuchan solo en loopback. `TRUST_PROXY` nunca es `true`, `*` ni un número de
   saltos: el backend no arranca si no es una lista de formatos admitidos.
 
+  Variables solo de producción (change `despliegue-continuo-ec2`): `ADMIN_EMAIL` y
+  `ADMIN_PASSWORD` las lee únicamente `backend/prisma/seed-produccion.ts` (el seed de desarrollo
+  no las usa). En producción salen de SSM Parameter Store (`/reservas/prod/`) y las pasa
+  `deploy/desplegar.sh` por el entorno del proceso del seed; **nunca** van en el repositorio ni
+  en un archivo. El seed rechaza las credenciales del README y una contraseña de menos de 16
+  caracteres. Los secretos de producción (`JWT_SECRET`, `POSTGRES_PASSWORD`) viven en SSM; ver
+  `docs/despliegue.md`.
+
   ### Base de datos
   - PostgreSQL corre en Docker, nunca instalado directo en la máquina — así los tres tienen
     la misma versión.
@@ -393,6 +408,13 @@ context: |
   4. **Bloquear el merge** si cualquiera de los pasos falla.
 
   Regla: **un PR con CI en rojo no se mergea nunca**, aunque "funcione localmente".
+
+  **CD:** `.github/workflows/cd.yml` despliega a la instancia EC2 de producción cuando el CI
+  termina en verde sobre un push a `main` (o a mano con `workflow_dispatch`: `despliegue` o
+  `vuelta-atras`). Usa credenciales temporales por OIDC, sin claves de AWS en GitHub, y las
+  acciones de terceros van fijadas por SHA de commit. `.github/workflows/certificado.yml` controla
+  a diario el certificado HTTPS. Las decisiones están en el change `despliegue-continuo-ec2` y
+  el runbook en `docs/despliegue.md`.
 
   ---
 
