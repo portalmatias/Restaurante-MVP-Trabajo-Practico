@@ -306,6 +306,28 @@ describe("ConsultaReserva - confirmar cancelación", () => {
       );
     });
 
+    it("un lanzamiento síncrono de la solicitud se muestra como error y no traba el diálogo", async () => {
+      // Sin `async`: `POST` lanza antes de devolver una promesa, así que no pasa por `toApiResult`.
+      POST.mockImplementation((ruta: string) => {
+        if (ruta === "/reservas/consultar") return Promise.resolve(respuestaOk(RESERVA));
+        throw new Error("falla inesperada");
+      });
+      await verDetalle();
+      const dialogo = await abrirDialogo();
+
+      confirmar();
+
+      const alerta = await within(dialogo).findByRole("alert");
+      expect(alerta).toHaveTextContent("Ocurrió un error inesperado.");
+      expect(alerta.textContent).not.toMatch(/falla inesperada/);
+      expect(within(dialogo).getByRole("button", { name: "Sí, cancelar" })).toBeEnabled();
+
+      fireEvent.click(within(dialogo).getByRole("button", { name: "Volver" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cancelar mi reserva" })).toBeInTheDocument();
+    });
+
     it("un 429 no ofrece un botón para reintentar", async () => {
       mockearPost(respuestaError(429));
       await verDetalle();

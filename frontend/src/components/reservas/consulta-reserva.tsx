@@ -318,6 +318,13 @@ function ResumenReserva({ reserva }: { reserva: ReservaConsultada }) {
   );
 }
 
+function enviarCancelacion(codigo: string, email: string) {
+  return apiClient.POST("/reservas/{codigo}/cancelar", {
+    params: { path: { codigo } },
+    body: { email },
+  });
+}
+
 function DetalleReserva({
   reserva,
   email,
@@ -371,12 +378,16 @@ function DetalleReserva({
     cancelacionEnCurso.current = true;
     setErrorAlCancelar(undefined);
     setCancelando(true);
-    const resultado = await toApiResult(
-      apiClient.POST("/reservas/{codigo}/cancelar", {
-        params: { path: { codigo: reserva.codigoReserva } },
-        body: { email },
-      }),
-    );
+    // Si `POST` lanzara antes de devolver su promesa, el lanzamiento se convierte en un rechazo
+    // para que `toApiResult` lo informe como error. Sin esto `cancelacionEnCurso` quedaría en
+    // `true` y el diálogo, que no se cierra mientras confirma, quedaría trabado.
+    let llamada: ReturnType<typeof enviarCancelacion>;
+    try {
+      llamada = enviarCancelacion(reserva.codigoReserva, email);
+    } catch (causa) {
+      llamada = Promise.reject(causa);
+    }
+    const resultado = await toApiResult(llamada);
     if (solicitud !== ultimaCancelacion.current) {
       return;
     }
