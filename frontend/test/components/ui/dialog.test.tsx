@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Dialog } from "../../../src/components/ui/dialog";
 
 // jsdom no implementa la semántica modal de HTMLDialogElement (design.md D5): no vuelve inerte
@@ -155,6 +155,98 @@ describe("Dialog", () => {
 
       expect(onCancel).not.toHaveBeenCalled();
       expect(showModal).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // En un navegador real, un botón enfocado que se deshabilita pierde el foco un instante
+  // después y no lo recupera al rehabilitarse. jsdom no lo hace, así que el test lo simula.
+  describe("al terminar de confirmar", () => {
+    function dialogo(props: { open?: boolean; confirmando?: boolean }) {
+      return (
+        <Dialog
+          open={props.open ?? true}
+          titulo="Cancelar reserva"
+          textoConfirmar="Sí, cancelar"
+          textoCancelar="Volver"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+          confirmando={props.confirmando}
+        >
+          <p>Resumen de la reserva</p>
+        </Dialog>
+      );
+    }
+
+    function confirmarYPerderElFoco(rerender: (ui: React.ReactElement) => void) {
+      const confirmar = screen.getByRole("button", { name: "Sí, cancelar" });
+      confirmar.focus();
+      fireEvent.click(confirmar);
+      // jsdom no permite sacar el foco de un botón ya deshabilitado: se lo saca justo antes.
+      act(() => confirmar.blur());
+      rerender(dialogo({ confirmando: true }));
+      expect(document.body).toHaveFocus();
+      return confirmar;
+    }
+
+    it("si el diálogo sigue abierto, devuelve el foco al botón que lo tenía", () => {
+      const { rerender } = render(dialogo({}));
+      const confirmar = confirmarYPerderElFoco(rerender);
+
+      rerender(dialogo({ confirmando: false }));
+
+      expect(confirmar).toHaveFocus();
+    });
+
+    it("si el diálogo se cierra, no fuerza el foco", () => {
+      const { rerender } = render(dialogo({}));
+      const confirmar = confirmarYPerderElFoco(rerender);
+
+      rerender(dialogo({ open: false, confirmando: false }));
+
+      expect(confirmar).not.toHaveFocus();
+    });
+
+    it("si el foco ya está en otro control del diálogo, no lo mueve", () => {
+      // Un enlace dentro del contenido sigue habilitado mientras confirma, a diferencia de los
+      // botones: es donde puede quedar el foco antes de que la acción termine.
+      const conEnlace = (confirmando: boolean) => (
+        <Dialog
+          open
+          titulo="Cancelar reserva"
+          textoConfirmar="Sí, cancelar"
+          textoCancelar="Volver"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+          confirmando={confirmando}
+        >
+          <a href="#ayuda">Ayuda</a>
+        </Dialog>
+      );
+      const { rerender } = render(conEnlace(false));
+      const confirmar = screen.getByRole("button", { name: "Sí, cancelar" });
+      confirmar.focus();
+      fireEvent.click(confirmar);
+      rerender(conEnlace(true));
+      const enlace = screen.getByRole("link", { name: "Ayuda" });
+      enlace.focus();
+
+      rerender(conEnlace(false));
+
+      expect(enlace).toHaveFocus();
+    });
+
+    it("si el foco quedó en el propio diálogo, lo devuelve al botón que lo tenía", () => {
+      // Tras un `cancel` no cancelable, `showModal()` deja el foco en el `<dialog>` mismo.
+      const { rerender } = render(dialogo({}));
+      const confirmar = confirmarYPerderElFoco(rerender);
+      const contenedor = screen.getByRole("dialog", { name: "Cancelar reserva" });
+      contenedor.setAttribute("tabindex", "-1");
+      contenedor.focus();
+      expect(contenedor).toHaveFocus();
+
+      rerender(dialogo({ confirmando: false }));
+
+      expect(confirmar).toHaveFocus();
     });
   });
 

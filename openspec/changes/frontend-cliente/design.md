@@ -517,6 +517,31 @@ cubre reusando el mismo `focus-visible:ring-2 focus-visible:ring-ring` de las de
 primitivas dentro del diálogo, no un estilo de foco propio). Cierra también con `Escape` de
 forma nativa.
 
+**Alcance real de ese comportamiento nativo** (medido en un navegador real al cierre,
+`tasks.md` 7.2):
+
+- **Atrapado de foco.** Mientras el diálogo está abierto, el contenido de la página queda
+  inerte: Tab y Shift+Tab nunca llegan a un control que esté detrás. El recorrido no es un
+  ciclo cerrado dentro del diálogo: después del último control, el foco pasa por la interfaz
+  del propio navegador y vuelve al primero. Eso es lo que la spec exige ("El diálogo de
+  cancelación atrapa el foco"); no se implementa un ciclo propio para evitar esa parada.
+- **Devolución de foco.** El navegador devuelve el foco al control que abrió el diálogo
+  solo si ese control sigue existiendo. Al cerrar con "Volver" o con Escape, vuelve a
+  "Cancelar mi reserva". Al confirmar con éxito, ese botón deja de mostrarse (la reserva ya
+  está `CANCELADA`), así que `ConsultaReserva` lleva el foco al aviso "Tu reserva fue
+  cancelada." (spec "Confirmar la cancelación lleva el foco al aviso"). Sin eso, el foco
+  quedaría en el documento sin ningún elemento. Pasa lo mismo tras un `409`: el botón se
+  quita en cuanto llega el rechazo, con el diálogo todavía abierto, así que al cerrarlo el
+  foco pasa al aviso "Esta reserva ya no se puede cancelar." (spec "Cerrar el diálogo tras un
+  rechazo por conflicto lleva el foco al aviso").
+- **Foco durante la confirmación.** Mientras la acción está en curso, `Dialog` deshabilita sus
+  dos botones. Un botón enfocado que se deshabilita pierde el foco un instante después, y el
+  navegador no se lo devuelve al rehabilitarlo: el foco queda en el documento, fuera del
+  diálogo. `Dialog` recuerda qué control tenía el foco al confirmar y se lo devuelve cuando
+  la acción termina con el diálogo todavía abierto (spec "Un error al confirmar no saca el
+  foco del diálogo"). Se prefirió esto a reemplazar `disabled` por `aria-disabled` porque no
+  cambia cómo se ven ni cómo se anuncian los botones mientras confirma.
+
 **Límite conocido de `jsdom` al probar esto:** `jsdom` (el DOM que usa la suite de RTL, ver
 `config.yaml` §9) no implementa la semántica modal real de `HTMLDialogElement`: no vuelve
 inerte el contenido detrás del diálogo, no atrapa el foco con Tab/Shift+Tab dentro de sus

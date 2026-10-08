@@ -343,9 +343,11 @@ function DetalleReserva({
   const [cancelando, setCancelando] = useState(false);
   const [errorAlCancelar, setErrorAlCancelar] = useState<ErrorApi>();
   const [recienCancelada, setRecienCancelada] = useState(false);
+  const avisoCancelada = useRef<HTMLDivElement>(null);
   // Un 409 es definitivo para esta reserva (ventana vencida o estado no cancelable): el detalle
   // deja de ofrecer la acción. Los demás errores pueden ser pasajeros y permiten reintentar.
   const [rechazadaPorConflicto, setRechazadaPorConflicto] = useState(false);
+  const avisoNoCancelable = useRef<HTMLDivElement>(null);
   // Mismo patrón que la consulta: `enCurso` evita reentradas y `ultimaSolicitud` descarta la
   // respuesta de una cancelación abandonada (por ejemplo, tras desmontar).
   const cancelacionEnCurso = useRef(false);
@@ -356,6 +358,21 @@ function DetalleReserva({
       ultimaCancelacion.current += 1;
     };
   }, []);
+
+  // Al confirmar, el botón que abrió el diálogo deja de existir y el navegador no tiene a dónde
+  // devolver el foco: se lo lleva al aviso para que quien usa teclado o lector no pierda su lugar.
+  // Espera a que el diálogo esté cerrado: mientras es modal, el aviso queda inerte y no puede
+  // recibir el foco.
+  useEffect(() => {
+    if (recienCancelada && !dialogoAbierto) avisoCancelada.current?.focus();
+  }, [recienCancelada, dialogoAbierto]);
+
+  // Lo mismo tras un 409: el botón ya se quitó con el diálogo todavía abierto, así que al
+  // cerrarlo el foco pasa al aviso de que la reserva ya no se puede cancelar.
+  const mostrarAvisoNoCancelable = rechazadaPorConflicto && !dialogoAbierto;
+  useEffect(() => {
+    if (mostrarAvisoNoCancelable) avisoNoCancelable.current?.focus();
+  }, [mostrarAvisoNoCancelable]);
 
   function abrirDialogo() {
     setErrorAlCancelar(undefined);
@@ -422,9 +439,11 @@ function DetalleReserva({
         </span>
       </p>
       {recienCancelada ? (
-        <Alert variant="info" className="text-base">
-          Tu reserva fue cancelada.
-        </Alert>
+        <div ref={avisoCancelada} tabIndex={-1}>
+          <Alert variant="info" className="text-base">
+            Tu reserva fue cancelada.
+          </Alert>
+        </div>
       ) : null}
       <Card title="Resumen de tu reserva" className="text-base">
         <ResumenReserva reserva={reserva} />
@@ -435,10 +454,12 @@ function DetalleReserva({
         </Button>
       ) : null}
       {/* Con el diálogo abierto el rechazo ya se lee ahí: el aviso aparece al cerrarlo. */}
-      {rechazadaPorConflicto && !dialogoAbierto ? (
-        <Alert variant="info" className="text-base">
-          {MENSAJE_YA_NO_CANCELABLE}
-        </Alert>
+      {mostrarAvisoNoCancelable ? (
+        <div ref={avisoNoCancelable} tabIndex={-1}>
+          <Alert variant="info" className="text-base">
+            {MENSAJE_YA_NO_CANCELABLE}
+          </Alert>
+        </div>
       ) : null}
       {noVerificada ? (
         <div className="flex flex-col gap-3">

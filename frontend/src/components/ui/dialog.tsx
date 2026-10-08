@@ -74,6 +74,26 @@ export function Dialog({
     }
   });
 
+  // Un botón enfocado que se deshabilita pierde el foco y no lo recupera al rehabilitarse: el
+  // foco queda en el documento, fuera del diálogo. Se recuerda qué control lo tenía al confirmar
+  // y se le devuelve cuando la acción termina con el diálogo todavía abierto.
+  const focoAlConfirmar = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (confirmando) {
+      return;
+    }
+    const previo = focoAlConfirmar.current;
+    focoAlConfirmar.current = null;
+    const dialogo = ref.current;
+    // El `<dialog>` se contiene a sí mismo: si el foco está en el contenedor, ningún control
+    // interno lo tiene y corresponde devolverlo.
+    const focoEnUnControl =
+      !!dialogo && document.activeElement !== dialogo && dialogo.contains(document.activeElement);
+    if (previo && open && dialogo?.contains(previo) && !focoEnUnControl) {
+      previo.focus();
+    }
+  }, [confirmando, open]);
+
   // Al desmontar se cierra el diálogo nativo si quedó abierto.
   useEffect(() => {
     const dialogo = ref.current;
@@ -124,7 +144,15 @@ export function Dialog({
         <Button variant="secondary" onClick={onCancel} disabled={confirmando}>
           {textoCancelar}
         </Button>
-        <Button variant={variantConfirmar} onClick={onConfirm} disabled={confirmando}>
+        <Button
+          variant={variantConfirmar}
+          onClick={() => {
+            focoAlConfirmar.current =
+              document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            onConfirm();
+          }}
+          disabled={confirmando}
+        >
           {textoConfirmar}
         </Button>
       </div>
