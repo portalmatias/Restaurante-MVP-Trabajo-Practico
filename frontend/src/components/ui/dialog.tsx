@@ -85,7 +85,11 @@ export function Dialog({
     const previo = focoAlConfirmar.current;
     focoAlConfirmar.current = null;
     const dialogo = ref.current;
-    if (previo && open && dialogo?.contains(previo) && !dialogo.contains(document.activeElement)) {
+    // El `<dialog>` se contiene a sí mismo: si el foco está en el contenedor, ningún control
+    // interno lo tiene y corresponde devolverlo.
+    const focoEnUnControl =
+      !!dialogo && document.activeElement !== dialogo && dialogo.contains(document.activeElement);
+    if (previo && open && dialogo?.contains(previo) && !focoEnUnControl) {
       previo.focus();
     }
   }, [confirmando, open]);

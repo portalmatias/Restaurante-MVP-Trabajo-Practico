@@ -234,6 +234,20 @@ describe("Dialog", () => {
 
       expect(enlace).toHaveFocus();
     });
+
+    it("si el foco quedó en el propio diálogo, lo devuelve al botón que lo tenía", () => {
+      // Tras un `cancel` no cancelable, `showModal()` deja el foco en el `<dialog>` mismo.
+      const { rerender } = render(dialogo({}));
+      const confirmar = confirmarYPerderElFoco(rerender);
+      const contenedor = screen.getByRole("dialog", { name: "Cancelar reserva" });
+      contenedor.setAttribute("tabindex", "-1");
+      contenedor.focus();
+      expect(contenedor).toHaveFocus();
+
+      rerender(dialogo({ confirmando: false }));
+
+      expect(confirmar).toHaveFocus();
+    });
   });
 
   it("muestra el contenido de error dentro del diálogo", () => {
