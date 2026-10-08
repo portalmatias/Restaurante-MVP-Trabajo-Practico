@@ -9,8 +9,9 @@ S4 de 6 y S5 de 8; grilla de 12 por 8), zona VIP (mesas V1 de 2, V2 de 4, V3 de 
 grilla de 10 por 6), aforos 40 (STANDARD), 20 (VIP) y 60 (global), y turnos almuerzo 12:00–15:00
 y cena 20:00–23:30 de martes a domingo (los del lunes, inactivos). Las horas son hora local del
 restaurante (`America/Argentina/Buenos_Aires`, UTC-3 fijo). Salvo que un escenario diga otra
-cosa, no hay reservas activas para el turno y la fecha consultados y el instante actual es
-2026-09-15 10:00.
+cosa, no hay reservas activas para el turno y la fecha consultados (las reservas de ejemplo del
+seed, entre ellas una `CONFIRMADA` en S3 para la cena del próximo sábado, no cuentan: los
+tests parten de una base sin reservas) y el instante actual es 2026-09-15 10:00.
 
 ## ADDED Requirements
 

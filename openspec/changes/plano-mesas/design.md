@@ -84,10 +84,11 @@ importa visualmente) y lo cubre un test del seed.
 COLUMN` con defaults o nulos: no reescribe filas problemáticas, no rompe a `reservas-crear` ni a
 `gestion-salon` (sus DTOs usan `whitelist` y `forbidNonWhitelisted`, así que `POST/PATCH
 /admin/mesas` no aceptan las columnas nuevas y una mesa dada de alta por el admin queda "sin
-ubicar"). Rollback: `DROP COLUMN` de las seis columnas y del enum, sin pérdida de datos de
-negocio. La migración se genera con `prisma migrate dev --name plano_mesas`, se **revisa el SQL**
-descartando el intento de Prisma de "reparar" el índice parcial, se agregan los `CHECK` a mano
-y se commitea.
+ubicar"). Rollback: `DROP COLUMN` de las siete columnas (cinco de `Mesa` y dos de `Zona`) y,
+después de la columna `forma`, `DROP TYPE` del enum, sin pérdida de datos de negocio. La
+migración se genera con `prisma migrate dev --create-only --name plano_mesas` (sin aplicarla),
+se **revisa el SQL** descartando el intento de Prisma de "reparar" el índice parcial, se agregan
+los `CHECK` a mano, se aplica con `prisma migrate dev` y se commitea.
 
 **Alternativas consideradas**
 
@@ -411,9 +412,11 @@ Orden: tests primero, en rojo, y luego la implementación (ver `tasks.md`).
   tres esquemas **en ambos lados con texto idéntico** (summary, description, ejemplos,
   `enumName` de `EstadoMesaPlano` y `FormaMesa`, orden de `required`). Riesgos: (1) campos
   nulables, que `@nestjs/swagger` emite con `nullable` (3.0) y el YAML escribe como `type:
-  [integer, 'null']` (3.1); hay que confirmar cómo normaliza el `scripts/openapi-diff.mjs` antes
-  de decidir la forma (tarea 4.x) y, si hace falta, ajustar el decorador (`type: [..]` en
-  `@ApiProperty`) en vez de tocar el script (que está cubierto por `test:scripts`); (2) el 429
+  [integer, 'null']` (3.1). `scripts/openapi-diff.mjs` no contiene ninguna normalización de
+  nulables, así que ambas representaciones se compararían como distintas y `openapi:check`
+  fallaría: hay que acordar una única forma en ambos lados (tarea 4.3) y, si hace falta, ajustar
+  el decorador (`type: [..]` en `@ApiProperty`) en vez de tocar el script (que está cubierto
+  por `test:scripts`); (2) el 429
   debe estar documentado en el YAML igual que lo hace `throttle-rutas-admin`; (3) correr
   `openapi:lint` (Spectral) y `npm run api:types` + `api:types:check` del frontend.
 

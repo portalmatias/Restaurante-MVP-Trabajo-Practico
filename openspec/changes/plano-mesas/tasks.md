@@ -12,22 +12,25 @@
 ## 2. Modelo de datos y seed (tests primero)
 
 - [ ] 2.1 Escribir `backend/test/plano-mesas-modelo.integration-spec.ts` (rojo): una mesa nueva
-      tiene `posX/posY` nulos, `ancho/alto` 1 y `forma` `RECTANGULAR`; `posX` sin `posY`, `posX`
-      negativo, `ancho` 0 y `planoColumnas` 0 son rechazados por la base. Verificar que falla.
+      tiene `posX/posY` nulos, `ancho/alto` 1 y `forma` `RECTANGULAR`; una zona nueva tiene
+      `planoColumnas/planoFilas` 12 y 8; `posX` sin `posY`, `posX` o `posY` negativos, `ancho` o
+      `alto` 0 y `planoColumnas` o `planoFilas` 0 son rechazados por la base. Verificar que falla.
 - [ ] 2.2 Agregar a `backend/prisma/schema.prisma` el enum `FormaMesa` y las columnas de `Mesa`
       (`posX`, `posY`, `ancho`, `alto`, `forma`) y de `Zona` (`planoColumnas`, `planoFilas`), con
       comentarios en español.
-- [ ] 2.3 Generar la migración con `prisma migrate dev --name plano_mesas`. **Revisar el SQL**:
-      quitar cualquier intento de reescribir el índice único parcial de `Reserva`, y agregar a
+- [ ] 2.3 Generar la migración con `prisma migrate dev --create-only --name plano_mesas` (sin
+      aplicarla). **Revisar el SQL**: quitar cualquier intento de reescribir el índice único parcial de `Reserva`, y agregar a
       mano los `CHECK` (`posX >= 0`, `posY >= 0`, ambos nulos o ambos no nulos, `ancho >= 1`,
-      `alto >= 1`, `planoColumnas >= 1`, `planoFilas >= 1`). Nunca `db push`. Verificar que 2.1
-      pasa y que `indices-partial.integration-spec.ts` sigue en verde.
+      `alto >= 1`, `planoColumnas >= 1`, `planoFilas >= 1`). Recién entonces aplicarla con
+      `prisma migrate dev`. Nunca `db push`. Verificar que 2.1 pasa y que `indices-partial.integration-spec.ts` sigue en verde.
 - [ ] 2.4 Escribir el test de migración sobre datos previos (rojo→verde): con mesas y reservas
-      cargadas antes de aplicar la migración, después conservan `id`, `capacidad`, `etiqueta` y
-      `mesaId`.
-- [ ] 2.5 Escribir `backend/prisma/layout-plano.spec.ts` (rojo): la función pura
+      cargadas antes de aplicar la migración, después conservan `id`, `zonaId`, `capacidad`, `etiqueta`
+      y `mesaId`.
+- [ ] 2.5 Escribir `backend/src/plano-mesas/layout-plano.spec.ts` (rojo): la función pura
       `validarLayout(zona, mesas)` detecta mesa fuera de grilla y solapamiento, y acepta el
-      layout de `design.md` D1. Implementarla en `backend/prisma/layout-plano.ts` hasta que pase.
+      layout de `design.md` D1. Implementarla en `backend/src/plano-mesas/layout-plano.ts` hasta
+      que pase (el jest unitario solo recolecta `backend/src/**/*.spec.ts`; el seed la importa
+      desde ahí).
 - [ ] 2.6 Actualizar `backend/prisma/seed.ts` con el layout de D1 (STANDARD 12×8, VIP 10×6) en
       el `create` y el `update` del `upsert` por `etiqueta`, y con las dimensiones de las zonas.
       Llamar a `validarLayout` antes de escribir. Verificar con un test de integración del seed
@@ -76,7 +79,8 @@
       `AppModule`. Verificar que 4.1 pasa.
 - [ ] 4.3 Revisar cómo `scripts/openapi-diff.mjs` normaliza los tipos nulables
       (`type: [integer, 'null']` frente a `nullable: true`) leyendo el script y su test
-      (`npm run test:scripts`); definir la forma común antes de escribir el YAML.
+      (`npm run test:scripts`); definir la forma común antes de escribir el YAML: ambos lados deben usar la misma
+      representación, porque el script no las equipara.
 - [ ] 4.4 Agregar a `openapi/openapi.yaml` el path `/plano-mesas` y los esquemas
       `PlanoMesasRespuesta`, `MesaPlano`, `EstadoMesaPlano` y `FormaMesa` (D2), con `400`, `404` y
       `429`, ejemplos y `additionalProperties: false`, y con texto idéntico al de los
@@ -111,7 +115,9 @@
       reintento automático.
 - [ ] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: pedido del plano en
       paralelo con `disponibilidad` y catálogo (`cache: "no-store"`), envuelto en `Suspense` con
-      el esqueleto, de modo que su error no tumbe la página. Verificar que los tests existentes
+      el esqueleto, de modo que su error no tumbe la página. La página hoy retorna antes cuando
+      `disponible` es `false` (lista los motivos); esa rama también debe renderizar el plano
+      atenuado con su aviso, después de los motivos, y se cubre con un test propio. Verificar que los tests existentes
       de la página siguen en verde.
 - [ ] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
       la página a 360 px (test del componente con las clases de orden y revisión visual).

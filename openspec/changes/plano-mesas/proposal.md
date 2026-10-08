@@ -27,7 +27,9 @@ sin filtrar datos de terceros y dibujarlo de forma accesible.
   `motivos`). Reutiliza `cargarContexto`, `evaluarReglas` y `calcularLugaresRestantes`
   (`backend/src/disponibilidad/`): el plano deriva el estado de cada mesa de la misma lista
   `mesasLibres` que usan la regla `SIN_MESA_DISPONIBLE` y el *best fit* de la creación, de modo
-  que no puede contradecir a la reserva real.
+  que comparte la lógica de la reserva real. Es una foto informativa: como
+  `GET /disponibilidad`, es una consulta sin lock y puede quedar obsoleta antes de confirmar,
+  porque la creación vuelve a leer bajo lock.
 - **Seguridad**: la respuesta no incluye ids de reservas, códigos, nombres, emails, teléfonos
   ni cantidad de comensales por mesa; solo el estado. Tiene límite de solicitudes propio y
   `Cache-Control: no-store`.
