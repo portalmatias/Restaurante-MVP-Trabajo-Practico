@@ -40,7 +40,7 @@ export default async function NuevaReservaPage({ searchParams }: NuevaReservaPag
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-10">
       {/* `key`: al volver a esta ruta con otra selección en la URL, el formulario se reinicia. */}
       <FormularioSeleccion
         key={JSON.stringify(seleccionInicial)}
