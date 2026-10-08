@@ -32,12 +32,12 @@ const CAMPOS: { campo: CampoNumerico; etiqueta: string; minimo: number }[] = [
 const REGLAS: Record<CampoNumerico | "requiereConfirmacionAdmin", ReglaCampo> = {
   // El 400 de regla de negocio ("El mínimo de comensales no puede ser mayor que el máximo.")
   // va junto al mínimo.
-  minComensales: { coincide: /^minComensales|mínimo de comensales/i, textoPorDefecto: "Ingresá un entero mayor o igual a 1." },
-  maxComensales: { coincide: /^maxComensales/, textoPorDefecto: "Ingresá un entero mayor o igual a 1." },
-  anticipacionMinHoras: { coincide: /^anticipacionMinHoras/, textoPorDefecto: "Ingresá un entero mayor o igual a 0." },
-  anticipacionMaxDias: { coincide: /^anticipacionMaxDias/, textoPorDefecto: "Ingresá un entero mayor o igual a 0." },
-  ventanaCancelacionHoras: { coincide: /^ventanaCancelacionHoras/, textoPorDefecto: "Ingresá un entero mayor o igual a 0." },
-  aforoMaximo: { coincide: /^aforoMaximo/, textoPorDefecto: "Ingresá un entero mayor o igual a 0." },
+  minComensales: { coincide: /^minComensales|mínimo de comensales/i, textoPorDefecto: "Ingresá un número entero de 1 o más." },
+  maxComensales: { coincide: /^maxComensales/, textoPorDefecto: "Ingresá un número entero de 1 o más." },
+  anticipacionMinHoras: { coincide: /^anticipacionMinHoras/, textoPorDefecto: "Ingresá un número entero de 0 o más." },
+  anticipacionMaxDias: { coincide: /^anticipacionMaxDias/, textoPorDefecto: "Ingresá un número entero de 0 o más." },
+  ventanaCancelacionHoras: { coincide: /^ventanaCancelacionHoras/, textoPorDefecto: "Ingresá un número entero de 0 o más." },
+  aforoMaximo: { coincide: /^aforoMaximo/, textoPorDefecto: "Ingresá un número entero de 0 o más." },
   requiereConfirmacionAdmin: { coincide: /^requiereConfirmacionAdmin/, textoPorDefecto: "Valor inválido." },
 };
 
@@ -59,29 +59,42 @@ export function ZonasPanel({ zonas, onZonaActualizada }: ZonasPanelProps) {
 
   return (
     <Card title="Zonas">
+      {editando ? (
+        <FormularioZona
+          key={editando.id}
+          zona={editando}
+          onCancelar={() => setEditando(undefined)}
+          onGuardada={(zona) => {
+            onZonaActualizada(zona);
+            // Solo se cierra el formulario de esa misma Zona: si mientras tanto se abrió el de
+            // otra, la respuesta atrasada no lo cierra.
+            setEditando((actual) => (actual?.id === zona.id ? undefined : actual));
+          }}
+        />
+      ) : null}
       <div className="relative overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="text-muted-foreground">
+          <thead className="bg-muted text-foreground">
             <tr>
-              <th scope="col" className="py-2 pr-3">Zona</th>
-              <th scope="col" className="py-2 pr-3">Comensales</th>
-              <th scope="col" className="py-2 pr-3">Anticipación</th>
-              <th scope="col" className="py-2 pr-3">Cancelación</th>
-              <th scope="col" className="py-2 pr-3">Confirmación</th>
-              <th scope="col" className="py-2 pr-3">Aforo</th>
-              <th scope="col" className="py-2"><span className="sr-only">Acciones</span></th>
+              <th scope="col" className="px-3 py-2 font-medium">Zona</th>
+              <th scope="col" className="px-3 py-2 font-medium">Comensales</th>
+              <th scope="col" className="px-3 py-2 font-medium">Anticipación</th>
+              <th scope="col" className="px-3 py-2 font-medium">Cancelación</th>
+              <th scope="col" className="px-3 py-2 font-medium">Confirmación</th>
+              <th scope="col" className="px-3 py-2 font-medium">Aforo</th>
+              <th scope="col" className="px-3 py-2"><span className="sr-only">Acciones</span></th>
             </tr>
           </thead>
           <tbody>
             {zonas.map((zona) => (
               <tr key={zona.id} className="border-t border-border">
-                <th scope="row" className="py-2 pr-3 font-medium">{zona.nombre}</th>
-                <td className="py-2 pr-3">{zona.minComensales} a {zona.maxComensales}</td>
-                <td className="py-2 pr-3">{zona.anticipacionMinHoras} h a {zona.anticipacionMaxDias} días</td>
-                <td className="py-2 pr-3">{zona.ventanaCancelacionHoras} h antes</td>
-                <td className="py-2 pr-3">{sinoNo(zona.requiereConfirmacionAdmin)}</td>
-                <td className="py-2 pr-3">{zona.aforoMaximo}</td>
-                <td className="py-2">
+                <th scope="row" className="px-3 py-2 font-display text-base">{zona.nombre}</th>
+                <td className="tabular px-3 py-2">{zona.minComensales} a {zona.maxComensales}</td>
+                <td className="tabular px-3 py-2">{zona.anticipacionMinHoras} horas a {zona.anticipacionMaxDias} días</td>
+                <td className="tabular px-3 py-2">{zona.ventanaCancelacionHoras} horas antes</td>
+                <td className="tabular px-3 py-2">{sinoNo(zona.requiereConfirmacionAdmin)}</td>
+                <td className="tabular px-3 py-2">{zona.aforoMaximo}</td>
+                <td className="px-3 py-2">
                   <BotonCompacto
                     variant="ghost"
                     aria-label={`Editar zona ${zona.nombre}`}
@@ -98,19 +111,6 @@ export function ZonasPanel({ zonas, onZonaActualizada }: ZonasPanelProps) {
           </tbody>
         </table>
       </div>
-      {editando ? (
-        <FormularioZona
-          key={editando.id}
-          zona={editando}
-          onCancelar={() => setEditando(undefined)}
-          onGuardada={(zona) => {
-            onZonaActualizada(zona);
-            // Solo se cierra el formulario de esa misma Zona: si mientras tanto se abrió el de
-            // otra, la respuesta atrasada no lo cierra.
-            setEditando((actual) => (actual?.id === zona.id ? undefined : actual));
-          }}
-        />
-      ) : null}
     </Card>
   );
 }
@@ -182,9 +182,9 @@ function FormularioZona({
       onSubmit={guardar}
       noValidate
       aria-label={`Editar zona ${zona.nombre}`}
-      className="mt-4 flex flex-col gap-4 border-t border-border pt-4"
+      className="mb-4 flex flex-col gap-4 border-b border-border pb-4"
     >
-      <h3 className="font-semibold">Editar zona {zona.nombre}</h3>
+      <h3 className="font-display text-base">Editar zona {zona.nombre}</h3>
       <div className="grid gap-4 sm:grid-cols-2">
         {CAMPOS.map(({ campo, etiqueta, minimo }) => (
           <Field

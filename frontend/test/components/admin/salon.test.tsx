@@ -130,7 +130,7 @@ describe("MesasPanel", () => {
     fireEvent.change(within(formulario).getByLabelText("Zona"), { target: { value: "z-vip" } });
     fireEvent.change(within(formulario).getByLabelText("Capacidad"), { target: { value: "6" } });
     fireEvent.change(within(formulario).getByLabelText("Etiqueta"), { target: { value: etiqueta } });
-    fireEvent.click(within(formulario).getByRole("button", { name: "Agregar mesa" }));
+    fireEvent.click(within(formulario).getByRole("button", { name: "Guardar mesa" }));
   }
 
   it("filtrar por Zona pide el listado con zonaId", async () => {
@@ -246,7 +246,7 @@ describe("TurnosPanel", () => {
     fireEvent.change(within(formulario).getByLabelText("Día"), { target: { value: "SABADO" } });
     fireEvent.change(within(formulario).getByLabelText("Hora de inicio"), { target: { value: "12:00" } });
     fireEvent.change(within(formulario).getByLabelText("Hora de fin"), { target: { value: "15:30" } });
-    fireEvent.click(within(formulario).getByRole("button", { name: "Agregar turno" }));
+    fireEvent.click(within(formulario).getByRole("button", { name: "Guardar turno" }));
   }
 
   it("muestra las horas en HH:mm, sin conversión de huso horario", async () => {

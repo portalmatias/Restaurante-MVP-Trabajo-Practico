@@ -21,7 +21,7 @@ const REGLAS: Record<CampoMesa, ReglaCampo> = {
   // 404 "La zona indicada no existe." (spec "Zona inexistente rechazada") y el 409 de cambiar
   // de Zona una Mesa con Reservas activas.
   zonaId: { coincide: /^zonaId|zona indicada|cambiar de zona/i, textoPorDefecto: "Elegí una zona válida." },
-  capacidad: { coincide: /^capacidad|capacidad/i, textoPorDefecto: "Ingresá un entero mayor o igual a 1." },
+  capacidad: { coincide: /^capacidad|capacidad/i, textoPorDefecto: "Ingresá un número entero de 1 o más." },
   // 409 "Ya existe una mesa con esa etiqueta." (spec "Etiqueta duplicada rechazada").
   etiqueta: { coincide: /^etiqueta|etiqueta/i, textoPorDefecto: "Ingresá una etiqueta." },
 };
@@ -151,21 +151,21 @@ export function MesasPanel({ zonas }: { zonas: Zona[] }) {
         {mesas && mesas.length > 0 ? (
           <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-muted-foreground">
+              <thead className="bg-muted text-foreground">
                 <tr>
-                  <th scope="col" className="py-2 pr-3">Etiqueta</th>
-                  <th scope="col" className="py-2 pr-3">Zona</th>
-                  <th scope="col" className="py-2 pr-3">Capacidad</th>
-                  <th scope="col" className="py-2"><span className="sr-only">Acciones</span></th>
+                  <th scope="col" className="px-3 py-2 font-medium">Etiqueta</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Zona</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Capacidad</th>
+                  <th scope="col" className="px-3 py-2"><span className="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody>
                 {mesas.map((mesa) => (
                   <tr key={mesa.id} className="border-t border-border align-top">
-                    <th scope="row" className="py-2 pr-3 font-medium">{mesa.etiqueta}</th>
-                    <td className="py-2 pr-3">{nombreZona(mesa.zonaId)}</td>
-                    <td className="py-2 pr-3">{mesa.capacidad}</td>
-                    <td className="py-2">
+                    <th scope="row" className="px-3 py-2 font-medium">{mesa.etiqueta}</th>
+                    <td className="tabular px-3 py-2">{nombreZona(mesa.zonaId)}</td>
+                    <td className="tabular px-3 py-2">{mesa.capacidad}</td>
+                    <td className="px-3 py-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <BotonCompacto
                           variant="ghost"
@@ -252,8 +252,8 @@ function FormularioMesa({
 
   const titulo = mesa ? `Editar mesa ${mesa.etiqueta}` : "Nueva mesa";
   return (
-    <form onSubmit={guardar} noValidate aria-label={titulo} className="flex flex-col gap-4 rounded-md border border-border p-4">
-      <h3 className="font-semibold">{titulo}</h3>
+    <form onSubmit={guardar} noValidate aria-label={titulo} className="flex flex-col gap-4 border-b border-border pb-4">
+      <h3 className="font-display text-base">{titulo}</h3>
       <div className="grid gap-4 sm:grid-cols-3">
         {/* El botón que abrió el formulario queda deshabilitado y suelta el foco: se lleva al
             primer campo para que quien usa teclado no pierda la posición. */}
@@ -293,7 +293,7 @@ function FormularioMesa({
       {errorGeneral ? <Alert variant="error">{errorGeneral}</Alert> : null}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={guardando}>
-          {guardando ? "Guardando…" : mesa ? "Guardar cambios" : "Agregar mesa"}
+          {guardando ? "Guardando…" : mesa ? "Guardar cambios" : "Guardar mesa"}
         </Button>
         <Button variant="secondary" disabled={guardando} onClick={onCancelar}>
           Cancelar

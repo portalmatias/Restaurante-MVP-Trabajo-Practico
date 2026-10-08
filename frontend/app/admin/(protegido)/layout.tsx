@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { AdminShell } from "../../../src/components/admin/admin-shell";
 
 export const metadata: Metadata = {
-  title: "Administración",
   // Pantallas internas del personal: no se indexan.
   robots: { index: false, follow: false },
 };

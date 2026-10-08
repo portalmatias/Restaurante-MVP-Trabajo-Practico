@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { ListadoReservas } from "../../../../src/components/admin/listado-reservas";
 import { leerFiltros } from "../../../../src/lib/admin/filtros-reservas";
+
+export const metadata: Metadata = { title: "Reservas" };
 
 type ReservasAdminPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

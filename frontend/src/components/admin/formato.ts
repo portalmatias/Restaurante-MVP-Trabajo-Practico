@@ -20,7 +20,15 @@ export const ETIQUETA_ESTADO: Record<EstadoReserva, string> = {
   PENDIENTE: "Pendiente",
   CONFIRMADA: "Confirmada",
   CANCELADA: "Cancelada",
-  NO_SHOW: "No se presentó",
+  NO_SHOW: "Ausente",
+};
+
+/** Tono del sello de cada estado (ver `sello.tsx`): texto y forma, no solo color. */
+export const TONO_ESTADO: Record<EstadoReserva, "pendiente" | "confirmada" | "cancelada" | "ausente"> = {
+  PENDIENTE: "pendiente",
+  CONFIRMADA: "confirmada",
+  CANCELADA: "cancelada",
+  NO_SHOW: "ausente",
 };
 
 export const ESTADOS_RESERVA = Object.keys(ETIQUETA_ESTADO) as EstadoReserva[];

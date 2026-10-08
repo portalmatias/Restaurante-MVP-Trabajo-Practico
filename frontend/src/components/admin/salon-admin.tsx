@@ -32,10 +32,10 @@ export function SalonAdmin() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-foreground">Salón</h1>
+      <h1 className="font-display text-3xl">Salón</h1>
       {error ? <Alert variant="error">{error}</Alert> : null}
       {zonas === undefined && !error ? (
-        <p role="status" className="text-sm text-muted-foreground">Cargando el salón…</p>
+        <p role="status" className="text-sm text-muted-foreground">Cargando zonas…</p>
       ) : null}
       {zonas ? (
         <>
@@ -45,10 +45,13 @@ export function SalonAdmin() {
               setZonas((actuales = []) => actuales.map((z) => (z.id === zona.id ? zona : z)))
             }
           />
-          <MesasPanel zonas={zonas} />
         </>
       ) : null}
-      <TurnosPanel />
+      {/* Mesas y turnos lado a lado en escritorio: son dos listas cortas e independientes. */}
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        {zonas ? <MesasPanel zonas={zonas} /> : null}
+        <TurnosPanel />
+      </div>
     </div>
   );
 }

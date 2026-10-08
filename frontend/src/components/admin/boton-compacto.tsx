@@ -17,7 +17,14 @@ export function BotonCompacto({
   return (
     <button
       type={type}
-      className={buttonVariants({ variant, size, className, fullWidth: false })}
+      // En escritorio (puntero fino) las acciones de fila bajan a 36 px para ver más filas;
+      // en pantallas táctiles se conserva el objetivo de 44 px.
+      className={buttonVariants({
+        variant,
+        size,
+        className: ["pointer-fine:min-h-9 pointer-fine:px-3", className].filter(Boolean).join(" "),
+        fullWidth: false,
+      })}
       {...props}
     />
   );

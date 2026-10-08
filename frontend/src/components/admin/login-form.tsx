@@ -17,6 +17,13 @@ export const MENSAJE_CREDENCIALES_INVALIDAS = "El email o la contraseña no son 
 export const MENSAJE_LIMITE_INTENTOS =
   "Se superó el límite de intentos de inicio de sesión. Esperá un minuto antes de volver a intentar.";
 
+/** Por qué se llegó al login, según el `?motivo=` que arma `AdminShell`. */
+const MENSAJES_MOTIVO: Record<string, string> = {
+  "sesion-vencida":
+    "Tu sesión venció. Por seguridad, la sesión del panel dura 60 minutos y no se renueva sola: ingresá de nuevo para seguir.",
+  renovar: "Ingresá de nuevo para renovar tu sesión por otros 60 minutos.",
+};
+
 type ErroresCampo = { email?: string; password?: string };
 
 /**
@@ -28,7 +35,7 @@ function erroresDeValidacion(mensajes: string[]): ErroresCampo {
   const errores: ErroresCampo = {};
   for (const mensaje of mensajes) {
     if (mensaje.startsWith("email")) errores.email = "Ingresá un email válido.";
-    if (mensaje.startsWith("password")) errores.password = "Ingresá la contraseña.";
+    if (mensaje.startsWith("password")) errores.password = "Ingresá tu contraseña.";
   }
   return errores;
 }
@@ -44,7 +51,7 @@ function mensajeGeneral(error: ErrorApi): string | undefined {
  * público y no `adminClient`: el login no lleva `Authorization`, y un `401` acá significa
  * credenciales incorrectas, no una sesión vencida que haya que redirigir (design.md D2/D4).
  */
-export function LoginForm() {
+export function LoginForm({ motivo }: { motivo?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,7 +73,7 @@ export function LoginForm() {
     }
     const nuevosErrores: ErroresCampo = {
       email: email.trim() === "" ? "Ingresá tu email." : undefined,
-      password: password === "" ? "Ingresá la contraseña." : undefined,
+      password: password === "" ? "Ingresá tu contraseña." : undefined,
     };
     setErroresCampo(nuevosErrores);
     setError(undefined);
@@ -113,10 +120,13 @@ export function LoginForm() {
 
   return (
     <form onSubmit={alEnviar} noValidate className="flex flex-col gap-5">
-      <h1 className="text-2xl font-semibold text-foreground">Iniciar sesión</h1>
-      <p className="text-sm text-muted-foreground">
-        Acceso exclusivo para el personal del restaurante.
-      </p>
+      <div className="flex flex-col gap-1">
+        <h1 className="font-display text-3xl">Iniciar sesión</h1>
+        <p className="text-sm text-muted-foreground">
+          Acceso exclusivo para el personal del restaurante.
+        </p>
+      </div>
+      {motivo && MENSAJES_MOTIVO[motivo] ? <Alert>{MENSAJES_MOTIVO[motivo]}</Alert> : null}
       <Field
         label="Email"
         name="email"
