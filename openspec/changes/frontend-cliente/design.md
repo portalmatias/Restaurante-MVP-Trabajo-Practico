@@ -530,7 +530,10 @@ forma nativa.
   "Cancelar mi reserva". Al confirmar con éxito, ese botón deja de mostrarse (la reserva ya
   está `CANCELADA`), así que `ConsultaReserva` lleva el foco al aviso "Tu reserva fue
   cancelada." (spec "Confirmar la cancelación lleva el foco al aviso"). Sin eso, el foco
-  quedaría en el documento sin ningún elemento.
+  quedaría en el documento sin ningún elemento. Pasa lo mismo tras un `409`: el botón se
+  quita en cuanto llega el rechazo, con el diálogo todavía abierto, así que al cerrarlo el
+  foco pasa al aviso "Esta reserva ya no se puede cancelar." (spec "Cerrar el diálogo tras un
+  rechazo por conflicto lleva el foco al aviso").
 
 **Límite conocido de `jsdom` al probar esto:** `jsdom` (el DOM que usa la suite de RTL, ver
 `config.yaml` §9) no implementa la semántica modal real de `HTMLDialogElement`: no vuelve

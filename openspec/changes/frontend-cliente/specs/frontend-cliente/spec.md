@@ -450,9 +450,11 @@ primitivas: etiqueta visible asociada al control, foco de teclado visible, área
 menos 44×44px, y mensaje de error asociado con `aria-describedby` cuando corresponda. El
 diálogo de confirmación de cancelación, además, SHALL atrapar el foco de teclado mientras está
 abierto: la navegación por teclado SHALL NOT llegar a ningún control de la página que queda
-detrás. Al cerrarse sin confirmar, SHALL devolver el foco al control que lo abrió. Al
-confirmarse la cancelación, ese control deja de existir, y el foco SHALL pasar al aviso de
-que la reserva fue cancelada.
+detrás. Al cerrarse sin confirmar, SHALL devolver el foco al control que lo abrió. Cuando ese
+control deja de existir, el foco SHALL pasar al aviso que explica por qué: al confirmarse la
+cancelación, al aviso de que la reserva fue cancelada; y al cerrar el diálogo después de que
+el servidor rechazó la cancelación por conflicto (`409`), al aviso de que la reserva ya no se
+puede cancelar.
 
 #### Scenario: El diálogo de cancelación atrapa el foco
 - **WHEN** el diálogo de confirmación de cancelación está abierto
@@ -466,3 +468,7 @@ que la reserva fue cancelada.
 #### Scenario: Confirmar la cancelación lleva el foco al aviso
 - **WHEN** la cancelación se confirma con éxito y el diálogo se cierra
 - **THEN** el foco de teclado pasa al aviso "Tu reserva fue cancelada."
+
+#### Scenario: Cerrar el diálogo tras un rechazo por conflicto lleva el foco al aviso
+- **WHEN** el servidor rechazó la cancelación con `409` y la persona cierra el diálogo
+- **THEN** el foco de teclado pasa al aviso "Esta reserva ya no se puede cancelar."

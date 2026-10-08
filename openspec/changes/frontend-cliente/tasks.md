@@ -268,8 +268,10 @@
       llega a ningún control de la página que queda detrás mientras está abierto; que cerrarlo
       con "Volver" o con Escape devuelve el foco al botón "Cancelar mi reserva" que lo abrió; y
       que confirmar con "Sí, cancelar" lleva el foco al aviso "Tu reserva fue cancelada."
-      (spec "Confirmar la cancelación lleva el foco al aviso"). Documentar el resultado en la
-      descripción del PR.
+      (spec "Confirmar la cancelación lleva el foco al aviso"); y que, tras un `409`, cerrar el
+      diálogo lleva el foco al aviso "Esta reserva ya no se puede cancelar." (spec "Cerrar el
+      diálogo tras un rechazo por conflicto lleva el foco al aviso"). Documentar el resultado
+      en la descripción del PR.
 - [ ] 7.3 El change no agrega ni modifica `openapi/openapi.yaml` ni `backend/prisma`: no
       aplican migración ni contrato propios. Verificar con `git diff main --stat -- backend
       openapi` vacío.
