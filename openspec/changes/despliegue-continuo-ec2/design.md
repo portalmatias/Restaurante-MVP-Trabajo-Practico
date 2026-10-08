@@ -177,9 +177,23 @@ El build de Next necesita más memoria que la que usa la aplicación, y no entra
 una `t3.micro` del Tier gratuito. Además no deja versiones anteriores listas para una vuelta
 atrás. Se descarta (decisión del equipo).
 
-**Arquitectura `amd64`:** `t3.micro` es x86. Las instancias `t4g` (ARM) serían algo más
-baratas en créditos, pero construir imágenes `arm64` en los runners `x86` de GitHub requiere
-emulación, que vuelve el build mucho más lento. Se descarta.
+**Arquitectura `amd64`:** `t3.micro` es x86. Las instancias `t4g` (ARM) consumirían algo menos
+de créditos, y desde agosto de 2025 GitHub ofrece runners `ubuntu-24.04-arm` nativos y gratuitos
+para repositorios públicos, así que construir imágenes `arm64` **ya no requiere emulación** (esa
+fue la razón original para descartarlas y dejó de valer). Se mantiene `amd64` por otros motivos:
+
+- **Las imágenes de producción tienen que poder correrse en local.** El equipo desarrolla en
+  Windows y x86, y la verificación de este change (tareas 4.2, 4.3 y 5.2) levanta la composición
+  de producción en una máquina local. Con `arm64` esa prueba pasaría por emulación en cada
+  equipo, o se perdería.
+- **Cambia lo que ya está definido y probado:** el job `imagenes` (runner y plataforma), el tipo
+  de instancia del runbook, y la validación de los digests por plataforma.
+- **La diferencia de créditos no decide:** lo que decide si el Tier gratuito alcanza es la
+  estimación de la tarea 1.3. Si esa estimación muestra que `t3.micro` no entra en los créditos
+  hasta el fin de la cursada, se reabre esta decisión y se evalúa `t4g.micro` con el runner
+  ARM64 (el resto del diseño no cambia).
+
+Se descarta `t4g` en este change.
 
 ### D4: Workflow de CD, OIDC y SSM con un documento propio
 
