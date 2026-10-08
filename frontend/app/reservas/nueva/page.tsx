@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { ErrorDeCarga } from "../../../src/components/reservas/error-de-carga";
 import { FormularioSeleccion } from "../../../src/components/reservas/formulario-seleccion";
 import { cargarCatalogo } from "../../../src/lib/cargar-catalogo";
 import { fechaLocalDeHoy } from "../../../src/lib/fecha-hora";
+
+export const metadata: Metadata = { title: "Elegí fecha y turno" };
 
 type NuevaReservaPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

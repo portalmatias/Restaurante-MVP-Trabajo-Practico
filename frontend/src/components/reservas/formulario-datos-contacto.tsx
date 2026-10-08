@@ -30,6 +30,9 @@ const CAMPOS_DEL_DTO: Record<string, Campo> = {
 const MENSAJE_CHOQUE =
   "No pudimos registrar tu reserva porque otra persona reservó al mismo tiempo. Reintentá en unos segundos.";
 
+// Tras un 429 reintentar enseguida agrava el límite: el envío queda en espera este tiempo.
+const MS_ESPERA_POR_LIMITE = 30_000;
+
 const MENSAJE_NO_ENCONTRADO = "Esa fecha, turno o zona ya no están disponibles. Empecemos de nuevo.";
 
 function errorDeNombre(nombre: string): string | undefined {
@@ -67,6 +70,8 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
   const [generales, setGenerales] = useState<string[]>([]);
   const [errorApi, setErrorApi] = useState<ErrorApi>();
   const [enviando, setEnviando] = useState(false);
+  // `true` desde un 429 hasta que pasa la espera: el botón de enviar sigue deshabilitado.
+  const [enEspera, setEnEspera] = useState(false);
   // Destino de la pantalla de éxito una vez registrada la reserva: si la navegación no llega a
   // desmontar el formulario, es la salida para que la persona vea su código.
   const [destinoExito, setDestinoExito] = useState<string>();
@@ -75,10 +80,12 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
   // descarta la respuesta de un envío abandonado (por ejemplo, tras desmontar el componente).
   const enCurso = useRef(false);
   const ultimaSolicitud = useRef(0);
+  const temporizadorEspera = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     return () => {
       ultimaSolicitud.current += 1;
+      clearTimeout(temporizadorEspera.current);
     };
   }, []);
 
@@ -102,7 +109,7 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
   }
 
   async function enviar() {
-    if (enCurso.current) {
+    if (enCurso.current || enEspera) {
       return;
     }
     const nuevosErrores: Errores = {
@@ -161,6 +168,11 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
       return;
     }
     setErrorApi(resultado.error);
+    if (resultado.error.tipo === "limite-de-intentos") {
+      setEnEspera(true);
+      clearTimeout(temporizadorEspera.current);
+      temporizadorEspera.current = setTimeout(() => setEnEspera(false), MS_ESPERA_POR_LIMITE);
+    }
   }
 
   function alEnviar(evento: FormEvent<HTMLFormElement>) {
@@ -177,7 +189,7 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
           ref={resumenErrores}
           role="alert"
           tabIndex={-1}
-          className="rounded-md border border-destructive bg-background px-4 py-3 text-base text-destructive"
+          className="rounded-sm border border-destructive bg-background px-4 py-3 text-base text-destructive"
         >
           <ul className="flex flex-col gap-1">
             {generales.map((mensaje, indice) => (
@@ -275,8 +287,8 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
           </Link>
         </div>
       ) : null}
-      <Button type="submit" size="lg" disabled={enviando}>
-        {enviando ? "Confirmando…" : "Confirmar reserva"}
+      <Button type="submit" size="lg" disabled={enviando || enEspera}>
+        {enviando ? "Confirmando…" : enEspera ? "Esperá un momento para reintentar" : "Confirmar reserva"}
       </Button>
     </form>
   );

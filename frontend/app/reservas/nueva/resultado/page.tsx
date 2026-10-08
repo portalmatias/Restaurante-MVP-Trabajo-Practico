@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga";
@@ -8,6 +9,8 @@ import { buttonVariants } from "../../../../src/components/ui/button";
 import { apiClient, toApiResult } from "../../../../src/lib/api/client";
 import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
+
+export const metadata: Metadata = { title: "Disponibilidad" };
 
 type ResultadoPageProps = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -65,7 +68,7 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
   if (disponibilidad.data && !disponibilidad.data.disponible) {
     return (
       <div className={contenedor}>
-        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="font-display text-3xl font-medium leading-tight sm:text-4xl">
           No hay lugar para esa combinación
         </h1>
         <ul className="flex flex-col gap-3">
@@ -107,7 +110,7 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
   return (
     <div className={contenedor}>
       <PasosReserva pasoActual={2} total={3} />
-      <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">¡Hay lugar!</h1>
+      <h1 className="font-display text-3xl font-medium leading-tight sm:text-4xl">¡Hay lugar!</h1>
       <ResumenSeleccion
         fecha={seleccion.fecha}
         horaInicio={turno.horaInicio}

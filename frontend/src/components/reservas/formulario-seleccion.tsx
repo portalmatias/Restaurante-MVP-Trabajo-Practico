@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "../ui/alert";
 import { Button, buttonVariants } from "../ui/button";
 import { Field } from "../ui/field";
-import { Select } from "../ui/select";
+import { Tablilla } from "../ui/tablilla";
 import type { components } from "../../lib/api/schema";
 import {
   diaSemanaDeFechaLocal,
@@ -59,6 +60,7 @@ export function FormularioSeleccion({
 }: FormularioSeleccionProps) {
   const router = useRouter();
   const tituloZonaId = useId();
+  const tituloTurnoId = useId();
   const opcionesZona = useRef<Array<HTMLButtonElement | null>>([]);
   const [inicial] = useState(() => resolverSeleccionInicial(seleccionInicial, { zonas, turnos, hoy }));
   const [fecha, setFecha] = useState(inicial.fecha ?? "");
@@ -152,10 +154,29 @@ export function FormularioSeleccion({
     className: "w-11 px-0 text-xl",
   });
 
+  // Sin zonas o sin turnos activos no hay nada que elegir: se explica en vez de mostrar un
+  // formulario que no puede completarse.
+  if (zonas.length === 0 || turnos.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="font-display text-3xl font-medium leading-tight sm:text-4xl">
+          Todavía no hay lugares para reservar
+        </h1>
+        <Alert variant="info" className="text-base">
+          Por ahora el restaurante no tiene turnos abiertos para reservar. Volvé a intentar más
+          tarde.
+        </Alert>
+        <Link href="/reservas" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+          Volver
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={alEnviar} noValidate className="flex flex-col gap-6">
       <PasosReserva pasoActual={1} total={3} />
-      <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">¿Cuándo y para cuántos?</h1>
+      <h1 className="font-display text-3xl font-medium leading-tight sm:text-4xl">¿Cuándo y para cuántos?</h1>
 
       <Field
         label="Fecha"
@@ -172,20 +193,34 @@ export function FormularioSeleccion({
           No hay turnos disponibles ese día. Elegí otra fecha.
         </Alert>
       ) : (
-        <Select
-          label="Turno"
-          name="turnoId"
-          value={turnoId}
-          disabled={!fechaElegible}
-          onChange={(evento) => setTurnoId(evento.target.value)}
-        >
-          <option value="">Elegí un turno</option>
-          {turnosDelDia.map((turno) => (
-            <option key={turno.id} value={turno.id}>
-              {`${formatearHoraTurno(turno.horaInicio)} a ${formatearHoraTurno(turno.horaFin)}`}
-            </option>
-          ))}
-        </Select>
+        <div role="group" aria-labelledby={tituloTurnoId} className="flex flex-col gap-2">
+          <span id={tituloTurnoId} className="text-sm font-medium text-foreground">
+            Turno
+          </span>
+          {!fechaElegible ? (
+            <p className="text-base text-muted-foreground">Elegí una fecha para ver los turnos de ese día.</p>
+          ) : (
+            // Cada tablilla lleva su tramo de viga: si los turnos pasan a otra fila, cuelgan igual.
+            <div className="flex flex-wrap gap-x-2 gap-y-2">
+              {turnosDelDia.map((turno) => {
+                const horario = `${formatearHoraTurno(turno.horaInicio)} a ${formatearHoraTurno(turno.horaFin)}`;
+                return (
+                  <div key={turno.id} className="relative pt-8">
+                    <div aria-hidden="true" className="absolute -inset-x-1 top-0 h-2 rounded-sm bg-madera" />
+                    <Tablilla
+                      titulo={formatearHoraTurno(turno.horaInicio)}
+                      japones={parseInt(formatearHoraTurno(turno.horaInicio), 10) < 16 ? "昼食" : "夕食"}
+                      detalle={`a ${formatearHoraTurno(turno.horaFin)}`}
+                      estado={turno.id === turnoId ? "elegida" : turnoId ? "descartada" : "libre"}
+                      aria-label={horario}
+                      onClick={() => setTurnoId(turno.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex flex-col gap-1.5">
@@ -214,9 +249,9 @@ export function FormularioSeleccion({
                 tabIndex={enTabulacion ? 0 : -1}
                 onClick={() => elegirZona(opcion)}
                 onKeyDown={(evento) => moverZona(evento, indice)}
-                className={`flex min-h-11 flex-col gap-1 rounded-lg bg-card p-4 text-left text-base text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${borde}`}
+                className={`flex min-h-11 flex-col gap-1 rounded-sm bg-card p-4 text-left text-base text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${borde}`}
               >
-                <span className="flex items-center justify-between gap-2 text-lg font-semibold">
+                <span className="flex items-center justify-between gap-2 font-display text-xl font-medium">
                   {opcion.nombre}
                   {elegida ? (
                     <svg
@@ -235,10 +270,10 @@ export function FormularioSeleccion({
                 </span>
                 <span>{`${opcion.minComensales} a ${opcion.maxComensales} comensales`}</span>
                 <span className="text-muted-foreground">
-                  {`Se reserva con ${pluralizar(opcion.anticipacionMinHoras, "hora", "horas")} a ${pluralizar(opcion.anticipacionMaxDias, "día", "días")} de anticipación`}
+                  {`Reservá con al menos ${pluralizar(opcion.anticipacionMinHoras, "hora", "horas")} de anticipación y hasta ${pluralizar(opcion.anticipacionMaxDias, "día", "días")} antes.`}
                 </span>
                 {opcion.requiereConfirmacionAdmin ? (
-                  <span className="mt-1 self-start rounded-md bg-accent px-2 py-1 text-sm font-medium text-accent-foreground">
+                  <span className="mt-1 self-start rounded-sm bg-accent px-2 py-1 text-sm font-medium text-accent-foreground">
                     Queda pendiente de confirmación
                   </span>
                 ) : null}
@@ -264,7 +299,7 @@ export function FormularioSeleccion({
           </button>
           <output
             aria-label="Cantidad de comensales"
-            className="min-w-12 text-center text-2xl font-semibold text-foreground"
+            className="tabular min-w-12 text-center font-display text-3xl font-medium text-foreground"
           >
             {comensales ?? "–"}
           </output>
@@ -280,7 +315,7 @@ export function FormularioSeleccion({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:static sm:mx-0 sm:border-t-0 sm:px-0 sm:py-0">
         <Button type="submit" size="lg" disabled={faltantes.length > 0}>
           Ver disponibilidad
         </Button>

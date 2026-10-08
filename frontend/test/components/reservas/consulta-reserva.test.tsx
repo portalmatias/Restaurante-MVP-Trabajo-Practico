@@ -412,6 +412,22 @@ describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
     expect(GET).not.toHaveBeenCalled();
   });
 
+  it("si al verificar la ventana el servidor responde 429, lo explica y no ofrece 'Reintentar'", async () => {
+    GET.mockResolvedValue(respuestaError(429));
+    await verDetalleDe(RESERVA_FUTURA);
+
+    expect(await screen.findByText(/Hiciste demasiados intentos/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+    expect(GET).toHaveBeenCalledTimes(1);
+  });
+
+  it("al mostrar el detalle el foco pasa al título", async () => {
+    await verDetalleDe(RESERVA_FUTURA);
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
+  });
+
   it.each(["CONFIRMADA", "PENDIENTE"])(
     "con una reserva %s muy por delante de la ventana se ofrece",
     async (estado) => {

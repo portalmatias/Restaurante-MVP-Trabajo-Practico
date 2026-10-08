@@ -46,12 +46,21 @@ function formatearSinRomper(formatear: (valor: string) => string, valor: string)
   }
 }
 
+const MENSAJE_LIMITE_AL_VERIFICAR =
+  "Hiciste demasiados intentos y no pudimos verificar si todavía podés cancelar. Esperá unos minutos y volvé a consultar tu reserva.";
+
 const MENSAJE_SIN_VERIFICAR =
   "No pudimos verificar si todavía podés cancelar. Probá de nuevo en unos minutos.";
 
 // "no-verificada": no hay con qué evaluar la ventana (falla de `GET /zonas`, zona ausente u
 // hora de inicio inválida). Nunca se ofrece una acción cuya condición no se pudo comprobar.
-type VerificacionCancelacion = "pendiente" | "no-verificada" | { puedeCancelar: boolean };
+// "limite-de-intentos": el servidor respondió 429; reintentar enseguida lo agrava, así que no se
+// ofrece "Reintentar".
+type VerificacionCancelacion =
+  | "pendiente"
+  | "no-verificada"
+  | "limite-de-intentos"
+  | { puedeCancelar: boolean };
 
 async function resolverVerificacion(
   fecha: string,
@@ -59,6 +68,9 @@ async function resolverVerificacion(
   zonaId: string,
 ): Promise<VerificacionCancelacion> {
   const resultado = await toApiResult(apiClient.GET("/zonas", { cache: "no-store" }));
+  if (resultado.error?.tipo === "limite-de-intentos") {
+    return "limite-de-intentos";
+  }
   const ventana = resultado.data?.find((zona) => zona.id === zonaId)?.ventanaCancelacionHoras;
   if (ventana === undefined) {
     return "no-verificada";
@@ -119,6 +131,7 @@ function useVerificacionCancelacion(reserva: ReservaConsultada) {
     ofrecerCancelar:
       admiteCancelar && typeof verificacion === "object" && verificacion.puedeCancelar,
     noVerificada: admiteCancelar && verificacion === "no-verificada",
+    limiteDeIntentos: admiteCancelar && verificacion === "limite-de-intentos",
     verificando,
     reintentar: () => {
       if (!enCurso.current) {
@@ -185,12 +198,19 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
   // desmontar el componente) nunca se aplica.
   const enCurso = useRef(false);
   const ultimaSolicitud = useRef(0);
+  // Al volver del detalle al formulario el botón que se tocó desaparece: el foco pasa al título.
+  const tituloFormulario = useRef<HTMLHeadingElement>(null);
+  const [volvioAlFormulario, setVolvioAlFormulario] = useState(false);
 
   useEffect(() => {
     return () => {
       ultimaSolicitud.current += 1;
     };
   }, []);
+
+  useEffect(() => {
+    if (volvioAlFormulario && !reserva) tituloFormulario.current?.focus();
+  }, [volvioAlFormulario, reserva]);
 
   async function consultar() {
     if (enCurso.current) {
@@ -230,6 +250,7 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
   }
 
   function consultarOtra() {
+    setVolvioAlFormulario(true);
     setReserva(undefined);
     setEmail("");
     setErrorApi(undefined);
@@ -249,7 +270,13 @@ export function ConsultaReserva({ codigoInicial = "" }: ConsultaReservaProps) {
 
   return (
     <form onSubmit={alEnviar} noValidate className="flex flex-col gap-5">
-      <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">Consultá tu reserva</h1>
+      <h1
+        ref={tituloFormulario}
+        tabIndex={-1}
+        className="font-display text-3xl font-medium leading-tight outline-none sm:text-4xl"
+      >
+        Consultá tu reserva
+      </h1>
       <p className="text-base text-muted-foreground">
         Ingresá el código de tu reserva y el email con el que reservaste.
       </p>
@@ -304,7 +331,7 @@ function ResumenReserva({ reserva }: { reserva: ReservaConsultada }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
       <dt className="text-muted-foreground">Código</dt>
-      <dd className="font-bold tracking-widest text-accent">{reserva.codigoReserva}</dd>
+      <dd className="tabular font-display text-lg font-medium tracking-widest text-accent">{reserva.codigoReserva}</dd>
       <dt className="text-muted-foreground">Fecha</dt>
       <dd>{formatearSinRomper(formatearFechaLargaEs, reserva.fecha)}</dd>
       <dt className="text-muted-foreground">Turno</dt>
@@ -337,7 +364,7 @@ function DetalleReserva({
   onCancelada: () => void;
   onConsultarOtra: () => void;
 }) {
-  const { ofrecerCancelar, noVerificada, verificando, reintentar } =
+  const { ofrecerCancelar, noVerificada, limiteDeIntentos, verificando, reintentar } =
     useVerificacionCancelacion(reserva);
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [cancelando, setCancelando] = useState(false);
@@ -350,6 +377,17 @@ function DetalleReserva({
   // respuesta de una cancelación abandonada (por ejemplo, tras desmontar).
   const cancelacionEnCurso = useRef(false);
   const ultimaCancelacion = useRef(0);
+  // El detalle reemplaza al formulario, y tras cancelar el botón que abrió el diálogo se
+  // desmonta: en ambos casos el foco pasa al título para no caer en `body`.
+  const tituloDetalle = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    tituloDetalle.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (recienCancelada) tituloDetalle.current?.focus();
+  }, [recienCancelada]);
 
   useEffect(() => {
     return () => {
@@ -413,11 +451,15 @@ function DetalleReserva({
 
   return (
     <div className="flex flex-col gap-5">
-      <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+      <h1
+        ref={tituloDetalle}
+        tabIndex={-1}
+        className="font-display text-3xl font-medium leading-tight outline-none sm:text-4xl"
+      >
         {TITULO_POR_ESTADO[reserva.estado]}
       </h1>
       <p>
-        <span className={`inline-block rounded-md px-3 py-1 text-base font-medium ${claseEtiqueta}`}>
+        <span className={`inline-block rounded-sm px-3 py-1 text-base font-medium ${claseEtiqueta}`}>
           {ETIQUETA_POR_ESTADO[reserva.estado]}
         </span>
       </p>
@@ -438,6 +480,11 @@ function DetalleReserva({
       {rechazadaPorConflicto && !dialogoAbierto ? (
         <Alert variant="info" className="text-base">
           {MENSAJE_YA_NO_CANCELABLE}
+        </Alert>
+      ) : null}
+      {limiteDeIntentos ? (
+        <Alert variant="info" className="text-base">
+          {MENSAJE_LIMITE_AL_VERIFICAR}
         </Alert>
       ) : null}
       {noVerificada ? (

@@ -32,7 +32,15 @@ function renderizar(seleccionInicial?: Inicial, hoy = HOY) {
 }
 
 const campoFecha = () => screen.getByLabelText("Fecha") as HTMLInputElement;
-const campoTurno = () => screen.getByLabelText("Turno") as HTMLSelectElement;
+// Cada turno es una tablilla (botón con aria-pressed) dentro del grupo «Turno».
+const grupoTurno = () => screen.getByRole("group", { name: "Turno" });
+const tablillaDe = (id: string) => {
+  const turno = TURNOS.find((candidato) => candidato.id === id);
+  if (!turno) throw new Error(`Turno desconocido: ${id}`);
+  const hora = (iso: string) => iso.slice(11, 16);
+  return screen.getByRole("button", { name: `${hora(turno.horaInicio)} a ${hora(turno.horaFin)}` });
+};
+const tablillasElegidas = () => within(grupoTurno()).queryAllByRole("button", { pressed: true });
 const opcionZona = (nombre: string) => screen.getByRole("radio", { name: new RegExp(nombre) });
 const botonVer = () => screen.getByRole("button", { name: "Ver disponibilidad" });
 const cantidad = () => screen.getByRole("status", { name: "Cantidad de comensales" });
@@ -44,7 +52,7 @@ function elegirFecha(fecha: string) {
 }
 
 function elegirTurno(id: string) {
-  fireEvent.change(campoTurno(), { target: { value: id } });
+  fireEvent.click(tablillaDe(id));
 }
 
 function elegirZona(nombre: string) {
@@ -56,7 +64,7 @@ describe("FormularioSeleccion - campos y obligatoriedad", () => {
     renderizar();
 
     expect(campoFecha()).toHaveAttribute("type", "date");
-    expect(campoTurno()).toBeInTheDocument();
+    expect(grupoTurno()).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Zona" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Comensales" })).toBeInTheDocument();
     expect(botonVer()).toBeInTheDocument();
@@ -131,15 +139,16 @@ describe("FormularioSeleccion - fecha", () => {
     elegirFecha("2026-09-13");
 
     expect(screen.getByText("Elegí una fecha desde hoy.")).toBeInTheDocument();
-    expect(campoTurno()).toBeDisabled();
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
   });
 });
 
 describe("FormularioSeleccion - turnos del día", () => {
-  it("deshabilita el turno hasta elegir la fecha", () => {
+  it("no ofrece tablillas hasta elegir la fecha y lo explica", () => {
     renderizar();
 
-    expect(campoTurno()).toBeDisabled();
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("Elegí una fecha para ver los turnos de ese día.")).toBeInTheDocument();
   });
 
   it("un sábado ofrece solo los turnos del sábado, con el horario local", () => {
@@ -147,14 +156,11 @@ describe("FormularioSeleccion - turnos del día", () => {
 
     elegirFecha(SABADO);
 
-    const opciones = within(campoTurno())
-      .getAllByRole("option")
-      .filter((opcion) => (opcion as HTMLOptionElement).value !== "")
-      .map((opcion) => [(opcion as HTMLOptionElement).value, opcion.textContent]);
-    expect(opciones).toEqual([
-      [TURNO_ALMUERZO_SABADO.id, "12:00 a 15:00"],
-      [TURNO_CENA_SABADO.id, "20:00 a 23:30"],
-    ]);
+    const nombres = within(grupoTurno())
+      .getAllByRole("button")
+      .map((tablilla) => tablilla.getAttribute("aria-label"));
+    expect(nombres).toEqual(["12:00 a 15:00", "20:00 a 23:30"]);
+    expect(tablillaDe(TURNO_ALMUERZO_SABADO.id)).toHaveAttribute("aria-pressed", "false");
   });
 
   it("un lunes sin turnos activos muestra el aviso y oculta el selector de turno", () => {
@@ -163,18 +169,18 @@ describe("FormularioSeleccion - turnos del día", () => {
     elegirFecha(LUNES);
 
     expect(screen.getByText("No hay turnos disponibles ese día. Elegí otra fecha.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Turno")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Turno" })).not.toBeInTheDocument();
   });
 
   it("cambiar la fecha a otro día limpia el turno que ya no corresponde", () => {
     renderizar();
     elegirFecha(SABADO);
     elegirTurno(TURNO_CENA_SABADO.id);
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
 
     elegirFecha(MARTES);
 
-    expect(campoTurno()).toHaveValue("");
+    expect(tablillasElegidas()).toHaveLength(0);
     expect(screen.getByText(/Falta elegir: turno/)).toBeInTheDocument();
   });
 
@@ -185,7 +191,7 @@ describe("FormularioSeleccion - turnos del día", () => {
 
     elegirFecha("2026-09-26");
 
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
   });
 });
 
@@ -195,7 +201,7 @@ describe("FormularioSeleccion - zona", () => {
 
     const vip = opcionZona("VIP");
     expect(within(vip).getByText("2 a 12 comensales")).toBeInTheDocument();
-    expect(within(vip).getByText(/24 horas a 60 días/)).toBeInTheDocument();
+    expect(within(vip).getByText(/al menos 24 horas de anticipación y hasta 60 días/)).toBeInTheDocument();
     expect(within(vip).getByText("Queda pendiente de confirmación")).toBeInTheDocument();
   });
 
@@ -204,7 +210,7 @@ describe("FormularioSeleccion - zona", () => {
 
     const standard = opcionZona("STANDARD");
     expect(within(standard).getByText("1 a 8 comensales")).toBeInTheDocument();
-    expect(within(standard).getByText(/2 horas a 30 días/)).toBeInTheDocument();
+    expect(within(standard).getByText(/al menos 2 horas de anticipación y hasta 30 días/)).toBeInTheDocument();
     expect(within(standard).queryByText(/pendiente de confirmación/)).not.toBeInTheDocument();
   });
 
@@ -342,7 +348,7 @@ describe("FormularioSeleccion - selección inicial", () => {
     });
 
     expect(campoFecha()).toHaveValue(SABADO);
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
     expect(opcionZona("VIP")).toHaveAttribute("aria-checked", "true");
     expect(cantidad()).toHaveTextContent("6");
     expect(botonVer()).toBeEnabled();
@@ -352,7 +358,7 @@ describe("FormularioSeleccion - selección inicial", () => {
     renderizar({ fecha: SABADO, turnoId: "no-existe", zonaId: ZONA_VIP.id, comensales: "6" });
 
     expect(campoFecha()).toHaveValue(SABADO);
-    expect(campoTurno()).toHaveValue("");
+    expect(tablillasElegidas()).toHaveLength(0);
     expect(opcionZona("VIP")).toHaveAttribute("aria-checked", "true");
     expect(cantidad()).toHaveTextContent("6");
   });
@@ -360,7 +366,7 @@ describe("FormularioSeleccion - selección inicial", () => {
   it("ignora un zonaId que no está en GET /zonas, y con él los comensales", () => {
     renderizar({ fecha: SABADO, turnoId: TURNO_CENA_SABADO.id, zonaId: "no-existe", comensales: "6" });
 
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("radio").every((r) => r.getAttribute("aria-checked") === "false")).toBe(true);
     expect(masComensales()).toBeDisabled();
     expect(screen.getByText("Falta elegir: zona")).toBeInTheDocument();
@@ -374,8 +380,7 @@ describe("FormularioSeleccion - selección inicial", () => {
     renderizar({ fecha, turnoId: TURNO_CENA_SABADO.id, zonaId: ZONA_STANDARD.id, comensales: "2" });
 
     expect(campoFecha()).toHaveValue("");
-    expect(campoTurno()).toHaveValue("");
-    expect(campoTurno()).toBeDisabled();
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
     expect(opcionZona("STANDARD")).toHaveAttribute("aria-checked", "true");
   });
 
@@ -383,7 +388,7 @@ describe("FormularioSeleccion - selección inicial", () => {
     renderizar({ fecha: SABADO, turnoId: TURNO_CENA_MARTES.id, zonaId: ZONA_STANDARD.id, comensales: "2" });
 
     expect(campoFecha()).toHaveValue(SABADO);
-    expect(campoTurno()).toHaveValue("");
+    expect(tablillasElegidas()).toHaveLength(0);
   });
 
   it.each([
@@ -435,5 +440,20 @@ describe("FormularioSeleccion - envío", () => {
     fireEvent.submit(botonVer().closest("form") as HTMLFormElement);
 
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("FormularioSeleccion - catálogo vacío", () => {
+  it.each([
+    ["sin zonas", [], TURNOS],
+    ["sin turnos", ZONAS, []],
+  ])("%s explica que no hay lugares y no muestra el formulario", (_motivo, zonas, turnos) => {
+    render(<FormularioSeleccion zonas={zonas} turnos={turnos} hoy={HOY} />);
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Todavía no hay lugares para reservar" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ver disponibilidad" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute("href", "/reservas");
   });
 });

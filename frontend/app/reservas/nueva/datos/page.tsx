@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga";
 import { FormularioDatosContacto } from "../../../../src/components/reservas/formulario-datos-contacto";
@@ -6,6 +7,8 @@ import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-se
 import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
 import { diaSemanaDeFechaLocal } from "../../../../src/lib/fecha-hora";
 import { leerSeleccionDeQuery, urlConSeleccion } from "../../../../src/lib/seleccion-reserva";
+
+export const metadata: Metadata = { title: "Tus datos" };
 
 type DatosPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -43,7 +46,7 @@ export default async function DatosPage({ searchParams }: DatosPageProps) {
   return (
     <div className={contenedor}>
       <PasosReserva pasoActual={3} total={3} />
-      <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">Tus datos</h1>
+      <h1 className="font-display text-3xl font-medium leading-tight sm:text-4xl">Tus datos</h1>
       <ResumenSeleccion
         fecha={seleccion.fecha}
         horaInicio={turno.horaInicio}
