@@ -343,6 +343,7 @@ function DetalleReserva({
   const [cancelando, setCancelando] = useState(false);
   const [errorAlCancelar, setErrorAlCancelar] = useState<ErrorApi>();
   const [recienCancelada, setRecienCancelada] = useState(false);
+  const avisoCancelada = useRef<HTMLDivElement>(null);
   // Un 409 es definitivo para esta reserva (ventana vencida o estado no cancelable): el detalle
   // deja de ofrecer la acción. Los demás errores pueden ser pasajeros y permiten reintentar.
   const [rechazadaPorConflicto, setRechazadaPorConflicto] = useState(false);
@@ -356,6 +357,12 @@ function DetalleReserva({
       ultimaCancelacion.current += 1;
     };
   }, []);
+
+  // Al confirmar, el botón que abrió el diálogo deja de existir y el navegador no tiene a dónde
+  // devolver el foco: se lo lleva al aviso para que quien usa teclado o lector no pierda su lugar.
+  useEffect(() => {
+    if (recienCancelada) avisoCancelada.current?.focus();
+  }, [recienCancelada]);
 
   function abrirDialogo() {
     setErrorAlCancelar(undefined);
@@ -422,9 +429,11 @@ function DetalleReserva({
         </span>
       </p>
       {recienCancelada ? (
-        <Alert variant="info" className="text-base">
-          Tu reserva fue cancelada.
-        </Alert>
+        <div ref={avisoCancelada} tabIndex={-1}>
+          <Alert variant="info" className="text-base">
+            Tu reserva fue cancelada.
+          </Alert>
+        </div>
       ) : null}
       <Card title="Resumen de tu reserva" className="text-base">
         <ResumenReserva reserva={reserva} />

@@ -244,6 +244,25 @@ describe("ConsultaReserva - confirmar cancelación", () => {
       expect(screen.getByText("K7PM3QXA")).toBeInTheDocument();
       expect(GET).toHaveBeenCalledTimes(1);
     });
+
+    it("lleva el foco al aviso de cancelación, porque el botón que abrió el diálogo ya no está", async () => {
+      mockearPost(respuestaOk(undefined, 204));
+      await verDetalle();
+      await abrirDialogo();
+
+      confirmar();
+
+      const aviso = await screen.findByText("Tu reserva fue cancelada.");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      // Dentro de `waitFor`: el foco tiene que quedar en el aviso una vez cerrado el diálogo.
+      await waitFor(() => {
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement).toContainElement(aviso);
+      });
+      expect(document.activeElement).not.toContainElement(
+        screen.getByRole("heading", { level: 1 }),
+      );
+    });
   });
 
   describe("cuando la cancelación es rechazada", () => {
