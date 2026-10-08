@@ -1,29 +1,40 @@
 @import "tailwindcss";
 
 /*
- * Tokens semánticos del sistema de diseño (D2 de openspec/changes/frontend-base/design.md).
- * Fuente única de color: ningún componente escribe un hexadecimal propio, todos usan estas
- * variables a través de las utilidades de Tailwind generadas por @theme inline.
- * MVP en modo claro únicamente: sin variante de esquema de color oscuro.
+ * Tokens semánticos del sistema de diseño de Ichigo (dirección «Kakefuda»: tablillas de madera
+ * colgadas, ver .impeccable/surfaces/app-page-tsx.md). Fuente única de color: ningún componente
+ * escribe un hexadecimal propio, todos usan estas variables a través de las utilidades de
+ * Tailwind generadas por @theme inline. Solo modo claro (hinoki).
+ *
+ * Contrastes verificados (WCAG 2.1):
+ *   foreground (#1F1813) sobre background (#E8DCC4)     12,9:1
+ *   muted-foreground (#5C4630) sobre background          6,5:1
+ *   accent (#9A2A19, texto del sello) sobre background   5,7:1  y sobre card 6,5:1
+ *   border (#8A6A43) sobre background                    3,7:1  (mínimo de bordes de controles: 3:1)
+ *   primary-foreground (#F3EBDA) sobre primary (#1F1813) 14,8:1
+ * El rojo del sello NUNCA va como texto sobre madera oscura (2,5:1): solo como relleno con
+ * texto hinoki claro (5,3:1).
  */
 :root {
-  color-scheme: light; /* MVP: solo modo claro, sin variante oscura del navegador */
-  --primary: #171717;
-  --primary-foreground: #ffffff;
-  --secondary: #404040;
-  --secondary-foreground: #ffffff;
-  --accent: #a16207;
-  --accent-foreground: #ffffff;
-  --background: #ffffff;
-  --foreground: #171717;
-  --card: #ffffff;
-  --card-foreground: #171717;
-  --muted: #e8ecf0;
-  --muted-foreground: #475569;
-  --border: #e5e5e5;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --ring: #171717;
+  color-scheme: light;
+  --background: #e8dcc4; /* hinoki */
+  --foreground: #1f1813; /* tinta sumi */
+  --card: #f3ebda; /* tablilla de hinoki claro */
+  --card-foreground: #1f1813;
+  --primary: #1f1813;
+  --primary-foreground: #f3ebda;
+  --secondary: #5c4630; /* nogal */
+  --secondary-foreground: #f3ebda;
+  --accent: #9a2a19; /* sello */
+  --accent-foreground: #f3ebda;
+  --muted: #d9cbae; /* hinoki a la sombra */
+  --muted-foreground: #5c4630;
+  --border: #8a6a43; /* canto de madera */
+  --destructive: #9a2a19;
+  --destructive-foreground: #f3ebda;
+  --ring: #9a2a19;
+  --madera: #2b221b; /* tablilla dada vuelta: madera oscura */
+  --madera-foreground: #f3ebda;
 }
 
 @theme inline {
@@ -43,10 +54,219 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-ring: var(--ring);
-  --font-sans: var(--font-inter);
+  --color-madera: var(--madera);
+  --color-madera-foreground: var(--madera-foreground);
+  --font-sans: var(--font-gothic), "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --font-wordmark: var(--font-marca), var(--font-mincho), serif;
+  --font-display: var(--font-mincho), "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  caret-color: var(--accent);
+  font-feature-settings: "palt" 1;
+}
+
+/* Números alineados en datos (turnos, fechas, aforo, códigos de reserva). */
+.tabular,
+table {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "palt" 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* Superficies del navegador que también llevan el diseño. */
+::selection {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+* {
+  scrollbar-color: var(--border) var(--muted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Veta de la madera: ruido muy fino en el fondo, sin degradados. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.55' numOctaves='2' seed='4'/><feColorMatrix values='0 0 0 0 0.12  0 0 0 0 0.09  0 0 0 0 0.07  0 0 0 1 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
+}
+
+/*
+ * Movimiento firma: la tablilla gira al elegirla. Con `prefers-reduced-motion` no hay giro:
+ * se cambia de cara con un fundido corto.
+ */
+@keyframes tablilla-dar-vuelta {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+@keyframes tablilla-fundido {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Movimiento de la landing. Todo es CSS y se activa solo donde el navegador lo soporta: sin
+ * soporte (o con `prefers-reduced-motion`) el contenido ya está en su estado final, nunca oculto.
+ */
+
+/* El nombre se escribe con tinta: aparece desde el desenfoque y el espaciado se asienta. */
+@keyframes tinta-entrada {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    letter-spacing: 0.32em;
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    letter-spacing: 0.06em;
+  }
+}
+
+/* Las tablillas cuelgan de un cordón y se mecen apenas, cada una a su ritmo. */
+@keyframes balanceo {
+  from {
+    transform: rotate(-5deg);
+  }
+  to {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes revelar {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* El marco de una foto se abre como un papel que se despliega. */
+@keyframes marco-abrir {
+  from {
+    clip-path: inset(9% 7% 9% 7% round 14px);
+  }
+  to {
+    clip-path: inset(0 round 4px);
+  }
+}
+
+/* La foto se desliza dentro de su marco más despacio que la página. */
+@keyframes deriva {
+  from {
+    transform: translateY(-5%) scale(1.14);
+  }
+  to {
+    transform: translateY(5%) scale(1.14);
+  }
+}
+
+.tinta-entrada {
+  animation: tinta-entrada 1.4s var(--ease-out-expo) both;
+}
+
+.balanceo {
+  transform-origin: 50% -1.5rem;
+  animation: balanceo 3.6s ease-in-out infinite alternate;
+}
+ol > li:nth-child(2) .balanceo {
+  animation-duration: 4.4s;
+  animation-delay: -1.5s;
+}
+ol > li:nth-child(3) .balanceo {
+  animation-duration: 3.2s;
+  animation-delay: -2.4s;
+}
+.balanceo:hover {
+  animation-play-state: paused;
+}
+
+@supports (animation-timeline: view()) {
+  .revelar {
+    animation: revelar linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  .marco-organico {
+    animation: marco-abrir linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+  .marco-organico .deriva {
+    animation: deriva linear both;
+    animation-timeline: view();
+    animation-range: cover 0% cover 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tinta-entrada,
+  .balanceo,
+  .revelar,
+  .marco-organico,
+  .marco-organico .deriva {
+    animation: none !important;
+  }
 }
