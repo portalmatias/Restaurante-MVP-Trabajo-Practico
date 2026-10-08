@@ -361,9 +361,11 @@ function DetalleReserva({
 
   // Al confirmar, el botón que abrió el diálogo deja de existir y el navegador no tiene a dónde
   // devolver el foco: se lo lleva al aviso para que quien usa teclado o lector no pierda su lugar.
+  // Espera a que el diálogo esté cerrado: mientras es modal, el aviso queda inerte y no puede
+  // recibir el foco.
   useEffect(() => {
-    if (recienCancelada) avisoCancelada.current?.focus();
-  }, [recienCancelada]);
+    if (recienCancelada && !dialogoAbierto) avisoCancelada.current?.focus();
+  }, [recienCancelada, dialogoAbierto]);
 
   // Lo mismo tras un 409: el botón ya se quitó con el diálogo todavía abierto, así que al
   // cerrarlo el foco pasa al aviso de que la reserva ya no se puede cancelar.

@@ -393,22 +393,35 @@ describe("ConsultaReserva - confirmar cancelación", () => {
       expect(llamadasACancelar()).toHaveLength(1);
     });
 
-    it("tras un 409, cerrar el diálogo lleva el foco al aviso, porque el botón ya no está", async () => {
-      mockearPost(respuestaError(409, { statusCode: 409, message: "x" }));
-      await verDetalle();
-      const dialogo = await abrirDialogo();
-      confirmar();
-      await within(dialogo).findByRole("alert");
+    it.each([
+      ["con 'Volver'", () => fireEvent.click(screen.getByRole("button", { name: "Volver" }))],
+      [
+        "con Escape",
+        () => fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true })),
+      ],
+    ])(
+      "tras un 409, cerrar el diálogo %s lleva el foco al aviso, porque el botón ya no está",
+      async (_forma, cerrar) => {
+        mockearPost(respuestaError(409, { statusCode: 409, message: "x" }));
+        await verDetalle();
+        const dialogo = await abrirDialogo();
+        confirmar();
+        await within(dialogo).findByRole("alert");
 
-      fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+        cerrar();
 
-      const aviso = await screen.findByText("Esta reserva ya no se puede cancelar.");
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      await waitFor(() => {
-        expect(document.activeElement).not.toBe(document.body);
-        expect(document.activeElement).toContainElement(aviso);
-      });
-    });
+        const aviso = await screen.findByText("Esta reserva ya no se puede cancelar.");
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        await waitFor(() => {
+          expect(document.activeElement).not.toBe(document.body);
+          expect(document.activeElement).toContainElement(aviso);
+        });
+        // El foco queda en el aviso, no en un contenedor más amplio del detalle.
+        expect(document.activeElement).not.toContainElement(
+          screen.getByRole("heading", { level: 1 }),
+        );
+      },
+    );
 
     it.each([[404], [429], [500]])(
       "tras un %i, al cerrar el diálogo el detalle sigue ofreciendo cancelar",
