@@ -347,6 +347,7 @@ function DetalleReserva({
   // Un 409 es definitivo para esta reserva (ventana vencida o estado no cancelable): el detalle
   // deja de ofrecer la acción. Los demás errores pueden ser pasajeros y permiten reintentar.
   const [rechazadaPorConflicto, setRechazadaPorConflicto] = useState(false);
+  const avisoNoCancelable = useRef<HTMLDivElement>(null);
   // Mismo patrón que la consulta: `enCurso` evita reentradas y `ultimaSolicitud` descarta la
   // respuesta de una cancelación abandonada (por ejemplo, tras desmontar).
   const cancelacionEnCurso = useRef(false);
@@ -363,6 +364,13 @@ function DetalleReserva({
   useEffect(() => {
     if (recienCancelada) avisoCancelada.current?.focus();
   }, [recienCancelada]);
+
+  // Lo mismo tras un 409: el botón ya se quitó con el diálogo todavía abierto, así que al
+  // cerrarlo el foco pasa al aviso de que la reserva ya no se puede cancelar.
+  const mostrarAvisoNoCancelable = rechazadaPorConflicto && !dialogoAbierto;
+  useEffect(() => {
+    if (mostrarAvisoNoCancelable) avisoNoCancelable.current?.focus();
+  }, [mostrarAvisoNoCancelable]);
 
   function abrirDialogo() {
     setErrorAlCancelar(undefined);
@@ -444,10 +452,12 @@ function DetalleReserva({
         </Button>
       ) : null}
       {/* Con el diálogo abierto el rechazo ya se lee ahí: el aviso aparece al cerrarlo. */}
-      {rechazadaPorConflicto && !dialogoAbierto ? (
-        <Alert variant="info" className="text-base">
-          {MENSAJE_YA_NO_CANCELABLE}
-        </Alert>
+      {mostrarAvisoNoCancelable ? (
+        <div ref={avisoNoCancelable} tabIndex={-1}>
+          <Alert variant="info" className="text-base">
+            {MENSAJE_YA_NO_CANCELABLE}
+          </Alert>
+        </div>
       ) : null}
       {noVerificada ? (
         <div className="flex flex-col gap-3">

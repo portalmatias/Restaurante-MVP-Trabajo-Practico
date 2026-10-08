@@ -393,6 +393,23 @@ describe("ConsultaReserva - confirmar cancelación", () => {
       expect(llamadasACancelar()).toHaveLength(1);
     });
 
+    it("tras un 409, cerrar el diálogo lleva el foco al aviso, porque el botón ya no está", async () => {
+      mockearPost(respuestaError(409, { statusCode: 409, message: "x" }));
+      await verDetalle();
+      const dialogo = await abrirDialogo();
+      confirmar();
+      await within(dialogo).findByRole("alert");
+
+      fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+
+      const aviso = await screen.findByText("Esta reserva ya no se puede cancelar.");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement).toContainElement(aviso);
+      });
+    });
+
     it.each([[404], [429], [500]])(
       "tras un %i, al cerrar el diálogo el detalle sigue ofreciendo cancelar",
       async (status) => {
