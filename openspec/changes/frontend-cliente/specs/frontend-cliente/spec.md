@@ -449,12 +449,20 @@ SHALL cumplir los mismos requisitos de accesibilidad que ya fija `frontend-base`
 primitivas: etiqueta visible asociada al control, foco de teclado visible, área táctil de al
 menos 44×44px, y mensaje de error asociado con `aria-describedby` cuando corresponda. El
 diálogo de confirmación de cancelación, además, SHALL atrapar el foco de teclado mientras está
-abierto y SHALL devolver el foco al control que lo abrió al cerrarse.
+abierto: la navegación por teclado SHALL NOT llegar a ningún control de la página que queda
+detrás. Al cerrarse sin confirmar, SHALL devolver el foco al control que lo abrió. Al
+confirmarse la cancelación, ese control deja de existir, y el foco SHALL pasar al aviso de
+que la reserva fue cancelada.
 
 #### Scenario: El diálogo de cancelación atrapa el foco
 - **WHEN** el diálogo de confirmación de cancelación está abierto
-- **THEN** la navegación por teclado con Tab no sale de los controles del diálogo
+- **THEN** la navegación por teclado con Tab y Shift+Tab no llega a ningún control de la
+  página que queda detrás del diálogo
 
 #### Scenario: Cerrar el diálogo devuelve el foco
-- **WHEN** el diálogo de confirmación se cierra, con o sin confirmar
+- **WHEN** el diálogo de confirmación se cierra sin confirmar, con "Volver" o con Escape
 - **THEN** el foco de teclado vuelve al control que abrió el diálogo
+
+#### Scenario: Confirmar la cancelación lleva el foco al aviso
+- **WHEN** la cancelación se confirma con éxito y el diálogo se cierra
+- **THEN** el foco de teclado pasa al aviso "Tu reserva fue cancelada."
