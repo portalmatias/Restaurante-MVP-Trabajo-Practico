@@ -534,6 +534,13 @@ forma nativa.
   quita en cuanto llega el rechazo, con el diálogo todavía abierto, así que al cerrarlo el
   foco pasa al aviso "Esta reserva ya no se puede cancelar." (spec "Cerrar el diálogo tras un
   rechazo por conflicto lleva el foco al aviso").
+- **Foco durante la confirmación.** Mientras la acción está en curso, `Dialog` deshabilita sus
+  dos botones. Un botón enfocado que se deshabilita pierde el foco un instante después, y el
+  navegador no se lo devuelve al rehabilitarlo: el foco queda en el documento, fuera del
+  diálogo. `Dialog` recuerda qué control tenía el foco al confirmar y se lo devuelve cuando
+  la acción termina con el diálogo todavía abierto (spec "Un error al confirmar no saca el
+  foco del diálogo"). Se prefirió esto a reemplazar `disabled` por `aria-disabled` porque no
+  cambia cómo se ven ni cómo se anuncian los botones mientras confirma.
 
 **Límite conocido de `jsdom` al probar esto:** `jsdom` (el DOM que usa la suite de RTL, ver
 `config.yaml` §9) no implementa la semántica modal real de `HTMLDialogElement`: no vuelve
