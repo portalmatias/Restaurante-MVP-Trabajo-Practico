@@ -35,7 +35,7 @@ export default function Home() {
             Ichigo
           </h1>
           <p className="max-w-[24ch] font-display text-2xl leading-snug sm:text-3xl">
-            Omakase japonés. Cada noche, pocos lugares y un solo menú.
+            Omakase japonés. Cada bocado, una sorpresa.
           </p>
           <p className="max-w-[56ch] text-base text-muted-foreground">
             Dejás la elección en manos del itamae: el pescado del día, el arroz tibio, un bocado
@@ -54,7 +54,7 @@ export default function Home() {
           </div>
         </div>
         <MarcoFoto
-          src="/ichigo/nigiri.png"
+          src="/ichigo/nigiri.webp"
           alt="Una pieza de nigiri de atún graso sobre un plato de cerámica oscura, en una mesa de madera clara"
           width={928}
           height={1152}
@@ -65,7 +65,7 @@ export default function Home() {
       </section>
 
       <MarcoFoto
-        src="/ichigo/barra.png"
+        src="/ichigo/barra.webp"
         alt="La barra de hinoki de Ichigo de noche, con luces cálidas y un plato negro sobre la madera"
         width={1376}
         height={768}
@@ -77,7 +77,7 @@ export default function Home() {
       <section aria-labelledby="omakase" className="flex flex-col gap-12">
         <div className="grid items-center gap-8 md:grid-cols-2 md:gap-14">
           <MarcoFoto
-            src="/ichigo/manos.png"
+            src="/ichigo/manos.webp"
             alt="Las manos del itamae apoyando una pieza de nigiri sobre un plato oscuro"
             width={1264}
             height={848}
@@ -113,7 +113,7 @@ export default function Home() {
       {/* La sala: una imagen grande, una chica y un texto breve. */}
       <section aria-labelledby="sala" className="grid items-end gap-8 md:grid-cols-12">
         <MarcoFoto
-          src="/ichigo/tablillas.png"
+          src="/ichigo/tablillas.webp"
           alt="Tablillas de madera clara colgadas de una viga oscura, sin escritura"
           width={1264}
           height={848}
@@ -122,7 +122,7 @@ export default function Home() {
         />
         <div className="revelar flex flex-col gap-4 md:col-span-5">
           <MarcoFoto
-            src="/ichigo/sake.png"
+            src="/ichigo/sake.webp"
             alt="Una botella y una taza de cerámica sobre una bandeja de madera, con una ramita de pasto seco"
             width={1024}
             height={1024}
