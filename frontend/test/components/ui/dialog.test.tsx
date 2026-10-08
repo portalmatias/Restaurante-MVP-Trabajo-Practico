@@ -207,15 +207,32 @@ describe("Dialog", () => {
     });
 
     it("si el foco ya está en otro control del diálogo, no lo mueve", () => {
-      const { rerender } = render(dialogo({}));
-      confirmarYPerderElFoco(rerender);
+      // Un enlace dentro del contenido sigue habilitado mientras confirma, a diferencia de los
+      // botones: es donde puede quedar el foco antes de que la acción termine.
+      const conEnlace = (confirmando: boolean) => (
+        <Dialog
+          open
+          titulo="Cancelar reserva"
+          textoConfirmar="Sí, cancelar"
+          textoCancelar="Volver"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+          confirmando={confirmando}
+        >
+          <a href="#ayuda">Ayuda</a>
+        </Dialog>
+      );
+      const { rerender } = render(conEnlace(false));
+      const confirmar = screen.getByRole("button", { name: "Sí, cancelar" });
+      confirmar.focus();
+      fireEvent.click(confirmar);
+      rerender(conEnlace(true));
+      const enlace = screen.getByRole("link", { name: "Ayuda" });
+      enlace.focus();
 
-      rerender(dialogo({ confirmando: false }));
-      const volver = screen.getByRole("button", { name: "Volver" });
-      volver.focus();
-      rerender(dialogo({ confirmando: false }));
+      rerender(conEnlace(false));
 
-      expect(volver).toHaveFocus();
+      expect(enlace).toHaveFocus();
     });
   });
 
