@@ -69,7 +69,7 @@ no hay lugares para reservar», un aviso informativo que lo explica y un enlace 
 
 ### Requirement: Pantallas de estado para ruta inexistente y error inesperado
 El sistema SHALL mostrar, para una ruta inexistente, una pantalla con el título «No encontramos
-esa página», una explicación y las acciones «Volver al inicio» y «Reservá una mesa». Ante un error
+esa página», una explicación y las acciones «Volver al inicio» y «Reservar una mesa». Ante un error
 inesperado que impida renderizar el layout, SHALL mostrar una pantalla con el título «Ichigo no
 está disponible por ahora» y un botón «Reintentar». Ambas pantallas SHALL usar la misma
 composición (tablilla colgada y mensaje), un `h1` único y los tokens de la identidad.

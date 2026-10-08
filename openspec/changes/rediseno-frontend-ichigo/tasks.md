@@ -42,10 +42,10 @@ desde cero.
 - [ ] 2.4 `identidad-visual-ichigo`, «Contrastes»: corregir el comentario de `globals.css` que
       indica 3,7:1 para `border` sobre `background` (medido 3,66:1) y el que indica 2,5:1 para
       el rojo sobre madera (medido 2,0:1 con `#9A2A19`; 2,5:1 es el rojo de relleno `#B2321F`).
-- [ ] 2.5 `landing-ichigo`: la acción principal dice «Reservar una mesa» y el cierre «Elegir fecha
-      y turno» (infinitivo impersonal, que `frontend-cliente` prohíbe). Escribir primero el test
-      que busque los textos «Reservá una mesa» y «Elegí fecha y turno» y luego corregir
-      `app/page.tsx` y los tests que citan los textos viejos.
+- [ ] 2.5 `landing-ichigo`: las acciones de la landing se mantienen en infinitivo («Reservar una
+      mesa», «Ya tengo un código», «Elegir fecha y turno») por decisión expresa del equipo. No
+      requiere cambios en `app/page.tsx`: agregar un test que fije esos textos y que compruebe
+      que los títulos y textos explicativos usan voseo y ninguno usa tuteo.
 - [ ] 2.6 `landing-ichigo`, «Los pasos de reserva coinciden con el flujo real»: el primer paso de
       `PASOS` dice «Elegí fecha, turno y cantidad de comensales» y omite la zona. Corregirlo a
       «Elegí fecha, turno, zona y cantidad de comensales».

@@ -16,32 +16,37 @@ de al menos 44×44px que fija `frontend-base`.
 - **THEN** la apertura muestra el texto y la fotografía lado a lado
 
 #### Scenario: Objetivos táctiles
-- **WHEN** se miden los enlaces «Reservá una mesa», «Ya tengo un código» y «Elegí fecha y
+- **WHEN** se miden los enlaces «Reservar una mesa», «Ya tengo un código» y «Elegir fecha y
   turno» a 390px
 - **THEN** cada uno mide al menos 44px de ancho y 44px de alto
 
 ### Requirement: Acción principal antes que la foto en celular
 La landing SHALL mostrar, antes de cualquier fotografía en el orden del documento y del foco,
 el nombre «Ichigo» como `h1`, la propuesta «Omakase japonés. Cada bocado, una sorpresa.» y la
-acción principal «Reservá una mesa», que SHALL enlazar a `/reservas`. Las etiquetas de las
-acciones de la landing SHALL usar voseo rioplatense, como exige `frontend-cliente`. La acción secundaria «Ya tengo un código» SHALL enlazar a
-`/reservas/consultar`. La acción principal SHALL ser visible sin desplazarse a 390×844px.
+acción principal «Reservar una mesa», que SHALL enlazar a `/reservas`. Las etiquetas de las
+acciones (botones y enlaces de llamada a la acción) SHALL estar en infinitivo («Reservar una
+mesa», «Elegir fecha y turno»), por decisión expresa del equipo y por ser la convención de la
+categoría; los títulos y los textos explicativos SHALL usar voseo rioplatense formal. La acción
+secundaria «Ya tengo un código» SHALL enlazar a `/reservas/consultar`. La acción principal SHALL ser visible sin desplazarse a 390×844px.
 
 #### Scenario: Acción visible en el primer viewport
 - **WHEN** se abre `/` a 390×844px sin desplazarse
-- **THEN** «Reservá una mesa» está completamente dentro del viewport
+- **THEN** «Reservar una mesa» está completamente dentro del viewport
 
 #### Scenario: Orden del documento
 - **WHEN** se recorre el DOM de `/` en orden
-- **THEN** el `h1` y el enlace «Reservá una mesa» aparecen antes que la primera imagen
+- **THEN** el `h1` y el enlace «Reservar una mesa» aparecen antes que la primera imagen
 
 #### Scenario: Propuesta de apertura
 - **WHEN** se lee el texto que sigue al `h1` en la apertura de `/`
 - **THEN** dice «Omakase japonés. Cada bocado, una sorpresa.»
 
-#### Scenario: Voseo en las acciones
-- **WHEN** se leen las etiquetas de los enlaces de acción de `/`
-- **THEN** ninguna usa el infinitivo impersonal («Reservar», «Elegir») ni el tuteo
+#### Scenario: Acciones en infinitivo y textos en voseo
+- **WHEN** se leen las etiquetas de los enlaces de acción de `/` y sus títulos y textos
+  explicativos
+- **THEN** las etiquetas de acción están en infinitivo («Reservar una mesa», «Ya tengo un código»,
+  «Elegir fecha y turno») y los títulos y textos explicativos usan voseo («Dejá tus datos», «Así
+  se reserva»), sin tuteo
 
 #### Scenario: Sin enlaces a la administración
 - **WHEN** se inspeccionan los enlaces de `/` y del encabezado
@@ -65,7 +70,7 @@ reserva» SHALL describir el servicio sin comprometer datos del sistema.
 
 #### Scenario: Cierre con la acción repetida
 - **WHEN** la persona llega al final de `/`
-- **THEN** encuentra un enlace «Elegí fecha y turno» que lleva a `/reservas/nueva`
+- **THEN** encuentra un enlace «Elegir fecha y turno» que lleva a `/reservas/nueva`
 
 ### Requirement: Fotografías sintéticas optimizadas y sin bloquear el contenido
 La landing SHALL mostrar cinco fotografías sintéticas en formato WebP servidas con

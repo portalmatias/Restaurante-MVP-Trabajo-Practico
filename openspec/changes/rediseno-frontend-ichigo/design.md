@@ -26,8 +26,7 @@ ajusten al código en vez de a una necesidad, y que lo que el prototipo hace mal
 - Donde el prototipo **no cumple** lo que la spec exige, no se adaptó la spec: se dejó una
   tarea explícita en `tasks.md` (sección 2). Hoy se conocen estos desvíos: `app/global-error.tsx`
   importa `next/font/google` (contradice la decisión D1); el estado `completa` de `Tablilla`
-  existe pero ninguna pantalla lo usa todavía; la landing dice «Reservar una mesa» (la spec exige
-  voseo: «Reservá una mesa») y su paso 1 de «Así se reserva» omite la zona; las acciones de fila
+  existe pero ninguna pantalla lo usa todavía; su paso 1 de «Así se reserva» omite la zona; las acciones de fila
   del admin usan `pointer: fine` y no excluyen los equipos híbridos; y el aviso del login dice
   «Tu sesión venció» aun cuando el backend rechazó la sesión por otro motivo.
 - **Desviación única de `config.yaml` §14, prioridad 2.** Escribir la spec después del código
@@ -200,6 +199,18 @@ decidió por la ruta y no con grupos de rutas de Next.js para no mover páginas 
 el diff acotado. Costo: es un componente de cliente (`usePathname`). Alternativa: dos layouts con
 grupos de rutas `(publico)` y `(admin)`, más limpia a largo plazo y más invasiva hoy.
 
+### Acciones en infinitivo: excepción deliberada al «Copy en voseo»
+`frontend-cliente` pide copy en voseo rioplatense en toda pantalla nueva, con ejemplos como
+«Reservá tu mesa». Este change **no lo aplica a las etiquetas de acción** (botones y enlaces de
+llamada a la acción): se mantienen en infinitivo («Reservar una mesa», «Elegir fecha y turno»,
+«Volver», «Reintentar», «Confirmar reserva»). Decisión expresa del equipo: es la convención de la
+categoría (reservas y comercio), se lee como una acción y no como una orden, y pasar los botones
+a imperativo le quita categoría a un restaurante de alta gama. Los títulos, los textos
+explicativos y los mensajes siguen en voseo formal. Es una excepción acotada a la regla de
+registro, no a la de accesibilidad: el nombre accesible de cada acción sigue siendo claro y
+verbal. Alternativa descartada: voseo también en las acciones, por coherencia con
+`frontend-cliente`.
+
 ### Precedencia sobre `frontend-cliente`
 `frontend-cliente` sigue como change sin archivar. Sus requisitos del Paso 1 («Elegir fecha,
 turno, zona y comensales», «Solo se ofrecen turnos del día…», «La fecha mínima seleccionable es
@@ -270,3 +281,7 @@ Preguntas para el equipo (ninguna cambia el contrato de la API):
    pantalla?
 8. **Desviación de `config.yaml` §14** (spec posterior al código): ¿el equipo la acepta de forma
    expresa para este change, con la validación del PR de implementación contra `tasks.md`?
+9. **Resuelta: acciones en infinitivo.** El equipo decidió mantener los botones y enlaces de
+   acción en infinitivo y usar voseo solo en títulos y textos explicativos. Se registra como
+   excepción a «Copy en voseo» de `frontend-cliente` (ver «Acciones en infinitivo»); falta que
+   quien archive `frontend-cliente` la refleje en esa spec.
