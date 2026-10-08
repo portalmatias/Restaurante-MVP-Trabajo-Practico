@@ -32,7 +32,8 @@ estado base (sin animación) de todo elemento animado SHALL ser su estado final.
 
 ### Requirement: Toda animación se apaga con prefers-reduced-motion
 Cuando el sistema operativo o el navegador piden `prefers-reduced-motion: reduce`, el sistema
-SHALL apagar todas las animaciones y transiciones decorativas: el balanceo de tablillas, la
+SHALL apagar todas las animaciones y transiciones decorativas (su duración se reduce a 0,01 ms
+como máximo, de modo que el cambio es instantáneo y los eventos de fin siguen disparándose): el balanceo de tablillas, la
 apertura y el desplazamiento (parallax) de las fotografías, la entrada del nombre, la aparición
 de secciones, el giro de las tablillas y el pulso de los esqueletos de carga. El desplazamiento
 suave de la página SHALL volver a ser instantáneo. Las transiciones del panel de admin SHALL
@@ -49,7 +50,8 @@ llevar la variante `motion-reduce`.
 
 #### Scenario: La tablilla cambia sin giro
 - **WHEN** con `prefers-reduced-motion: reduce` se elige una tablilla en el Paso 1
-- **THEN** la elección cambia de cara de inmediato, con una transición menor a 50 ms
+- **THEN** la elección cambia de cara de inmediato, sin giro ni fundido perceptible
+- **AND** la duración calculada de la transición de la tablilla es de 0,01 ms como máximo
 
 #### Scenario: Entrada del nombre
 - **WHEN** se abre `/` con `prefers-reduced-motion: reduce`

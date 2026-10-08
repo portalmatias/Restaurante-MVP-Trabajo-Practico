@@ -9,6 +9,12 @@ fecha elegible, el sistema SHALL mostrar el texto «Elegí una fecha para ver lo
 día». Elegir una tablilla SHALL fijar el `turnoId` del asistente sin cambiar las reglas de
 validación ni los parámetros de URL que ya definía `frontend-cliente`.
 
+Cuando la fecha elegida es elegible pero ese día de la semana no tiene turnos activos, el
+sistema SHALL mostrar el aviso informativo «No hay turnos disponibles ese día. Elegí otra
+fecha.» en lugar del grupo «Turno» y de la indicación «Elegí una fecha…». Este requisito
+reemplaza al del Paso 1 de `frontend-cliente` que habla de un `<select>` de turnos (ver
+`design.md`, «Precedencia sobre `frontend-cliente`»).
+
 #### Scenario: Turnos como botones dentro de un grupo
 - **WHEN** la persona elige una fecha con dos turnos activos
 - **THEN** el grupo «Turno» contiene dos botones con `aria-pressed="false"` cuyos nombres son los
@@ -20,9 +26,15 @@ validación ni los parámetros de URL que ya definía `frontend-cliente`.
 - **AND** la del almuerzo pasa a descartada pero sigue habilitada
 
 #### Scenario: Sin fecha, sin turnos
-- **WHEN** el campo de fecha está vacío o contiene una fecha no elegible
+- **WHEN** todavía no se eligió ninguna fecha en el calendario o la fecha cargada desde la URL no
+  es elegible
 - **THEN** no se muestra ninguna tablilla y aparece el texto «Elegí una fecha para ver los
   turnos de ese día»
+
+#### Scenario: Fecha elegible sin turnos ese día
+- **WHEN** se elige una fecha elegible cuyo día de la semana no tiene turnos activos
+- **THEN** se muestra el aviso «No hay turnos disponibles ese día. Elegí otra fecha.»
+- **AND** no se muestra la indicación «Elegí una fecha para ver los turnos de ese día»
 
 #### Scenario: Los turnos fuera del día no se ofrecen
 - **WHEN** la fecha elegida cae en un día en que un turno no está activo
@@ -137,7 +149,8 @@ focalizables por programa (`tabindex="-1"`) sin mostrar un contorno de foco prop
 ### Requirement: Los estados del flujo se distinguen por texto
 El estado de una reserva consultada y los avisos del flujo (error, información, límite de
 intentos) SHALL comunicarse con texto legible, no solo con color, y las reglas de cada zona
-SHALL expresarse como «Reservá con al menos N horas de anticipación y hasta N días antes.».
+SHALL expresarse como «Reservá con al menos N horas de anticipación y hasta N días antes.»,
+con `hora` y `día` en singular cuando N vale 1 («al menos 1 hora», «hasta 1 día»).
 Los códigos de reserva y las cifras SHALL mostrarse con números tabulares.
 
 #### Scenario: Estado de la reserva consultada
@@ -148,3 +161,23 @@ Los códigos de reserva y las cifras SHALL mostrarse con números tabulares.
 - **WHEN** el Paso 1 lista la zona VIP con 24 horas mínimas y 60 días máximos de anticipación
 - **THEN** su descripción dice «Reservá con al menos 24 horas de anticipación y hasta 60 días
   antes.»
+
+#### Scenario: Regla de anticipación con valores en singular
+- **WHEN** el Paso 1 lista una zona con 1 hora mínima y 1 día máximo de anticipación
+- **THEN** su descripción dice «Reservá con al menos 1 hora de anticipación y hasta 1 día antes.»
+
+### Requirement: Disposición del Paso 1 en pantallas anchas
+En el Paso 1 de `/reservas/nueva`, desde el breakpoint `lg` (1024px) el sistema SHALL mostrar el
+calendario de fecha a la izquierda y, a su derecha, los turnos, la zona y los comensales, de
+modo que elegir la fecha y ver sus turnos no obligue a desplazarse. Por debajo de `lg` SHALL
+apilar todo en una columna, con el calendario primero. El botón de continuar SHALL quedar debajo
+de ambas columnas.
+
+#### Scenario: Calendario a la izquierda en escritorio
+- **WHEN** se abre `/reservas/nueva` a 1440px de ancho
+- **THEN** el calendario queda a la izquierda de las tablillas de turno, la zona y los comensales,
+  y la parte superior del calendario está alineada con la de la columna derecha
+
+#### Scenario: Una columna en celular
+- **WHEN** se abre `/reservas/nueva` a 390px de ancho
+- **THEN** el calendario aparece antes que los turnos y no hay desplazamiento horizontal

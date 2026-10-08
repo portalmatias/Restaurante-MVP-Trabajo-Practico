@@ -6,7 +6,8 @@ ocupación de cada Zona y la ocupación global, calculadas como la suma de comen
 Reservas en estado `CONFIRMADA` o `PENDIENTE` de esa fecha y ese turno. La ocupación de
 cada Zona SHALL mostrarse junto a su aforo máximo configurado. El sistema SHALL NOT contar
 Reservas `CANCELADA` o `NO_SHOW` en la ocupación. Como el aforo máximo global no tiene hoy
-un endpoint que lo exponga (`design.md` D5), la ocupación global SHALL mostrarse sin un
+un endpoint que lo exponga (decisión D5 del change archivado `frontend-admin`,
+`openspec/changes/archive/2026-10-01-frontend-admin/design.md`), la ocupación global SHALL mostrarse sin un
 aforo máximo de referencia, hasta que un change de backend lo agregue.
 
 Para cada Zona el sistema SHALL mostrar además el porcentaje de ocupación (entero, sin tope),
@@ -155,17 +156,18 @@ pestaña no haga pedidos a la API.
 
 ### Requirement: Motivo visible en el login
 El formulario de `/admin/login` SHALL explicar por qué se llegó a él cuando la URL trae el
-parámetro `motivo`: con `sesion-vencida` SHALL informar que la sesión venció, que dura 60
-minutos y no se renueva sola; con `renovar` SHALL informar que se ingresa de nuevo para renovar
+parámetro `motivo`: con `sesion-vencida` SHALL informar, sin afirmar la causa, que la sesión terminó o ya no es
+válida, que dura 60 minutos y no se renueva sola; con `renovar` SHALL informar que se ingresa de nuevo para renovar
 la sesión por otros 60 minutos. Un valor desconocido SHALL ignorarse sin mostrar mensaje. El
 sistema SHALL redirigir con `motivo=sesion-vencida` solo cuando la sesión desapareció sin que
 el administrador activara «Cerrar sesión».
 
-#### Scenario: Sesión vencida
-- **WHEN** una sesión que existía deja de ser válida (venció o la rechazó el backend) sin que el
-  administrador cerrara sesión
+#### Scenario: Sesión que deja de ser válida
+- **WHEN** una sesión que existía deja de ser válida (venció o la rechazó el backend con `401`
+  o `403`) sin que el administrador cerrara sesión
 - **THEN** el sistema lo redirige a `/admin/login?motivo=sesion-vencida`
-- **AND** el login muestra «Tu sesión venció»
+- **AND** el login muestra «Tu sesión terminó o ya no es válida», sin decir que venció, porque el
+  motivo puede ser otro
 
 #### Scenario: Cierre voluntario sin mensaje de vencimiento
 - **WHEN** el administrador activa «Cerrar sesión»

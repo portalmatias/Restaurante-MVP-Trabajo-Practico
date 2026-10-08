@@ -1,9 +1,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: Layout compartido y esqueleto de rutas
-El sistema SHALL servir un layout compartido con encabezado y pie de página en todas las
-rutas, y SHALL exponer `/` (landing), `/admin` y `/reservas` como páginas que usan ese layout.
-El encabezado SHALL mostrar el nombre «Ichigo» como enlace a `/` y la navegación pública
+El sistema SHALL servir un layout compartido con encabezado y pie de página públicos en todas
+las rutas públicas (`/` y `/reservas/**`), y SHALL exponer `/admin` como página accesible por URL
+directa. Las rutas `/admin` y las que cuelgan de `/admin/` SHALL NOT mostrar el encabezado ni
+el pie públicos: el panel tiene su propio encabezado y su propia navegación. La decisión SHALL
+tomarse por la ruta exacta (`/admin` o prefijo `/admin/`), de modo que una ruta como
+`/administrar` conserve el marco público. El encabezado público SHALL mostrar el nombre «Ichigo» como enlace a `/` y la navegación pública
 («Reservas» y «Consultar reserva»). El idioma del documento SHALL ser español rioplatense
 (`es-AR`), y el título de cada página SHALL seguir la plantilla definida por la capability
 `identidad-visual-ichigo`.
@@ -16,12 +19,21 @@ El encabezado SHALL mostrar el nombre «Ichigo» como enlace a `/` y la navegaci
 
 #### Scenario: El personal entra a la administración por URL directa
 - **WHEN** una persona escribe la dirección `/admin` en el navegador
-- **THEN** la página `/admin` se muestra con el mismo layout, aunque ninguna página pública la
-  enlace
+- **THEN** la página `/admin` se muestra, aunque ninguna página pública la enlace
 
 #### Scenario: Las rutas placeholder comparten el layout
-- **WHEN** una persona visita `/admin` o `/reservas`
-- **THEN** ambas páginas muestran el mismo pie de página que `/`
+- **WHEN** una persona visita `/` o `/reservas` (rutas públicas, entre ellas la página placeholder)
+- **THEN** ambas páginas muestran el mismo encabezado y el mismo pie de página
+
+#### Scenario: El panel de administración no muestra el marco público
+- **WHEN** se visita `/admin`, `/admin/login`, `/admin/reservas` o `/admin/salon`
+- **THEN** la página no muestra el encabezado público («Ichigo», «Reservas», «Consultar
+  reserva») ni el pie «Ichigo es un restaurante ficticio…»
+- **AND** el contenido sigue dentro de un único elemento `main`
+
+#### Scenario: Una ruta parecida a /admin conserva el marco público
+- **WHEN** se evalúa una ruta como `/administrar`
+- **THEN** se la trata como pública y muestra el encabezado y el pie
 
 #### Scenario: El idioma del documento es español
 - **WHEN** se carga cualquier página del sitio
@@ -52,8 +64,10 @@ fondo sobre el que se dibujan.
 ### Requirement: Objetivos táctiles mínimos
 Todo elemento interactivo SHALL tener un área táctil de al menos 44×44px. Como única
 excepción, las acciones compactas de fila de las tablas del panel de administración
-(`BotonCompacto`) SHALL tener al menos 36px de alto cuando el dispositivo de entrada principal
-es un puntero fino (`pointer: fine`), y SHALL conservar los 44px en pantallas táctiles.
+(`BotonCompacto`) SHALL tener al menos 36px de alto solo cuando ningún dispositivo de entrada
+disponible es un puntero grueso (no coincide `any-pointer: coarse`), y SHALL conservar los 44px
+cuando lo haya. Así un equipo híbrido (pantalla táctil con mouse) conserva el área táctil
+completa.
 
 #### Scenario: Tamaño mínimo de un botón
 - **WHEN** se mide el área táctil renderizada de cualquier variante de `Button` o de un enlace
@@ -62,10 +76,15 @@ es un puntero fino (`pointer: fine`), y SHALL conservar los 44px en pantallas t�
 
 #### Scenario: Acción de fila en una pantalla táctil
 - **WHEN** se mide un `BotonCompacto` del listado de reservas en un dispositivo con
-  `pointer: coarse`
+  `any-pointer: coarse`
+- **THEN** su alto es de al menos 44px
+
+#### Scenario: Equipo híbrido con pantalla táctil y mouse
+- **WHEN** se mide un `BotonCompacto` en un dispositivo cuyo puntero principal es fino pero que
+  también tiene una pantalla táctil (`any-pointer: coarse`)
 - **THEN** su alto es de al menos 44px
 
 #### Scenario: Acción de fila con mouse
-- **WHEN** se mide un `BotonCompacto` del listado de reservas en un dispositivo con
-  `pointer: fine`
+- **WHEN** se mide un `BotonCompacto` del listado de reservas en un dispositivo sin
+  `any-pointer: coarse`
 - **THEN** su alto es de al menos 36px

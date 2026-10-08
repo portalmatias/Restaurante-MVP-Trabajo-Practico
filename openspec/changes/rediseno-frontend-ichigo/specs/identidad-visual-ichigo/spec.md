@@ -2,11 +2,13 @@
 
 ### Requirement: Tokens semánticos de la identidad Kakefuda
 El sistema SHALL definir en `frontend/app/globals.css` los tokens semánticos de color de la
-identidad de Ichigo: `background` (hinoki, `#E8DCC4`), `foreground` y `primary` (tinta sumi,
-`#1F1813`), `card` (hinoki claro, `#F3EBDA`), `secondary` y `muted-foreground` (nogal,
-`#5C4630`), `muted` (`#D9CBAE`), `border` (canto de madera, `#8A6A43`), `accent`,
-`destructive` y `ring` (sello, `#9A2A19`) y `madera` (`#2B221B`) con `madera-foreground`
-(`#F3EBDA`). Los componentes SHALL consumir esos tokens a través de las utilidades de
+identidad de Ichigo: `background` (hinoki, `#E8DCC4`), `foreground`, `card-foreground` y
+`primary` (tinta sumi, `#1F1813`), `card` (hinoki claro, `#F3EBDA`), `secondary` y
+`muted-foreground` (nogal, `#5C4630`), `muted` (`#D9CBAE`), `border` (canto de madera,
+`#8A6A43`), `accent`, `destructive` y `ring` (sello, `#9A2A19`), `madera` (`#2B221B`) y los
+tokens de texto sobre relleno `primary-foreground`, `secondary-foreground`,
+`accent-foreground`, `destructive-foreground` y `madera-foreground` (todos hinoki claro,
+`#F3EBDA`). Los componentes SHALL consumir esos tokens a través de las utilidades de
 Tailwind y SHALL NOT escribir un color hexadecimal propio. El sistema SHALL ofrecer solo modo
 claro.
 
@@ -25,19 +27,26 @@ claro.
   `color-scheme: light` y no define valores alternativos
 
 ### Requirement: Contrastes mínimos WCAG 2.1 AA de la paleta
-Toda combinación de color de texto y fondo de la paleta SHALL alcanzar al menos 4,5:1. Los
+Toda combinación de texto y fondo que los componentes usan SHALL alcanzar al menos 4,5:1; las
+combinaciones permitidas son las que enumera el primer escenario y ninguna otra (por ejemplo,
+`foreground` no se usa como texto sobre `madera`: daría 1,12:1). Los
 bordes de los controles (campos, botones con contorno, tablillas) SHALL alcanzar al menos 3:1
 contra el fondo sobre el que se dibujan. El rojo del sello (`accent`) SHALL usarse como texto
 solo sobre `background`, `card` o `muted`, y SHALL NOT usarse como texto sobre `madera`;
 sobre `madera` SHALL aparecer solo como relleno, con texto `accent-foreground`.
 
 #### Scenario: Contraste de texto de las combinaciones definidas
-- **WHEN** se calcula la relación de contraste de `foreground` sobre `background`, de
-  `muted-foreground` sobre `background`, `card` y `muted`, de `accent` sobre `background`,
-  `card` y `muted`, de `primary-foreground` sobre `primary`, de `accent-foreground` sobre
-  `accent` y de `madera-foreground` sobre `madera`
-- **THEN** cada relación es de al menos 4,5:1 (valores medidos al redactar esta spec: 12,9;
-  6,5; 7,5; 5,5; 5,7; 6,5; 4,8; 14,8; 6,5 y 13,1)
+- **WHEN** se calcula la relación de contraste de `foreground` y `card-foreground` sobre
+  `background`, `card` y `muted`, de `muted-foreground` (igual a `secondary`) sobre
+  `background`, `card` y `muted`, de `accent` y `destructive` sobre `background`, `card` y
+  `muted`, de `primary-foreground` sobre `primary`, de `secondary-foreground` sobre
+  `secondary`, de `accent-foreground` sobre `accent`, de `destructive-foreground` sobre
+  `destructive` y de `madera-foreground` sobre `madera`
+- **THEN** cada relación es de al menos 4,5:1 (valores medidos al redactar esta spec, con
+  `foreground`: 12,9 sobre `background`, 14,8 sobre `card` y 10,9 sobre `muted`; con
+  `muted-foreground`: 6,5, 7,5 y 5,5; con `accent`: 5,7, 6,5 y 4,8; `primary-foreground`
+  sobre `primary` 14,8; `accent-foreground` sobre `accent` 6,5 y `madera-foreground` sobre
+  `madera` 13,1)
 
 #### Scenario: Contraste de bordes de controles
 - **WHEN** se calcula el contraste de `border` contra `background` y contra `card`
@@ -77,9 +86,10 @@ sistema.
 ### Requirement: Metadatos del documento
 El sistema SHALL declarar el título del sitio como «Ichigo» con la plantilla `%s | Ichigo`, SHALL
 declarar el idioma del documento como `es-AR` y SHALL asignar un título propio a cada
-pantalla pública (inicio de reservas, elección de fecha y turno, disponibilidad, datos,
-reserva registrada, consulta y no encontrada) que describa su contenido. La landing SHALL
-mostrar solo «Ichigo».
+pantalla pública del flujo de reserva (inicio de reservas, elección de fecha y turno,
+disponibilidad, datos, reserva registrada, consulta y no encontrada) que describa su contenido.
+El título de la pestaña de la landing (`/`) SHALL ser exactamente «Ichigo». Los títulos de las
+pantallas del panel de administración quedan fuera de este requisito.
 
 #### Scenario: Título de una pantalla del flujo
 - **WHEN** una persona abre `/reservas/consultar`
@@ -99,16 +109,19 @@ mostrar solo «Ichigo».
 - **THEN** no hay dos iguales y todos terminan en « | Ichigo»
 
 ### Requirement: Procedencia documentada de las imágenes
-Toda imagen raster que se sirva desde `frontend/public/ichigo/` SHALL ser una fotografía
-sintética o propia y SHALL estar listada en `frontend/public/ichigo/PROCEDENCIA.md` con su
-herramienta de origen, la fecha, el prompt o autoría y su uso. Las imágenes SHALL NOT contener
+Toda imagen raster que se sirva desde `frontend/public/ichigo/` SHALL estar en formato WebP,
+SHALL ser una fotografía sintética o propia y SHALL estar listada en `frontend/public/ichigo/PROCEDENCIA.md` con su
+herramienta de origen, la fecha, el prompt o autoría y su uso. El documento SHALL registrar
+además la conversión a WebP (herramienta y calidad) y el peso total resultante. Las imágenes SHALL NOT contener
 texto, logotipos ni personas reconocibles, y SHALL llevar un texto alternativo descriptivo
 cuando comunican contenido.
 
 #### Scenario: Cada imagen del repositorio está documentada
 - **WHEN** se compara la lista de archivos de `frontend/public/ichigo/` con las filas de
   `PROCEDENCIA.md`
-- **THEN** cada archivo `.png` tiene su fila con herramienta, fecha, prompt y uso
+- **THEN** cada archivo `.webp` tiene su fila con herramienta, fecha, prompt y uso
+- **AND** no queda ningún `.png` en la carpeta
+- **AND** el documento indica que las imágenes se convirtieron a WebP y con qué calidad
 - **AND** el documento aclara que las fotos no son de un local real
 
 #### Scenario: El contenido ilustrativo se declara como tal
