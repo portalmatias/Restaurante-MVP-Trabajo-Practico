@@ -114,7 +114,7 @@ export function Dialog({
           }
         }
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-border bg-card p-6 text-foreground backdrop:bg-black/50"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-sm border border-border bg-card p-6 text-foreground backdrop:bg-black/50"
     >
       <h2 id={tituloId} className="text-xl font-semibold">
         {titulo}

@@ -25,7 +25,7 @@ const roleByVariant: Record<AlertVariant, "status" | "alert"> = {
  */
 export function Alert({ variant = "info", role, className, ...props }: AlertProps) {
   const classes = [
-    "rounded-md border bg-background px-4 py-3 text-sm",
+    "rounded-sm border bg-background px-4 py-3 text-sm",
     alertVariantClasses[variant],
     className,
   ]
