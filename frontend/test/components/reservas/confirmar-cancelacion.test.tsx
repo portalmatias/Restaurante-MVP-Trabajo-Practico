@@ -244,6 +244,17 @@ describe("ConsultaReserva - confirmar cancelación", () => {
       expect(screen.getByText("K7PM3QXA")).toBeInTheDocument();
       expect(GET).toHaveBeenCalledTimes(1);
     });
+
+    it("lleva el foco al título: el botón que abrió el diálogo ya no existe", async () => {
+      mockearPost(respuestaOk(undefined, 204));
+      await verDetalle();
+      await abrirDialogo();
+
+      confirmar();
+
+      const titulo = await screen.findByRole("heading", { level: 1, name: "Tu reserva está cancelada" });
+      expect(titulo).toHaveFocus();
+    });
   });
 
   describe("cuando la cancelación es rechazada", () => {

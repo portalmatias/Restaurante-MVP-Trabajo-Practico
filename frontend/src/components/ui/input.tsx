@@ -11,7 +11,7 @@ export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "aria-inval
  */
 export function Input({ className, invalid = false, ...props }: InputProps) {
   const classes = [
-    "min-h-11 w-full rounded-md border bg-background px-3 text-base text-foreground",
+    "min-h-11 w-full rounded-sm border bg-background px-3 text-base text-foreground",
     "placeholder:text-muted-foreground",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     "disabled:cursor-not-allowed disabled:opacity-50",

@@ -11,6 +11,7 @@ import { adminClient, toAdminApiResult } from "../../lib/api/admin-client";
 import type { components } from "../../lib/api/schema";
 import type { DiaSemana } from "../../lib/fecha-hora";
 import { repartirErrores, type ReglaCampo } from "./errores-campo";
+import { Sello } from "./sello";
 import { DIAS_SEMANA, ETIQUETA_DIA, horaTurno, ordenarTurnos, rangoTurno } from "./formato";
 
 type Turno = components["schemas"]["TurnoRespuestaDto"];
@@ -111,12 +112,12 @@ export function TurnosPanel() {
         {turnos && turnos.length > 0 ? (
           <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-muted-foreground">
+              <thead className="bg-muted text-foreground">
                 <tr>
-                  <th scope="col" className="py-2 pr-3">Día</th>
-                  <th scope="col" className="py-2 pr-3">Horario</th>
-                  <th scope="col" className="py-2 pr-3">Estado</th>
-                  <th scope="col" className="py-2"><span className="sr-only">Acciones</span></th>
+                  <th scope="col" className="px-3 py-2 font-medium">Día</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Horario</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Estado</th>
+                  <th scope="col" className="px-3 py-2"><span className="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -124,10 +125,12 @@ export function TurnosPanel() {
                   const descripcion = `${ETIQUETA_DIA[turno.diaSemana]} ${rangoTurno(turno)}`;
                   return (
                     <tr key={turno.id} className="border-t border-border align-top">
-                      <th scope="row" className="py-2 pr-3 font-medium">{ETIQUETA_DIA[turno.diaSemana]}</th>
-                      <td className="py-2 pr-3">{rangoTurno(turno)}</td>
-                      <td className="py-2 pr-3">{turno.activo ? "Activo" : "Inactivo"}</td>
-                      <td className="py-2">
+                      <th scope="row" className="px-3 py-2 font-medium">{ETIQUETA_DIA[turno.diaSemana]}</th>
+                      <td className="tabular px-3 py-2">{rangoTurno(turno)}</td>
+                      <td className="px-3 py-2">
+                        <Sello tono={turno.activo ? "activo" : "inactivo"}>{turno.activo ? "Activo" : "Inactivo"}</Sello>
+                      </td>
+                      <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-2">
                           <BotonCompacto
                             variant="ghost"
@@ -222,8 +225,8 @@ function FormularioTurno({
     ? `Editar turno ${ETIQUETA_DIA[turno.diaSemana]} ${rangoTurno(turno)}`
     : "Nuevo turno";
   return (
-    <form onSubmit={guardar} noValidate aria-label={titulo} className="flex flex-col gap-4 rounded-md border border-border p-4">
-      <h3 className="font-semibold">{titulo}</h3>
+    <form onSubmit={guardar} noValidate aria-label={titulo} className="flex flex-col gap-4 border-b border-border pb-4">
+      <h3 className="font-display text-base">{titulo}</h3>
       <div className="grid gap-4 sm:grid-cols-3">
         {/* El botón que abrió el formulario queda deshabilitado y suelta el foco: se lleva al
             primer campo para que quien usa teclado no pierda la posición. */}
@@ -265,7 +268,7 @@ function FormularioTurno({
       {errorGeneral ? <Alert variant="error">{errorGeneral}</Alert> : null}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={guardando}>
-          {guardando ? "Guardando…" : turno ? "Guardar cambios" : "Agregar turno"}
+          {guardando ? "Guardando…" : turno ? "Guardar cambios" : "Guardar turno"}
         </Button>
         <Button variant="secondary" disabled={guardando} onClick={onCancelar}>
           Cancelar

@@ -52,9 +52,9 @@ export function buttonVariants({
   fullWidth = true,
 }: ButtonVariantsOptions = {}) {
   return [
-    "inline-flex items-center justify-center rounded-md px-4 font-medium",
+    "inline-flex items-center justify-center rounded-md px-4 font-medium tracking-wide",
     "transition-colors duration-200 motion-reduce:transition-none",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
     "disabled:cursor-not-allowed disabled:opacity-50",
     fullWidth ? "w-full sm:w-auto" : undefined,
     sizeClasses[size],

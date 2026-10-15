@@ -502,6 +502,28 @@ describe("FormularioDatosContacto - error de servidor o de red", () => {
     );
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Nombre")).toHaveValue("Ana Pérez");
-    expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeEnabled();
+    // Reintentar enseguida agrava el límite: el botón queda en espera.
+    expect(screen.getByRole("button", { name: "Esperá un momento para reintentar" })).toBeDisabled();
+  });
+
+  it("tras un 429 el botón vuelve a habilitarse cuando termina la espera", async () => {
+    jest.useFakeTimers({ doNotFake: ["queueMicrotask", "nextTick", "setImmediate", "clearImmediate"] });
+    try {
+      POST.mockResolvedValue(respuestaError(429));
+      renderizar();
+
+      completarFormulario();
+      enviar();
+      await screen.findByRole("alert");
+      expect(screen.getByRole("button", { name: "Esperá un momento para reintentar" })).toBeDisabled();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeEnabled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

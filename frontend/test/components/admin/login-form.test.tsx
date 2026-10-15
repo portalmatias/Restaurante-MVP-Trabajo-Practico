@@ -156,3 +156,17 @@ describe("LoginForm", () => {
     expect(replace).toHaveBeenCalledWith("/admin");
   });
 });
+
+describe("LoginForm - motivo de llegada", () => {
+  it("explica que la sesión venció", () => {
+    render(<LoginForm motivo="sesion-vencida" />);
+    expect(screen.getByRole("status")).toHaveTextContent(/Tu sesión venció/);
+  });
+
+  it("no muestra ningún aviso sin motivo o con uno desconocido", () => {
+    const { rerender } = render(<LoginForm />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    rerender(<LoginForm motivo="otro" />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
