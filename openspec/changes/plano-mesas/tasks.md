@@ -38,27 +38,43 @@
 - [ ] 2.7 Confirmar a mano que `POST/PATCH /admin/mesas` siguen funcionando sin enviar las
       columnas nuevas (suite `gestion-salon-admin` y `mesas.integration-spec.ts` en verde).
 
+- [ ] 2.8 Escribir (rojo) un test de integración que fije las claves exactas de `GET
+      /admin/mesas`, `GET /admin/zonas` y de las altas y ediciones de mesa (`Object.keys` iguales
+      a las actuales, sin `posX`, `posY`, `ancho`, `alto`, `forma`, `planoColumnas` ni
+      `planoFilas`). Agregar un `select` explícito con los campos actuales en `ZonasService`
+      (`listar` y las lecturas que devuelvan la zona) y en `MesasService` de `gestion-salon`
+      (`listar`, `crear`, `actualizar`), y actualizar sus `*.spec.ts` unitarios (hoy fijan
+      `findMany({ where })` sin `select`). Verificar que pasa.
+
 ## 3. Backend: servicio y reglas del plano (tests primero)
 
 - [ ] 3.1 Escribir `backend/src/plano-mesas/estado-mesa.spec.ts` (rojo) para la función pura
       `calcularEstadoMesa(mesa, mesasLibresIds, comensales)`: libre, ocupada, no alcanza,
-      ocupada y chica ⇒ ocupada, capacidad exacta ⇒ libre.
-- [ ] 3.2 Implementar `backend/src/plano-mesas/estado-mesa.ts`. Verificar que 3.1 pasa.
+      ocupada y chica ⇒ ocupada, capacidad exacta ⇒ libre. Incluir en
+      `backend/src/plano-mesas/orden-mesas.spec.ts` la función pura `ordenarMesasPorEtiqueta`
+      (orden natural: S1, S2, S10 y no S1, S10, S2).
+- [ ] 3.2 Implementar `backend/src/plano-mesas/estado-mesa.ts` y `orden-mesas.ts`. Verificar que
+      3.1 pasa.
 - [ ] 3.3 Escribir `backend/test/plano-mesas.integration-spec.ts` (rojo) contra PostgreSQL real
-      con los escenarios de la spec `plano-mesas`: ocupada por `CONFIRMADA` y por `PENDIENTE`,
+      con los escenarios de la spec `plano-mesas`, **con fechas relativas a hoy o con el reloj
+      inyectado** (las fechas literales de la spec son ilustrativas; ver `design.md`, D8): ocupada por `CONFIRMADA` y por `PENDIENTE`,
       liberada por `CANCELADA` y `NO_SHOW`, otra fecha/turno/zona no ocupa, no alcanza, mesa sin
       ubicar, veredicto igual al de `DisponibilidadService.consultar`, e invariante
       `existe mesa LIBRE ⇔ SIN_MESA_DISPONIBLE ∉ motivos` recorriendo una grilla de
       combinaciones.
 - [ ] 3.4 Agregar en el mismo archivo el test de **no fuga de datos**: con una reserva de nombre,
       email, teléfono y código reconocibles, el cuerpo serializado no los contiene ni contiene
-      el id de la reserva ni de la mesa; cada mesa tiene exactamente las ocho propiedades.
+      el id de la reserva ni de la mesa; cada mesa tiene exactamente las ocho propiedades (`Object.keys` iguales a la lista del
+      esquema, no solo "contiene").
 - [ ] 3.5 Crear `backend/src/plano-mesas/dto/` (`PlanoMesasRespuesta`, `MesaPlano`, enums con
       `enumName` `EstadoMesaPlano` y `FormaMesa`) con `@ApiProperty` y textos en español,
       reutilizando `ConsultarDisponibilidadDto`, `MotivoNoDisponible` y `ErrorRespuesta`.
-- [ ] 3.6 Implementar `PlanoMesasService.consultar` según D2: `cargarContexto`, `evaluarReglas`,
-      `calcularLugaresRestantes`, lectura de mesas con `select` explícito y estado vía
-      `calcularEstadoMesa` sobre `contexto.mesasLibres`. Verificar que 3.3 y 3.4 pasan.
+- [ ] 3.6 Implementar `PlanoMesasService.consultar` según D2, con el reloj inyectado: una
+      transacción `RepeatableRead` de solo lectura que ejecuta `cargarContexto(tx, …)` y la
+      lectura de mesas con `select` explícito, y después `evaluarReglas`,
+      `calcularLugaresRestantes`, el estado vía `calcularEstadoMesa` sobre
+      `contexto.mesasLibres` y el orden con `ordenarMesasPorEtiqueta`. Verificar que 3.3 y 3.4
+      pasan y que el service no toma locks ni escribe.
 - [ ] 3.7 Escribir el test de consistencia con la creación (rojo→verde): plano, creación de
       reserva con los mismos datos, y la mesa asignada estaba `LIBRE`; luego el plano la muestra
       `OCUPADA`. Reutilizar los helpers de `reservas-crear`.
@@ -70,9 +86,9 @@
 
 - [ ] 4.1 Escribir `backend/test/plano-mesas.e2e-spec.ts` (rojo): `200` sin token, `400` con
       `comensales=0`, `404` con turno o zona inexistentes, header `Cache-Control: no-store`,
-      y `429` en la solicitud siguiente al límite con el límite reducido en el entorno de
-      test (patrón de `throttle-rutas-admin.e2e-spec.ts`); la solicitud rechazada no ejecuta
-      consultas.
+      y `429` en la solicitud 121 tras enviar las 120 permitidas, todas reales (patrón de
+      `throttle-rutas-admin.e2e-spec.ts`, que envía las 60 de admin sin bajar el límite: no se
+      agrega ninguna variable de entorno); la solicitud rechazada no ejecuta consultas.
 - [ ] 4.2 Implementar `PlanoMesasController` con `@Throttle` (120 por 60 s, constante nombrada),
       `Cache-Control: no-store` y decoradores `@nestjs/swagger` en español, y
       `PlanoMesasModule` (importa `DisponibilidadModule` y `PrismaModule`); registrarlo en
@@ -83,8 +99,9 @@
       representación, porque el script no las equipara.
 - [ ] 4.4 Agregar a `openapi/openapi.yaml` el path `/plano-mesas` y los esquemas
       `PlanoMesasRespuesta`, `MesaPlano`, `EstadoMesaPlano` y `FormaMesa` (D2), con `400`, `404` y
-      `429`, ejemplos y `additionalProperties: false`, y con texto idéntico al de los
-      decoradores.
+      `429` y ejemplos, **sin** `additionalProperties` (ningún esquema actual lo usa y
+      `openapi:check` lo contaría como deriva; la ausencia de claves de más la prueba la tarea
+      3.4), y con texto idéntico al de los decoradores.
 - [ ] 4.5 Correr `npm run openapi:check` y `npm run openapi:lint`; resolver cualquier deriva
       corrigiendo el decorador o el YAML, no el script.
 - [ ] 4.6 Regenerar el cliente con `npm run api:types` y verificar `api:types:check` del
@@ -107,18 +124,22 @@
       (motivos primero, texto "hoy no se puede reservar este turno") y de la aclaración
       "La mesa se asigna automáticamente al confirmar la reserva" / "foto del momento".
 - [ ] 5.5 Escribir tests y componente del esqueleto `plano-mesas-cargando.tsx`: `aria-busy`,
-      texto accesible, sin animación con `prefers-reduced-motion: reduce` (simular
-      `matchMedia`), y la regla CSS correspondiente en el componente o en `globals.css` usando
-      solo tokens existentes.
+      texto accesible, y la regla CSS `@media (prefers-reduced-motion: reduce)` que apaga su
+      animación en el componente o en `globals.css` usando solo tokens existentes. El test
+      comprueba que la regla existe en la hoja de estilos; **no** se simula `matchMedia` porque
+      `jsdom` no evalúa media queries (la prueba real es la manual de 6.1).
 - [ ] 5.6 Tests y manejo de errores: fallo `5xx`/red ⇒ mensaje + "Reintentar" reutilizando
       `error-con-reintento.tsx` y la reserva sigue disponible; `429` ⇒ mensaje específico sin
       reintento automático.
-- [ ] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: pedido del plano en
-      paralelo con `disponibilidad` y catálogo (`cache: "no-store"`), envuelto en `Suspense` con
-      el esqueleto, de modo que su error no tumbe la página. La página hoy retorna antes cuando
-      `disponible` es `false` (lista los motivos); esa rama también debe renderizar el plano
-      atenuado con su aviso, después de los motivos, y se cubre con un test propio. Verificar que los tests existentes
-      de la página siguen en verde.
+- [ ] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: el plano es la fuente
+      del veredicto (`disponible`, `motivos`) y se pide con `cache: "no-store"` junto al
+      catálogo; `/disponibilidad` se pide solo si el plano falla (red, `5xx`, `429` o `404`), y
+      entonces la sección del plano muestra su error (D7). Solo un `404/400` de
+      `/disponibilidad` redirige al paso 1. El error del plano no tumba la página. La página hoy
+      retorna antes cuando `disponible` es `false` (lista los motivos); esa rama también debe
+      renderizar el plano atenuado con su aviso, después de los motivos, y se cubre con un test
+      propio. Tests: plano `404` ⇒ sin redirección y veredicto de `/disponibilidad`; ambos
+      `404` ⇒ redirección. Verificar que los tests existentes de la página siguen en verde.
 - [ ] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
       la página a 360 px (test del componente con las clases de orden y revisión visual).
 
@@ -127,7 +148,9 @@
 - [ ] 6.1 Revisión visual real: levantar backend y frontend con el seed, abrir
       `/reservas/nueva/resultado` en escritorio y en 360 px, capturar pantallas de STANDARD y
       VIP con mesas libres, ocupadas y que no alcanzan, y confirmar que se distinguen en
-      escala de grises y con el lector de pantalla leyendo la lista. Adjuntar capturas al PR.
+      escala de grises y con el lector de pantalla leyendo la lista. Con "reducir movimiento"
+      activado en el sistema operativo, comprobar que el esqueleto no se anima. Adjuntar
+      capturas al PR.
 - [ ] 6.2 Prueba manual de seguridad: con curl y sin token, consultar el plano de un turno con
       una reserva real del seed y confirmar a ojo que no aparece ningún dato personal ni id;
       comprobar el `429` excediendo el límite.

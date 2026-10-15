@@ -84,7 +84,14 @@ importa visualmente) y lo cubre un test del seed.
 COLUMN` con defaults o nulos: no reescribe filas problemáticas, no rompe a `reservas-crear` ni a
 `gestion-salon` (sus DTOs usan `whitelist` y `forbidNonWhitelisted`, así que `POST/PATCH
 /admin/mesas` no aceptan las columnas nuevas y una mesa dada de alta por el admin queda "sin
-ubicar"). Rollback: `DROP COLUMN` de las siete columnas (cinco de `Mesa` y dos de `Zona`) y,
+ubicar"). **La salida sí hay que protegerla:** los DTO filtran la entrada, pero no la respuesta.
+`ZonasService.listar` hace `zona.findMany()` sin `select` y los servicios de mesas devuelven la
+fila de Prisma tal cual, así que después de la migración `/admin/mesas` devolvería `posX`,
+`posY`, `ancho`, `alto` y `forma`, y `/admin/zonas` devolvería `planoColumnas` y `planoFilas`,
+campos que no están en `openapi/openapi.yaml` (y `openapi:check` es estático: no lo detecta). Se
+agrega un `select` explícito, con exactamente los campos actuales, en esas lecturas (tarea 2.8) y
+un test que fija las claves de la respuesta de ambos endpoints. Los campos del plano solo salen
+por `GET /plano-mesas`. Rollback: `DROP COLUMN` de las siete columnas (cinco de `Mesa` y dos de `Zona`) y,
 después de la columna `forma`, `DROP TYPE` del enum, sin pérdida de datos de negocio. La
 migración se genera con `prisma migrate dev --create-only --name plano_mesas` (sin aplicarla),
 se **revisa el SQL** descartando el intento de Prisma de "reparar" el índice parcial, se agregan
@@ -139,14 +146,18 @@ obliga a pagar la consulta de mesas a quien no la necesita).
 
 1. Arma la `SolicitudDisponibilidad` igual que `DisponibilidadService` (misma
    `fechaCalendarioDesdeIso`).
-2. `contexto = await cargarContexto(prisma, solicitud)`, **la misma función** que usa la
-   consulta y la creación.
-3. `motivos = evaluarReglas(contexto, solicitud, new Date())` y
+2. Abre una transacción de **solo lectura** con aislamiento `RepeatableRead`
+   (`prisma.$transaction(..., { isolationLevel: RepeatableRead })`) y dentro de ella hace los
+   pasos 3 a 5, de modo que todas las lecturas ven la misma foto de la base.
+   `contexto = await cargarContexto(tx, solicitud)`, **la misma función** que usa la consulta y
+   la creación (acepta un cliente de transacción, como en `ReservasService`).
+3. `motivos = evaluarReglas(contexto, solicitud, ahora)` (el reloj se **inyecta** en el
+   service, igual que ya lo recibe `evaluarReglas`; en producción es `new Date()`) y
    `lugaresRestantes = calcularLugaresRestantes(contexto)`: el veredicto del plano es idéntico
    al de `/disponibilidad` por construcción (mismo código, no una copia).
-4. Lee las mesas de la zona con sus columnas de plano (`mesa.findMany` con `select` explícito
-   de `id`, `etiqueta`, `capacidad`, `posX`, `posY`, `ancho`, `alto`, `forma`) más
-   `zona.planoColumnas/planoFilas`.
+4. Lee, con el mismo `tx`, las mesas de la zona con sus columnas de plano (`mesa.findMany` con
+   `select` explícito de `id`, `etiqueta`, `capacidad`, `posX`, `posY`, `ancho`, `alto`,
+   `forma`) más `zona.planoColumnas/planoFilas`.
 5. Deriva el estado **solo** con `contexto.mesasLibres` (la lista que ya usan
    `SIN_MESA_DISPONIBLE` y `elegirMesaBestFit`):
    - la mesa **no está** en `mesasLibres` → `OCUPADA`;
@@ -164,11 +175,14 @@ Dos precisiones de semántica:
   `disponible: false` (aforo de zona o global superado, anticipación, turno inactivo, comensales
   fuera de rango). El frontend debe mostrar el veredicto de `disponible`/`motivos` por encima
   del plano y no sugerir que se puede reservar si `disponible` es `false`.
-- `mesasLibres` se lee en una sola consulta dentro de `cargarContexto`; las mesas de la zona se
-  leen en otra. Entre ambas una mesa podría crearse o borrarse por el admin. Una mesa que no
-  está en `mesasLibres` porque es nueva se mostraría `OCUPADA` por un instante. Es una foto del
-  momento (igual que `/disponibilidad`, `config.yaml` §6) y el costo de cerrarlo con una
-  transacción `RepeatableRead` no se justifica; se documenta y se acepta.
+- `mesasLibres` (dentro de `cargarContexto`) y la lista de mesas de la zona son dos lecturas.
+  Sin transacción, si el administrador eliminara o moviera de zona la única mesa libre que
+  alcanza entre ambas, `disponible` quedaría en `true` sin ninguna mesa `LIBRE`, y la garantía de
+  arriba no valdría "por construcción". Por eso las dos salen de **una misma transacción
+  `RepeatableRead` de solo lectura** (paso 2): ven una sola foto. No toma locks ni bloquea a los
+  escritores (en PostgreSQL las lecturas con snapshot no los bloquean) y son lecturas por clave
+  sobre decenas de filas, así que el costo es despreciable. Sigue siendo una foto del momento
+  respecto de las reservas que se creen después (D4).
 
 **Fragmento OpenAPI** (va al PR de implementación en `openapi/openapi.yaml`; no se agrega al YAML
 ejecutable antes, regla de `config.yaml` §3). Los `summary` y `description` quedan en español y
@@ -228,8 +242,11 @@ components:
 
 (El fragmento está abreviado para legibilidad; el PR de implementación lo escribe expandido,
 con `description` en español y ejemplos, siguiendo el estilo de `/disponibilidad`.) `mesas`
-sale ordenada por `etiqueta` para que el orden no dependa del plan de Postgres y la lista
-textual sea estable. Se reutilizan `MotivoNoDisponible` y `ErrorRespuesta` del contrato actual.
+sale en **orden natural de `etiqueta`** (S1, S2, …, S9, S10), no alfabético, para que el orden
+no dependa del plan de Postgres, la lista textual sea estable y una mesa S10 no quede entre S1 y
+S2. Se ordena en el service con una función pura (`ordenarMesasPorEtiqueta`, comparación
+numérica de los dígitos: `localeCompare(b, 'es', { numeric: true })`), no con `orderBy` de
+Prisma. Se reutilizan `MotivoNoDisponible` y `ErrorRespuesta` del contrato actual.
 **No** se expone `id` de la mesa: el cliente no lo necesita (la clave de lista es la `etiqueta`,
 única) y exponerlo es un dato más que no aporta; si D9 llega a implementarse, ese change lo
 agrega. La respuesta incluye `Cache-Control: no-store`.
@@ -243,9 +260,11 @@ personales de otras reservas"):
   Es información que cualquier visitante del salón ve. **No** se expone: id de reserva, código,
   nombre, email, teléfono, comensales de la reserva, estado de la reserva (`PENDIENTE` vs
   `CONFIRMADA`, que revelaría actividad del admin en VIP), hora de creación ni `Reserva.mesaId`.
-  El `select` de Prisma es explícito (nunca `include: { reservas: true }`) y un test de contrato
-  verifica que la respuesta contiene exactamente las claves del esquema (`additionalProperties:
-  false`), de modo que un campo agregado por descuido rompe el test.
+  El `select` de Prisma es explícito (nunca `include: { reservas: true }`) y un test de integración
+  compara las claves de la respuesta y de cada mesa con la lista exacta del esquema
+  (`Object.keys` iguales, no solo "contiene"), de modo que un campo agregado por descuido rompe
+  el test. No se usa `additionalProperties: false` en el YAML: `@nestjs/swagger` no lo emite
+  para clases DTO y `openapi:check` lo contaría como deriva (ningún esquema actual lo usa).
 - **`OCUPADA` no distingue por qué.** Reservas `PENDIENTE` y `CONFIRMADA` se ven igual; las
   `CANCELADA`/`NO_SHOW` liberan la mesa (igual que `cargarContexto`).
 - **Inferencia de datos de terceros.** El estado por mesa sumado a `capacidad` permite inferir
@@ -310,21 +329,32 @@ eligió esa mesa (ver D9). Queda como pregunta abierta.
   tablilla Kakefuda: madera (tokens de `frontend/app/globals.css`, solo mención: no se
   rediseña), `etiqueta` y `capacidad` impresas. El SVG es decorativo para tecnologías de
   asistencia (`aria-hidden="true"`); el contenido accesible es la lista (D7).
-- **Estados sin depender del color** (WCAG 1.4.1): cada estado suma un patrón y un texto,
-  además del color: `LIBRE` (relleno liso + marca ✓ + texto "Libre"), `OCUPADA` (rayado diagonal
-  + marca × + "Ocupada"), `NO_ALCANZA` (punteado + marca – + "No alcanza"). Contraste de texto y
-  bordes ≥ 4.5:1 / 3:1 contra el fondo de la tablilla, verificado con los tokens reales.
-- **Leyenda** siempre visible con los tres estados (misma forma y texto que en el dibujo).
+- **Estados sin depender del color** (WCAG 1.4.1): en el dibujo, cada estado suma un patrón y una
+  marca además del color: `LIBRE` (relleno liso + marca ✓), `OCUPADA` (rayado diagonal + marca
+  ×), `NO_ALCANZA` (punteado + marca –). El **texto** del estado ("Libre", "Ocupada", "No
+  alcanza") va en la lista y en la leyenda, no dentro de cada mesa: una mesa de una celda mide
+  unos 27 px en un celular y el texto no entra, y el texto dentro de un SVG con `viewBox` escala
+  con el contenedor, así que un tamaño mínimo no se puede garantizar sin medir con JavaScript
+  (descartado arriba). Contraste de marcas y bordes ≥ 3:1 y de los textos ≥ 4.5:1 contra el
+  fondo de la tablilla, verificado con los tokens reales.
+- **Leyenda** siempre visible con los tres estados (mismo patrón y marca que en el dibujo, con el
+  texto del estado).
 - **Mesas sin ubicar** (`posX` nulo): no se dibujan; figuran en la lista con la nota
   "sin ubicar en el plano". Si **ninguna** tiene posición, se oculta el dibujo y queda solo la
   lista.
 - **Veredicto primero.** El plano se muestra debajo del mensaje de `disponible`/`motivos` que la
   página ya presenta, y cuando `disponible` es `false` el plano se atenúa y se agrega el texto
   "El plano muestra el estado de las mesas, pero hoy no se puede reservar este turno por: …".
-- **Obtención de datos.** El plano se pide en el Server Component de la página, en paralelo con
-  `disponibilidad` y el catálogo, pero **su fallo no tumba la página**: la página usa un
-  `Suspense` con un componente servidor propio que captura el error y renderiza
-  `ErrorConReintento` (ya existe). `cache: "no-store"`. Tipos de `schema.d.ts` regenerados.
+- **Una sola fuente del veredicto.** La página pide `/plano-mesas` y **ese** veredicto
+  (`disponible`, `lugaresRestantes`, `motivos`) gobierna el mensaje, el botón "Continuar" y el
+  atenuado: no hay dos respuestas que puedan discrepar si se crea una reserva entre medio, y se
+  evita duplicar las consultas de `cargarContexto` en cada visita. `/disponibilidad` se pide
+  **solo como respaldo** cuando el plano falla (red, `5xx`, `429` o `404`); en ese caso el
+  veredicto sale de `/disponibilidad`, como hoy, y la sección del plano muestra su error o su
+  mensaje (D7). La página sigue pidiendo el catálogo como hasta ahora.
+- **Obtención de datos.** El plano se pide en el Server Component de la página
+  (`cache: "no-store"`) y **su fallo no tumba la página**: se captura y se degrada a la sección
+  de error de D7, con `ErrorConReintento` (ya existe). Tipos de `schema.d.ts` regenerados.
 
 ### D6. Administración del plano: queda para un change siguiente
 
@@ -355,14 +385,19 @@ protegido por `JwtAuthGuard` + `RolesGuard`, con throttle de admin.
   con lector de pantalla. Si D9 se implementa, las mesas pasan a ser `<button>` reales dentro de
   una lista, con foco visible (anillo del token de foco existente) y activación por Enter/Espacio.
 - **`prefers-reduced-motion`:** las transiciones y el brillo del esqueleto se desactivan con
-  `@media (prefers-reduced-motion: reduce)`; la aparición del plano no usa animación esencial.
+  `@media (prefers-reduced-motion: reduce)` en CSS; la aparición del plano no usa animación
+  esencial. `jsdom` no evalúa media queries, así que esto **no** se prueba con `matchMedia`
+  simulado: se verifica leyendo que la regla existe en la hoja de estilos (test que busca el
+  bloque `@media (prefers-reduced-motion: reduce)` con las clases del esqueleto) y a mano en el
+  navegador con la opción del sistema activada (tarea 6.1).
 - **Contraste, foco y zoom:** texto en píxeles relativos (`rem`), la página sigue usable a 200 %
   de zoom, sin scroll horizontal del `body`.
 - **Celular.** La grilla escala al ancho disponible (360 px de viewport → ~328 px de dibujo →
-  ~27 px por celda en STANDARD de 12 columnas). Para que las tablillas chicas (una celda) sigan
-  legibles, la `etiqueta` se imprime en un tamaño mínimo de 11 px y la `capacidad` solo se
-  imprime en el dibujo si la mesa mide al menos 2 celdas de ancho (la lista siempre la dice). La
-  lista va **antes** que el dibujo en pantallas angostas (`order`), porque ahí es la vía más
+  ~27 px por celda en STANDARD de 12 columnas). En el dibujo, la
+  `etiqueta` se imprime dentro de la mesa como ayuda visual y la `capacidad` solo si la mesa mide
+  al menos 2 celdas de ancho; no se garantiza un tamaño de letra mínimo en el SVG (escala con el
+  contenedor). Lo que garantiza la legibilidad es la lista, que siempre dice etiqueta, capacidad
+  y estado en texto de tamaño normal. La lista va **antes** que el dibujo en pantallas angostas (`order`), porque ahí es la vía más
   rápida; en escritorio van lado a lado o dibujo primero. El contenedor tiene
   `overflow-x: auto` solo como red de seguridad.
 - **Estados de carga/error/429:**
@@ -372,7 +407,10 @@ protegido por `JwtAuthGuard` + `RolesGuard`, con throttle de admin.
     con botón "Reintentar". La reserva nunca depende del plano.
   - `429`: mensaje específico "Estamos recibiendo muchas consultas. Probá de nuevo en un
     minuto." sin reintento automático (evita agravar el límite compartido).
-  - `404/400`: se tratan como la página ya trata los de `/disponibilidad` (selección inválida).
+  - `404/400` del **plano**: degradan la sección (mensaje "No pudimos cargar el plano. Podés
+    seguir con tu reserva igual."), y el veredicto sale de `/disponibilidad`. Solo un `404/400`
+    de `/disponibilidad` redirige al paso 1 como hoy (selección inválida). Así, un backend sin
+    la ruta (rollback o despliegue en otro orden) no deja a nadie atrapado en el paso 1.
 - Copy en voseo rioplatense, como el resto del cliente.
 
 ### D8. Estrategia de tests
@@ -381,12 +419,17 @@ Orden: tests primero, en rojo, y luego la implementación (ver `tasks.md`).
 
 - **Unitarios** (`*.spec.ts`, al lado del archivo): la función pura que deriva el estado de cada
   mesa a partir de `mesasLibres` y `comensales` (tabla de casos: libre, ocupada, no alcanza,
-  ocupada y chica ⇒ ocupada, capacidad exacta ⇒ libre, mesa sin ubicar); validador de layout
+  ocupada y chica ⇒ ocupada, capacidad exacta ⇒ libre, mesa sin ubicar); `ordenarMesasPorEtiqueta` (S1, S2, S10 en ese orden); validador de layout
   (límites, solapamientos) que usa el seed.
+- **Fechas y reloj.** Los escenarios de la spec usan fechas literales (2026-09-19, "ahora" =
+  2026-09-15 10:00) solo para ser legibles. Los tests no las usan tal cual: o inyectan el reloj
+  en `PlanoMesasService` (unitarios e integración) o traducen cada fecha a una relativa a hoy
+  (`proximaFecha(...)`, como hacen los e2e actuales), de modo que `ANTICIPACION_MINIMA` no
+  invalide los casos que esperan `motivos: []`.
 - **Integración contra PostgreSQL real** (`backend/test/*.integration-spec.ts`, sin mocks de
   Prisma): reserva `CONFIRMADA`/`PENDIENTE` ⇒ `OCUPADA`; `CANCELADA`/`NO_SHOW` ⇒ libre; mesa
   sin posición ⇒ `posX: null` y no rompe; **sin fuga de datos personales** (cuerpo serializado
-  no contiene nombre/email/teléfono/código); respuesta sin `id` ni claves extra; invariante de
+  no contiene nombre/email/teléfono/código); respuesta sin `id` ni claves extra (`Object.keys` exactas); invariante de
   consistencia: para una grilla de combinaciones, `existe mesa LIBRE ⇔ SIN_MESA_DISPONIBLE ∉
   motivos`; migración aplicada sobre una base con datos previos conserva reservas y mesas.
 - **Consistencia con la creación e invariante 1:** un test que (a) pide el plano, (b) crea una
@@ -397,16 +440,19 @@ Orden: tests primero, en rojo, y luego la implementación (ver `tasks.md`).
   no altera la defensa contra la doble reserva (no escribe ni toma locks).
 - **e2e** (`backend/test/plano-mesas.e2e-spec.ts`, Supertest): ruta pública sin token ⇒ `200`;
   `400` con parámetros inválidos; `404` con turno o zona inexistentes; `Cache-Control: no-store`;
-  `429` al exceder el límite (con el límite bajado por configuración de test, como hace
-  `throttle-rutas-admin.e2e-spec.ts`) y que la solicitud 121 no ejecuta consultas.
+  `429` al exceder el límite: se envían las **121 solicitudes reales** contra el límite de 120
+  (así lo hace `throttle-rutas-admin.e2e-spec.ts` con las 60 de admin; ese spec no baja el
+  límite por configuración y este change no agrega ninguna variable de entorno) y se comprueba
+  que la 121 responde `429` sin ejecutar consultas.
 - **Seed:** test de que el layout inicial entra en la grilla, no se solapa y es idempotente
   (correr dos veces no duplica ni cambia posiciones).
 - **Frontend (Jest + React Testing Library, `frontend/test/`)**: render con estados mixtos
   (lista con texto de estado por mesa, leyenda, resumen); no depende solo del color (cada estado
   tiene texto y marca); mesa sin ubicar aparece solo en la lista; `disponible: false` muestra el
   aviso y atenúa; esqueleto con `aria-busy`; error con botón de reintento; mensaje específico de
-  `429`; el SVG tiene `aria-hidden`; con `prefers-reduced-motion` no hay clase de animación
-  (matchMedia simulado).
+  `429`; `404` del plano degrada la sección y el veredicto sale de `/disponibilidad` (sin
+  redirigir); el SVG tiene `aria-hidden`; la hoja de estilos contiene la regla
+  `prefers-reduced-motion: reduce` para el esqueleto (ver D7).
 - **Contrato (`openapi:check`).** El CI genera el spec desde los decoradores de `@nestjs/swagger`
   y lo diffea contra `openapi/openapi.yaml`. El PR de implementación debe agregar el path y los
   tres esquemas **en ambos lados con texto idéntico** (summary, description, ejemplos,

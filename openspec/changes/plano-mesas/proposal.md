@@ -65,7 +65,8 @@ sin filtrar datos de terceros y dibujarlo de forma accesible.
 ## Impact
 
 - **Backend**: nuevo módulo `plano-mesas` (controller, service, DTOs), migración Prisma,
-  cambios en `prisma/seed.ts`; `DisponibilidadModule` ya exporta lo necesario (se agrega la
+  cambios en `prisma/seed.ts`, y un `select` explícito en las lecturas de `ZonasService` y de
+  `MesasService` para que las columnas nuevas no salgan por `/admin/zonas` ni `/admin/mesas`; `DisponibilidadModule` ya exporta lo necesario (se agrega la
   exportación de los helpers si hiciera falta).
 - **Contrato**: `openapi/openapi.yaml` (+1 path, +3 esquemas); `openapi:check` y
   `openapi:lint` deben seguir en verde.

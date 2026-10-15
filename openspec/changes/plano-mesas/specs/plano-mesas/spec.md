@@ -8,7 +8,9 @@ Los escenarios usan los datos del seed: zona STANDARD (mesas S1 y S2 de 2 comens
 S4 de 6 y S5 de 8; grilla de 12 por 8), zona VIP (mesas V1 de 2, V2 de 4, V3 de 6 y V4 de 12;
 grilla de 10 por 6), aforos 40 (STANDARD), 20 (VIP) y 60 (global), y turnos almuerzo 12:00–15:00
 y cena 20:00–23:30 de martes a domingo (los del lunes, inactivos). Las horas son hora local del
-restaurante (`America/Argentina/Buenos_Aires`, UTC-3 fijo). Salvo que un escenario diga otra
+restaurante (`America/Argentina/Buenos_Aires`, UTC-3 fijo). Las fechas literales de los
+escenarios son ilustrativas: los tests las traducen a fechas relativas a hoy o inyectan el reloj.
+Salvo que un escenario diga otra
 cosa, no hay reservas activas para el turno y la fecha consultados (las reservas de ejemplo del
 seed, entre ellas una `CONFIRMADA` en S3 para la cena del próximo sábado, no cuentan: los
 tests parten de una base sin reservas) y el instante actual es 2026-09-15 10:00.
@@ -44,8 +46,8 @@ bloquea nada y no modifica datos.
 Ante una consulta válida, el sistema SHALL responder `200 OK` con `zona` (nombre de la zona),
 `columnas` y `filas` (dimensiones de la grilla del plano de la zona), `disponible`,
 `lugaresRestantes` y `motivos` (con el mismo contenido que devolvería `GET /disponibilidad` para
-la misma consulta) y `mesas`, una lista con **todas** las mesas de la zona consultada, ordenada
-por `etiqueta`. Cada mesa SHALL incluir `etiqueta`, `capacidad`, `forma`, `posX`, `posY`,
+la misma consulta) y `mesas`, una lista con **todas** las mesas de la zona consultada, en orden
+natural de `etiqueta` (S2 antes que S10). Cada mesa SHALL incluir `etiqueta`, `capacidad`, `forma`, `posX`, `posY`,
 `ancho`, `alto` y `estado`. Que no haya lugar para reservar no es un error: la respuesta SHALL
 seguir siendo `200`.
 
@@ -54,6 +56,10 @@ seguir siendo `200`.
 - **THEN** la respuesta trae `zona: "STANDARD"`, `columnas: 12`, `filas: 8`,
   `disponible: true` y `motivos: []`
 - **AND** `mesas` contiene exactamente S1, S2, S3, S4 y S5, en ese orden
+
+#### Scenario: Orden natural de las etiquetas
+- **WHEN** la zona STANDARD tiene además una mesa "S10" y se consulta el plano
+- **THEN** `mesas` las trae en el orden S1, S2, S3, S4, S5, S10
 
 #### Scenario: El veredicto coincide con el de la consulta de disponibilidad
 - **WHEN** se consulta el plano y `GET /disponibilidad` con los mismos cuatro parámetros
@@ -119,8 +125,10 @@ o `NO_SHOW` SHALL considerarse no ocupada. Una mesa de otra zona SHALL NOT apare
 ### Requirement: El plano no contradice la reserva real
 El sistema SHALL derivar el `estado` de las mesas de la misma consulta de mesas libres y de las
 mismas reglas de disponibilidad que usan la consulta de disponibilidad y la creación de
-reservas, sin reimplementarlas. Por lo tanto, el plano SHALL contener al menos una mesa `LIBRE`
-si y solo si `motivos` no incluye `SIN_MESA_DISPONIBLE`. Cuando `disponible` es `false`, el
+reservas, sin reimplementarlas, y SHALL leer ambas cosas (mesas libres y lista de mesas de la
+zona) de una misma foto de la base. Por lo tanto, el plano SHALL contener al menos una mesa
+`LIBRE` si y solo si `motivos` no incluye `SIN_MESA_DISPONIBLE`, incluso si el administrador
+elimina o mueve una mesa mientras se arma la respuesta. Cuando `disponible` es `false`, el
 sistema SHALL informar los motivos aun si hay mesas `LIBRE`.
 
 #### Scenario: Sin mesa libre que alcance coincide con SIN_MESA_DISPONIBLE
@@ -204,8 +212,10 @@ El sistema SHALL mostrar, en `/reservas/nueva/resultado`, el plano de la zona el
 estado de sus mesas para la fecha, el turno y los comensales de la selección, debajo del
 veredicto de disponibilidad que la pantalla ya presenta. SHALL indicar que el plano es una foto
 del momento y que la mesa se asigna automáticamente al confirmar la reserva, y SHALL NOT ofrecer
-elegir una mesa. Cuando `disponible` es `false`, SHALL mostrar los motivos antes del plano y
-SHALL NOT sugerir que se puede reservar.
+elegir una mesa. El veredicto de la pantalla (mensaje, atenuado del plano y acción para
+continuar) SHALL salir de la respuesta del plano; solo si el plano no se pudo obtener, SHALL
+salir de la consulta de disponibilidad. Cuando `disponible` es `false`, SHALL mostrar los
+motivos antes del plano y SHALL NOT sugerir que se puede reservar.
 
 #### Scenario: Plano con mesas libres y ocupadas
 - **WHEN** la persona llega al resultado con zona STANDARD y 4 comensales, y S5 está ocupada
@@ -225,8 +235,10 @@ SHALL NOT sugerir que se puede reservar.
 ### Requirement: Accesibilidad del plano
 El plano SHALL ofrecer una alternativa textual siempre visible: una lista con una entrada por
 mesa que dice su etiqueta, su capacidad y su estado en palabras. El estado de cada mesa SHALL
-distinguirse sin depender solo del color: cada estado SHALL tener un patrón de relleno, una
-marca y un texto propios, y la leyenda SHALL mostrar los tres. El dibujo SHALL ser
+distinguirse sin depender solo del color: en el dibujo, cada estado SHALL tener un patrón de
+relleno y una marca propios, y el texto del estado SHALL figurar en la lista y en la leyenda, que
+SHALL mostrar los tres estados con su patrón, su marca y su texto. El dibujo SHALL NOT depender
+de texto dentro de cada mesa para transmitir el estado. El dibujo SHALL ser
 transparente para tecnologías de asistencia (`aria-hidden`) porque la lista lo reemplaza; el
 plano SHALL incluir un resumen en texto con la cantidad de mesas por estado. Las animaciones y
 transiciones SHALL desactivarse con `prefers-reduced-motion: reduce`.
@@ -238,8 +250,9 @@ transiciones SHALL desactivarse con `prefers-reduced-motion: reduce`.
 
 #### Scenario: El estado no depende del color
 - **WHEN** se renderiza el dibujo con los tres estados
-- **THEN** cada mesa lleva, además de su color, un patrón de relleno distinto, una marca
-  distinta y el texto de su estado
+- **THEN** cada mesa lleva, además de su color, un patrón de relleno distinto y una marca
+  distinta
+- **AND** la leyenda y la lista dicen el estado en palabras
 
 #### Scenario: Resumen en texto
 - **WHEN** se renderiza un plano con 3 mesas libres, 1 ocupada y 1 que no alcanza
@@ -251,8 +264,9 @@ transiciones SHALL desactivarse con `prefers-reduced-motion: reduce`.
 
 ### Requirement: Plano usable en celular
 El plano SHALL escalar al ancho de la pantalla sin provocar scroll horizontal de la página en
-un viewport de 360 px, SHALL mantener legible la etiqueta de cada mesa y SHALL mostrar la lista
-textual antes que el dibujo en pantallas angostas.
+un viewport de 360 px, SHALL decir la etiqueta, la capacidad y el estado de cada mesa en la lista
+textual con texto de tamaño normal, y SHALL mostrar la lista antes que el dibujo en pantallas
+angostas.
 
 #### Scenario: Viewport de 360 px
 - **WHEN** se muestra el plano de STANDARD (grilla de 12 columnas) en un viewport de 360 px
@@ -263,8 +277,11 @@ textual antes que el dibujo en pantallas angostas.
 Mientras el plano se pide, el sistema SHALL mostrar un esqueleto con `aria-busy="true"` y un
 texto accesible. Si el plano falla por un error de red o `5xx`, SHALL mostrar un mensaje con un
 botón para reintentar y SHALL permitir continuar con la reserva. Si responde `429`, SHALL mostrar
-un mensaje específico de demasiadas consultas, sin reintento automático. Ningún error del plano
-SHALL impedir mostrar el veredicto de disponibilidad ni continuar al paso siguiente.
+un mensaje específico de demasiadas consultas, sin reintento automático. Si responde `404` o
+`400`, SHALL tratarlo como un plano no disponible (misma sección degradada) y SHALL NOT
+redirigir al paso 1: solo la consulta de disponibilidad decide si la selección es inválida.
+Ningún error del plano SHALL impedir mostrar el veredicto de disponibilidad ni continuar al paso
+siguiente.
 
 #### Scenario: Cargando
 - **WHEN** el plano todavía no llegó
@@ -274,6 +291,15 @@ SHALL impedir mostrar el veredicto de disponibilidad ni continuar al paso siguie
 - **WHEN** el plano responde `500` y la disponibilidad responde `disponible: true`
 - **THEN** la pantalla muestra el mensaje de error del plano con un botón "Reintentar"
 - **AND** la acción para continuar con la reserva sigue disponible
+
+#### Scenario: El backend no tiene la ruta del plano
+- **WHEN** el plano responde `404` y la consulta de disponibilidad responde `disponible: true`
+- **THEN** la pantalla muestra el veredicto de disponibilidad y la sección del plano degradada
+- **AND** no redirige al paso 1 y la acción para continuar sigue disponible
+
+#### Scenario: Selección inválida
+- **WHEN** el plano y la consulta de disponibilidad responden `404`
+- **THEN** el sistema trata la selección como inválida y vuelve al paso 1
 
 #### Scenario: Demasiadas consultas
 - **WHEN** el plano responde `429`
