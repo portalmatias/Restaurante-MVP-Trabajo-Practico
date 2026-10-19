@@ -29,3 +29,7 @@ Thumbs.db
 # Python (skill ui-ux-pro-max)
 __pycache__/
 *.pyc
+
+# Estado del despliegue en el servidor (deploy/desplegar.sh): historial, versión actual y
+# env de Compose con secretos. Nunca se versiona.
+/.despliegue/

@@ -3,12 +3,14 @@
 # Procedimiento de despliegue en la instancia de producción (D7 de
 # openspec/changes/despliegue-continuo-ec2/design.md).
 #
-# Lo ejecuta el documento SSM `reservas-desplegar` (deploy/ssm-desplegar.json), como root:
+# Lo ejecuta como root deploy/ssh-entrada.sh (mediante `sudo`), que es el comando forzado de la
+# clave SSH del workflow de CD y le pasa los cuatro argumentos ya validados:
 #
 #   desplegar.sh <sha> <digestBackend> <digestFrontend> <modo>
 #
 #   sha             SHA completo del commit de main (40 caracteres hexadecimales en minúscula).
-#   digestBackend   digest de la imagen del backend  (sha256:<64 hex>, o vacío).
+#   digestBackend   digest de la imagen del backend  (sha256:<64 hex>, o vacío: ssh-entrada.sh
+#                   traduce el marcador `-` que manda el workflow a una cadena vacía).
 #   digestFrontend  digest de la imagen del frontend (sha256:<64 hex>, o vacío).
 #   modo            `despliegue` o `vuelta-atras`. En `despliegue` los dos digests son
 #                   obligatorios. En `vuelta-atras` el workflow los manda vacíos: el SHA tiene
@@ -18,9 +20,18 @@
 # Códigos de salida: 0 desplegado (o versión ya superada, sin cambios); 1 falló (con vuelta
 # atrás si había una versión previa); 2 parámetros inválidos (no se tocó nada).
 #
-# Seguridad: el script corre SIN `set -x` y nunca imprime los valores de los parámetros de SSM.
-# Los secretos se escriben solo en $RAIZ/.env (root, modo 600). Las credenciales del admin no
-# se escriben en ningún archivo: solo llegan, por entorno, al contenedor del seed.
+# Archivos en /opt/reservas (el repositorio se clona ahí, directamente):
+#   .env                       lo copia a mano quien instala el servidor (docs/despliegue.md):
+#                              JWT_SECRET, POSTGRES_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD y
+#                              SITE_ADDRESS. Tiene que ser de root y de modo 600 o 400. Este
+#                              script solo lo LEE; nunca lo modifica ni lo imprime.
+#   .despliegue/compose.env    el que sí genera este script para Compose, por versión: los
+#                              secretos de arriba más las imágenes por digest (root, modo 600).
+#   .despliegue/VERSION_ACTUAL, historial y desplegar.lock: estado del despliegue.
+#
+# Seguridad: el script corre SIN `set -x` y nunca imprime los valores del .env. Las
+# credenciales del admin no se escriben en ningún archivo propio de este script: solo llegan,
+# por entorno, al contenedor del seed.
 #
 # Todo el cuerpo está dentro de `main`: bash lee los scripts de a partes, y el `git checkout`
 # de abajo reemplaza este mismo archivo mientras corre. Con una función, bash ya leyó todo
@@ -32,19 +43,20 @@ main() {
   # Rutas. RESERVAS_RAIZ y RESERVAS_REGISTRO existen solo para la prueba local de la tarea 5.2
   # (docs/despliegue.md); en la instancia no se definen.
   local RAIZ="${RESERVAS_RAIZ:-/opt/reservas}"
-  local REPO="$RAIZ/repo"
+  local REPO="$RAIZ"
   local ENV_FILE="$RAIZ/.env"
-  local ARCHIVO_ACTUAL="$RAIZ/VERSION_ACTUAL"
-  local ARCHIVO_HISTORIAL="$RAIZ/historial"
+  local ESTADO="$RAIZ/.despliegue"
+  local ENV_COMPOSE="$ESTADO/compose.env"
+  local ARCHIVO_ACTUAL="$ESTADO/VERSION_ACTUAL"
+  local ARCHIVO_HISTORIAL="$ESTADO/historial"
   local COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
-  local RUTA_PARAMETROS="/reservas/prod/"
   local SEGUNDOS_COMPROBACION=90
 
   log() { printf '[desplegar %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
   error() { printf '[desplegar %s] ERROR: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
 
   # ---------------------------------------------------------------------------------------
-  # 1. Validación de parámetros (defensa en profundidad: SSM ya los validó). Antes de tocar
+  # 1. Validación de parámetros (defensa en profundidad: ssh-entrada.sh ya los validó). Antes de tocar
   #    nada, ni siquiera el lock.
   # ---------------------------------------------------------------------------------------
   if [ "$#" -ne 4 ]; then
@@ -56,8 +68,8 @@ main() {
     error "SHA inválido: tiene que ser el SHA completo del commit (40 caracteres hexadecimales en minúscula)."
     return 2
   fi
-  # Los digests pueden llegar vacíos (el documento SSM los admite así para la vuelta atrás),
-  # pero si vienen, con el formato exacto.
+  # Los digests pueden llegar vacíos (en la vuelta atrás no hacen falta), pero si vienen, con
+  # el formato exacto.
   if ! [[ "$digest_backend" =~ ^(sha256:[0-9a-f]{64})?$ ]] || ! [[ "$digest_frontend" =~ ^(sha256:[0-9a-f]{64})?$ ]]; then
     error "digest inválido: el formato esperado es sha256:<64 caracteres hexadecimales>."
     return 2
@@ -76,7 +88,8 @@ main() {
   # workflow).
   # ---------------------------------------------------------------------------------------
   umask 077
-  exec 9> "$RAIZ/desplegar.lock"
+  mkdir -p "$ESTADO"
+  exec 9> "$ESTADO/desplegar.lock"
   if ! flock -w 900 9; then
     error "hay otro despliegue en curso desde hace más de 15 minutos."
     return 1
@@ -91,46 +104,57 @@ main() {
   local imagen_frontend="$registro/reservas-frontend"
 
   compose() {
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_COMPOSE" "$@"
   }
 
   # ---------------------------------------------------------------------------------------
-  # Parámetros de SSM. Se leen una vez, a variables locales, sin imprimirlos.
+  # Variables del servidor (/opt/reservas/.env). Se leen una vez, a variables locales, sin
+  # imprimirlas. El archivo NO se ejecuta (no se hace `source`): se interpreta línea por línea,
+  # así que un valor con `$(...)` o `;` es solo texto.
   # ---------------------------------------------------------------------------------------
   local p_jwt="" p_postgres="" p_admin_email="" p_admin_password="" p_site=""
   leer_parametros() {
-    local region nombre valor salida
-    region="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
-    if [ -z "$region" ]; then
-      # IMDSv2 desde el host (el límite de saltos 1 lo deja fuera del alcance de los
-      # contenedores, no del host).
-      local token
-      token="$(curl -sf -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')"
-      region="$(curl -sf -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/placement/region)"
-    fi
-    if ! salida="$(aws ssm get-parameters-by-path --region "$region" --path "$RUTA_PARAMETROS" \
-      --recursive --with-decryption --query 'Parameters[].[Name,Value]' --output text)"; then
-      error "no se pudieron leer los parámetros de $RUTA_PARAMETROS en SSM."
+    local dueno modo linea nombre valor
+    if [ ! -f "$ENV_FILE" ]; then
+      error "no existe $ENV_FILE: copiá el .env de producción al servidor (docs/despliegue.md)."
       return 1
     fi
-    while IFS=$'\t' read -r nombre valor; do
+    # Dueño: quien corre el script (root en la instancia). Modo: solo el dueño lo lee.
+    dueno="$(stat -c '%u' "$ENV_FILE")"
+    modo="$(stat -c '%a' "$ENV_FILE")"
+    if [ "$dueno" != "$(id -u)" ]; then
+      error "$ENV_FILE tiene que ser de root (chown root:root)."
+      return 1
+    fi
+    if [ "$modo" != "600" ] && [ "$modo" != "400" ]; then
+      error "$ENV_FILE tiene modo $modo: tiene que ser 600 (chmod 600), porque tiene secretos."
+      return 1
+    fi
+    while IFS= read -r linea || [ -n "$linea" ]; do
+      linea="${linea%$'\r'}"
+      case "$linea" in "" | \#*) continue ;; esac
+      [[ "$linea" == *=* ]] || continue
+      nombre="${linea%%=*}"
+      valor="${linea#*=}"
+      # Comillas dobles o simples alrededor del valor completo (como en .env.example).
+      if [[ "$valor" =~ ^\"(.*)\"$ ]] || [[ "$valor" =~ ^\'(.*)\'$ ]]; then valor="${BASH_REMATCH[1]}"; fi
       case "$nombre" in
-        "${RUTA_PARAMETROS}JWT_SECRET") p_jwt="$valor" ;;
-        "${RUTA_PARAMETROS}POSTGRES_PASSWORD") p_postgres="$valor" ;;
-        "${RUTA_PARAMETROS}ADMIN_EMAIL") p_admin_email="$valor" ;;
-        "${RUTA_PARAMETROS}ADMIN_PASSWORD") p_admin_password="$valor" ;;
-        "${RUTA_PARAMETROS}config/SITE_ADDRESS") p_site="$valor" ;;
+        JWT_SECRET) p_jwt="$valor" ;;
+        POSTGRES_PASSWORD) p_postgres="$valor" ;;
+        ADMIN_EMAIL) p_admin_email="$valor" ;;
+        ADMIN_PASSWORD) p_admin_password="$valor" ;;
+        SITE_ADDRESS) p_site="$valor" ;;
       esac
-    done <<< "$salida"
+    done < "$ENV_FILE"
 
     local faltan=()
     [ -n "$p_jwt" ] || faltan+=(JWT_SECRET)
     [ -n "$p_postgres" ] || faltan+=(POSTGRES_PASSWORD)
     [ -n "$p_admin_email" ] || faltan+=(ADMIN_EMAIL)
     [ -n "$p_admin_password" ] || faltan+=(ADMIN_PASSWORD)
-    [ -n "$p_site" ] || faltan+=(config/SITE_ADDRESS)
+    [ -n "$p_site" ] || faltan+=(SITE_ADDRESS)
     if [ "${#faltan[@]}" -gt 0 ]; then
-      error "faltan parámetros en SSM: ${faltan[*]} (bajo $RUTA_PARAMETROS)."
+      error "faltan variables en $ENV_FILE (o están vacías): ${faltan[*]}."
       return 1
     fi
     # Formatos: la contraseña de la base va dentro de DATABASE_URL, así que solo admite
@@ -144,15 +168,15 @@ main() {
       return 1
     fi
     if ! [[ "$p_site" =~ ^(:80|[a-z0-9]([a-z0-9.-]*[a-z0-9])?)$ ]]; then
-      error "config/SITE_ADDRESS tiene que ser ':80' o un nombre de dominio en minúsculas."
+      error "SITE_ADDRESS tiene que ser ':80' o un nombre de dominio en minúsculas."
       return 1
     fi
   }
 
-  # Escribe el .env de Compose para una versión: root, modo 600, reemplazo atómico.
+  # Escribe el env de Compose para una versión: root, modo 600, reemplazo atómico.
   generar_env() {
     local d_back="$1" d_front="$2" temporal
-    temporal="$(mktemp "$RAIZ/.env.XXXXXX")"
+    temporal="$(mktemp "$ESTADO/compose.env.XXXXXX")"
     {
       printf 'POSTGRES_PASSWORD=%s\n' "$p_postgres"
       printf 'JWT_SECRET=%s\n' "$p_jwt"
@@ -163,7 +187,7 @@ main() {
       printf 'DIGEST_FRONTEND=%s\n' "$d_front"
     } > "$temporal"
     chmod 600 "$temporal"
-    mv -f "$temporal" "$ENV_FILE"
+    mv -f "$temporal" "$ENV_COMPOSE"
   }
 
   # Comprueba la versión a través del proxy de borde: la página principal y una consulta a
@@ -222,17 +246,17 @@ main() {
     done
   }
 
-  # Levanta una versión ya preparada (checkout + .env) y la comprueba.
+  # Levanta una versión ya preparada (checkout + env de Compose) y la comprueba.
   levantar_y_comprobar() {
     compose up -d --remove-orphans && comprobar
   }
 
-  # Deja el checkout y el .env como estaban, sin reiniciar contenedores (falla antes del up).
+  # Deja el checkout y el env de Compose como estaban, sin reiniciar contenedores (falla antes del up).
   restaurar_archivos() {
     if [ -n "$sha_previo" ]; then
       git -C "$REPO" checkout -q --detach "$sha_previo"
       generar_env "$db_previo" "$df_previo"
-      log "checkout y .env restaurados a la versión previa ($sha_previo); los contenedores no se tocaron."
+      log "checkout y env de Compose restaurados a la versión previa ($sha_previo); los contenedores no se tocaron."
     fi
   }
 
@@ -276,7 +300,7 @@ main() {
   leer_parametros
   git -C "$REPO" checkout -q --detach "$sha"
 
-  # 4 y 5. .env de la versión nueva e imágenes por digest.
+  # 4 y 5. Env de Compose de la versión nueva e imágenes por digest.
   generar_env "$digest_backend" "$digest_frontend"
   log "descargando imágenes..."
   if ! compose pull -q; then
