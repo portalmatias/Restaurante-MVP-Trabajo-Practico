@@ -95,16 +95,17 @@
 
 - [ ] 5.1 Escribir `deploy/desplegar.sh` según D7:
       - validación de `sha`, digests y `modo`, y `flock`;
-      - validación del `.env` (D6): existe, es de `root` con modo `600`, no es un enlace
-        simbólico y tiene `JWT_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` y
-        `SITE_ADDRESS`, sin imprimir ningún valor; el script nunca modifica el `.env`;
+      - validación del `.env` (D6): existe, es de `root` con modo `600` (o `400`), tiene
+        `JWT_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `SITE_ADDRESS` con
+        su formato, se lee sin ejecutarlo y no se imprime ningún valor; el script nunca
+        modifica el `.env`;
       - `SIGHUP` y `SIGPIPE` ignorados y salida duplicada en
         `/var/log/reservas-despliegue.log` (conexión SSH cortada);
       - ruta `/opt/reservas` (el repositorio clonado directo ahí, sin nivel `repo/`);
       - `version_previa` leída al inicio, chequeo de ancestro en modo `despliegue` y búsqueda
         en `historial` en modo `vuelta-atras`;
-      - checkout, escritura de `.env.version` (modo `600`) con las imágenes por digest, pull,
-        migraciones, seed, `up` y comprobación;
+      - checkout, escritura de `.despliegue/compose.env` (modo `600`) con las imágenes por
+        digest, pull, migraciones, seed, `up` y comprobación;
       - vuelta atrás a `version_previa`, registro en `VERSION_ACTUAL` e `historial`, y
         limpieza explícita de imágenes (no `docker image prune` solo).
 
@@ -133,10 +134,11 @@
 - [ ] 5.3 Escribir primero los tests y después `deploy/ssh-entrada.sh` (D4), el comando
       forzado de la clave SSH. Los tests lo ejecutan con distintos `SSH_ORIGINAL_COMMAND` y un
       `desplegar.sh` de prueba que solo registra sus argumentos:
-      - `despliegue <sha> <digest> <digest>` y `vuelta-atras <sha>` válidos invocan a
-        `desplegar.sh` con los cuatro argumentos esperados, cada uno por separado;
+      - `<sha> <digest> <digest> despliegue` y `<sha> - - vuelta-atras` válidos invocan a
+        `desplegar.sh` con los cuatro argumentos esperados, cada uno por separado (el `-` llega
+        como cadena vacía);
       - se rechazan (código `2` y sin invocar nada): comando vacío, `bash`, `ls; id`,
-        `despliegue $(id) ...`, un SHA de 39 o 41 caracteres o con mayúsculas, un digest sin
+        `$(id) ...`, un SHA de 39 o 41 caracteres o con mayúsculas, un digest sin
         `sha256:` o de otra longitud, un `modo` desconocido, argumentos de más, saltos de línea,
         espacios o tabulaciones extra, y una segunda línea con otro comando;
       - ningún valor del pedido se evalúa en una shell (`eval`, `sh -c`, expansión).
@@ -148,17 +150,16 @@
       - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
         y `modo` validados;
       - job `decidir`, que usa la función de 5.6;
-      - en `modo=vuelta-atras`, el job `imagenes` no corre y se envían `sha` y `modo` con los
-        digests vacíos;
+      - en `modo=vuelta-atras`, el job `imagenes` no corre y los dos digests se envían como
+        `-`;
       - job `imagenes` con `packages: write`, que no sobrescribe un tag existente y expone los
         digests;
       - job `desplegar` con `environment: produccion` y `contents: read` (sin `id-token`), que
         usa el cliente `ssh` del runner (sin acciones de terceros para la conexión): valida
-        `SERVER_PORT`, `SERVER_USER` y `SERVER_HOST`, escribe la clave y `SSH_KNOWN_HOSTS` con
-        `umask 077` y los borra en un paso `if: always()`, y se conecta con
-        `StrictHostKeyChecking=yes` y `BatchMode=yes`; envía `despliegue <sha> <digestBackend>
-        <digestFrontend>` o `vuelta-atras <sha>`; tiene `timeout-minutes: 30` y no usa
-        `set -x`;
+        `SERVER_PORT`, `SERVER_USER` y `SERVER_HOST`, escribe la clave y `SSH_KNOWN_HOSTS` en un
+        directorio temporal con `umask 077` que borra con un `trap`, y se conecta con
+        `StrictHostKeyChecking=yes` y `BatchMode=yes`; envía `<sha> <digestBackend|->
+        <digestFrontend|-> <modo>`; envuelve `ssh` en `timeout 30m` y no usa `set -x`;
       - si falta alguno de los secrets `SERVER_*` o `SSH_*`, termina en error con un mensaje
         claro, sin afectar al CI;
       - acciones fijadas por SHA y `concurrency` sin cancelar.
@@ -189,12 +190,12 @@
       - runbook de AWS y del servidor, siguiendo las secciones 1 a 4 de la guía de la docente:
         security group (22, 80 y 443), instancia Ubuntu 24.04 sin rol IAM, Docker y Compose,
         clon directo en `/opt/reservas` (con el punto final), usuario `deploy` fuera del grupo
-        `docker`, regla de `sudoers`, `sshd` endurecido, par de claves dedicado con la línea
-        de `authorized_keys` (`command=` y `restrict`), `.env` de producción y archivos de
-        estado en `.git/info/exclude`;
+        `docker`, regla de `sudoers`, `sshd` endurecido, par de claves dedicado (generado en la
+        computadora del operador) con la línea de `authorized_keys` (`command=` y `restrict`)
+        y `.env` de producción;
       - el environment `produccion` de GitHub con `SERVER_HOST`, `SERVER_USER`, `SERVER_PORT`,
         `SSH_PRIVATE_KEY` y `SSH_KNOWN_HOSTS` (cómo obtener y verificar la huella), y cómo
-        borrar la clave privada del servidor después de copiarla;
+        borrar la clave privada de la computadora después de copiarla;
       - rotación de la clave de despliegue y revocación ante una filtración;
       - el riesgo aceptado del puerto 22 abierto a internet y sus mitigaciones;
       - cuenta y costos: MFA en root, usuarios IAM con MFA, sin Organizations, alerta de
@@ -217,8 +218,8 @@
         usuario `deploy`, `sudoers`, `sshd`, `.env` y clave SSH;
       - pedirle a la docente un subdominio apuntado a la IP elástica y pasárselo cuando
         exista la instancia;
-      - crear el environment `produccion` (solo `main`) con sus secrets y borrar del servidor
-        la clave privada.
+      - crear el environment `produccion` (solo `main`) con sus secrets y borrar de la
+        computadora la clave privada.
 
       Hacer el primer despliegue con `workflow_dispatch`. Verificar que
       el workflow termina en verde y que `http://<IP-elástica>/` muestra la app. Con la app
@@ -244,7 +245,7 @@
 - [ ] 6.4 Verificar los límites de la clave de despliegue (con la clave real, desde un equipo
       del equipo, y guardar las salidas sin datos sensibles):
       - `ssh deploy@<IP>` sin comando (shell interactiva) → rechazado;
-      - `ssh deploy@<IP> id`, `ssh deploy@<IP> "despliegue abc"` y un SHA o digest mal formado
+      - `ssh deploy@<IP> id`, `ssh deploy@<IP> "uno dos"` y un SHA o digest mal formado
         → rechazados sin ejecutar nada;
       - `ssh -L 8080:127.0.0.1:5432 deploy@<IP>` y `ssh -A` → no reenvían nada (`restrict`);
       - `deploy` no puede leer `/opt/reservas/.env`, no puede escribir en `/opt/reservas`, no

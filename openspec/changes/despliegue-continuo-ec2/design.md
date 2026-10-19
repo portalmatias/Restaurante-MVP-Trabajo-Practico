@@ -236,27 +236,36 @@ validó el CI.
    credenciales de AWS). Usa el cliente `ssh` que ya trae el runner, **sin acciones de
    terceros para la conexión**: una acción comprometida que maneje la clave sería la peor
    pieza de la cadena. El paso:
-   - valida los secrets antes de usarlos: `SERVER_PORT` con `^[0-9]{1,5}$`, `SERVER_USER` con
-     `^[a-z_][a-z0-9_-]{0,31}$` (que no pueda empezar con `-` ni inyectar opciones de `ssh`) y
-     `SERVER_HOST` con un nombre de host o una IPv4;
-   - escribe `SSH_PRIVATE_KEY` en un archivo de `$RUNNER_TEMP` con `umask 077` y
-     `SSH_KNOWN_HOSTS` en otro, y los borra en un paso `if: always()`;
+   - valida los secrets antes de usarlos: que existan los cinco, `SERVER_PORT` con
+     `^[0-9]{1,5}$`, `SERVER_USER` con `^[a-z_][a-z0-9_-]*$` (que no pueda empezar con `-` ni
+     inyectar opciones de `ssh`) y `SERVER_HOST` con `^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$`
+     (una IP o un nombre de dominio, sin espacios);
+   - escribe `SSH_PRIVATE_KEY` y `SSH_KNOWN_HOSTS` en un directorio temporal de `$RUNNER_TEMP`
+     (`mktemp -d`, con `umask 077`) y lo borra con un `trap` al salir del paso, también si
+     falla;
    - se conecta con `-o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
-     -o UserKnownHostsFile=<archivo> -o ConnectTimeout=20 -o ServerAliveInterval=30`. Con
+     -o UserKnownHostsFile=<archivo> -o ConnectTimeout=30 -o ServerAliveInterval=30
+     -o ServerAliveCountMax=10`. Con
      `StrictHostKeyChecking=yes` y la huella fijada, `ssh` aborta **antes de autenticarse** si
      el servidor no es el esperado: la clave privada nunca se le presenta a un impostor;
    - pasa los valores por variables de entorno, nunca interpolados en el código del `run`, y
      el paso corre sin `set -x`. GitHub enmascara los secrets en los logs;
    - el comando remoto es una sola línea con un formato fijo, que `ssh-entrada.sh` valida (ver
      abajo), y el código de salida de `desplegar.sh` llega como código de salida de `ssh`;
-   - el job tiene `timeout-minutes: 30`. La salida de `desplegar.sh` se ve en vivo en el log.
+   - envuelve `ssh` en `timeout 30m`. La salida de `desplegar.sh` se ve en vivo en el log, y
+     el paso traduce el código de salida de `ssh` a un mensaje: `255` (no se pudo conectar o la
+     huella no coincide), `124` (pasaron 30 minutos), `2` (el servidor rechazó el pedido) u
+     otro (falló `desplegar.sh`; si dice `VUELTA ATRÁS`, producción sigue en la versión
+     anterior).
 
-   El comando depende del modo:
-   - **`modo=despliegue`** (automático o manual): `despliegue <sha> <digestBackend>
-     <digestFrontend>`, con los dos digests que expone `imagenes`;
+   El comando es **siempre una línea de cuatro campos separados por un espacio**:
+   `<sha> <digestBackend> <digestFrontend> <modo>`. Un digest vacío viaja como `-`, porque un
+   campo vacío no se distingue de un espacio de más; `ssh-entrada.sh` lo traduce a la cadena
+   vacía que espera `desplegar.sh`. Según el modo:
+   - **`modo=despliegue`** (automático o manual): los dos digests que expone `imagenes`;
    - **`modo=vuelta-atras`** (solo manual): el job `imagenes` **no corre** (condición sobre el
-     input `modo`), y se envía `vuelta-atras <sha>`, sin digests. `desplegar.sh` toma los
-     digests de `historial`, nunca del workflow ni del tag.
+     input `modo`) y los dos digests viajan como `-`. `desplegar.sh` toma los digests de
+     `historial`, nunca del workflow ni del tag.
 
 - `concurrency: { group: despliegue-produccion, cancel-in-progress: false }` hace que los
   despliegues corran de a uno sin cortar uno a la mitad. GitHub deja **una sola ejecución en
@@ -272,9 +281,11 @@ validó el CI.
 (la guía los pone como secrets del repositorio; el environment es más estricto). El environment
 admite **solo la rama `main`**: un PR, una rama o un fork no reciben la clave.
 
-**Clave dedicada** (guía, 2.1): un par `ed25519` sin frase de paso, generado en el servidor
-para este único uso. La privada se copia a GitHub y **se borra del servidor**; la guía la deja
-ahí, y en el servidor no cumple ninguna función. La pública se autoriza con restricciones
+**Clave dedicada** (guía, 2.1): un par `ed25519` sin frase de paso, para este único uso. A
+diferencia de la guía, que lo genera en el servidor, el runbook lo **genera en la computadora
+del operador**: la clave privada pasa solo a GitHub y se borra de la computadora, así que
+**nunca está guardada en el servidor** (donde no cumple ninguna función). Es una desviación
+consciente de la guía, equivalente y más estricta. La pública se autoriza con restricciones
 (guía, 2.3, endurecida) en `~deploy/.ssh/authorized_keys`:
 
 ```
@@ -288,16 +299,20 @@ command="/opt/reservas/deploy/ssh-entrada.sh",restrict ssh-ed25519 AAAA... githu
 **`deploy/ssh-entrada.sh`** hace de puerta, con el mismo propósito que el documento SSM del
 diseño anterior (que el pedido no pueda ser un comando arbitrario):
 - si `SSH_ORIGINAL_COMMAND` está vacío (intento de shell interactiva), lo rechaza;
-- acepta **solo** estas dos formas exactas, validadas con expresiones regulares ancladas:
-  - `despliegue <sha> <digestBackend> <digestFrontend>`, con `sha` de `^[0-9a-f]{40}$` y los
-    digests de `^sha256:[0-9a-f]{64}$`;
-  - `vuelta-atras <sha>`, con el mismo `sha`;
+- acepta **solo** una línea de exactamente cuatro campos separados por un espacio, que primero
+  pasa por una expresión regular anclada (`[a-z0-9:-]+` en los tres primeros campos y
+  `[a-z-]+` en el último: ningún metacaracter de shell, salto de línea, tabulación ni espacio
+  de más) y después se valida campo por campo:
+  - `sha` de `^[0-9a-f]{40}$`;
+  - `digestBackend` y `digestFrontend` de `^sha256:[0-9a-f]{64}$`, o `-` (vacío);
+  - `modo` de `^(despliegue|vuelta-atras)$`;
 - cualquier otra cosa termina en `2` sin ejecutar nada ni interpretar el texto en una shell;
-- invoca `sudo -n /opt/reservas/deploy/desplegar.sh <sha> <digestBackend> <digestFrontend>
-  <modo>` pasando cada valor como argumento separado (sin `eval` ni `sh -c`), con los digests
-  vacíos en `vuelta-atras`, que es el contrato que ya tiene `desplegar.sh`;
-- registra cada pedido (aceptado o rechazado) con `logger -t reservas-ssh`, sin imprimir nada
-  de `.env`.
+- traduce `-` a la cadena vacía e invoca `sudo -n /opt/reservas/deploy/desplegar.sh <sha>
+  <digestBackend> <digestFrontend> <modo>` pasando cada valor como argumento separado (sin
+  `eval` ni `sh -c`), que es el contrato de `desplegar.sh`; sin imprimir nada de `.env`.
+
+Para probarlo sin servidor, `ssh-entrada.sh` acepta `RESERVAS_DESPLEGAR` (la ruta de otro
+script, que se ejecuta sin `sudo`): solo para pruebas; en el servidor no se define.
 
 **Usuario `deploy`:** sin contraseña, **fuera del grupo `docker`** (pertenecer a él equivale a
 ser `root`) y con una única regla de `sudoers`:
@@ -311,9 +326,10 @@ escribir `desplegar.sh`, la regla de `sudoers` le daría `root` a cualquiera que
 `deploy` solo lee `ssh-entrada.sh`; el administrador entra con su propio usuario (`ubuntu` y su
 `.pem`) para mantenimiento.
 
-**Endurecimiento de `sshd`** (`/etc/ssh/sshd_config.d/99-reservas.conf`):
+**Endurecimiento de `sshd`** (`/etc/ssh/sshd_config.d/60-reservas.conf`):
 `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin no`,
-`AllowUsers ubuntu deploy` y `MaxAuthTries 3`. `fail2ban` es opcional: frena el ruido de
+`PubkeyAuthentication yes`, `X11Forwarding no`, `AllowUsers ubuntu deploy`, `MaxAuthTries 3` y
+`LoginGraceTime 20`. `fail2ban` es opcional: frena el ruido de
 escaneos, pero con solo clave no es una barrera de seguridad.
 
 **Decisión: SSH en lugar de SSM (cambio del 2026-10-19).** La primera versión de este change
@@ -387,8 +403,10 @@ Como indica la guía (4.2), el `.env` de producción lo crea el administrador en
 el workflow.
 
 **Variables del `.env`:**
-- `JWT_SECRET`: 64 bytes aleatorios.
-- `POSTGRES_PASSWORD`
+- `JWT_SECRET`: 32 caracteres o más, solo `A-Za-z0-9_-` (el runbook lo genera con
+  `openssl rand -base64 48`).
+- `POSTGRES_PASSWORD`: 24 caracteres o más, solo `A-Za-z0-9_-`, porque va dentro de la URL de
+  conexión.
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 - `SITE_ADDRESS` (no es secreto): `:80` o el subdominio, ver D2. Vive en el `.env` y no en el
@@ -398,13 +416,19 @@ el workflow.
 `umask 077` y sin que pasen por el historial del shell (`openssl rand` y un editor, no
 `echo ... >> .env`). `/opt/reservas/.env` es de `root`, modo `600`, y `.gitignore` ya lo
 excluye (`.env*`), así que `git checkout` no lo toca. El disco es un volumen EBS cifrado (D9).
+Hay una plantilla sin valores en `deploy/env.produccion.example`.
 
 **Cómo lo usa el despliegue:** `desplegar.sh` **valida y nunca modifica** el `.env`: comprueba
-que exista, que sea de `root` con modo `600`, que no sea un enlace simbólico y que estén todas
-las variables requeridas con valor. Si algo falla, termina en error **antes de tocar nada**, sin
-imprimir ningún valor. Los digests de las imágenes (que cambian en cada despliegue) los escribe
-en otro archivo, `/opt/reservas/.env.version` (mismo dueño y modo), y a Compose le pasa los dos
-con `--env-file`. Ningún secreto se imprime: el script corre sin `set -x`.
+que exista, que sea de quien corre el script (`root`) con modo `600` o `400`, y que estén
+todas las variables requeridas con valor y con el formato de arriba (`SITE_ADDRESS`, `:80` o un
+dominio en minúsculas). Lo lee línea por línea **sin ejecutarlo** (no hace `source`), así que
+un valor con `$(...)` o `;` es solo texto. Si algo falla, termina en error **antes del
+`checkout`**, sin imprimir ningún valor. Para Compose genera aparte, en cada despliegue,
+`/opt/reservas/.despliegue/compose.env` (`root`, modo `600`, reemplazo atómico) con los dos
+secretos que usa Compose, `SITE_ADDRESS` y las imágenes **por digest**, y se lo pasa con
+`--env-file`. `ADMIN_EMAIL` y `ADMIN_PASSWORD` no se escriben en ningún archivo propio: llegan
+por entorno solo al contenedor del seed. Ningún secreto se imprime: el script corre sin
+`set -x`.
 
 - **Valores no secretos:** `JWT_EXPIRES_IN=60m`, `THROTTLE_*`, `TRUST_PROXY`, `HOST` y `PORT`.
   Van fijos en `docker-compose.prod.yml`.
@@ -439,34 +463,42 @@ salida **también** en `/var/log/reservas-despliegue.log` (con `tee`, tolerando 
 estándar ya no exista) y termina el despliegue igual. El resultado queda en ese log, y el
 `flock` evita que un reintento del workflow se superponga.
 
-Cada versión se registra como una línea `<sha> <digestBackend> <digestFrontend>`.
-`/opt/reservas/VERSION_ACTUAL` guarda la que está sirviendo, y `/opt/reservas/historial` todas
-las que se desplegaron con éxito, en orden. Son archivos sin versionar, junto con `.env` y
-`.env.version`: el runbook los agrega a `.git/info/exclude` del servidor.
+Cada versión se registra como una línea `<sha> <digestBackend> <digestFrontend>`. El estado
+vive en `/opt/reservas/.despliegue/`: `VERSION_ACTUAL` guarda la que está sirviendo,
+`historial` todas las que se desplegaron con éxito, en orden, `compose.env` el env de Compose
+de D6 y `desplegar.lock` el `flock`. El directorio está en `.gitignore` (`/.despliegue/`), así
+que nunca se versiona ni lo toca `git checkout`.
 
 1. Valida el formato de los parámetros otra vez (defensa en profundidad, después de
-   `ssh-entrada.sh`) y valida el `.env` (D6): existe, es de `root` con modo `600` y tiene todas
-   las variables. Si algo falla, termina sin tocar nada.
+   `ssh-entrada.sh`; en modo `despliegue` exige además los dos digests). Si algo falla,
+   termina con `2` sin tocar nada, ni siquiera el lock. Después toma el lock y, antes del
+   `checkout` (paso 3), valida el `.env` (D6): existe, es de `root` con modo `600` y tiene
+   todas las variables con su formato.
 2. Lee `VERSION_ACTUAL` y la guarda como **`version_previa`**. Esa es la versión que está
    sirviendo y a la que se vuelve si algo falla.
-3. `git -C /opt/reservas fetch origin main`. En modo `despliegue`, si `<sha>` es ancestro
-   del SHA de `version_previa` (`git merge-base --is-ancestor`), termina en 0 sin tocar nada:
-   la versión está superada. Si no, `git checkout --detach <sha>`. El clon es del repositorio
+3. `git -C /opt/reservas fetch origin main`. En los dos modos exige que `<sha>` esté en la
+   historia de `main`. En modo `despliegue`, si `<sha>` es ancestro del SHA de
+   `version_previa` (`git merge-base --is-ancestor`), termina en 0 sin tocar nada: la versión
+   está superada. En modo `vuelta-atras` busca `<sha>` en `historial` y toma de ahí sus
+   digests. Después valida el `.env` y hace `git checkout --detach <sha>`. El clon es del repositorio
    público, sin credenciales. Así, `docker-compose.prod.yml`, el `Caddyfile` y el propio script
    salen del mismo commit que las imágenes.
-4. Escribe `.env.version` (D6) con las imágenes **por digest**. El `.env` no se modifica.
+4. Escribe `.despliegue/compose.env` (D6) con las imágenes **por digest**. El `.env` no se
+   modifica.
 5. `docker compose pull`.
 6. Levanta `postgres` y espera su healthcheck.
-7. **Migraciones:** `docker compose run --rm backend npx prisma migrate deploy`. Si falla, corta:
-   los contenedores viejos siguen arriba.
-8. **Datos iniciales:** `docker compose run --rm backend node dist-seed/seed-produccion.js`
-   (D8). Si falla, corta.
+7. **Migraciones:** `docker compose run --rm -T backend prisma migrate deploy`. Si falla,
+   corta (y restaura el `checkout` y el `compose.env` de la versión previa): los contenedores
+   viejos siguen arriba.
+8. **Datos iniciales:** `docker compose run --rm -T backend node dist-seed/seed-produccion.js`
+   (D8), con `ADMIN_EMAIL` y `ADMIN_PASSWORD` pasados por entorno. Si falla, corta del mismo
+   modo.
 9. `docker compose up -d --remove-orphans`.
 10. **Comprobación:** hasta 90 s de reintentos contra el proxy de borde: la página principal
     (espera `200`) y `/api/zonas` (espera `200` y un JSON).
 11. Si la comprobación pasa, escribe la versión nueva en `VERSION_ACTUAL`, la agrega a
     `historial` y hace la limpieza de imágenes (abajo). Termina en 0.
-12. Si falla, vuelve a **`version_previa`**: hace su `checkout`, reescribe `.env.version` con
+12. Si falla, vuelve a **`version_previa`**: hace su `checkout`, reescribe `compose.env` con
     sus digests y repite los pasos 9 y 10. `VERSION_ACTUAL` no cambia. Termina en 1 con el mensaje
     `VUELTA ATRÁS a <sha-previo>`, que el workflow muestra.
 
@@ -553,13 +585,15 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
     sea de `root`;
   - crear el usuario `deploy` (sin contraseña), la regla de `sudoers` y el endurecimiento de
     `sshd` de D4;
-  - generar el par de claves del despliegue, autorizar la pública con `command=` y
-    `restrict`, copiar la privada a GitHub y **borrarla del servidor**;
-  - crear `/opt/reservas/.env` (D6) y agregar los archivos de estado a `.git/info/exclude`.
+  - generar el par de claves del despliegue **en la computadora del operador** (D4), autorizar
+    la pública en el servidor con `command=` y `restrict`, copiar la privada a GitHub y
+    borrarla de la computadora;
+  - crear `/opt/reservas/.env` (D6); el estado de `.despliegue/` ya está en `.gitignore`.
 - **Environment `produccion` de GitHub** (solo `main`), con los secrets `SERVER_HOST`,
-  `SERVER_USER` (`deploy`), `SERVER_PORT` (`22`), `SSH_PRIVATE_KEY` y `SSH_KNOWN_HOSTS`. La
-  huella se toma **del propio servidor** (`/etc/ssh/ssh_host_ed25519_key.pub`) y se compara con
-  la que muestra la consola de EC2 antes de cargarla.
+  `SERVER_USER` (`deploy`), `SERVER_PORT` (`22`), `SSH_PRIVATE_KEY` y `SSH_KNOWN_HOSTS`. Este
+  último sale de `ssh-keyscan`, y antes de cargarlo se **compara su huella** con la que informa
+  el propio servidor (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, por la sesión de
+  administración), para no registrar la clave de un intermediario.
 - **Rotación de la clave de despliegue:** generar un par nuevo, reemplazar la línea de
   `authorized_keys` y el secret, y confirmar que la clave anterior ya no entra.
 - **Sin IAM:** no hay proveedor OIDC, rol de GitHub, perfil de instancia, parámetros ni
@@ -625,7 +659,8 @@ posterior en rojo o corriendo, y despacho manual inválido.
 - **[Riesgo aceptado] SSH abierto a internet** (puerto 22 en `0.0.0.0/0`, D4): habrá escaneos
   y fuerza bruta, y un fallo de `sshd` o de configuración quedaría expuesto.
   → **Mitigación:** solo clave, sin contraseñas ni `root`, `AllowUsers`, `MaxAuthTries 3`,
-  `sshd` al día con `unattended-upgrades`, `fail2ban` opcional, y la clave de despliegue con
+  `sshd` al día con las actualizaciones de seguridad de Ubuntu (`unattended-upgrades`),
+  `fail2ban` opcional, y la clave de despliegue con
   comando forzado y `restrict`. Lo que **no** cubre: una vulnerabilidad de `sshd` aún sin
   parche.
 - **[Riesgo] La clave de despliegue es permanente** y vive en los secrets de GitHub.
