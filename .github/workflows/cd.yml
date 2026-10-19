@@ -8,9 +8,11 @@ name: CD
 #   `modo=vuelta-atras` a un SHA ya desplegado con éxito (sin reconstruir nada).
 #
 # Seguridad:
-# - Sin claves de AWS: credenciales temporales por OIDC, solo en el job `desplegar`, que corre
-#   en el environment `produccion` (restringido a main). El rol solo puede ejecutar el
-#   documento SSM `reservas-desplegar` sobre la instancia; no lee secretos.
+# - El despliegue entra por SSH con una clave dedicada, guardada como secret del environment
+#   `produccion` (restringido a main) y usada solo en el job `desplegar`. En el servidor esa
+#   clave tiene un comando forzado (deploy/ssh-entrada.sh): solo puede pedir un despliegue o
+#   una vuelta atrás con un SHA y dos digests validados, nada más. Sin claves de AWS.
+# - La identidad del servidor se verifica con SSH_KNOWN_HOSTS (StrictHostKeyChecking=yes).
 # - Permisos mínimos por job y acciones de terceros fijadas por SHA de commit.
 # - Los inputs del usuario llegan a los pasos por variables de entorno, nunca interpolados en
 #   el código de un `run`.
@@ -183,7 +185,7 @@ jobs:
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
   desplegar:
-    name: Desplegar en la instancia (SSM)
+    name: Desplegar en la instancia (SSH)
     needs: [decidir, imagenes]
     # `imagenes` se saltea en una vuelta atrás; en un despliegue tiene que haber terminado bien.
     if: >-
@@ -194,7 +196,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: produccion
     permissions:
-      id-token: write
       contents: read
     env:
       SHA: ${{ needs.decidir.outputs.sha }}
@@ -202,66 +203,62 @@ jobs:
       # Vacíos en una vuelta atrás: desplegar.sh usa los del historial.
       DIGEST_BACKEND: ${{ needs.imagenes.outputs.digest-backend }}
       DIGEST_FRONTEND: ${{ needs.imagenes.outputs.digest-frontend }}
-      INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
     steps:
-      - name: Verificar la configuración del environment
-        env:
-          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
-          AWS_REGION: ${{ vars.AWS_REGION }}
+      - name: Verificar los secrets del environment
         run: |
           faltan=()
-          [ -n "$AWS_ROLE_ARN" ] || faltan+=(AWS_ROLE_ARN)
-          [ -n "$AWS_REGION" ] || faltan+=(AWS_REGION)
-          [ -n "$INSTANCE_ID" ] || faltan+=(INSTANCE_ID)
+          [ -n "$SERVER_HOST" ] || faltan+=(SERVER_HOST)
+          [ -n "$SERVER_USER" ] || faltan+=(SERVER_USER)
+          [ -n "$SERVER_PORT" ] || faltan+=(SERVER_PORT)
+          [ -n "$SSH_PRIVATE_KEY" ] || faltan+=(SSH_PRIVATE_KEY)
+          [ -n "$SSH_KNOWN_HOSTS" ] || faltan+=(SSH_KNOWN_HOSTS)
           if [ "${#faltan[@]}" -gt 0 ]; then
-            echo "::error title=Infraestructura sin configurar::Faltan las variables ${faltan[*]} del environment produccion. Ver docs/despliegue.md."
+            echo "::error title=Servidor sin configurar::Faltan los secrets ${faltan[*]} del environment produccion. Ver docs/despliegue.md."
             exit 1
           fi
+          # Formatos: evitan que un valor mal copiado llegue a ssh como una opción.
+          [[ "$SERVER_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$ ]] || { echo "::error title=SERVER_HOST inválido::Tiene que ser una IP o un nombre de dominio, sin espacios ni caracteres especiales."; exit 1; }
+          [[ "$SERVER_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "::error title=SERVER_USER inválido::Tiene que ser un nombre de usuario de Linux (por ejemplo deploy)."; exit 1; }
+          [[ "$SERVER_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "::error title=SERVER_PORT inválido::Tiene que ser un número de puerto (por ejemplo 22)."; exit 1; }
 
-      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-          role-session-name: cd-${{ github.run_id }}
-
-      - name: Ejecutar reservas-desplegar en la instancia
+      - name: Ejecutar el despliegue en el servidor
         run: |
-          parametros="$(printf '{"sha":["%s"],"digestBackend":["%s"],"digestFrontend":["%s"],"modo":["%s"]}' \
-            "$SHA" "$DIGEST_BACKEND" "$DIGEST_FRONTEND" "$MODO")"
-          comando="$(aws ssm send-command \
-            --document-name reservas-desplegar \
-            --instance-ids "$INSTANCE_ID" \
-            --parameters "$parametros" \
-            --comment "CD ${MODO} ${SHA:0:12} (run ${GITHUB_RUN_ID})" \
-            --query Command.CommandId --output text)"
-          echo "Comando SSM: $comando"
+          umask 077
+          directorio="$(mktemp -d "$RUNNER_TEMP/ssh.XXXXXX")"
+          trap 'rm -rf "$directorio"' EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$directorio/clave"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$directorio/known_hosts"
 
-          # Espera propia: el waiter de la CLI corta a los 100 s, y un despliegue tarda más.
-          estado=Pending
-          for _ in $(seq 1 180); do
-            sleep 10
-            estado="$(aws ssm get-command-invocation --command-id "$comando" --instance-id "$INSTANCE_ID" \
-              --query Status --output text 2> /dev/null || echo Pending)"
+          # Un único argumento: <sha> <digestBackend> <digestFrontend> <modo>. Un digest vacío
+          # (vuelta atrás) viaja como `-`; deploy/ssh-entrada.sh lo traduce a vacío.
+          pedido="$SHA ${DIGEST_BACKEND:--} ${DIGEST_FRONTEND:--} $MODO"
+
+          # El código de salida de ssh es el de desplegar.sh (0 desplegado, 1 falló, 2 pedido
+          # rechazado) o 255 si no se pudo conectar. StrictHostKeyChecking=yes con el
+          # known_hosts del secret: si cambia la clave del servidor, falla en vez de confiar.
+          set +e
+          timeout 30m ssh \
+            -i "$directorio/clave" -p "$SERVER_PORT" \
+            -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$directorio/known_hosts" \
+            -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+            "$SERVER_USER@$SERVER_HOST" "$pedido"
+          estado=$?
+          set -e
+
+          if [ "$estado" -ne 0 ]; then
             case "$estado" in
-              Pending | InProgress | Delayed) continue ;;
-              *) break ;;
+              255) detalle="No se pudo conectar o la clave del servidor no coincide con SSH_KNOWN_HOSTS." ;;
+              124) detalle="Pasaron 30 minutos sin que termine el despliegue." ;;
+              2) detalle="El servidor rechazó el pedido (formato inválido)." ;;
+              *) detalle="desplegar.sh terminó con código $estado. Si dice VUELTA ATRÁS, producción sigue en la versión anterior." ;;
             esac
-          done
-
-          echo "::group::Salida de desplegar.sh"
-          aws ssm get-command-invocation --command-id "$comando" --instance-id "$INSTANCE_ID" \
-            --query StandardOutputContent --output text
-          echo "::endgroup::"
-          errores="$(aws ssm get-command-invocation --command-id "$comando" --instance-id "$INSTANCE_ID" \
-            --query StandardErrorContent --output text)"
-          if [ -n "$errores" ] && [ "$errores" != "None" ]; then
-            echo "::group::Errores de desplegar.sh"
-            echo "$errores"
-            echo "::endgroup::"
-          fi
-
-          if [ "$estado" != "Success" ]; then
-            echo "::error title=Despliegue fallido::Estado del comando SSM: $estado. Si dice VUELTA ATRÁS, producción sigue en la versión anterior."
+            echo "::error title=Despliegue fallido::$detalle"
             exit 1
           fi
           {
