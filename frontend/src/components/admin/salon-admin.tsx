@@ -48,7 +48,7 @@ export function SalonAdmin() {
         </>
       ) : null}
       {/* Mesas y turnos lado a lado en escritorio: son dos listas cortas e independientes. */}
-      <div className="grid items-start gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         {zonas ? <MesasPanel zonas={zonas} /> : null}
         <TurnosPanel />
       </div>
