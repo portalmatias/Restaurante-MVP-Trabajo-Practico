@@ -17,12 +17,18 @@ export function BotonCompacto({
   return (
     <button
       type={type}
-      // En escritorio (puntero fino) las acciones de fila bajan a 36 px para ver más filas;
-      // en pantallas táctiles se conserva el objetivo de 44 px.
+      // Las acciones de fila bajan a 36 px solo si no hay ningún puntero grueso disponible
+      // (`sin-puntero-grueso`, definida en globals.css): un equipo híbrido con pantalla táctil
+      // conserva el objetivo de 44 px aunque su puntero principal sea un mouse.
       className={buttonVariants({
         variant,
         size,
-        className: ["pointer-fine:min-h-9 pointer-fine:px-3", className].filter(Boolean).join(" "),
+        className: [
+          "sin-puntero-grueso:min-h-9 sin-puntero-grueso:px-3",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" "),
         fullWidth: false,
       })}
       {...props}

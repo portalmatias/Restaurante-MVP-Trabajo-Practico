@@ -1,6 +1,19 @@
 @import "tailwindcss";
 
 /*
+ * `pointer-fine` (variante de Tailwind) solo mira el puntero principal: un equipo híbrido
+ * (pantalla táctil con mouse) lo cumple igual que una PC de escritorio sin tacto. Esta variante
+ * exige además que no haya ningún puntero grueso disponible, para que la excepción de 36px de
+ * `BotonCompacto` (design.md D10 de `rediseno-frontend-ichigo`) no baje el objetivo táctil en un
+ * híbrido que se usa con el dedo.
+ */
+@custom-variant sin-puntero-grueso {
+  @media (any-pointer: fine) and (not (any-pointer: coarse)) {
+    @slot;
+  }
+}
+
+/*
  * Tokens semánticos del sistema de diseño de Ichigo (dirección «Kakefuda»: tablillas de madera
  * colgadas, ver .impeccable/surfaces/app-page-tsx.md). Fuente única de color: ningún componente
  * escribe un hexadecimal propio, todos usan estas variables a través de las utilidades de
