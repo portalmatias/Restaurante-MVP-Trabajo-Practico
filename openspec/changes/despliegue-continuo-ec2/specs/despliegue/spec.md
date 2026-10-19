@@ -28,7 +28,8 @@ vieja, salvo una vuelta atrás pedida explícitamente.
 
 #### Scenario: Pull request o rama que no es main
 - **WHEN** el CI corre sobre un pull request (incluido uno desde un fork) o sobre otra rama
-- **THEN** no se inicia ningún despliegue y el workflow no recibe credenciales de AWS
+- **THEN** no se inicia ningún despliegue y el workflow no recibe la clave SSH ni se conecta al
+  servidor
 
 #### Scenario: Dos merges seguidos
 - **WHEN** se mergean dos commits a `main` mientras el primero todavía se está desplegando
@@ -114,10 +115,12 @@ SHALL detenerse sin levantar la versión nueva.
 
 ### Requirement: Superficie de red mínima
 Desde internet, el servidor de producción SHALL aceptar conexiones únicamente en los puertos
-HTTP y HTTPS del proxy de borde. Mientras producción esté en la etapa HTTP, SHALL aceptarlas
-solo desde las direcciones del equipo. La base de datos, el backend y el frontend SHALL NOT aceptar
-conexiones directas desde fuera del servidor, y el servidor SHALL NOT exponer acceso remoto
-por SSH.
+HTTP y HTTPS del proxy de borde y en el puerto SSH que usa el despliegue. Mientras producción
+esté en la etapa HTTP, SHALL aceptar las conexiones HTTP y HTTPS solo desde las direcciones del
+equipo (el puerto SSH queda abierto en las dos etapas, porque los servidores de GitHub Actions
+no tienen una dirección fija). La base de datos, el backend y el frontend SHALL NOT aceptar
+conexiones directas desde fuera del servidor. El acceso por SSH SHALL aceptar solo
+autenticación por clave y SHALL rechazar el ingreso del usuario `root`.
 
 #### Scenario: Conexión directa a la base de datos
 - **WHEN** desde internet se intenta conectar al puerto de PostgreSQL de la IP pública
@@ -128,8 +131,13 @@ por SSH.
   frontend en la IP pública
 - **THEN** la conexión no se establece
 
-#### Scenario: Intento de SSH
-- **WHEN** desde internet se intenta abrir una sesión SSH contra la IP pública
+#### Scenario: SSH con contraseña
+- **WHEN** desde internet se intenta abrir una sesión SSH con una contraseña, o como `root`
+- **THEN** el servidor rechaza la autenticación
+
+#### Scenario: Puertos distintos de los previstos
+- **WHEN** desde internet se intenta conectar a cualquier puerto de la IP pública que no sea el
+  de HTTP, el de HTTPS ni el de SSH
 - **THEN** la conexión no se establece
 
 #### Scenario: Acceso de un tercero en la etapa HTTP
@@ -143,10 +151,12 @@ por SSH.
 
 ### Requirement: Secretos fuera del repositorio, las imágenes y los logs
 Los secretos de producción (secreto del JWT, contraseña de la base de datos y credenciales del
-admin) SHALL guardarse cifrados fuera del repositorio. Solo el servidor de producción SHALL
-leerlos, y solo al desplegar. SHALL NOT aparecer en el repositorio, en las imágenes de
+admin) SHALL guardarse solo en un archivo del servidor de producción, sobre un disco cifrado, y
+SHALL NOT pasar por GitHub. SHALL NOT aparecer en el repositorio, en las imágenes de
 contenedor, en los argumentos del workflow ni en sus logs. En el servidor, el archivo que los
-contiene SHALL ser legible solo por el administrador del sistema.
+contiene SHALL ser legible solo por el administrador del sistema, y el despliegue SHALL
+negarse a continuar si no lo es o si falta alguno de los valores requeridos. El procedimiento
+de despliegue SHALL NOT modificar ese archivo.
 
 #### Scenario: Inspeccionar una imagen publicada
 - **WHEN** alguien descarga una imagen publicada y revisa su sistema de archivos, sus capas y
@@ -155,33 +165,52 @@ contiene SHALL ser legible solo por el administrador del sistema.
 
 #### Scenario: Revisar los logs del workflow de CD
 - **WHEN** alguien con acceso de lectura al repositorio revisa los logs de un despliegue
-- **THEN** no encuentra ningún secreto de producción
+- **THEN** no encuentra ningún secreto de producción ni la clave SSH del despliegue
 
-### Requirement: Credenciales de la instancia fuera del alcance de los contenedores
-Los contenedores de la aplicación SHALL NOT poder obtener las credenciales del rol de la
-instancia, que leen los secretos de producción.
+#### Scenario: Archivo de secretos con permisos abiertos o incompleto
+- **WHEN** se pide un despliegue y el archivo de secretos es legible por otros usuarios, o falta
+  alguno de los valores requeridos
+- **THEN** el despliegue termina en error sin modificar nada en el servidor
+- **AND** el mensaje de error no incluye ningún valor del archivo
+
+### Requirement: Sin credenciales de AWS al alcance de los contenedores
+La instancia de producción SHALL NOT tener un rol de AWS asociado, y los contenedores de la
+aplicación SHALL NOT poder obtener credenciales de AWS por el servicio de metadatos de la
+instancia.
 
 #### Scenario: Contenedor que consulta los metadatos de la instancia
 - **WHEN** desde cualquier contenedor se pide un token o credenciales al servicio de metadatos
   de la instancia
-- **THEN** la solicitud no obtiene respuesta
+- **THEN** la solicitud no obtiene respuesta ni credenciales
 
-### Requirement: Credenciales de despliegue temporales y acotadas
-El workflow de CD SHALL autenticarse en AWS con credenciales temporales emitidas para cada
-ejecución, sin claves de acceso permanentes guardadas en GitHub. Esas credenciales SHALL
-servir solo para ejecutar el procedimiento de despliegue sobre la instancia de producción, y
-solo para ejecuciones del workflow de despliegue sobre `main`.
+### Requirement: Credencial de despliegue acotada
+El workflow de CD SHALL conectarse al servidor por SSH con una clave dedicada a ese único uso,
+guardada como secreto de GitHub accesible solo para el workflow de despliegue sobre `main`.
+GitHub SHALL NOT guardar credenciales de AWS. El servidor SHALL aceptar esa clave solo para
+ejecutar el procedimiento de despliegue con un SHA de commit y, en un despliegue, dos digests de
+imagen bien formados; SHALL rechazar cualquier otro pedido, sin abrir una shell, sin ejecutar
+comandos arbitrarios y sin reenvío de puertos. El workflow SHALL verificar la identidad del
+servidor con una huella fijada antes de presentarle la clave.
 
 #### Scenario: Ejecución desde otra rama o desde un fork
-- **WHEN** un workflow que no corre sobre `main` en el entorno de producción intenta obtener
-  credenciales de AWS
-- **THEN** AWS rechaza la solicitud
+- **WHEN** un workflow que no corre sobre `main` en el entorno de producción intenta usar la
+  clave de despliegue
+- **THEN** GitHub no le entrega el secreto
 
-#### Scenario: Uso de las credenciales para otra acción
-- **WHEN** con las credenciales del despliegue se intenta una acción distinta del
-  procedimiento de despliegue (por ejemplo, ejecutar un comando arbitrario en la instancia o
-  leer los secretos)
-- **THEN** AWS la rechaza por falta de permisos
+#### Scenario: Uso de la clave para otra acción
+- **WHEN** con la clave del despliegue se intenta abrir una shell, ejecutar un comando
+  distinto del procedimiento de despliegue, reenviar un puerto o pasar un SHA o un digest mal
+  formado
+- **THEN** el servidor rechaza el pedido sin ejecutar nada
+
+#### Scenario: Servidor distinto del esperado
+- **WHEN** el workflow se conecta a un servidor cuya huella no coincide con la fijada
+- **THEN** la conexión se aborta sin presentar la clave y el workflow termina en error
+
+#### Scenario: Conexión cortada durante un despliegue
+- **WHEN** se corta la conexión entre el workflow y el servidor mientras se despliega
+- **THEN** el servidor termina el despliegue en curso (o su vuelta atrás) igual
+- **AND** el resultado queda registrado en el servidor
 
 ### Requirement: Datos iniciales y admin propios de producción
 Producción SHALL arrancar con el catálogo necesario para operar (zonas, mesas, turnos y

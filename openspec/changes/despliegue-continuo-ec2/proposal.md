@@ -10,7 +10,7 @@ Desplegar cambia el modelo de amenazas del proyecto. Hasta ahora, por decisión 
 `exposicion-red-local`, todo escuchaba en loopback y los límites de solicitudes se contaban por
 máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar desde el diseño:
 
-- credenciales que dan acceso a la cuenta de AWS o a la instancia;
+- credenciales que dan acceso a la instancia (la clave SSH del despliegue);
 - secretos de producción (JWT, base de datos, admin) que podrían terminar en el repositorio
   público o en las imágenes;
 - el admin del seed, cuya contraseña figura en el README;
@@ -19,9 +19,18 @@ máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar d
 
 ## What Changes
 
+> **Cambio de transporte (2026-10-19):** la primera versión de este change desplegaba por AWS
+> SSM con credenciales temporales de OIDC y **sin SSH**. La guía orientadora de la docente
+> («Despliegue Continuo (CD) en Monorepo con Docker Compose y Caddy») pide desplegar por **SSH**
+> desde GitHub Actions, con los secrets `SERVER_HOST`, `SERVER_USER`, `SERVER_PORT` y
+> `SSH_PRIVATE_KEY`, y el `.env` copiado a mano al servidor. El equipo decidió seguir la guía.
+> El resto del diseño (imágenes por digest, Caddy, vuelta atrás) se mantiene. La clave SSH se
+> restringe a un único comando forzado para conservar la propiedad central del diseño
+> anterior: quien tenga la credencial no puede ejecutar comandos arbitrarios (D4).
+
 - **Despliegue monolítico en una EC2:** PostgreSQL, backend, frontend y un proxy de borde
   corren en la misma instancia, orquestados con Docker Compose. Solo el proxy publica puertos
-  (`80` y `443`, siempre). El `443` empieza a servir HTTPS cuando el subdominio apunta a la
+  (`80` y `443`, siempre) y, para el despliegue, SSH en el `22` con restricciones (ver abajo). El `443` empieza a servir HTTPS cuando el subdominio apunta a la
   instancia. Base, backend y frontend quedan en una red interna de Docker, sin puertos
   publicados.
 - **Imágenes de contenedor versionadas:** GitHub Actions construye las imágenes de backend y
@@ -29,13 +38,17 @@ máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar d
   Container Registry. Se despliegan por digest, así que una versión no cambia aunque alguien
   vuelva a publicar su tag. Las imágenes no contienen secretos.
 - **Workflow de CD** (`.github/workflows/cd.yml`): corre solo cuando el CI terminó en verde
-  sobre un push a `main`. Se autentica en AWS por OIDC, sin claves permanentes, con un rol que
-  solo puede ejecutar el procedimiento de despliegue en esa instancia, vía SSM. No hay SSH.
+  sobre un push a `main`. Entra a la instancia **por SSH** con una clave dedicada, guardada
+  como secret del environment `produccion` (que admite solo `main`), junto con la huella del
+  servidor para no conectarse a un impostor. En la instancia, esa clave tiene un **comando
+  forzado**: solo puede invocar el procedimiento de despliegue con un SHA y dos digests
+  validados, no abre una shell ni ejecuta nada más. No hay credenciales de AWS en GitHub.
 - **Despliegue verificado con vuelta atrás:** la instancia descarga las imágenes del commit,
   aplica las migraciones, levanta la versión nueva y comprueba que responda. Si la
   comprobación falla, vuelve sola a la versión anterior.
-- **Secretos en AWS SSM Parameter Store:** la instancia los lee con su propio rol al
-  desplegar; nunca pasan por el repositorio, las imágenes ni los logs del workflow.
+- **Secretos en un `.env` del servidor:** se copia a mano a `/opt/reservas/.env` (dueño `root`,
+  modo `600`), como indica la guía. El script de despliegue lo valida y nunca lo modifica;
+  los secretos no pasan por el repositorio, las imágenes ni los logs del workflow.
 - **Seed de producción aparte:** carga zonas, mesas, turnos y configuración, pero no reservas
   de ejemplo. El admin se crea con email y contraseña de producción tomados de los secretos,
   **nunca** con las credenciales públicas del README.
@@ -43,8 +56,18 @@ máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar d
   el backend confía solo en el salto del frontend, usando el `TRUST_PROXY` que ya dejó
   preparado `exposicion-red-local`.
 - **CI:** se suman los tests del frontend, porque ahora un merge a `main` llega a producción.
-- **Runbook** para crear la infraestructura de AWS a mano, documentado en el repositorio con
-  los permisos exactos.
+- **Runbook** para crear la infraestructura de AWS y preparar el servidor a mano (instancia,
+  security group, IP elástica, usuario `deploy`, clave SSH y secrets de GitHub), documentado en
+  el repositorio.
+
+### Riesgo aceptado: SSH abierto a internet
+
+Los runners de GitHub no tienen una IP fija, así que el puerto `22` queda abierto a
+`0.0.0.0/0` en las dos etapas. Es el costo de seguir la guía de la docente, y el equipo lo
+acepta. Se mitiga con autenticación solo por clave (sin contraseñas), sin login de `root`, un
+usuario sin shell útil y sin permisos de Docker, un comando forzado con validación estricta de
+cada valor, `restrict` en la clave, huella del servidor fijada en el workflow y, opcionalmente,
+`fail2ban`. Los detalles y lo que sigue abierto están en D4 y en Risks de `design.md`.
 
 ### HTTPS con un subdominio de la docente (HTTP solo como etapa transitoria)
 
@@ -127,17 +150,17 @@ a contarse por la IP real.
 
 - **Contenedores:** `backend/Dockerfile` y `frontend/Dockerfile` nuevos, junto con
   `.dockerignore`. `frontend/next.config.ts` suma `output: "standalone"`.
-- **Despliegue:** `deploy/docker-compose.prod.yml`, `deploy/Caddyfile` y
-  `deploy/desplegar.sh` (script que corre en la instancia), además de un documento de SSM
-  versionado en `deploy/`.
+- **Despliegue:** `deploy/docker-compose.prod.yml`, `deploy/Caddyfile`, `deploy/desplegar.sh`
+  (script que corre en la instancia como `root`) y `deploy/ssh-entrada.sh` (el comando
+  forzado de la clave SSH, que valida el pedido antes de invocar a `desplegar.sh`).
 - **Backend:** seed de producción (`backend/prisma/seed-produccion.ts`) y extracción del
   catálogo compartido con el seed de desarrollo. La API, `openapi.yaml` y el schema de Prisma
   no cambian.
 - **CI/CD:** `.github/workflows/cd.yml` y `certificado.yml` nuevos, y `scripts/cd/` con la decisión de despliegue y sus tests. `ci.yml` suma los tests del frontend.
 - **Variables de entorno:** `.env.example` documenta `ADMIN_EMAIL` y `ADMIN_PASSWORD`, que
-  solo usa el seed de producción.
-- **Documentación:** `docs/despliegue.md` (runbook de AWS, rollback, activación de HTTPS con
-  el subdominio y riesgo de la etapa en HTTP), README y `config.yaml` (§2, §4, §10, §12).
+  solo usa el seed de producción, y el `.env` de producción del servidor (D6).
+- **Documentación:** `docs/despliegue.md` (runbook de AWS y del servidor, SSH y sus
+  restricciones, rollback, activación de HTTPS con el subdominio y riesgo de la etapa en HTTP), README y `config.yaml` (§2, §4, §10, §12).
 - **Dependencias npm:** ninguna nueva. **Imagen nueva:** Caddy como proxy de borde
   (justificado en `design.md`).
 - **Costos:** dentro del Tier gratuito. En una cuenta del plan Free, la instancia, el disco,
