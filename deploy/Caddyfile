@@ -1,6 +1,6 @@
 # Proxy de borde de producción (D2 de openspec/changes/despliegue-continuo-ec2).
 #
-# SITE_ADDRESS define la etapa (sale de /reservas/prod/config/SITE_ADDRESS en SSM):
+# SITE_ADDRESS define la etapa (sale de SITE_ADDRESS en /opt/reservas/.env del servidor):
 # - `:80`: etapa transitoria en HTTP, en la IP pública, mientras el subdominio no apunte a la
 #   instancia. Sin certificado ni HSTS.
 # - `<subdominio>`: etapa HTTPS. Caddy obtiene y renueva solo el certificado de Let's Encrypt

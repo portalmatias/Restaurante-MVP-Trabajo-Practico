@@ -1,11 +1,11 @@
 # Composición de producción (D1, D2, D5 y D6 de openspec/changes/despliegue-continuo-ec2).
 #
-# La levanta deploy/desplegar.sh en la instancia, siempre con el .env que genera ese script:
+# La levanta deploy/desplegar.sh en el servidor, siempre con el env de Compose que genera:
 #
-#   docker compose -f deploy/docker-compose.prod.yml --env-file /opt/reservas/.env up -d
+#   docker compose -f deploy/docker-compose.prod.yml --env-file /opt/reservas/.despliegue/compose.env up -d
 #
-# Ese .env tiene los secretos (POSTGRES_PASSWORD, JWT_SECRET), la configuración no secreta de
-# SSM (SITE_ADDRESS) y las imágenes propias por digest. Nada de eso vive en el
+# Ese archivo tiene los secretos (POSTGRES_PASSWORD, JWT_SECRET, que salen del .env del
+# servidor), SITE_ADDRESS y las imágenes propias por digest. Nada de eso vive en el
 # repositorio. Ver docs/despliegue.md.
 #
 #   internet ──:80/:443──> caddy ──borde──> frontend (172.30.0.10) ──interna──> backend ──> postgres

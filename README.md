@@ -138,8 +138,9 @@ salto que le habla) y solo Caddy publica puertos. Ver [Despliegue](#despliegue).
 
 Producción corre en **una instancia EC2** del Tier gratuito de AWS, con Docker Compose y un
 único servicio público (Caddy, en los puertos 80 y 443). Cada commit con CI en verde sobre
-`main` se despliega solo (`.github/workflows/cd.yml`), con credenciales temporales por OIDC y
-sin SSH. Si la versión nueva no responde, el script vuelve solo a la anterior.
+`main` se despliega solo (`.github/workflows/cd.yml`), por SSH con una clave dedicada que, en el
+servidor, solo puede pedir un despliegue (comando forzado). Si la versión nueva no responde, el
+script vuelve solo a la anterior.
 
 Cómo se crea la infraestructura, en qué etapa está producción (HTTP o HTTPS), qué datos quedan
 expuestos en la etapa HTTP, cómo volver atrás, rotar la contraseña del admin y apagar todo:

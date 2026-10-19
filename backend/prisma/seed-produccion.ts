@@ -5,7 +5,7 @@
  * - Carga el catálogo necesario para operar (configuración global, zonas, mesas y turnos),
  *   idempotente, igual que el seed de desarrollo.
  * - Crea el admin con `ADMIN_EMAIL` y `ADMIN_PASSWORD`, que en producción salen de los
- *   secretos de SSM Parameter Store (D6). Nunca con las credenciales del README.
+ *   variables del `.env` del servidor (D6). Nunca con las credenciales del README.
  * - No crea reservas de ejemplo.
  *
  * Si el admin ya existe, no toca su contraseña: un despliegue nunca cambia credenciales sin
