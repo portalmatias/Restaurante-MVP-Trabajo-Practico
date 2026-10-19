@@ -39,6 +39,17 @@
 
 set -euo pipefail
 
+# Conexión cortada (D7): si se cae el SSH del runner, sshd manda SIGHUP y cierra la tubería de
+# salida. Un despliegue interrumpido entre la migración y el `up` sería peor que uno fallido,
+# así que se ignoran SIGHUP y SIGPIPE (las señales ignoradas las heredan los procesos hijos) y
+# la salida se copia también a un log propio. `tee --output-error=warn` sigue escribiendo el log
+# aunque la salida estándar ya no exista. Si el log no se puede abrir, se sigue sin él.
+trap '' HUP PIPE
+LOG_DESPLIEGUE="${RESERVAS_LOG:-/var/log/reservas-despliegue.log}"
+if ( umask 077; : >> "$LOG_DESPLIEGUE" ) 2> /dev/null; then
+  exec > >(tee --output-error=warn -a "$LOG_DESPLIEGUE") 2>&1
+fi
+
 main() {
   # Rutas. RESERVAS_RAIZ y RESERVAS_REGISTRO existen solo para la prueba local de la tarea 5.2
   # (docs/despliegue.md); en la instancia no se definen.
