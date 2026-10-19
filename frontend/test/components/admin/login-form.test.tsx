@@ -158,9 +158,9 @@ describe("LoginForm", () => {
 });
 
 describe("LoginForm - motivo de llegada", () => {
-  it("explica que la sesión venció", () => {
+  it("explica que la sesión terminó o ya no es válida", () => {
     render(<LoginForm motivo="sesion-vencida" />);
-    expect(screen.getByRole("status")).toHaveTextContent(/Tu sesión venció/);
+    expect(screen.getByRole("status")).toHaveTextContent(/Tu sesión terminó o ya no es válida/);
   });
 
   it("no muestra ningún aviso sin motivo o con uno desconocido", () => {
