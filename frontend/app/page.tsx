@@ -20,7 +20,7 @@ const TIEMPOS = [
 ] as const;
 
 const PASOS = [
-  "Elegí fecha, turno y cantidad de comensales.",
+  "Elegí fecha, turno, zona y cantidad de comensales.",
   "Dejá tu nombre, tu email y tu teléfono. No necesitás cuenta.",
   "Guardá el código que recibís: con él y tu email consultás o cancelás.",
 ] as const;
