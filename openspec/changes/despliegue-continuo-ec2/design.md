@@ -36,9 +36,11 @@ La motivación está en `proposal.md`. El enfoque depende de estos hechos del re
 
 **Goals:**
 - Que nada que viva en GitHub (código, imágenes, logs o configuración del workflow) alcance
-  para acceder a la cuenta de AWS, a la instancia o a los datos.
-- Que el rol del despliegue pueda hacer **una sola cosa**: correr el procedimiento versionado
-  de despliegue con un SHA.
+  para acceder a la cuenta de AWS ni a los datos, y que **no haya ninguna credencial de AWS en
+  GitHub**.
+- Que la clave SSH del despliegue pueda hacer **una sola cosa**: correr el procedimiento
+  versionado de despliegue con un SHA y dos digests validados. Nada de shell, de reenvío de
+  puertos ni de comandos arbitrarios.
 - Que activar HTTPS con el subdominio de la docente no requiera tocar código de la aplicación.
 
 **Non-Goals:**
@@ -61,7 +63,8 @@ internet ──:80/:443──> [caddy] ──> [frontend :3000] ──/api──
 - `deploy/docker-compose.prod.yml` define cuatro servicios. **Solo `caddy` publica puertos**
   (`80:80` y `443:443`, en las dos etapas). Los demás no tienen `ports:`: no se publican en la
   interfaz de la instancia, así que no se pueden alcanzar desde internet. El propio host sí
-  llega a ellos por la red de Docker, lo que se acepta: en el host solo entra SSM.
+  llega a ellos por la red de Docker, lo que se acepta: al host solo se entra por SSH, con las
+  restricciones de D4.
 - Caddy guarda certificados y claves en un volumen con nombre (`caddy_data`), que se conserva
   entre despliegues y reinicios. Sin él, cada despliegue pediría un certificado nuevo y
   chocaría con los límites de emisión de Let's Encrypt.
@@ -107,8 +110,8 @@ al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale
   con el desafío HTTP-01 por el puerto 80, lo renueva solo, redirige HTTP a HTTPS y sirve por
   443.
 
-`SITE_ADDRESS` no es secreto: va como parámetro no secreto en SSM (`/reservas/prod/config/`),
-para que activar HTTPS sea cambiar ese valor y redesplegar, sin tocar el repositorio.
+`SITE_ADDRESS` no es secreto: va en el `.env` del servidor (D6), para que activar HTTPS sea
+cambiar ese valor y redesplegar, sin tocar el repositorio.
 
 **Control del certificado:** Let's Encrypt dejó de mandar avisos de vencimiento por mail el 4
 de junio de 2025, así que no alcanza con configurar un correo. Un workflow programado
@@ -195,7 +198,7 @@ fue la razón original para descartarlas y dejó de valer). Se mantiene `amd64` 
 
 Se descarta `t4g` en este change.
 
-### D4: Workflow de CD, OIDC y SSM con un documento propio
+### D4: Workflow de CD por SSH con una clave de comando forzado
 
 **Disparo:** `.github/workflows/cd.yml` con `on: workflow_run` (workflow `CI`, tipo
 `completed`). El job corre solo si se cumplen las tres condiciones:
@@ -229,14 +232,30 @@ validó el CI.
 2. `imagenes`: checkout de ese SHA y `docker/build-push-action` de las dos imágenes a GHCR, con
    `permissions: packages: write` y el `GITHUB_TOKEN`. Si el tag ya existe, no se reconstruye
    (D3). Expone como salida los dos digests.
-3. `desplegar`: `environment: produccion`, `permissions: id-token: write, contents: read`, y
-   `aws-actions/configure-aws-credentials` con `role-to-assume`. Llama a `aws ssm send-command`
-   con el documento `reservas-desplegar`, espera el resultado y lo muestra. Los parámetros
-   dependen del modo:
-   - **`modo=despliegue`** (automático o manual): `sha` y los dos digests que expone
-     `imagenes`;
+3. `desplegar`: `environment: produccion`, `permissions: contents: read` (sin `id-token`: no hay
+   credenciales de AWS). Usa el cliente `ssh` que ya trae el runner, **sin acciones de
+   terceros para la conexión**: una acción comprometida que maneje la clave sería la peor
+   pieza de la cadena. El paso:
+   - valida los secrets antes de usarlos: `SERVER_PORT` con `^[0-9]{1,5}$`, `SERVER_USER` con
+     `^[a-z_][a-z0-9_-]{0,31}$` (que no pueda empezar con `-` ni inyectar opciones de `ssh`) y
+     `SERVER_HOST` con un nombre de host o una IPv4;
+   - escribe `SSH_PRIVATE_KEY` en un archivo de `$RUNNER_TEMP` con `umask 077` y
+     `SSH_KNOWN_HOSTS` en otro, y los borra en un paso `if: always()`;
+   - se conecta con `-o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
+     -o UserKnownHostsFile=<archivo> -o ConnectTimeout=20 -o ServerAliveInterval=30`. Con
+     `StrictHostKeyChecking=yes` y la huella fijada, `ssh` aborta **antes de autenticarse** si
+     el servidor no es el esperado: la clave privada nunca se le presenta a un impostor;
+   - pasa los valores por variables de entorno, nunca interpolados en el código del `run`, y
+     el paso corre sin `set -x`. GitHub enmascara los secrets en los logs;
+   - el comando remoto es una sola línea con un formato fijo, que `ssh-entrada.sh` valida (ver
+     abajo), y el código de salida de `desplegar.sh` llega como código de salida de `ssh`;
+   - el job tiene `timeout-minutes: 30`. La salida de `desplegar.sh` se ve en vivo en el log.
+
+   El comando depende del modo:
+   - **`modo=despliegue`** (automático o manual): `despliegue <sha> <digestBackend>
+     <digestFrontend>`, con los dos digests que expone `imagenes`;
    - **`modo=vuelta-atras`** (solo manual): el job `imagenes` **no corre** (condición sobre el
-     input `modo`), y se envían `sha` y `modo`, con los digests vacíos. `desplegar.sh` toma los
+     input `modo`), y se envía `vuelta-atras <sha>`, sin digests. `desplegar.sh` toma los
      digests de `historial`, nunca del workflow ni del tag.
 
 - `concurrency: { group: despliegue-produccion, cancel-in-progress: false }` hace que los
@@ -248,33 +267,88 @@ validó el CI.
 - Las acciones de terceros se fijan por **SHA de commit**, no por tag: el workflow maneja
   credenciales de producción.
 
-**Confianza de IAM (OIDC):** el rol `reservas-github-despliegue` solo confía en
-`token.actions.githubusercontent.com` con `aud = sts.amazonaws.com` y
-`sub = repo:<owner>/Restaurante-MVP-Trabajo-Practico:environment:produccion`. Además, el
-environment `produccion` de GitHub admite **solo la rama `main`**. Un PR, una rama o un fork no
-consiguen un token con ese `sub`. Así se cumple "Credenciales de despliegue temporales y
-acotadas" sin claves permanentes.
+**Quién puede usar la clave:** `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `SERVER_HOST`,
+`SERVER_USER` y `SERVER_PORT` son **secrets del environment `produccion`**, no del repositorio
+(la guía los pone como secrets del repositorio; el environment es más estricto). El environment
+admite **solo la rama `main`**: un PR, una rama o un fork no reciben la clave.
 
-**Permisos del rol** (los mínimos):
-- `ssm:SendCommand` sobre **dos** recursos: el ARN de la instancia y el ARN del documento
-  `reservas-desplegar`. **No** se permite `AWS-RunShellScript`, así que el rol no puede
-  ejecutar comandos arbitrarios.
-- `ssm:GetCommandInvocation` y `ssm:ListCommandInvocations`, para leer el resultado.
-- Nada más: sin `ssm:GetParameter*`, sin EC2 y sin IAM.
+**Clave dedicada** (guía, 2.1): un par `ed25519` sin frase de paso, generado en el servidor
+para este único uso. La privada se copia a GitHub y **se borra del servidor**; la guía la deja
+ahí, y en el servidor no cumple ninguna función. La pública se autoriza con restricciones
+(guía, 2.3, endurecida) en `~deploy/.ssh/authorized_keys`:
 
-**Documento SSM `reservas-desplegar`** (versionado en `deploy/ssm-desplegar.json`; el runbook
-lo crea y lo actualiza):
-- Recibe cuatro parámetros validados por SSM antes de llegar a la instancia (spec: "Despliegue
-  con un identificador inválido"):
-  - `sha`, con `allowedPattern: ^[0-9a-f]{40}$`;
-  - `digestBackend` y `digestFrontend`, con `^(sha256:[0-9a-f]{64})?$` (vacíos en
-    `modo=vuelta-atras`; `desplegar.sh` exige que no estén vacíos en `modo=despliegue`);
-  - `modo`, con `allowedValues: [despliegue, vuelta-atras]`.
-- Ejecuta `/opt/reservas/repo/deploy/desplegar.sh` con esos cuatro valores.
+```
+command="/opt/reservas/deploy/ssh-entrada.sh",restrict ssh-ed25519 AAAA... github-actions-deploy
+```
 
-**Alternativa considerada: SSH con una clave en un secreto de GitHub.** Los runners de GitHub no
-tienen IP fija, así que el puerto 22 quedaría abierto a internet. Además, la clave sería una
-credencial permanente. Se descarta (decisión del equipo).
+- `command=` fuerza ese programa para **cualquier** conexión con la clave, sin importar qué
+  pida el cliente; lo que el cliente pidió llega en `SSH_ORIGINAL_COMMAND`.
+- `restrict` desactiva el pty, el reenvío de puertos, de agente y de X11 y el `~/.ssh/rc`.
+
+**`deploy/ssh-entrada.sh`** hace de puerta, con el mismo propósito que el documento SSM del
+diseño anterior (que el pedido no pueda ser un comando arbitrario):
+- si `SSH_ORIGINAL_COMMAND` está vacío (intento de shell interactiva), lo rechaza;
+- acepta **solo** estas dos formas exactas, validadas con expresiones regulares ancladas:
+  - `despliegue <sha> <digestBackend> <digestFrontend>`, con `sha` de `^[0-9a-f]{40}$` y los
+    digests de `^sha256:[0-9a-f]{64}$`;
+  - `vuelta-atras <sha>`, con el mismo `sha`;
+- cualquier otra cosa termina en `2` sin ejecutar nada ni interpretar el texto en una shell;
+- invoca `sudo -n /opt/reservas/deploy/desplegar.sh <sha> <digestBackend> <digestFrontend>
+  <modo>` pasando cada valor como argumento separado (sin `eval` ni `sh -c`), con los digests
+  vacíos en `vuelta-atras`, que es el contrato que ya tiene `desplegar.sh`;
+- registra cada pedido (aceptado o rechazado) con `logger -t reservas-ssh`, sin imprimir nada
+  de `.env`.
+
+**Usuario `deploy`:** sin contraseña, **fuera del grupo `docker`** (pertenecer a él equivale a
+ser `root`) y con una única regla de `sudoers`:
+
+```
+deploy ALL=(root) NOPASSWD: /opt/reservas/deploy/desplegar.sh
+```
+
+**Dueño del código:** `/opt/reservas` y todo su contenido son de `root`. Si `deploy` pudiera
+escribir `desplegar.sh`, la regla de `sudoers` le daría `root` a cualquiera que tenga la clave.
+`deploy` solo lee `ssh-entrada.sh`; el administrador entra con su propio usuario (`ubuntu` y su
+`.pem`) para mantenimiento.
+
+**Endurecimiento de `sshd`** (`/etc/ssh/sshd_config.d/99-reservas.conf`):
+`PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin no`,
+`AllowUsers ubuntu deploy` y `MaxAuthTries 3`. `fail2ban` es opcional: frena el ruido de
+escaneos, pero con solo clave no es una barrera de seguridad.
+
+**Decisión: SSH en lugar de SSM (cambio del 2026-10-19).** La primera versión de este change
+descartaba SSH y desplegaba con OIDC y SSM, sin puerto 22 y sin claves permanentes. La
+consigna de la docente (su guía de CD) pide SSH, y el equipo decidió seguirla. Lo que se
+acepta, de forma explícita:
+- **El puerto 22 queda abierto a internet (`0.0.0.0/0`) en las dos etapas.** Los runners de
+  GitHub no tienen una IP fija y el rango de IPs de GitHub cambia, así que no se puede
+  restringir el origen. Cualquiera puede intentar conectarse, y habrá escaneos y fuerza bruta.
+- **La clave es una credencial permanente** guardada en GitHub. No vence sola como las
+  credenciales de OIDC.
+
+Lo que lo compensa:
+- **Una superficie menor que un SSH típico.** Sin contraseñas, sin `root`, y con la clave de
+  despliegue limitada a un comando forzado con validación estricta: quien la robe no consigue
+  shell, ni reenvío de puertos, ni lectura de `.env`.
+- **Qué puede hacer igual quien robe la clave:** pedir un despliegue de un SHA de `main` con
+  digests del registro de este repositorio, o una vuelta atrás a una versión ya desplegada.
+  No puede ejecutar código arbitrario en la instancia, salvo el que ya está en `main`.
+- **Se pueden rotar:** el runbook explica cómo generar una clave nueva, reemplazarla en
+  `authorized_keys` y en el secret, y revocar la anterior.
+- **Menos piezas de AWS.** Sin proveedor OIDC, sin rol de GitHub, sin documento SSM, sin perfil
+  IAM en la instancia ni parámetros: nada de AWS en GitHub.
+
+**Alternativa considerada: mantener SSM con OIDC.** Es la opción más segura (sin puerto 22 y
+con credenciales que vencen), y por eso era la del diseño original. Se descarta únicamente
+porque la consigna pide SSH.
+
+**Alternativa considerada: SSH sin comando forzado** (la clave a secas, como en la guía). Daría
+una shell completa a quien robe la clave desde GitHub. Se descarta: el comando forzado cuesta
+un script corto y quita esa posibilidad.
+
+**Alternativa considerada: restringir el puerto 22 a los rangos de GitHub Actions.** El rango
+publicado en `api.github.com/meta` es amplio (miles de direcciones), cambia, y habría que
+actualizar el security group con un proceso propio. Se descarta.
 
 **Alternativa considerada: Infraestructura como código (Terraform).** Suma una herramienta y un
 estado que manejar, y el equipo crea la infraestructura una sola vez. El runbook (D8) lista
@@ -306,54 +380,81 @@ la verificación de la tarea 6 prueba los puertos internos desde afuera.
 catálogo. Si alguna ruta con límite empezara a llamarse desde el servidor, compartiría cupo
 entre clientes. Queda documentado en Risks.
 
-### D6: Secretos en SSM Parameter Store y `.env` generado en la instancia
+### D6: Secretos en un `.env` del servidor, copiado a mano
 
-**Parámetros** `SecureString` bajo `/reservas/prod/` (cifrados con la clave administrada
-`aws/ssm`):
+Como indica la guía (4.2), el `.env` de producción lo crea el administrador en
+`/opt/reservas/.env`, en la raíz del proyecto. Nunca pasa por GitHub, por las imágenes ni por
+el workflow.
+
+**Variables del `.env`:**
 - `JWT_SECRET`: 64 bytes aleatorios.
 - `POSTGRES_PASSWORD`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
+- `SITE_ADDRESS` (no es secreto): `:80` o el subdominio, ver D2. Vive en el `.env` y no en el
+  repositorio, porque cambia según la etapa y no con el código.
 
-El runbook indica cómo generarlos sin que pasen por el historial del shell.
+**Cómo se crea:** el runbook indica cómo generar los valores en el propio servidor, con
+`umask 077` y sin que pasen por el historial del shell (`openssl rand` y un editor, no
+`echo ... >> .env`). `/opt/reservas/.env` es de `root`, modo `600`, y `.gitignore` ya lo
+excluye (`.env*`), así que `git checkout` no lo toca. El disco es un volumen EBS cifrado (D9).
 
-**Parámetro no secreto** (`String`) bajo `/reservas/prod/config/`: `SITE_ADDRESS` (`:80` o el
-subdominio, ver D2). Vive en SSM, y no en el repositorio, porque cambia según la etapa y no con
-el código.
+**Cómo lo usa el despliegue:** `desplegar.sh` **valida y nunca modifica** el `.env`: comprueba
+que exista, que sea de `root` con modo `600`, que no sea un enlace simbólico y que estén todas
+las variables requeridas con valor. Si algo falla, termina en error **antes de tocar nada**, sin
+imprimir ningún valor. Los digests de las imágenes (que cambian en cada despliegue) los escribe
+en otro archivo, `/opt/reservas/.env.version` (mismo dueño y modo), y a Compose le pasa los dos
+con `--env-file`. Ningún secreto se imprime: el script corre sin `set -x`.
 
-- **Perfil de la instancia:** `AmazonSSMManagedInstanceCore` (para recibir comandos), más una
-  política propia con `ssm:GetParametersByPath` sobre `/reservas/prod/*` y `kms:Decrypt`
-  condicionado a `kms:ViaService = ssm.<región>.amazonaws.com`. El rol de GitHub **no** puede
-  leer secretos; la instancia sí.
-- `desplegar.sh` escribe `/opt/reservas/.env` con `umask 077`, dueño `root` y modo `600`, y lo
-  pasa a Compose con `--env-file`. Ningún secreto se imprime: el script corre sin `set -x`.
-- **Valores no secretos:** `JWT_EXPIRES_IN=60m`, `THROTTLE_*`, `TRUST_PROXY`, `HOST`, `PORT`,
-  y los digests de las imágenes. Van fijos en `docker-compose.prod.yml` o los arma el
-  script.
-- `DATABASE_URL` lo arma Compose con `POSTGRES_PASSWORD`; no es un parámetro aparte.
+- **Valores no secretos:** `JWT_EXPIRES_IN=60m`, `THROTTLE_*`, `TRUST_PROXY`, `HOST` y `PORT`.
+  Van fijos en `docker-compose.prod.yml`.
+- `DATABASE_URL` lo arma Compose con `POSTGRES_PASSWORD`; no es una variable aparte.
+- **Sin perfil IAM en la instancia:** nada en el servidor necesita llamar a AWS, así que la
+  instancia **no tiene un rol asociado** y no hay credenciales que un contenedor pueda robar
+  por el servicio de metadatos. El IMDSv2 obligatorio y el límite de saltos 1 de D9 quedan
+  igual, como segunda capa.
 
-**Alternativa considerada: secretos de GitHub enviados en el `send-command`.** Los parámetros de
-SSM Run Command quedan visibles en el historial de comandos de la consola y de la API. Además,
-el rol de GitHub tendría que manejar los secretos. Se descarta.
+**Alternativa considerada: AWS SSM Parameter Store** (el diseño original). Los secretos
+vivían cifrados en AWS y la instancia los leía con su rol. Es más cómodo de rotar, y mantiene
+los secretos fuera del disco. Se descarta porque exige un perfil IAM en la instancia y una
+política propia, y porque la guía de la docente indica el `.env` a mano. El costo es que los
+secretos quedan en un archivo del servidor: protegido por permisos y por el disco cifrado, pero
+legible por cualquiera con acceso de `root` a la instancia.
+
+**Alternativa considerada: secretos de GitHub enviados en el comando SSH.** Los pondría en la
+línea de comandos, visible en la tabla de procesos del servidor y en los logs de `sshd`, y
+obligaría al workflow a manejar los secretos de producción. Se descarta.
 
 ### D7: Procedimiento en la instancia (`deploy/desplegar.sh`)
 
-El script corre como root vía SSM, con `set -euo pipefail` y un lock (`flock`) como segunda
-barrera contra despliegues simultáneos.
+El script corre como `root`, invocado por `ssh-entrada.sh` con `sudo` (D4), con
+`set -euo pipefail` y un lock (`flock`) como segunda barrera contra despliegues simultáneos.
+Vive en `/opt/reservas/deploy/desplegar.sh`: el repositorio se clona directo en `/opt/reservas`
+(con el punto final de `git clone <repo> .`, como indica la guía, 4.1), sin un nivel `repo/`.
+
+**Conexión cortada:** con SSH, si se cae la conexión del runner, `sshd` manda `SIGHUP` al
+proceso, y un despliegue cortado a la mitad (por ejemplo, después de migrar y antes de levantar)
+sería peor que uno fallido. Por eso `desplegar.sh` ignora `SIGHUP` y `SIGPIPE`, escribe su
+salida **también** en `/var/log/reservas-despliegue.log` (con `tee`, tolerando que la salida
+estándar ya no exista) y termina el despliegue igual. El resultado queda en ese log, y el
+`flock` evita que un reintento del workflow se superponga.
 
 Cada versión se registra como una línea `<sha> <digestBackend> <digestFrontend>`.
 `/opt/reservas/VERSION_ACTUAL` guarda la que está sirviendo, y `/opt/reservas/historial` todas
-las que se desplegaron con éxito, en orden.
+las que se desplegaron con éxito, en orden. Son archivos sin versionar, junto con `.env` y
+`.env.version`: el runbook los agrega a `.git/info/exclude` del servidor.
 
-1. Valida el formato de los parámetros otra vez (defensa en profundidad).
+1. Valida el formato de los parámetros otra vez (defensa en profundidad, después de
+   `ssh-entrada.sh`) y valida el `.env` (D6): existe, es de `root` con modo `600` y tiene todas
+   las variables. Si algo falla, termina sin tocar nada.
 2. Lee `VERSION_ACTUAL` y la guarda como **`version_previa`**. Esa es la versión que está
    sirviendo y a la que se vuelve si algo falla.
-3. `git -C /opt/reservas/repo fetch origin main`. En modo `despliegue`, si `<sha>` es ancestro
+3. `git -C /opt/reservas fetch origin main`. En modo `despliegue`, si `<sha>` es ancestro
    del SHA de `version_previa` (`git merge-base --is-ancestor`), termina en 0 sin tocar nada:
    la versión está superada. Si no, `git checkout --detach <sha>`. El clon es del repositorio
    público, sin credenciales. Así, `docker-compose.prod.yml`, el `Caddyfile` y el propio script
    salen del mismo commit que las imágenes.
-4. Genera `.env` (D6) con las imágenes **por digest**.
+4. Escribe `.env.version` (D6) con las imágenes **por digest**. El `.env` no se modifica.
 5. `docker compose pull`.
 6. Levanta `postgres` y espera su healthcheck.
 7. **Migraciones:** `docker compose run --rm backend npx prisma migrate deploy`. Si falla, corta:
@@ -365,8 +466,8 @@ las que se desplegaron con éxito, en orden.
     (espera `200`) y `/api/zonas` (espera `200` y un JSON).
 11. Si la comprobación pasa, escribe la versión nueva en `VERSION_ACTUAL`, la agrega a
     `historial` y hace la limpieza de imágenes (abajo). Termina en 0.
-12. Si falla, vuelve a **`version_previa`**: hace su `checkout`, regenera `.env` con sus
-    digests y repite los pasos 9 y 10. `VERSION_ACTUAL` no cambia. Termina en 1 con el mensaje
+12. Si falla, vuelve a **`version_previa`**: hace su `checkout`, reescribe `.env.version` con
+    sus digests y repite los pasos 9 y 10. `VERSION_ACTUAL` no cambia. Termina en 1 con el mensaje
     `VUELTA ATRÁS a <sha-previo>`, que el workflow muestra.
 
 **Limpieza de imágenes:** `docker image prune` sin `-a` solo borra imágenes sin tag, y las
@@ -418,48 +519,62 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
   margen. La latencia desde Argentina es mayor que con `sa-east-1` (São Paulo), pero alcanza
   para un MVP. Si la tarea 1.3 muestra que `sa-east-1` también entra en el presupuesto, se
   puede elegir esa sin cambiar nada más.
-- **Instancia:** Amazon Linux 2023 (trae el agente de SSM), **`t3.micro`**, con
+- **Instancia:** Ubuntu Server 24.04 LTS (amd64), como pide la guía, **`t3.micro`**, con
   **especificación de créditos de CPU `standard`**. En `unlimited`, el valor por defecto de las
   `t3`, el uso sostenido por encima de la línea base se cobra aparte. En `standard`, la
   instancia se ralentiza, pero no genera cargos. Más el *swapfile* de 2 GB (D1).
 - **Disco:** EBS `gp3` cifrado de 20 GB.
-- **Metadatos:** IMDSv2 obligatorio (`HttpTokens=required`), para que un SSRF no pueda leer las
-  credenciales del perfil, y **límite de saltos en 1** (`HttpPutResponseHopLimit=1`). Un
-  contenedor en la red bridge de Docker está a un salto más que el host; con límite 1, la
-  respuesta del token de IMDSv2 no le llega, y no puede obtener las credenciales del rol, que
-  lee todos los secretos. Algunas configuraciones de AL2023 usan 2 para que los contenedores sí
-  lleguen, así que se fija de forma explícita. Ningún contenedor necesita IMDS: los secretos
-  los lee `desplegar.sh` en el host.
+- **Metadatos:** la instancia **no tiene un rol IAM asociado** (D6), así que el servicio de
+  metadatos no entrega credenciales. Como segunda capa, IMDSv2 obligatorio
+  (`HttpTokens=required`) y **límite de saltos en 1** (`HttpPutResponseHopLimit=1`): un
+  contenedor en la red bridge de Docker está a un salto más que el host, y con límite 1 ni
+  siquiera recibe el token. Ningún contenedor necesita IMDS.
 - **IP elástica**, para que la URL no cambie al reiniciar.
-- **Security group:** entrada **solo TCP 80 y 443**. Sin 22, sin 5432, sin 3000 ni 3001. El
-  origen depende de la etapa:
+- **Security group:** entrada **solo TCP 22, 80 y 443**. Sin 5432, sin 3000 ni 3001.
+  - **22 (SSH):** `0.0.0.0/0` **en las dos etapas** (D4): los runners de GitHub no tienen IP
+    fija. Es el riesgo aceptado del cambio a SSH; lo acotan las restricciones de D4.
+  - **80 y 443:** el origen depende de la etapa:
   - **etapa HTTP:** solo las IPs públicas del equipo (`/32` cada una). Así, el login del admin en
     claro no queda expuesto a internet. Como las IPs domésticas pueden cambiar, el runbook
-    indica cómo actualizarlas. El despliegue no necesita entrada: llega por SSM;
+    indica cómo actualizarlas;
   - **etapa HTTPS:** `0.0.0.0/0` en los dos puertos. Let's Encrypt valida desde direcciones que
     no se publican, así que el 80 tiene que estar abierto a todos para emitir y renovar el
     certificado, y también sirve para la redirección.
 
   Salida abierta, necesaria para descargar imágenes y paquetes, y para hablar con Let's
   Encrypt.
-- **Docker, Compose y git** instalados, y clon del repositorio en `/opt/reservas/repo`.
-- **IAM:**
-  - el proveedor OIDC de GitHub;
-  - el rol de GitHub (D4);
-  - el perfil de la instancia (D6).
-- **Parámetros** de `/reservas/prod/`, el documento SSM y el environment `produccion` de GitHub
-  (solo `main`), con las variables no secretas `AWS_ROLE_ARN`, `AWS_REGION` e
-  `INSTANCE_ID`. No son secretos, pero tampoco hace falta publicarlos fuera del environment.
+- **Preparación del servidor**, siguiendo la guía (secciones 1 a 4):
+  - actualizar el sistema e instalar `curl`, `wget`, `git`, `unzip` y `ca-certificates`
+    (sin Nginx ni Certbot: Caddy está en el Compose);
+  - instalar Docker y Compose con el script oficial (`get.docker.com`) y sumar al usuario de
+    administración (`ubuntu`) al grupo `docker`. **El usuario `deploy` no va en ese grupo**;
+  - clonar el repositorio **directo en `/opt/reservas`** con `sudo git clone <repo> .` (el
+    punto final es parte del comando: sin él queda `/opt/reservas/<repo>`), de modo que todo
+    sea de `root`;
+  - crear el usuario `deploy` (sin contraseña), la regla de `sudoers` y el endurecimiento de
+    `sshd` de D4;
+  - generar el par de claves del despliegue, autorizar la pública con `command=` y
+    `restrict`, copiar la privada a GitHub y **borrarla del servidor**;
+  - crear `/opt/reservas/.env` (D6) y agregar los archivos de estado a `.git/info/exclude`.
+- **Environment `produccion` de GitHub** (solo `main`), con los secrets `SERVER_HOST`,
+  `SERVER_USER` (`deploy`), `SERVER_PORT` (`22`), `SSH_PRIVATE_KEY` y `SSH_KNOWN_HOSTS`. La
+  huella se toma **del propio servidor** (`/etc/ssh/ssh_host_ed25519_key.pub`) y se compara con
+  la que muestra la consola de EC2 antes de cargarla.
+- **Rotación de la clave de despliegue:** generar un par nuevo, reemplazar la línea de
+  `authorized_keys` y el secret, y confirmar que la clave anterior ya no entra.
+- **Sin IAM:** no hay proveedor OIDC, rol de GitHub, perfil de instancia, parámetros ni
+  documento SSM.
 - **Backups:**
   - snapshot diario del volumen con Data Lifecycle Manager, con retención de 3 días (los
     snapshots son incrementales, pero consumen créditos);
-  - un procedimiento para exportar la base con `pg_dump` y descargarla vía SSM, que se usa
-    sí o sí **antes del vencimiento del plan Free**.
+  - un procedimiento para exportar la base con `pg_dump` y descargarla por `scp` con el usuario
+    de administración (no con la clave de despliegue, que no abre una shell), que se usa sí o
+    sí **antes del vencimiento del plan Free**.
 - **Activar HTTPS con el subdominio:**
   1. pasarle a la docente la IP elástica;
   2. esperar a que el registro `A` del subdominio resuelva a esa IP (`dig +short <subdominio>`);
-  3. abrir el security group a `0.0.0.0/0` en 80 y 443, cambiar
-     `/reservas/prod/config/SITE_ADDRESS` al subdominio y redesplegar;
+  3. abrir el security group a `0.0.0.0/0` en 80 y 443, cambiar `SITE_ADDRESS` en
+     `/opt/reservas/.env` al subdominio y redesplegar;
   4. verificar el certificado, la redirección y HSTS (tarea 6.6).
 
   Si Caddy no logra emitir el certificado (DNS todavía no propagado), sigue reintentando y el
@@ -467,6 +582,7 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
   primero se restringe otra vez el security group a las IPs del equipo, después se vuelve a
   `SITE_ADDRESS=:80` y se redespliega. Volver a `:80` sin restringir el security group dejaría
   el login en claro abierto a internet. Se reintenta cuando el DNS resuelva.
+  (El puerto 22 no cambia entre etapas.)
 - **Riesgo aceptado de la etapa HTTP** y su alcance, según la spec.
 
 ### D10: Tests del frontend y de la decisión de despliegue en CI
@@ -506,9 +622,34 @@ posterior en rojo o corriendo, y despacho manual inválido.
 - **[Riesgo] Disco o memoria agotados** (imágenes viejas, logs).
   → **Mitigación:** rotación de logs (D1) y la limpieza explícita de imágenes de D7, que solo
   conserva la versión actual y la inmediatamente anterior.
+- **[Riesgo aceptado] SSH abierto a internet** (puerto 22 en `0.0.0.0/0`, D4): habrá escaneos
+  y fuerza bruta, y un fallo de `sshd` o de configuración quedaría expuesto.
+  → **Mitigación:** solo clave, sin contraseñas ni `root`, `AllowUsers`, `MaxAuthTries 3`,
+  `sshd` al día con `unattended-upgrades`, `fail2ban` opcional, y la clave de despliegue con
+  comando forzado y `restrict`. Lo que **no** cubre: una vulnerabilidad de `sshd` aún sin
+  parche.
+- **[Riesgo] La clave de despliegue es permanente** y vive en los secrets de GitHub.
+  → **Mitigación:** secret de un environment que admite solo `main`, comando forzado que no
+  da shell ni lectura de `.env`, validación estricta de cada valor, rotación documentada y
+  huella del servidor fijada. Quien la robe solo puede pedir despliegues de versiones de
+  `main` o vueltas atrás a versiones ya desplegadas (D4).
+- **[Riesgo] Escalada de `deploy` a `root`** si `deploy` pudiera escribir lo que `sudo`
+  ejecuta, o si perteneciera al grupo `docker`.
+  → **Mitigación:** `/opt/reservas` es de `root`, `deploy` fuera del grupo `docker` y una
+  única regla de `sudoers`. La tarea 6.4 lo verifica.
+- **[Riesgo] Man-in-the-middle del despliegue.**
+  → **Mitigación:** `StrictHostKeyChecking=yes` con `SSH_KNOWN_HOSTS`: `ssh` aborta antes de
+  autenticarse si la huella no coincide.
 - **[Riesgo] Una acción de terceros comprometida** en el workflow de CD.
-  → **Mitigación:** acciones fijadas por SHA, permisos mínimos por job, y un rol que no puede
-  leer secretos ni ejecutar comandos arbitrarios.
+  → **Mitigación:** acciones fijadas por SHA, permisos mínimos por job, la conexión hecha con
+  el cliente `ssh` del runner (sin acción de terceros que maneje la clave) y una clave que no
+  puede ejecutar comandos arbitrarios.
+- **[Riesgo] Secretos en un archivo del servidor** (`/opt/reservas/.env`).
+  → **Mitigación:** dueño `root` y modo `600` (el script lo exige), disco EBS cifrado,
+  la clave de despliegue no los puede leer y la instancia no tiene credenciales de AWS. El
+  riesgo residual es el acceso de `root` a la instancia.
+- **[Riesgo] Despliegue cortado a la mitad** si se cae la conexión SSH.
+  → **Mitigación:** `desplegar.sh` ignora `SIGHUP` y `SIGPIPE` y escribe su propio log (D7).
 - **[Riesgo] Alguien publica el puerto del frontend o del backend** en
   `docker-compose.prod.yml`. Eso habilita falsificar la IP (D5) o saltear el proxy.
   → **Mitigación:** la verificación de la tarea 6 prueba los puertos desde afuera, y un
@@ -535,15 +676,18 @@ posterior en rojo o corriendo, y despacho manual inválido.
 ## Migration Plan
 
 1. Mergear el PR de spec y después el de implementación. El CD no tiene a dónde desplegar hasta
-   que exista la infraestructura: sin `INSTANCE_ID` en el environment, el job `desplegar`
-   termina en error con un mensaje claro y no afecta al CI.
-2. Crear la infraestructura siguiendo `docs/despliegue.md` y cargar los parámetros.
+   que exista la infraestructura: sin los secrets `SERVER_*` y `SSH_*` en el environment, el
+   job `desplegar` termina en error con un mensaje claro y no afecta al CI.
+2. Crear la infraestructura y preparar el servidor siguiendo `docs/despliegue.md`: instancia,
+   security group, IP elástica, Docker, clon en `/opt/reservas`, usuario `deploy`, clave SSH,
+   `.env` y secrets de GitHub. Pedirle el subdominio a la docente cuando exista la IP.
 3. Primer despliegue manual con `workflow_dispatch` usando el SHA de `main`, en la etapa HTTP, y
    verificación de la tarea 6.
 4. Pasarle a la docente la IP elástica y, cuando el subdominio resuelva, activar HTTPS (D9).
 5. Desde ahí, el commit verde más reciente de `main` se despliega solo.
-6. **Rollback del change completo:** deshabilitar el workflow de CD desde GitHub (la instancia
-   sigue sirviendo la última versión) y, si hace falta, detener la instancia.
+6. **Rollback del change completo:** deshabilitar el workflow de CD desde GitHub, **borrar la
+   línea de `authorized_keys` y el secret `SSH_PRIVATE_KEY`** (la instancia sigue sirviendo la
+   última versión) y, si hace falta, detener la instancia.
 
 ## Open Questions
 
