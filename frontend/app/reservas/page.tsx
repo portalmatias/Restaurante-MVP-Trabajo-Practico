@@ -16,13 +16,13 @@ export default function ReservasPage() {
         Elegí fecha, turno y zona, y reservá sin necesidad de crear una cuenta.
       </p>
       <Link href="/reservas/nueva" className={buttonVariants({ variant: "primary", size: "lg" })}>
-        Reservá ahora
+        Reservar ahora
       </Link>
       <Link
         href="/reservas/consultar"
         className={buttonVariants({ variant: "ghost", fullWidth: false, className: "self-start underline" })}
       >
-        ¿Ya reservaste? Consultá o cancelá tu reserva
+        ¿Ya reservaste? Consultar o cancelar tu reserva
       </Link>
     </div>
   );

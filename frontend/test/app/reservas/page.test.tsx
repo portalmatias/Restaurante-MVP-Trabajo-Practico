@@ -9,10 +9,10 @@ describe("/reservas (Inicio)", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Reservá tu mesa" })).toBeInTheDocument();
   });
 
-  it("ofrece la acción principal 'Reservá ahora' hacia /reservas/nueva", () => {
+  it("ofrece la acción principal 'Reservar ahora' hacia /reservas/nueva", () => {
     render(<ReservasPage />);
 
-    expect(screen.getByRole("link", { name: "Reservá ahora" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Reservar ahora" })).toHaveAttribute(
       "href",
       "/reservas/nueva",
     );
@@ -22,7 +22,7 @@ describe("/reservas (Inicio)", () => {
     render(<ReservasPage />);
 
     expect(
-      screen.getByRole("link", { name: "¿Ya reservaste? Consultá o cancelá tu reserva" }),
+      screen.getByRole("link", { name: "¿Ya reservaste? Consultar o cancelar tu reserva" }),
     ).toHaveAttribute("href", "/reservas/consultar");
   });
 
