@@ -489,7 +489,7 @@ unset NUEVA_PASSWORD ADMIN_EMAIL
 sudo ls -l /opt/reservas/.env      # sigue -rw------- root root
 ```
 
-La contraseña nueva no puede llevar `|`, `&` ni `` (rompen el `sed` del paso anterior).
+La contraseña nueva no puede llevar los caracteres `|`, `&` ni la barra invertida (rompen el `sed` del paso anterior).
 
 Verificar: login con la contraseña vieja → `401`; con la nueva → `200`. Los tokens ya emitidos
 siguen valiendo hasta que vencen (60 minutos). Guardar la contraseña nueva en el gestor del equipo.
