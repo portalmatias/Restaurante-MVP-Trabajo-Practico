@@ -47,8 +47,8 @@ máquina. En internet aparecen cuatro riesgos que este change tiene que cerrar d
   aplica las migraciones, levanta la versión nueva y comprueba que responda. Si la
   comprobación falla, vuelve sola a la versión anterior.
 - **Secretos en un `.env` del servidor:** se copia a mano a `/opt/reservas/.env` (dueño `root`,
-  modo `600`), como indica la guía. El script de despliegue lo valida y nunca lo modifica;
-  los secretos no pasan por el repositorio, las imágenes ni los logs del workflow.
+  modo `600` o `400`), como indica la guía. El script de despliegue lo valida y nunca lo
+  modifica; los secretos no pasan por el repositorio, las imágenes ni los logs del workflow.
 - **Seed de producción aparte:** carga zonas, mesas, turnos y configuración, pero no reservas
   de ejemplo. El admin se crea con email y contraseña de producción tomados de los secretos,
   **nunca** con las credenciales públicas del README.

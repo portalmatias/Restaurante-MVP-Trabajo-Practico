@@ -392,8 +392,8 @@ publicado en `api.github.com/meta` es amplio (miles de direcciones), cambia, y h
 actualizar el security group con un proceso propio. Se descarta.
 
 **Alternativa considerada: Infraestructura como código (Terraform).** Suma una herramienta y un
-estado que manejar, y el equipo crea la infraestructura una sola vez. El runbook (D8) lista
-cada recurso y cada política tal como quedan, para que se puedan revisar en el PR.
+estado que manejar, y el equipo crea la infraestructura una sola vez. El runbook (D9) lista
+cada recurso y su configuración tal como quedan, para que se puedan revisar en el PR.
 
 ### D5: IP real del cliente: Caddy sobrescribe y el backend confía solo en el frontend
 
@@ -439,8 +439,9 @@ el workflow.
 
 **Cómo se crea:** el runbook indica cómo generar los valores en el propio servidor, con
 `umask 077` y sin que pasen por el historial del shell (`openssl rand` y un editor, no
-`echo ... >> .env`). `/opt/reservas/.env` es de `root`, modo `600`, y `.gitignore` ya lo
-excluye (`.env*`), así que `git checkout` no lo toca. El disco es un volumen EBS cifrado (D9).
+`echo ... >> .env`). `/opt/reservas/.env` se crea de `root` con modo `600` (el script también
+acepta `400`, solo lectura), y `.gitignore` ya lo excluye (`.env*`), así que `git checkout` no
+lo toca. El disco es un volumen EBS cifrado (D9).
 Hay una plantilla sin valores en `deploy/env.produccion.example`.
 
 **Cómo lo usa el despliegue:** `desplegar.sh` **valida y nunca modifica** el `.env`: comprueba
@@ -497,8 +498,8 @@ que nunca se versiona ni lo toca `git checkout`.
 1. Valida el formato de los parámetros otra vez (defensa en profundidad, después de
    `ssh-entrada.sh`; en modo `despliegue` exige además los dos digests). Si algo falla,
    termina con `2` sin tocar nada, ni siquiera el lock. Después toma el lock y, antes del
-   `checkout` (paso 3), valida el `.env` (D6): existe, es de `root` con modo `600` y tiene
-   todas las variables con su formato.
+   `checkout` (paso 3), valida el `.env` (D6): existe, es de `root` con modo `600` o `400`
+   y tiene todas las variables con su formato.
 2. Lee `VERSION_ACTUAL` y la guarda como **`version_previa`**. Esa es la versión que está
    sirviendo y a la que se vuelve si algo falla.
 3. `git -C /opt/reservas fetch origin main`. En los dos modos exige que `<sha>` esté en la
@@ -596,7 +597,7 @@ script lo informa, deja los contenedores detenidos y termina en 1.
 
 ### D9: Runbook de AWS (`docs/despliegue.md`)
 
-Pasos manuales que deja documentados, con las políticas JSON completas:
+Pasos manuales que deja documentados, con los comandos completos:
 
 - **Cuenta:**
   - el root solo se usa para crear la cuenta y tiene MFA;
@@ -766,7 +767,7 @@ posterior en rojo o corriendo, y despacho manual inválido.
   el cliente `ssh` del runner (sin acción de terceros que maneje la clave) y una clave que no
   puede ejecutar comandos arbitrarios.
 - **[Riesgo] Secretos en un archivo del servidor** (`/opt/reservas/.env`).
-  → **Mitigación:** dueño `root` y modo `600` (el script lo exige), disco EBS cifrado,
+  → **Mitigación:** dueño `root` y modo `600` o `400` (el script lo exige), disco EBS cifrado,
   la clave de despliegue no los puede leer y la instancia no tiene credenciales de AWS. El
   riesgo residual es el acceso de `root` a la instancia.
 - **[Riesgo] Despliegue cortado a la mitad** si se cae la conexión SSH.
