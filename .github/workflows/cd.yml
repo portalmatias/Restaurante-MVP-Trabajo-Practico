@@ -274,6 +274,18 @@ jobs:
           estado=$?
           set -e
 
+          # 3 = versión superada: un commit anterior al que ya está sirviendo. No es un error (el
+          # job termina en verde) pero tampoco se desplegó nada: el resumen lo dice.
+          if [ "$estado" -eq 3 ]; then
+            echo "::notice title=Versión superada::$SHA es anterior a la versión en servicio: no se cambió nada en producción."
+            {
+              echo "### No se desplegó: versión superada"
+              echo
+              echo "- SHA: \`$SHA\`"
+              echo "- Producción conserva la versión más nueva que ya estaba sirviendo."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [ "$estado" -ne 0 ]; then
             case "$estado" in
               255) detalle="No se pudo conectar o la clave del servidor no coincide con SSH_KNOWN_HOSTS." ;;

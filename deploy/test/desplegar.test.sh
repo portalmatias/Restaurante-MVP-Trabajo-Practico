@@ -179,7 +179,7 @@ verificar "guarda la etapa vigente" grep -qx "sitio.prueba.test" "$ESTADO/SITE_A
 # --- 4. Un SHA anterior sigue siendo «superado» -------------------------------------------------
 echo "4. Un commit anterior al que está sirviendo se saltea"
 desplegar "$SHA0" "$DB" "$DF" despliegue
-[ "$CODIGO" = 0 ] && ok "termina en 0" || mal "termina en 0 (código $CODIGO)" "$(cat "$T/salida.txt")"
+[ "$CODIGO" = 3 ] && ok "termina en 3 (superada: no es un error, pero el workflow la distingue)" || mal "termina en 3 (código $CODIGO)" "$(cat "$T/salida.txt")"
 verificar "dice «versión superada»" contiene "$T/salida.txt" "versión superada"
 [ ! -s "$FAKE_DIR/docker.log" ] && ok "no toca Docker" || mal "no toca Docker" "$(cat "$FAKE_DIR/docker.log")"
 

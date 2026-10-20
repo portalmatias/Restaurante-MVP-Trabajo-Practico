@@ -17,8 +17,10 @@
 #                   que figurar en el historial y se usan los digests registrados ahí (si
 #                   llegara alguno, se ignora).
 #
-# Códigos de salida: 0 desplegado (o versión ya superada, sin cambios); 1 falló (con vuelta
-# atrás si había una versión previa); 2 parámetros inválidos (no se tocó nada).
+# Códigos de salida: 0 desplegado; 3 versión superada (un commit anterior al que ya está
+# sirviendo: no se cambió nada y NO es un error; el workflow lo informa como «superada» en lugar
+# de «desplegado»); 1 falló (con vuelta atrás si había una versión previa); 2 parámetros
+# inválidos (no se tocó nada).
 #
 # Archivos en /opt/reservas (el repositorio se clona ahí, directamente):
 #   .env                       lo copia a mano quien instala el servidor (docs/despliegue.md):
@@ -307,7 +309,7 @@ main() {
     # pasar de HTTP a HTTPS), y `--is-ancestor` también da verdadero para un SHA igual.
     if [ -n "$sha_previo" ] && [ "$sha" != "$sha_previo" ] && git -C "$REPO" merge-base --is-ancestor "$sha" "$sha_previo"; then
       log "versión superada: $sha ya está contenido en la versión en servicio ($sha_previo). No se cambia nada."
-      return 0
+      return 3
     fi
     if [ "$sha" = "$sha_previo" ]; then
       log "redespliegue de la versión en servicio: se regenera el entorno de Compose y se recrean los contenedores que hayan cambiado."

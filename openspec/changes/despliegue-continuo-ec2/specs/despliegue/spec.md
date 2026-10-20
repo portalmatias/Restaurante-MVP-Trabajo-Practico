@@ -41,6 +41,8 @@ vieja, salvo una vuelta atrás pedida explícitamente.
 - **WHEN** el despliegue de un commit anterior llega al servidor después de que el de un commit
   más nuevo ya quedó sirviendo
 - **THEN** el servidor lo saltea como versión superada y producción conserva el más nuevo
+- **AND** el script sale con un código propio (3), que no es un error: el job termina en verde y
+  su resumen dice «No se desplegó: versión superada», sin afirmar que se desplegó
 
 #### Scenario: Redespliegue del mismo commit
 - **WHEN** se despliega el mismo SHA que ya está sirviendo, por ejemplo después de cambiar un

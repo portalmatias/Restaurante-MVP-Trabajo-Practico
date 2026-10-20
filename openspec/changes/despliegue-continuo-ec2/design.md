@@ -499,8 +499,10 @@ que nunca se versiona ni lo toca `git checkout`.
    sirviendo y a la que se vuelve si algo falla.
 3. `git -C /opt/reservas fetch origin main`. En los dos modos exige que `<sha>` esté en la
    historia de `main`. En modo `despliegue`, si `<sha>` es ancestro **propio** del SHA de
-   `version_previa` (`git merge-base --is-ancestor` y `<sha>` distinto), termina en 0 sin tocar
-   nada: la versión está superada. Un `<sha>` **igual** al que está sirviendo **no** se saltea:
+   `version_previa` (`git merge-base --is-ancestor` y `<sha>` distinto), termina con el código 3
+   sin tocar nada: la versión está superada. No es un error (el job de Actions termina en verde),
+   pero tampoco es un despliegue: por eso lleva un código propio y el resumen del job dice «No se
+   desplegó: versión superada» en lugar de «Desplegado en producción». Un `<sha>` **igual** al que está sirviendo **no** se saltea:
    `--is-ancestor` también da verdadero para un SHA igual, y redesplegar el mismo commit es la
    forma de aplicar un cambio del `.env` (por ejemplo, `SITE_ADDRESS` al pasar a HTTPS); se
    regenera `compose.env` y `docker compose up -d` recrea lo que cambió. En modo `vuelta-atras` busca `<sha>` en `historial` y toma de ahí sus

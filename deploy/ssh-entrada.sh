@@ -17,7 +17,7 @@
 # una línea separada por espacios; acá se traduce a la cadena vacía que espera desplegar.sh.
 #
 # Códigos de salida: 2 si el pedido no es válido (no se ejecuta nada); si no, el de
-# desplegar.sh (0 desplegado; 1 falló).
+# desplegar.sh (0 desplegado; 3 versión superada, sin cambios y sin error; 1 falló).
 #
 # --- Instalación en el servidor (docs/despliegue.md, §4) ------------------------------------
 #

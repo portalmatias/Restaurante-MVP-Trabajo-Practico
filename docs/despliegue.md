@@ -358,7 +358,9 @@ GitHub deja una sola ejecución en espera y la más nueva en llegar reemplaza a 
 orden de llegada y no de commit, así que un CI viejo que termina tarde podía cancelar al commit
 más nuevo (que quedaba sin desplegar) o una vuelta atrás manual. Si llegan varios seguidos, los
 despliegues hacen cola en el servidor (`flock` en `desplegar.sh`, espera de hasta 15 minutos) y
-uno anterior al que ya está sirviendo se saltea como «versión superada». El script que corre es
+uno anterior al que ya está sirviendo se saltea como «versión superada»: `desplegar.sh` sale con
+código 3, el job termina en verde (no es un error) y su resumen dice «No se desplegó: versión
+superada», para que una ejecución verde no se lea como un despliegue. El script que corre es
 el del commit en servicio; si el commit nuevo trae otro `desplegar.sh`, el script continúa con
 esa versión en el mismo despliegue (ver `desplegar.sh`, «reejecución»).
 
