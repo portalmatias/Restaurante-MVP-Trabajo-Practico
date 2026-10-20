@@ -95,7 +95,7 @@
 
 - [ ] 5.1 Escribir `deploy/desplegar.sh` según D7:
       - validación de `sha`, digests y `modo`, y `flock`;
-      - validación del `.env` (D6): existe, es de `root` con modo `600` (o `400`), tiene
+      - validación del `.env` (D6): existe, es de `root` con modo `600` o `400`, tiene
         `JWT_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `SITE_ADDRESS` con
         su formato, se lee sin ejecutarlo y no se imprime ningún valor; el script nunca
         modifica el `.env`;
