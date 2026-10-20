@@ -48,6 +48,10 @@
   --ring: #9a2a19;
   --madera: #2b221b; /* tablilla dada vuelta: madera oscura */
   --madera-foreground: #f3ebda;
+  /* Anillo de foco para controles que se dibujan SOBRE la madera: el rojo `ring` mide 2,02:1
+     contra ella; este hinoki claro mide 13,14:1. Sobre background, card y muted el rojo mide
+     5,69, 6,51 y 4,82:1. */
+  --ring-madera: #f3ebda;
 }
 
 @theme inline {
@@ -69,6 +73,7 @@
   --color-ring: var(--ring);
   --color-madera: var(--madera);
   --color-madera-foreground: var(--madera-foreground);
+  --color-ring-madera: var(--ring-madera);
   --font-sans: var(--font-gothic), "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   --font-wordmark: var(--font-marca), var(--font-mincho), serif;
   --font-display: var(--font-mincho), "Hiragino Mincho ProN", "Yu Mincho", serif;
