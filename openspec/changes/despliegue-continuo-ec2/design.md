@@ -116,9 +116,15 @@ cambiar ese valor y redesplegar, sin tocar el repositorio.
 **Control del certificado:** Let's Encrypt dejó de mandar avisos de vencimiento por mail el 4
 de junio de 2025, así que no alcanza con configurar un correo. Un workflow programado
 (`.github/workflows/certificado.yml`, diario) se conecta a `https://<subdominio>`, verifica que
-el certificado sea válido para ese nombre y que le queden 21 días o más, y **falla** si no; la
-falla le llega al equipo como notificación de GitHub. Se activa solo cuando existe la variable
-`SUBDOMINIO` del repositorio (etapa HTTPS); no usa credenciales. Caddy renueva a los 30 días del
+el certificado sea válido para ese nombre y que le queden 21 días o más, y **falla** si no. La
+notificación de GitHub **no alcanza** como aviso al equipo: según la documentación («Notifications
+for workflow runs»), la falla de un workflow programado le llega solo a quien lo creó, o a quien
+editó después su cron o lo volvió a habilitar. Por eso, al fallar, el workflow **abre un issue**
+(o comenta el que ya está abierto) con `permissions: issues: write`, que ve todo el que sigue el
+repositorio. Además, en un repositorio público GitHub **deshabilita los workflows programados
+tras 60 días sin actividad** (documentación «Disabling and enabling a workflow»); no hay aviso, así
+que el runbook indica revisar la pestaña Actions y volver a habilitarlo. Se activa solo cuando
+existe la variable `SUBDOMINIO` del repositorio (etapa HTTPS); no usa credenciales de AWS. Caddy renueva a los 30 días del
 vencimiento, así que un aviso a los 21 días indica que la renovación falló al menos una vez.
 
 **Por qué Caddy y no nginx:**
@@ -163,7 +169,12 @@ proyecto fijar política para sus otros subdominios). Sobre HTTP no se envía HS
   `reservas-frontend:<sha>`, sin `latest`. Pero un tag de GHCR **se puede volver a publicar**, así
   que la inmutabilidad no puede depender de él:
   - el job de imágenes **no sobrescribe** un tag existente: si `:<sha>` ya está publicado, toma
-    su digest y no reconstruye;
+    su digest y no reconstruye, **pero solo si la imagen declara `org.opencontainers.image.revision`
+    igual al SHA** (la etiqueta la pone este mismo workflow al construir). Si no coincide, el job
+    falla: alguien con permiso de push podría haber publicado `:<sha>` con otro contenido antes
+    que el CD, y confiar en el primero que llegó desplegaría ese digest. El control reduce el
+    riesgo pero no lo elimina (esa persona puede poner la etiqueta que quiera): el límite real es
+    quién tiene permiso de escritura en el registro;
   - el despliegue usa siempre la imagen **por digest** (`image@sha256:...`), nunca por tag;
   - la instancia guarda cada versión como la terna SHA + digest del backend + digest del
     frontend (ver D7), y una vuelta atrás vuelve a esa terna exacta.
@@ -173,7 +184,11 @@ proyecto fijar política para sus otros subdominios). Sobre HTTP no se envía HS
 - **Paquetes públicos en GHCR:** el repositorio es público y las imágenes no contienen
   secretos, así que la instancia las descarga sin credenciales de registro. Publicarlas como
   privadas obligaría a guardar un token de GitHub en la instancia, y eso sí sería un secreto
-  más.
+  más. Un paquete nuevo nace **privado** (documentación «Working with the Container registry»), y
+  GitHub no ofrece una API para cambiarlo: el runbook agrega un paso manual tras la primera
+  publicación (*Package settings* → *Change visibility* → Public) y un reintento del primer
+  despliegue, que falla al descargar mientras siguen privados. `desplegar.sh` lo recuerda en su
+  mensaje de error.
 
 **Alternativa considerada: construir en la instancia** (`git pull` + `docker compose build`).
 El build de Next necesita más memoria que la que usa la aplicación, y no entra en el 1 GB de
@@ -267,10 +282,16 @@ validó el CI.
      input `modo`) y los dos digests viajan como `-`. `desplegar.sh` toma los digests de
      `historial`, nunca del workflow ni del tag.
 
-- `concurrency: { group: despliegue-produccion, cancel-in-progress: false }` hace que los
-  despliegues corran de a uno sin cortar uno a la mitad. GitHub deja **una sola ejecución en
-  espera** por grupo: si llegan varias, la más nueva reemplaza a la que esperaba. Por eso la spec
-  garantiza que se despliegue **el commit verde más reciente**, no cada commit intermedio.
+- **Sin `concurrency`.** Un grupo de concurrencia deja **una sola ejecución en espera** y la más
+  nueva en **llegar** reemplaza a la que esperaba: por orden de llegada, no de commit. Con
+  `cancel-in-progress: false` y a nivel de workflow, el CI de un commit viejo que termina tarde
+  cancelaría la ejecución pendiente del commit más nuevo (que quedaría sin desplegar) o una
+  vuelta atrás manual; poniéndolo a nivel del job `desplegar` pasaría lo mismo con el despliegue
+  pendiente. La exclusión mutua la da el servidor: `desplegar.sh` toma un `flock` (espera hasta
+  15 minutos) y los despliegues **hacen cola**; uno anterior al que ya está sirviendo se saltea
+  como «versión superada» (D7). Nada se cancela: cada commit verde se despliega o se declara
+  superado, y la vuelta atrás manual nunca se pierde. El costo es que puede haber despliegues
+  intermedios inútiles, que `decidir` reduce al omitir los commits con un posterior verde.
 - **Segunda barrera en la instancia:** `desplegar.sh` rechaza en modo `despliegue` un SHA que
   sea ancestro de la versión actual (D7).
 - Las acciones de terceros se fijan por **SHA de commit**, no por tag: el workflow maneja
@@ -477,10 +498,19 @@ que nunca se versiona ni lo toca `git checkout`.
 2. Lee `VERSION_ACTUAL` y la guarda como **`version_previa`**. Esa es la versión que está
    sirviendo y a la que se vuelve si algo falla.
 3. `git -C /opt/reservas fetch origin main`. En los dos modos exige que `<sha>` esté en la
-   historia de `main`. En modo `despliegue`, si `<sha>` es ancestro del SHA de
-   `version_previa` (`git merge-base --is-ancestor`), termina en 0 sin tocar nada: la versión
-   está superada. En modo `vuelta-atras` busca `<sha>` en `historial` y toma de ahí sus
-   digests. Después valida el `.env` y hace `git checkout --detach <sha>`. El clon es del repositorio
+   historia de `main`. En modo `despliegue`, si `<sha>` es ancestro **propio** del SHA de
+   `version_previa` (`git merge-base --is-ancestor` y `<sha>` distinto), termina en 0 sin tocar
+   nada: la versión está superada. Un `<sha>` **igual** al que está sirviendo **no** se saltea:
+   `--is-ancestor` también da verdadero para un SHA igual, y redesplegar el mismo commit es la
+   forma de aplicar un cambio del `.env` (por ejemplo, `SITE_ADDRESS` al pasar a HTTPS); se
+   regenera `compose.env` y `docker compose up -d` recrea lo que cambió. En modo `vuelta-atras` busca `<sha>` en `historial` y toma de ahí sus
+   digests. Después valida el `.env` y hace `git checkout --detach <sha>`. Si el `desplegar.sh` de `<sha>`
+   es otro archivo que el que está corriendo (el script en ejecución es el del commit anterior, y un
+   cambio al script llegaría un despliegue tarde), **se reejecuta una sola vez con la versión
+   nueva** (`RESERVAS_REEJECUTADO=1`; hereda el descriptor del lock y la salida ya duplicada). Solo
+   en modo `despliegue`: una vuelta atrás no debe ejecutar el script de una versión vieja. El
+   `ssh-entrada.sh` es el límite de confianza y se actualiza con el mismo `git checkout`, de modo
+   que rige desde la llamada siguiente. El clon es del repositorio
    público, sin credenciales. Así, `docker-compose.prod.yml`, el `Caddyfile` y el propio script
    salen del mismo commit que las imágenes.
 4. Escribe `.despliegue/compose.env` (D6) con las imágenes **por digest**. El `.env` no se
@@ -494,13 +524,32 @@ que nunca se versiona ni lo toca `git checkout`.
    (D8), con `ADMIN_EMAIL` y `ADMIN_PASSWORD` pasados por entorno. Si falla, corta del mismo
    modo.
 9. `docker compose up -d --remove-orphans`.
-10. **Comprobación:** hasta 90 s de reintentos contra el proxy de borde: la página principal
-    (espera `200`) y `/api/zonas` (espera `200` y un JSON).
-11. Si la comprobación pasa, escribe la versión nueva en `VERSION_ACTUAL`, la agrega a
-    `historial` y hace la limpieza de imágenes (abajo). Termina en 0.
-12. Si falla, vuelve a **`version_previa`**: hace su `checkout`, reescribe `compose.env` con
-    sus digests y repite los pasos 9 y 10. `VERSION_ACTUAL` no cambia. Termina en 1 con el mensaje
-    `VUELTA ATRÁS a <sha-previo>`, que el workflow muestra.
+10. **Comprobación:** hasta 90 s de reintentos contra el proxy de borde **según la etapa**: en
+    `:80`, `http://127.0.0.1`; en la etapa HTTPS, `https://<subdominio>` con
+    `curl --resolve <subdominio>:443:127.0.0.1` (así viaja el nombre del sitio, SNI y `Host`, y
+    una respuesta solo llega si Caddy tiene el certificado). Espera la página principal (`200`) y
+    `/api/zonas` (`200` y un JSON). En un **cambio de etapa a un dominio** la espera es de hasta
+    300 s (ver «Cambio de etapa»).
+11. Si la comprobación pasa, escribe la versión nueva en `VERSION_ACTUAL` y la etapa en
+    `.despliegue/SITE_ADDRESS_VIGENTE`, agrega la versión a `historial` (sin repetir la última
+    línea si es un redespliegue) y hace la limpieza de imágenes (abajo). Termina en 0.
+12. Si falla, vuelve a **`version_previa` y a su etapa**: hace su `checkout`, reescribe
+    `compose.env` con sus digests y el `SITE_ADDRESS` de `SITE_ADDRESS_VIGENTE`, y repite los
+    pasos 9 y 10 con esa etapa. `VERSION_ACTUAL` no cambia. Termina en 1 con el mensaje
+    `VUELTA ATRÁS a <sha-previo> (etapa <site>)`, que el workflow muestra.
+
+**Cambio de etapa (HTTP → HTTPS).** `SITE_ADDRESS` define la etapa y vive en el `.env`. Cambiarlo
+y redesplegar el mismo SHA recrea Caddy. El orden de activación importa (D9): si el security group
+se abriera **antes**, el login del admin quedaría en HTTP, abierto a internet, mientras
+`SITE_ADDRESS` sigue en `:80`. Por eso se cambia `SITE_ADDRESS` y se redespliega **primero**, y se
+abre el security group **después**. Como con el 80 cerrado Let's Encrypt no puede validar, la
+comprobación del paso 10 espera hasta 300 s (en vez de 90) cuando la etapa cambia a un dominio, y
+el log avisa cuándo abrir 80 y 443; Caddy reintenta la validación solo. Si el certificado no se
+emite a tiempo, la vuelta atrás (paso 12) vuelve a la versión **y a la etapa** anteriores
+(`SITE_ADDRESS_VIGENTE`), con la comprobación habitual de 90 s: el sitio queda en HTTP y el
+runbook indica volver a cerrar el security group antes de reintentar. Sin este registro de la
+etapa, la vuelta atrás releería el mismo `SITE_ADDRESS` nuevo del `.env` y fallaría igual, con el
+sitio caído. Una instalación sin `SITE_ADDRESS_VIGENTE` toma como vigente la del `.env`.
 
 **Limpieza de imágenes:** `docker image prune` sin `-a` solo borra imágenes sin tag, y las
 anteriores conservan su tag `<sha>`. El script borra explícitamente las imágenes de
@@ -607,14 +656,18 @@ Pasos manuales que deja documentados, con las políticas JSON completas:
 - **Activar HTTPS con el subdominio:**
   1. pasarle a la docente la IP elástica;
   2. esperar a que el registro `A` del subdominio resuelva a esa IP (`dig +short <subdominio>`);
-  3. abrir el security group a `0.0.0.0/0` en 80 y 443, cambiar `SITE_ADDRESS` en
-     `/opt/reservas/.env` al subdominio y redesplegar;
-  4. verificar el certificado, la redirección y HSTS (tarea 6.6).
+  3. **cambiar `SITE_ADDRESS`** en `/opt/reservas/.env` al subdominio **primero**;
+  4. **redesplegar** la versión en servicio (mismo SHA; D7 no lo saltea);
+  5. **abrir el security group** a `0.0.0.0/0` en 80 y 443 **recién cuando el log lo indique**
+     (Caddy ya está en la etapa HTTPS y reintenta la validación; D7, «Cambio de etapa»);
+  6. verificar el certificado, la redirección y HSTS (tarea 6.6).
 
   Si Caddy no logra emitir el certificado (DNS todavía no propagado), sigue reintentando y el
   sitio no responde por HTTPS hasta lograrlo. En ese caso se vuelve a la etapa HTTP **completa**:
   primero se restringe otra vez el security group a las IPs del equipo, después se vuelve a
-  `SITE_ADDRESS=:80` y se redespliega. Volver a `:80` sin restringir el security group dejaría
+  `SITE_ADDRESS=:80` y se redespliega. Si la activación terminó en vuelta atrás automática, el
+  sitio ya volvió a HTTP con el security group abierto: se lo restringe de nuevo antes de
+  reintentar. Volver a `:80` sin restringir el security group dejaría
   el login en claro abierto a internet. Se reintenta cuando el DNS resuelva.
   (El puerto 22 no cambia entre etapas.)
 - **Riesgo aceptado de la etapa HTTP** y su alcance, según la spec.
@@ -627,10 +680,30 @@ una línea en un workflow, dentro de un change que justamente trata del pipeline
 `config.yaml`).
 
 La función de decisión del job `decidir` (D4) vive en `scripts/cd/` con sus tests de
-`node --test`, que ya corre el paso `test:scripts` del CI. Sus tests cubren los escenarios del
+`node --test`, que corre el paso `test:scripts` del CI. Ese script usa un glob
+(`scripts/*.test.mjs scripts/cd/*.test.mjs`) para que un test nuevo de `scripts/cd/` no quede
+fuera sin que nadie lo note. La lógica de `deploy/desplegar.sh` (redespliegue, etapa,
+vuelta atrás, reejecución) se prueba con `npm run test:deploy` (`deploy/test/desplegar.test.sh`):
+repositorio Git temporal y simulacros de `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker
+ni red, en un paso propio del CI. Sus tests cubren los escenarios del
 requisito "Despliegue automático solo desde main con CI en verde" que no se pueden provocar a
 mano en `main` sin romperlo: CI en rojo, dos merges seguidos, CI viejo que termina tarde, commit
 posterior en rojo o corriendo, y despacho manual inválido.
+
+### D11: Resolución de la revisión del 8/10 (#71)
+
+| Punto de la revisión | Resolución |
+|---|---|
+| 1. Redesplegar el mismo SHA no hace nada | D7 paso 3: el atajo vale solo para un SHA anterior. |
+| 2. Chequeo de salud y vuelta atrás ignoran la etapa | D7 pasos 10-12: comprueba con la etapa en curso y vuelve a la etapa vigente. |
+| 3. El orden de activación deja HTTP abierto | D9 y D7 «Cambio de etapa»: `SITE_ADDRESS` primero, security group después. |
+| 4. Los tests de `scripts/cd/` no corrían en CI | D10: `test:scripts` con glob y `test:deploy` (ya incluía el archivo de `decidir`; ahora no depende de listarlo). |
+| 5. Un commit verde puede cancelarse | D4: sin `concurrency`; cola con `flock` en el servidor. |
+| 6. El script corre desde el commit anterior | D7 paso 3: reejecución con la versión nueva. |
+| 7. Tag `:<sha>` ya existente | D3: se exige la etiqueta `revision` igual al SHA. |
+| 8. Visibilidad de los paquetes en GHCR | D3: nacen privados; paso manual y reintento. |
+| 9. Aviso del certificado | D2: issue automático y límite de 60 días documentado. |
+| 10. Políticas IAM de SSM | Ya no aplican: el despliegue es por SSH y no hay rol IAM (D4, D6). |
 
 ## Risks / Trade-offs
 
