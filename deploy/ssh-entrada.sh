@@ -43,6 +43,12 @@
 
 set -euo pipefail
 
+# Si el cliente corta la conexión (el `timeout` del workflow, una caída de red), sshd manda
+# SIGHUP y cierra la tubería: este script y los que arranca la ignoran (sudo reenvía la señal
+# a desplegar.sh, que también la ignora) y el despliegue termina o vuelve atrás por su cuenta,
+# en vez de quedar a medias entre el checkout y el `up`.
+trap '' HUP PIPE
+
 DESPLEGAR="${RESERVAS_DESPLEGAR:-/opt/reservas/deploy/desplegar.sh}"
 
 rechazar() {
