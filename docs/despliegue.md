@@ -136,8 +136,14 @@ aws ec2 run-instances --region us-east-1 \
   --credit-specification CpuCredits=standard \
   --metadata-options HttpTokens=required,HttpEndpoint=enabled \
   --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=20,VolumeType=gp3,Encrypted=true}' \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=reservas-prod},{Key=Backup,Value=reservas}]'
+  --tag-specifications \
+    'ResourceType=instance,Tags=[{Key=Name,Value=reservas-prod},{Key=Backup,Value=reservas}]' \
+    'ResourceType=volume,Tags=[{Key=Name,Value=reservas-prod},{Key=Backup,Value=reservas}]'
 ```
+
+La política de snapshots (sección 8) apunta a **volúmenes** con `Backup=reservas`: por eso el
+comando etiqueta también el volumen (`ResourceType=volume`); etiquetar solo la instancia no
+generaría ningún snapshot.
 
 Asociar la IP elástica (sección 2) y anotar la IP: es `SERVER_HOST`.
 
@@ -151,9 +157,16 @@ Conectarse con el par de claves de AWS: `ssh -i clave.pem ubuntu@<IP-ELASTICA>`.
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl wget git unzip ca-certificates
 
-# Docker con el script oficial (incluye el plugin de Compose)
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh && rm get-docker.sh
+# Docker desde el repositorio apt oficial (documentación de Docker para Ubuntu), con su clave
+# verificable: no se ejecuta como root un script remoto sin fijar
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+# La huella tiene que ser 9DC8 5822 9FC7 DD38 854A  E2D8 8D81 803C 0EBF CD88; si no, parar.
+gpg --show-keys --with-fingerprint /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker ubuntu          # solo el usuario administrador; ver nota
 docker --version && docker compose version   # (reconectarse para que tome el grupo)
 
@@ -210,8 +223,11 @@ sudo ls -l /opt/reservas/.env      # -rw------- root root
 | `SITE_ADDRESS` | `:80` en la etapa HTTP; el subdominio en la etapa HTTPS (sección 9) |
 
 Hay una plantilla de referencia en [`deploy/env.produccion.example`](../deploy/env.produccion.example).
-`desplegar.sh` valida estos formatos y corta con un mensaje claro si algo falta. **Guardar la
-contraseña del admin en el gestor de contraseñas del equipo.**
+`desplegar.sh` exige que estén las cinco variables y valida el formato de `JWT_SECRET`,
+`POSTGRES_PASSWORD` y `SITE_ADDRESS`. Las credenciales del admin las valida el seed de producción
+antes de escribir nada: email con formato válido (la misma regla del login), contraseña de 16
+caracteres o más y distintas de las del README. **Guardar la contraseña del admin en el gestor de
+contraseñas del equipo.**
 
 ### 4.4 Usuario `deploy`, clave SSH y `sudo`
 
@@ -282,6 +298,17 @@ ssh -i ./github_actions_cd deploy@<IP-ELASTICA> bash          # rechazado: nunca
 ```
 
 Si abre una shell, el comando forzado no quedó bien en `authorized_keys`: **no seguir**.
+
+### 4.7 Rotación del log de despliegues
+
+`desplegar.sh` escribe su salida también en `/var/log/reservas-despliegue.log` (así queda el
+resultado aunque se corte la conexión SSH). Ese archivo crece con cada despliegue; se rota con
+`logrotate`, semanal, con 8 copias comprimidas y un tope de 5 MB:
+
+```bash
+sudo install -m 644 -o root -g root /opt/reservas/deploy/logrotate-reservas /etc/logrotate.d/reservas-despliegue
+sudo logrotate --debug /etc/logrotate.d/reservas-despliegue    # simulación: tiene que terminar sin errores
+```
 
 ## 5. GitHub: environment `produccion` y secrets
 
@@ -432,11 +459,19 @@ aws dlm create-lifecycle-policy --region us-east-1 \
 cualquier cambio riesgoso). Desde tu computadora, por SSH como `ubuntu`:
 
 ```bash
+# `pipefail` en el lado remoto: sin él, el estado de la tubería es el de `gzip` y un `pg_dump`
+# o un Compose que fallaron dejarían un archivo vacío que igual pasa `gunzip -t`.
 ssh -i clave.pem ubuntu@<IP-ELASTICA> \
-  'cd /opt/reservas && sudo docker compose -f deploy/docker-compose.prod.yml --env-file .despliegue/compose.env exec -T postgres pg_dump -U reservas reservas | gzip' \
-  > respaldo.sql.gz
-gunzip -t respaldo.sql.gz && echo "respaldo OK"
+  'set -o pipefail; cd /opt/reservas && sudo docker compose -f deploy/docker-compose.prod.yml --env-file .despliegue/compose.env exec -T postgres pg_dump -U reservas reservas | gzip' \
+  > respaldo.sql.gz \
+  && gunzip -t respaldo.sql.gz \
+  && gunzip -c respaldo.sql.gz | grep -q 'PostgreSQL database dump complete' \
+  && echo "respaldo OK" \
+  || { echo "FALLÓ el respaldo: no usar respaldo.sql.gz"; rm -f respaldo.sql.gz; }
 ```
+
+`pg_dump` termina el volcado con la línea `PostgreSQL database dump complete`: que esté es lo que
+distingue un respaldo completo de uno cortado.
 
 Guardar `respaldo.sql.gz` fuera del repositorio (contiene datos de contacto de las reservas).
 Para restaurarlo en una base vacía: `gunzip -c respaldo.sql.gz | docker compose ... exec -T postgres psql -U reservas reservas`.
@@ -520,10 +555,18 @@ existe: un despliegue nunca cambia credenciales sin aviso. Se rota a mano, como 
 
 ```bash
 cd /opt/reservas
-read -rsp "Nueva contraseña (16+ caracteres): " NUEVA_PASSWORD; echo; export NUEVA_PASSWORD
+read -rsp "Nueva contraseña (16+ caracteres): " NUEVA_PASSWORD; echo
+# El largo mínimo es el del seed; `|`, `&` y la barra invertida romperían el `sed` del final.
+prohibidos='[|&\\]'
+if [ "${#NUEVA_PASSWORD}" -lt 16 ] || [[ $NUEVA_PASSWORD =~ $prohibidos ]]; then
+  echo "Contraseña inválida: 16 caracteres o más, sin | & \\"; NUEVA_PASSWORD=""
+fi
+export NUEVA_PASSWORD
 ADMIN_EMAIL=$(sudo sed -n 's/^ADMIN_EMAIL=//p' .env); export ADMIN_EMAIL
 
-sudo -E docker compose -f deploy/docker-compose.prod.yml --env-file .despliegue/compose.env run --rm -T \
+# Solo si la base se actualiza se toca el .env: si falla (o la contraseña no pasó la validación),
+# no se cambia nada y el .env sigue coherente con la base.
+[ -n "$NUEVA_PASSWORD" ] && sudo -E docker compose -f deploy/docker-compose.prod.yml --env-file .despliegue/compose.env run --rm -T \
   -e NUEVA_PASSWORD -e ADMIN_EMAIL backend node -e "
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
@@ -534,10 +577,9 @@ const bcrypt = require('bcrypt');
   await prisma.\$disconnect();
   console.log('Contraseña del admin actualizada.');
 })().catch((e) => { console.error(e.message); process.exit(1); });
-"
-
-# Dejar el .env coherente con la base (el seed lo ignora si el admin existe)
-sudo NUEVA_PASSWORD="$NUEVA_PASSWORD" bash -c 'sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$NUEVA_PASSWORD|" /opt/reservas/.env'
+" \
+&& sudo NUEVA_PASSWORD="$NUEVA_PASSWORD" bash -c 'sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$NUEVA_PASSWORD|" /opt/reservas/.env' \
+&& echo ".env actualizado (el seed lo ignora si el admin ya existe)" || echo "NO se cambió nada"
 unset NUEVA_PASSWORD ADMIN_EMAIL
 sudo ls -l /opt/reservas/.env      # sigue -rw------- root root
 ```
