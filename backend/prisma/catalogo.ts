@@ -256,7 +256,7 @@ export async function seedCatalogoSiFalta(
     vipId ??= (await prisma.zona.findUnique({ where: { nombre: 'VIP' } }))?.id;
     if (!standardId || !vipId) {
       log(
-        'Seed: no hay zonas STANDARD y VIP (el administrador las renombró o borró): no se cargan las mesas iniciales.',
+        'Seed: no hay zonas STANDARD y VIP (la API no permite renombrarlas ni borrarlas: revisar la base por un cambio manual o un seed de zonas que no corrió): no se cargan las mesas iniciales.',
       );
     } else {
       log('Seed: mesas...');
