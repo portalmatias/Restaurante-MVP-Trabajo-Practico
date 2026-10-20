@@ -153,3 +153,8 @@ jobs:
       # (que diferencias de orden son deriva y cuales no). Se testea aparte, sin build.
       - name: Tests de las utilidades de scripts/
         run: npm run test:scripts
+
+      # D7 de despliegue-continuo-ec2: la lógica de deploy/desplegar.sh (redespliegue, etapa
+      # HTTP/HTTPS, vuelta atrás, reejecución) se prueba sin Docker ni red, con simulacros.
+      - name: Tests de deploy/desplegar.sh
+        run: npm run test:deploy
