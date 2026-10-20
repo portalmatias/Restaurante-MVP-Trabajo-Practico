@@ -80,7 +80,9 @@ Entre que existe la instancia y la docente configura el DNS, producción respond
 plano en la IP**. El equipo acepta ese riesgo **solo durante esa etapa transitoria**: el email
 y la contraseña del login de admin, el JWT y los datos de contacto de las reservas viajarían
 sin cifrar. Por eso, en esa etapa no se carga ningún dato real ni se usa el login de admin
-fuera de pruebas, y el paso a HTTPS es un cambio de configuración, sin tocar código.
+fuera de pruebas, y el paso a HTTPS es un cambio de configuración, sin tocar código. El riesgo
+se acota además con el security group: en esa etapa admite el puerto HTTP **solo desde las
+direcciones del equipo**, así que no está abierto a internet.
 
 ### AWS en el Tier gratuito (propuesta de la docente)
 

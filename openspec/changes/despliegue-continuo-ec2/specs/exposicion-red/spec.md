@@ -37,9 +37,15 @@ parezcan acotadas, hacen confiable a cualquier origen.
 - **AND** la documentación advierte que esa configuración deja los límites por máquina
 
 #### Scenario: Encabezado agregado por un cliente detrás del salto confiable
-- **WHEN** con un salto confiable declarado, el cliente, cuya IP no pertenece a ningún salto
-  confiable, envía su propio `X-Forwarded-For` y el salto confiable agrega la IP real al final
+- **WHEN** la configuración declara confiable la dirección del frontend y el cliente, cuya IP no
+  pertenece a ningún salto confiable, envía su propio `X-Forwarded-For` y el frontend, que es ese
+  salto confiable, agrega la IP real al final
 - **THEN** el backend usa la IP que agregó el salto, no la que inventó el cliente
+
+#### Scenario: Encabezado que llega desde una dirección que no es un salto confiable
+- **WHEN** una solicitud con `X-Forwarded-For` llega al backend desde una dirección que la
+  configuración no declara confiable
+- **THEN** el backend ignora el encabezado y aplica los límites a la dirección de la conexión
 
 #### Scenario: Proxy de borde que reemplaza el encabezado
 - **WHEN** el proxy de borde reemplaza el `X-Forwarded-For` del cliente por la IP de la

@@ -96,7 +96,10 @@ ejecute exactamente lo mismo.
 Después de levantar una versión nueva, el despliegue SHALL comprobar que la aplicación
 responde a través del proxy de borde, tanto la página pública como una consulta a la API. Si
 la comprobación falla, SHALL volver a levantar la versión anterior y el workflow SHALL
-terminar en error.
+terminar en error. La vuelta atrás restaura el código, las imágenes y la configuración, pero
+NO el schema de la base de datos: por eso las migraciones SHALL ser compatibles con la versión
+anterior de la aplicación (cambios aditivos; un cambio que quita o renombra algo se hace en dos
+versiones, primero agregando y recién después retirando lo viejo).
 
 #### Scenario: Versión nueva sana
 - **WHEN** la versión nueva responde a la comprobación dentro del tiempo límite
@@ -111,6 +114,14 @@ terminar en error.
 - **WHEN** falla la comprobación de una versión nueva
 - **THEN** el servidor vuelve a la versión que estaba sirviendo justo antes de ese intento, no
   a una más vieja
+
+#### Scenario: Vuelta atrás después de una migración
+- **WHEN** una versión nueva aplicó una migración y después no responde a la comprobación
+- **THEN** el servidor vuelve a levantar la versión anterior, que tiene que seguir
+  funcionando con el schema ya migrado
+- **AND** la documentación indica que una migración que quita o renombra algo no se publica
+  junto con el código que deja de usarlo, y que antes de una migración riesgosa se exporta la
+  base con `pg_dump`
 
 #### Scenario: Cambio de etapa que no se puede completar
 - **WHEN** se cambia `SITE_ADDRESS` para pasar a HTTPS y el proxy de borde no obtiene el
@@ -170,7 +181,8 @@ autenticación por clave y SHALL rechazar el ingreso del usuario `root`.
 - **THEN** la conexión no se establece
 
 #### Scenario: Acceso normal
-- **WHEN** un cliente abre la dirección pública de producción
+- **WHEN** un cliente abre la dirección pública de producción (en la etapa HTTPS, cualquier
+  cliente; en la etapa HTTP, un cliente con una dirección del equipo)
 - **THEN** recibe la aplicación servida a través del proxy de borde
 
 ### Requirement: Secretos fuera del repositorio, las imágenes y los logs
@@ -241,7 +253,9 @@ Producción SHALL arrancar con el catálogo necesario para operar (zonas, mesas,
 configuración de negocio) y sin reservas de ejemplo. La cuenta de admin de producción SHALL
 crearse con credenciales provistas como secretos de producción y SHALL NOT poder usar las
 credenciales documentadas en el README para el entorno de desarrollo. Cargar los datos
-iniciales SHALL ser idempotente y SHALL NOT sobrescribir la contraseña de un admin existente.
+iniciales SHALL ser idempotente, SHALL NOT sobrescribir la contraseña de un admin existente y
+SHALL NOT revertir cambios que el administrador hizo después sobre el catálogo (reglas de zona,
+aforo, mesas y turnos): un despliegue solo carga lo que falta.
 
 #### Scenario: Login con las credenciales del README
 - **WHEN** alguien intenta loguearse en producción con el email y la contraseña de admin que
@@ -251,6 +265,15 @@ iniciales SHALL ser idempotente y SHALL NOT sobrescribir la contraseña de un ad
 #### Scenario: Login con las credenciales de producción
 - **WHEN** el admin se loguea con las credenciales guardadas como secreto de producción
 - **THEN** el login funciona
+
+#### Scenario: Catálogo modificado por el administrador
+- **WHEN** el administrador cambió una regla de zona, la capacidad de una mesa, un turno o el
+  aforo, y se despliega una versión nueva
+- **THEN** esos valores siguen como los dejó el administrador
+
+#### Scenario: Email de admin inválido
+- **WHEN** el email de admin provisto para producción no tiene formato de email válido
+- **THEN** la carga de datos iniciales se detiene con un error y no crea la cuenta
 
 #### Scenario: Contraseña de admin débil
 - **WHEN** la contraseña de admin provista para producción tiene menos de 16 caracteres o
@@ -285,7 +308,8 @@ del frontend. Así, los límites de solicitudes se cuentan por la IP real de cad
 cliente no puede falsificarla.
 
 #### Scenario: Dos clientes distintos
-- **WHEN** un cliente agota el límite de intentos de login en producción
+- **WHEN** un cliente agota el límite de intentos de login en producción (en la etapa HTTP, los
+  dos clientes tienen direcciones del equipo, porque no se admite a nadie más)
 - **THEN** otro cliente, desde otra IP, puede seguir intentando loguearse y recibe `401`, no
   `429`
 
@@ -351,6 +375,7 @@ exponer la versión del servidor ni del framework.
 
 #### Scenario: Encabezados de seguridad
 - **WHEN** un cliente pide cualquier página de producción
-- **THEN** la respuesta incluye `X-Content-Type-Options: nosniff`, una política que impide
-  mostrar la app dentro de un frame de otro sitio y una `Referrer-Policy` restrictiva
+- **THEN** la respuesta incluye `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+  `Content-Security-Policy: frame-ancestors 'none'` (que impiden mostrar la app dentro de un
+  frame de otro sitio) y `Referrer-Policy: strict-origin-when-cross-origin`
 - **AND** no expone en los encabezados la versión del servidor ni del framework

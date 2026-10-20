@@ -100,8 +100,8 @@ diferencia con desarrollo que no está probada. Se descarta.
 
 ### D2: Caddy como proxy de borde
 
-**Decisión:** imagen oficial de Caddy con versión fija (`caddy:2.10-alpine`; se confirma el tag
-al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale de una variable,
+**Decisión:** imagen oficial de Caddy con versión y digest fijos (`caddy:2.11.7-alpine@sha256:...`,
+la que fija `deploy/docker-compose.prod.yml`) y un `deploy/Caddyfile` versionado. La dirección del sitio sale de una variable,
 `SITE_ADDRESS`, que define la etapa:
 
 - **Etapa HTTP (transitoria):** `SITE_ADDRESS=:80`, mientras el subdominio no apunte a la IP
@@ -243,7 +243,11 @@ validó el CI.
      historia de `main`; la instancia exige además que figure en `historial` (D7).
 
    La ancestría se resuelve con la API `compare` de GitHub, y el estado del CI con las
-   ejecuciones del workflow `CI` de evento `push` sobre `main`.
+   ejecuciones del workflow `CI` de evento `push` sobre `main`. Dos límites de la API se
+   cubren explícitamente: `compare` devuelve a lo sumo 250 commits posteriores, así que si
+   `ahead_by` supera lo recibido la lista quedó truncada (faltan los más nuevos) y el pedido se
+   rechaza; y las ejecuciones del CI se piden por páginas de 100 hasta cubrir todos los commits
+   posteriores (tope de 10 páginas), no una sola página.
 2. `imagenes`: checkout de ese SHA y `docker/build-push-action` de las dos imágenes a GHCR, con
    `permissions: packages: write` y el `GITHUB_TOKEN`. Si el tag ya existe, no se reconstruye
    (D3). Expone como salida los dos digests.
@@ -573,10 +577,16 @@ script lo informa, deja los contenedores detenidos y termina en 1.
   turnos) a `backend/prisma/catalogo.ts`. `seed.ts` sigue igual en comportamiento: catálogo,
   admin del README y reservas de ejemplo.
 - `backend/prisma/seed-produccion.ts`:
-  1. Carga el catálogo (idempotente, como hoy).
+  1. Carga el catálogo **solo donde falta** (`seedCatalogoSiFalta`): una tabla que ya tiene
+     filas no se toca. `seedCatalogo`, que usa el seed de desarrollo, reescribe con `upsert` las
+     reglas de zona, el aforo, la capacidad y zona de las mesas y el estado de los turnos; en
+     cada despliegue eso revertiría lo que el administrador cambió por la API de gestión del
+     salón.
   2. Lee `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
-  3. Corta con un error si falta alguna, si la contraseña tiene menos de 16 caracteres o si
-     coincide con la contraseña o el email de desarrollo. El script importa esas constantes, en
+  3. Corta con un error si falta alguna, si el email no tiene formato válido (la misma regla
+     `@IsEmail()` del login: de lo contrario la cuenta se crearía pero no podría ingresar), si la
+     contraseña tiene menos de 16 caracteres o si coincide con la contraseña o el email de
+     desarrollo. El script importa esas constantes, en
      lugar de copiarlas, para que la comparación no quede desactualizada.
   4. Si no existe un usuario con ese email, lo crea con bcrypt. Si existe, **no toca** su
      contraseña.
