@@ -19,7 +19,7 @@ export const UMBRAL_CASI_LLENO = 80;
 
 export type LecturaAforo = {
   nivel: NivelAforo;
-  /** Porcentaje entero de ocupación, sin tope (110 de 40 es 275). 0 si no hay aforo. */
+  /** Porcentaje entero de ocupación, redondeado hacia abajo y sin tope (110 de 40 es 275). 0 si no hay aforo. */
   porcentaje: number;
   /** Lugares libres, nunca negativos. */
   libres: number;
@@ -32,12 +32,14 @@ export function leerAforo(ocupado: number, maximo: number): LecturaAforo {
     return { nivel: "sin-aforo", porcentaje: 0, libres: 0, ancho: ocupado > 0 ? 100 : 0 };
   }
   const razon = (ocupado / maximo) * 100;
-  const porcentaje = Math.round(razon);
+  // Entero hacia abajo y calculado con enteros: ni el redondeo ni la coma flotante lo adelantan
+  // (39 de 49 es 79 %, no 80 %; 199 de 200 es 99 %, no 100 %).
+  const porcentaje = Math.floor((ocupado * 100) / maximo);
   const libres = Math.max(0, maximo - ocupado);
   const ancho = Math.min(100, Math.max(0, razon));
   let nivel: NivelAforo = "holgado";
   if (ocupado > maximo) nivel = "sobrecupo";
   else if (ocupado === maximo) nivel = "completo";
-  else if (razon >= UMBRAL_CASI_LLENO) nivel = "casi-lleno";
+  else if (porcentaje >= UMBRAL_CASI_LLENO) nivel = "casi-lleno";
   return { nivel, porcentaje, libres, ancho };
 }
