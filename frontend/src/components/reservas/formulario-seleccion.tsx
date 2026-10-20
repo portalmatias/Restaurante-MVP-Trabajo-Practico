@@ -94,7 +94,10 @@ export function FormularioSeleccion({
   const maximoDias = Math.max(
     ...zonas.map((candidata) => candidata.anticipacionMaxDias),
   );
-  const ultimaFecha = sumarDias(hoy, maximoDias);
+  // El servidor mide la anticipación máxima por instante, no por día: la cena de hoy + máximo
+  // queda a más de `maximoDias` días y se rechaza. El último día que siempre alcanza es
+  // hoy + máximo - 1.
+  const ultimaFecha = sumarDias(hoy, maximoDias - 1);
   const zona = zonas.find((candidata) => candidata.id === zonaId);
 
   const faltantes: string[] = [];

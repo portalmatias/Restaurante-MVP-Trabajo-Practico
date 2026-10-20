@@ -528,3 +528,36 @@ describe("FormularioSeleccion - catálogo vacío", () => {
     expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute("href", "/reservas");
   });
 });
+
+describe("FormularioSeleccion - último día elegible del calendario", () => {
+  // Con la zona de mayor anticipación en 60 días (VIP) y hoy 2026-09-14, el último día que el
+  // backend acepta a cualquier hora es hoy + 59: la cena de hoy + 60 queda a más de 60 días
+  // (spec «Días no elegibles distinguidos por texto»).
+  const ULTIMO_ELEGIBLE = "2026-11-12"; // jueves, hoy + 59
+  const PRIMER_LEJANO = "2026-11-13"; // viernes, hoy + 60
+
+  const estaDeshabilitado = (fecha: string) => diaDelCalendario(fecha).getAttribute("aria-disabled") === "true";
+
+  function irAlMes(nombreMes: RegExp) {
+    for (let intento = 0; intento < 14; intento += 1) {
+      if (nombreMes.test(calendario().textContent ?? "")) return;
+      fireEvent.click(screen.getByRole("button", { name: "Mes siguiente" }));
+    }
+    throw new Error("No se llegó al mes pedido.");
+  }
+
+  it("ofrece hoy + 59 y deja deshabilitado hoy + 60", () => {
+    renderizar();
+    irAlMes(/noviembre/i);
+
+    expect(estaDeshabilitado(ULTIMO_ELEGIBLE)).toBe(false);
+    expect(estaDeshabilitado(PRIMER_LEJANO)).toBe(true);
+  });
+
+  it("deshabilita «Mes siguiente» en el mes de ese último día", () => {
+    renderizar();
+    irAlMes(/noviembre/i);
+
+    expect(screen.getByRole("button", { name: "Mes siguiente" })).toBeDisabled();
+  });
+});
