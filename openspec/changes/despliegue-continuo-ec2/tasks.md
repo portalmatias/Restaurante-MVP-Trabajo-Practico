@@ -1,10 +1,10 @@
 ## 1. Prerrequisitos
 
-- [ ] 1.1 Crear `feature/despliegue-continuo-ec2` desde `main` y confirmar que se cumplen los
+- [x] 1.1 Crear `feature/despliegue-continuo-ec2` desde `main` y confirmar que se cumplen los
       hechos de `design.md` (Context): sin Dockerfiles, `next.config.ts` con el rewrite de
       `/api`, `main.ts` con `HOST || '127.0.0.1'` y `configurarRed`, y `prisma` como
       dependencia de producción. Si algo cambió, anotarlo en la descripción del PR.
-- [ ] 1.2 Confirmar y fijar los tags de las imágenes base (`node:20-alpine` con versión de
+- [x] 1.2 Confirmar y fijar los tags de las imágenes base (`node:20-alpine` con versión de
       parche, `caddy:2.x-alpine`, `postgres:16.4-alpine`). Confirmar en la documentación de
       Caddy de ese tag que `reverse_proxy` ignora los `X-Forwarded-For` entrantes de orígenes no
       confiables (D2). Anotar los tags y el enlace a la documentación en el PR.
@@ -16,7 +16,7 @@
       cursada. Anotar el resultado, sin datos de la cuenta, en el PR. Si no entra, frenar y
       decidirlo con el equipo antes de seguir.
 
-- [ ] 1.4 Cubrir los escenarios modificados de `exposicion-red`:
+- [x] 1.4 Cubrir los escenarios modificados de `exposicion-red`:
       - confirmar que los tests unitarios de `configurar-red` ya rechazan `10.0.0.0/7` y
         admiten `10.0.0.0/8`;
       - agregar en `backend/test/exposicion-red.e2e-spec.ts` el caso "Confianza declarada solo
@@ -29,11 +29,11 @@
 
 ## 2. Seed de producción (D8)
 
-- [ ] 2.1 Extraer las funciones del catálogo de `backend/prisma/seed.ts` (configuración, zonas,
+- [x] 2.1 Extraer las funciones del catálogo de `backend/prisma/seed.ts` (configuración, zonas,
       mesas y turnos) a `backend/prisma/catalogo.ts`, sin cambiar el comportamiento. Exportar
       las constantes del admin de desarrollo. Verificar que `npm run db:seed -w backend` dos
       veces seguidas deja los mismos conteos, y que los tests de integración siguen en verde.
-- [ ] 2.2 Escribir los tests de `seed-produccion` contra la base de test (integración):
+- [x] 2.2 Escribir los tests de `seed-produccion` contra la base de test (integración):
       - sin `ADMIN_EMAIL` o `ADMIN_PASSWORD`, falla;
       - con una contraseña de 15 caracteres, falla;
       - con la contraseña o el email de desarrollo, falla;
@@ -42,12 +42,12 @@
       - con otra contraseña en la segunda corrida, no cambia el hash del admin existente.
 
       Verificar que fallan sin la implementación (rojo).
-- [ ] 2.3 Implementar `backend/prisma/seed-produccion.ts` y verificar que pasan los tests de
+- [x] 2.3 Implementar `backend/prisma/seed-produccion.ts` y verificar que pasan los tests de
       2.2 con `npm run test:integration -w backend`.
 
 ## 3. Imágenes de contenedor (D3)
 
-- [ ] 3.1 Escribir `.dockerignore` y `backend/Dockerfile` (multi-stage, usuario `node`,
+- [x] 3.1 Escribir `.dockerignore` y `backend/Dockerfile` (multi-stage, usuario `node`,
       `HOST=0.0.0.0`, con `dist-seed/seed-produccion.js` compilado y `prisma/`). Verificar que
       `docker build -f backend/Dockerfile .` construye, que `docker run --rm <img> id -u` no da
       `0`, que `docker history --no-trunc` y `docker inspect` no muestran ningún valor de
@@ -55,7 +55,7 @@
       (`docker create` + `docker export`) y verificar que no contiene ningún archivo `.env*` y que
       `grep` no encuentra ninguno de los valores del `.env` local. Repetir la misma verificación
       sobre la imagen del frontend en 3.2.
-- [ ] 3.2 Agregar `output: "standalone"` a `frontend/next.config.ts` y escribir
+- [x] 3.2 Agregar `output: "standalone"` a `frontend/next.config.ts` y escribir
       `frontend/Dockerfile` (build-arg `NEXT_PUBLIC_API_URL=http://backend:3001`,
       `HOSTNAME=0.0.0.0`, usuario `node`). Verificar que construye, que `npm run dev` y
       `npm run test -w frontend` siguen funcionando en local, que el usuario no es root, y la
@@ -63,7 +63,7 @@
 
 ## 4. Composición de producción (D1, D2, D5, D6)
 
-- [ ] 4.1 Escribir `deploy/docker-compose.prod.yml`:
+- [x] 4.1 Escribir `deploy/docker-compose.prod.yml`:
       - redes `borde` e `interna` (`172.30.0.0/24`, frontend en `172.30.0.10`);
       - **solo** `caddy` con `ports: ["80:80", "443:443"]` y el volumen `caddy_data` (D1);
       - las imágenes propias **por digest** (`image@${DIGEST_BACKEND}`), nunca por tag;
@@ -74,7 +74,7 @@
 
       Verificar con `docker compose -f deploy/docker-compose.prod.yml config` que ningún otro
       servicio publica puertos.
-- [ ] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`,
+- [x] 4.2 Escribir `deploy/Caddyfile` con `SITE_ADDRESS`,
       `reverse_proxy frontend:3000`, los encabezados de D2 (incluido quitar `Server` y
       `X-Powered-By`) y HSTS solo en la etapa HTTPS. Verificar localmente, levantando la
       composición con imágenes locales y un `.env` de prueba con `SITE_ADDRESS=:80`:
@@ -86,7 +86,7 @@
       Para la etapa HTTPS, verificar con `caddy adapt` que con `SITE_ADDRESS=ejemplo.test` la
       configuración incluye la redirección de HTTP a HTTPS y el encabezado HSTS (la emisión real
       del certificado se prueba en 6.6).
-- [ ] 4.3 Probar la IP real del cliente con la composición local: 6 logins fallidos desde el
+- [x] 4.3 Probar la IP real del cliente con la composición local: 6 logins fallidos desde el
       host con un `X-Forwarded-For` distinto cada uno → el sexto responde `429`. Después, un
       login desde otro contenedor de la red `borde` (otra IP) → responde `401`, no `429`.
       Guardar la salida para el PR (spec: "Límites de solicitudes por IP real del cliente").
@@ -170,9 +170,11 @@
       - acciones fijadas por SHA y `concurrency` sin cancelar.
 
       Verificar con `actionlint` sin errores.
-- [ ] 5.5 Agregar `npm run test:frontend` al job de tests de `ci.yml` (D10). Verificar en el
-      PR que el job lo ejecuta y queda en verde.
-- [ ] 5.6 Escribir primero los tests y después `scripts/cd/decidir-despliegue.mjs` (D4, D10),
+- [x] 5.5 Agregar `npm run test:frontend` al job de tests de `ci.yml` (D10). Verificar en el
+      PR que el job lo ejecuta y queda en verde (el paso «Tests del frontend» corre y pasa en el
+      CI del PR #79, junto con «Tests de las utilidades de scripts/» y «Tests de
+      deploy/desplegar.sh»).
+- [x] 5.6 Escribir primero los tests y después `scripts/cd/decidir-despliegue.mjs` (D4, D10),
       con un caso por escenario del requisito "Despliegue automático solo desde main con CI en
       verde":
       - "CI en rojo sobre main" (no despliega);
@@ -183,19 +185,20 @@
       - vuelta atrás manual a un SHA de `main` (se acepta aunque esté superado).
 
       Verificar que fallan sin la implementación y que pasan con `npm run test:scripts`.
-- [ ] 5.7 Escribir `.github/workflows/certificado.yml` (D2): ejecución diaria y manual, que
+- [x] 5.7 Escribir `.github/workflows/certificado.yml` (D2): ejecución diaria y manual, que
       solo corre si existe la variable `SUBDOMINIO`, y falla si el certificado no es válido para
       ese nombre o le quedan menos de 21 días, y al fallar abre un issue (o comenta el abierto)
       con `permissions: issues: write` (D2). Verificar con `actionlint`, y probar el chequeo
       contra un sitio con certificado válido y contra uno vencido (por ejemplo,
       `expired.badssl.com`).
 
-- [ ] 5.8 Escribir `deploy/test/desplegar.test.sh` (D7, D10) con simulacros de `docker`, `curl`,
+- [x] 5.8 Escribir `deploy/test/desplegar.test.sh` (D7, D10) con simulacros de `docker`, `curl`,
       `flock`, `sleep` y `stat`: primer despliegue, cambio de etapa fallido con vuelta atrás a la
       etapa previa, redespliegue del mismo SHA con otro `SITE_ADDRESS`, SHA anterior superado,
       reejecución por cambio del script (una sola vez y log sin duplicar). Verificar que las
       pruebas fallan al revertir el atajo «superada» o la vuelta atrás a la etapa.
-- [ ] 5.9 CI (D10): `test:scripts` con glob (`scripts/*.test.mjs scripts/cd/*.test.mjs`) y un
+- [ ] 5.9 CI (D10): `test:scripts` con la lista explícita de archivos de test, incluido
+      `scripts/cd/decidir-despliegue.test.mjs` (Node 20 y `cmd.exe` no expanden globs), y un
       paso `npm run test:deploy` en `ci.yml`. Verificar en el PR que ambos corren.
 - [ ] 5.10 En `cd.yml` (D3, D4): sin `concurrency` (cola con `flock` en el servidor) y, si el tag
       `:<sha>` ya existe, exigir que la imagen declare `org.opencontainers.image.revision` igual
@@ -204,7 +207,7 @@
 
 ## 6. Infraestructura y primer despliegue (D9)
 
-- [ ] 6.1 Escribir `docs/despliegue.md`:
+- [x] 6.1 Escribir `docs/despliegue.md`:
       - runbook de AWS y del servidor, siguiendo las secciones 1 a 4 de la guía de la docente:
         security group (22, 80 y 443), instancia Ubuntu 24.04 sin rol IAM, Docker y Compose,
         clon directo en `/opt/reservas` (con el punto final), usuario `deploy` fuera del grupo
@@ -299,7 +302,7 @@
 
 ## 7. Documentación y cierre
 
-- [ ] 7.1 Actualizar `config.yaml`:
+- [x] 7.1 Actualizar `config.yaml`:
       - §4: `deploy/`, los Dockerfiles y `cd.yml`;
       - §10: `ADMIN_EMAIL` y `ADMIN_PASSWORD` solo para el seed de producción;
       - §12: workflow de CD por SSH (secrets del environment `produccion`).

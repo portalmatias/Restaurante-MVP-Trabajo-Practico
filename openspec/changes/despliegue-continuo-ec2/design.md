@@ -100,8 +100,8 @@ diferencia con desarrollo que no está probada. Se descarta.
 
 ### D2: Caddy como proxy de borde
 
-**Decisión:** imagen oficial de Caddy con versión fija (`caddy:2.10-alpine`; se confirma el tag
-al implementar) y un `deploy/Caddyfile` versionado. La dirección del sitio sale de una variable,
+**Decisión:** imagen oficial de Caddy con versión y digest fijos (`caddy:2.11.7-alpine@sha256:...`,
+la que fija `deploy/docker-compose.prod.yml`) y un `deploy/Caddyfile` versionado. La dirección del sitio sale de una variable,
 `SITE_ADDRESS`, que define la etapa:
 
 - **Etapa HTTP (transitoria):** `SITE_ADDRESS=:80`, mientras el subdominio no apunte a la IP
@@ -243,7 +243,11 @@ validó el CI.
      historia de `main`; la instancia exige además que figure en `historial` (D7).
 
    La ancestría se resuelve con la API `compare` de GitHub, y el estado del CI con las
-   ejecuciones del workflow `CI` de evento `push` sobre `main`.
+   ejecuciones del workflow `CI` de evento `push` sobre `main`. Dos límites de la API se
+   cubren explícitamente: `compare` devuelve a lo sumo 250 commits posteriores, así que si
+   `ahead_by` supera lo recibido la lista quedó truncada (faltan los más nuevos) y el pedido se
+   rechaza; y las ejecuciones del CI se piden por páginas de 100 hasta cubrir todos los commits
+   posteriores (tope de 10 páginas), no una sola página.
 2. `imagenes`: checkout de ese SHA y `docker/build-push-action` de las dos imágenes a GHCR, con
    `permissions: packages: write` y el `GITHUB_TOKEN`. Si el tag ya existe, no se reconstruye
    (D3). Expone como salida los dos digests.
@@ -500,8 +504,10 @@ que nunca se versiona ni lo toca `git checkout`.
    sirviendo y a la que se vuelve si algo falla.
 3. `git -C /opt/reservas fetch origin main`. En los dos modos exige que `<sha>` esté en la
    historia de `main`. En modo `despliegue`, si `<sha>` es ancestro **propio** del SHA de
-   `version_previa` (`git merge-base --is-ancestor` y `<sha>` distinto), termina en 0 sin tocar
-   nada: la versión está superada. Un `<sha>` **igual** al que está sirviendo **no** se saltea:
+   `version_previa` (`git merge-base --is-ancestor` y `<sha>` distinto), termina con el código 3
+   sin tocar nada: la versión está superada. No es un error (el job de Actions termina en verde),
+   pero tampoco es un despliegue: por eso lleva un código propio y el resumen del job dice «No se
+   desplegó: versión superada» en lugar de «Desplegado en producción». Un `<sha>` **igual** al que está sirviendo **no** se saltea:
    `--is-ancestor` también da verdadero para un SHA igual, y redesplegar el mismo commit es la
    forma de aplicar un cambio del `.env` (por ejemplo, `SITE_ADDRESS` al pasar a HTTPS); se
    regenera `compose.env` y `docker compose up -d` recrea lo que cambió. En modo `vuelta-atras` busca `<sha>` en `historial` y toma de ahí sus
@@ -572,10 +578,16 @@ script lo informa, deja los contenedores detenidos y termina en 1.
   turnos) a `backend/prisma/catalogo.ts`. `seed.ts` sigue igual en comportamiento: catálogo,
   admin del README y reservas de ejemplo.
 - `backend/prisma/seed-produccion.ts`:
-  1. Carga el catálogo (idempotente, como hoy).
+  1. Carga el catálogo **solo donde falta** (`seedCatalogoSiFalta`): una tabla que ya tiene
+     filas no se toca. `seedCatalogo`, que usa el seed de desarrollo, reescribe con `upsert` las
+     reglas de zona, el aforo, la capacidad y zona de las mesas y el estado de los turnos; en
+     cada despliegue eso revertiría lo que el administrador cambió por la API de gestión del
+     salón.
   2. Lee `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
-  3. Corta con un error si falta alguna, si la contraseña tiene menos de 16 caracteres o si
-     coincide con la contraseña o el email de desarrollo. El script importa esas constantes, en
+  3. Corta con un error si falta alguna, si el email no tiene formato válido (la misma regla
+     `@IsEmail()` del login: de lo contrario la cuenta se crearía pero no podría ingresar), si la
+     contraseña tiene menos de 16 caracteres o si coincide con la contraseña o el email de
+     desarrollo. El script importa esas constantes, en
      lugar de copiarlas, para que la comparación no quede desactualizada.
   4. Si no existe un usuario con ese email, lo crea con bcrypt. Si existe, **no toca** su
      contraseña.
@@ -681,9 +693,10 @@ una línea en un workflow, dentro de un change que justamente trata del pipeline
 `config.yaml`).
 
 La función de decisión del job `decidir` (D4) vive en `scripts/cd/` con sus tests de
-`node --test`, que corre el paso `test:scripts` del CI. Ese script usa un glob
-(`scripts/*.test.mjs scripts/cd/*.test.mjs`) para que un test nuevo de `scripts/cd/` no quede
-fuera sin que nadie lo note. La lógica de `deploy/desplegar.sh` (redespliegue, etapa,
+`node --test`, que corre el paso `test:scripts` del CI. Ese script lista los archivos de test
+uno por uno (`scripts/openapi-diff.test.mjs scripts/cd/decidir-despliegue.test.mjs`): el CI usa
+Node 20, cuyo `node --test` no expande globs, y en Windows (`cmd.exe`) el shell tampoco lo hace;
+un test nuevo se agrega a esa lista. La lógica de `deploy/desplegar.sh` (redespliegue, etapa,
 vuelta atrás, reejecución) se prueba con `npm run test:deploy` (`deploy/test/desplegar.test.sh`):
 repositorio Git temporal y simulacros de `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker
 ni red, en un paso propio del CI. Sus tests cubren los escenarios del
@@ -698,7 +711,7 @@ posterior en rojo o corriendo, y despacho manual inválido.
 | 1. Redesplegar el mismo SHA no hace nada | D7 paso 3: el atajo vale solo para un SHA anterior. |
 | 2. Chequeo de salud y vuelta atrás ignoran la etapa | D7 pasos 10-12: comprueba con la etapa en curso y vuelve a la etapa vigente. |
 | 3. El orden de activación deja HTTP abierto | D9 y D7 «Cambio de etapa»: `SITE_ADDRESS` primero, security group después. |
-| 4. Los tests de `scripts/cd/` no corrían en CI | D10: `test:scripts` con glob y `test:deploy` (ya incluía el archivo de `decidir`; ahora no depende de listarlo). |
+| 4. Los tests de `scripts/cd/` no corrían en CI | D10: `test:scripts` incluye el archivo de `decidir` (lista explícita, porque Node 20 y `cmd.exe` no expanden globs) y se suma `test:deploy`. |
 | 5. Un commit verde puede cancelarse | D4: sin `concurrency`; cola con `flock` en el servidor. |
 | 6. El script corre desde el commit anterior | D7 paso 3: reejecución con la versión nueva. |
 | 7. Tag `:<sha>` ya existente | D3: se exige la etiqueta `revision` igual al SHA. |
