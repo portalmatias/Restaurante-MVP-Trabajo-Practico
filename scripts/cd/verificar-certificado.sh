@@ -30,8 +30,14 @@ trap 'rm -rf "$temporal"' EXIT
 if ! timeout 30 openssl s_client -connect "$nombre:443" -servername "$nombre" \
   -verify_hostname "$nombre" -verify_return_error < /dev/null \
   > "$temporal/salida" 2> "$temporal/errores"; then
-  motivo="$(grep -m1 -iE 'verify error|error|unable' "$temporal/errores" || echo 'sin detalle')"
-  echo "El certificado de $nombre NO es válido: $motivo" >&2
+  motivo="$(grep -m1 -iE 'verify error|error|unable|timed out|no route|connection' "$temporal/errores" || echo 'sin detalle')"
+  # Un fallo de red o de DNS no es un certificado inválido: el aviso no tiene que mandar a
+  # revisar el certificado cuando el problema es que el sitio no responde.
+  if grep -qiE 'verify error|certificate verify|hostname mismatch|self.signed|expired' "$temporal/errores"; then
+    echo "El certificado de $nombre NO es válido: $motivo" >&2
+  else
+    echo "No se pudo verificar el certificado de $nombre: no hubo conexión TLS (puede ser la red, el DNS o que el sitio no esté respondiendo). Detalle: $motivo" >&2
+  fi
   exit 1
 fi
 

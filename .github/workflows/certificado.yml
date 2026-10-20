@@ -24,6 +24,12 @@ on:
 
 permissions: {}
 
+# Una sola verificación a la vez: el aviso busca un issue abierto y recién después lo crea, y
+# dos ejecuciones simultáneas (la programada y una manual) podían abrir dos.
+concurrency:
+  group: certificado
+  cancel-in-progress: false
+
 jobs:
   verificar:
     name: Verificar el certificado
@@ -38,6 +44,7 @@ jobs:
           persist-credentials: false
 
       - name: Certificado válido y con 21 días o más
+        id: verificar
         env:
           SUBDOMINIO: ${{ vars.SUBDOMINIO }}
         run: |
@@ -47,8 +54,10 @@ jobs:
           fi
           echo "$salida"
 
+      # Solo si falló la verificación: una caída del runner o del checkout no es un problema del
+      # certificado y no debe abrir un issue que diga lo contrario.
       - name: Abrir un issue si falló
-        if: failure()
+        if: failure() && steps.verificar.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
           SUBDOMINIO: ${{ vars.SUBDOMINIO }}
