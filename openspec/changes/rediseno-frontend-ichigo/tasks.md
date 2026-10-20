@@ -31,9 +31,10 @@ desde cero.
       `next/font/local` con los mismos archivos de `src/fonts/` y comprobar que el test pasa.
 - [ ] 2.2 `tablilla-turnos`, «Estados descartada y completa»: escribir
       `frontend/test/components/ui/tablilla.test.tsx` con el caso `completa` pasando
-      `aria-label`; verificar si el texto «Completo» llega al nombre accesible (sospecha:
-      `aria-label` lo tapa, porque el `sr-only` queda dentro del botón). Si falla, ajustar el
-      componente para que el estado se anuncie (por ejemplo, componiendo el nombre).
+      `aria-label="20:00 a 23:30"`; debe fallar (hoy usa `disabled` y un `sr-only` que el
+      `aria-label` tapa). Ajustar el componente: `aria-disabled="true"` en lugar de `disabled`,
+      sin `aria-pressed`, nombre accesible «20:00 a 23:30, completo» compuesto por el componente,
+      ignorar la activación y seguir en el orden de tabulación.
 - [ ] 2.3 `movimiento-ui`: `globals.css` declara `@keyframes tablilla-dar-vuelta` y
       `tablilla-fundido` sin usarlos, y su comentario dice que con `prefers-reduced-motion` «se
       cambia de cara con un fundido corto» (la spec exige cambio instantáneo). Eliminarlos (el
@@ -41,19 +42,22 @@ desde cero.
       referencia.
 - [ ] 2.4 `identidad-visual-ichigo`, «Contrastes»: corregir el comentario de `globals.css` que
       indica 3,7:1 para `border` sobre `background` (medido 3,66:1) y el que indica 2,5:1 para
-      el rojo sobre madera (medido 2,0:1 con `#9A2A19`; 2,5:1 es el rojo de relleno `#B2321F`).
+      el rojo sobre madera (medido 2,0:1 con `#9A2A19`, el único rojo de la paleta: `#B2321F` no
+      es un token de esta spec ni de `globals.css`).
 - [ ] 2.5 `landing-ichigo`: las acciones de la landing se mantienen en infinitivo («Reservar una
       mesa», «Ya tengo un código», «Elegir fecha y turno») por decisión expresa del equipo. No
       requiere cambios en `app/page.tsx`: agregar un test que fije esos textos y que compruebe
       que los títulos y textos explicativos usan voseo y ninguno usa tuteo.
 - [ ] 2.6 `landing-ichigo`, «Los pasos de reserva coinciden con el flujo real»: el primer paso de
       `PASOS` dice «Elegí fecha, turno y cantidad de comensales» y omite la zona. Corregirlo a
-      «Elegí fecha, turno, zona y cantidad de comensales».
+      «Elegí fecha, turno, zona y cantidad de comensales» (ya hecho en la rama de implementación,
+      commit `ae4086c`: verificarlo contra el escenario).
 - [ ] 2.7 `frontend-base`, «Objetivos táctiles mínimos»: `BotonCompacto` usa la variante
       `pointer-fine:` de Tailwind, que mira solo el puntero principal. Escribir un test o una
       verificación manual en un equipo híbrido y cambiarla para que el alto de 36px aplique solo
       sin `any-pointer: coarse` (por ejemplo con una variante propia `@custom-variant` sobre
-      `@media (any-pointer: fine) and (not (any-pointer: coarse))`).
+      `@media (any-pointer: fine) and (not (any-pointer: coarse))`). Ya hecho en la rama de
+      implementación, commit `abff7bc`: verificarlo contra los escenarios.
 - [ ] 2.8 `frontend-admin`, «Motivo visible en el login»: cambiar el texto de `sesion-vencida` en
       `login-form.tsx` de «Tu sesión venció…» a «Tu sesión terminó o ya no es válida…» (ya hecho
       en la rama de implementación, commit `29de1b2`: verificarlo) y quitar la mención fija de «60
@@ -75,6 +79,10 @@ desde cero.
 - [ ] 2.11 `experiencia-reserva-cliente`: ninguna pantalla pasa hoy `estado="completa"` a una
       tablilla. Confirmarlo con `git grep 'estado='` y registrar en el PR que el estado queda
       soportado por el componente pero sin cableado a la disponibilidad (cambio futuro).
+- [ ] 2.12 `identidad-visual-ichigo`, «Contrastes»: agregar a `globals.css` `--ring-madera: #f3ebda`
+      y `--color-ring-madera`, y comprobar que la `Tablilla` descartada o completa dibuja el foco
+      con `ring-offset-2 ring-offset-background` (o con `ring-madera`) y no con el rojo pegado a
+      la madera. Anotar los contrastes de foco medidos (5,69, 6,51, 4,82 y 13,14:1).
 
 ## 3. Pruebas automatizadas que faltan (escribirlas antes de tocar el código que cubren)
 
@@ -82,8 +90,8 @@ desde cero.
       `aria-pressed`; japonés con `aria-hidden` y `lang="ja"`; objetivo táctil por clases) y de
       `TablillaPaso` (no focalizable).
 - [ ] 3.2 `experiencia-reserva-cliente`: verificar que `formulario-seleccion.test.tsx` cubre los
-      cuatro escenarios de «Los turnos del día se eligen como tablillas» y de «Pantalla cuando no
-      hay nada para reservar»; completar los que falten.
+      cinco escenarios de «Los turnos del día se eligen como tablillas» y los dos de «Pantalla
+      cuando no hay nada para reservar»; completar los que falten.
 - [ ] 3.3 `experiencia-reserva-cliente`: verificar los tests de espera tras `429` (botón
       deshabilitado, texto, rehabilitación a los 30 s con reloj simulado, Enter sin envío) en
       `formulario-datos-contacto.test.tsx`; completar los que falten. El `429` se simula en el
@@ -127,8 +135,9 @@ desde cero.
       Paso 1 con `?fecha=` de un lunes sin turnos activos muestra el aviso «No hay turnos
       disponibles ese día. Elegí otra fecha.»; desde el calendario ese día no se puede elegir) y de
       la regla de zona en singular («1 hora», «1 día»).
-- [ ] 3.13 `tablilla-turnos`: test de que una `completa` sigue deshabilitada y sin `aria-pressed`
-      cuando se elige otra tablilla.
+- [ ] 3.13 `tablilla-turnos`: test de que una `completa` sigue con `aria-disabled="true"` y sin
+      `aria-pressed` cuando se elige otra tablilla, de que se alcanza con Tab y de que activarla
+      no cambia la elección.
 
 ## 4. Verificación manual (nada de esto está hecho)
 
@@ -200,6 +209,10 @@ desde cero.
       en la spec si cambia un requisito (la spec manda, `config.yaml` §14).
 - [ ] 6.3 Definir con el equipo el orden de archivado respecto de `frontend-cliente` (pregunta
       1) y, al archivar, fundir los requisitos de `experiencia-reserva-cliente` que
-      contradigan a los de `frontend-cliente`.
+      contradigan a los de `frontend-cliente`. Incluye, en la spec de `frontend-cliente`,
+      actualizar el requisito «Copy en voseo rioplatense» y su escenario «La acción principal de
+      inicio usa voseo» (que hoy nombra «Reservar una mesa» como impersonal incorrecto) con la
+      excepción de los botones y enlaces de acción en infinitivo (`design.md`, «Acciones en
+      infinitivo»), y retirar el `Select` de turnos que mencionan su design y sus tareas.
 - [ ] 6.4 Pasar `npx openspec validate --all --strict` y esperar a que CI quede en verde antes de
       pedir la aprobación de un compañero distinto del autor.

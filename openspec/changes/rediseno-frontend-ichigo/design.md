@@ -26,7 +26,8 @@ ajusten al código en vez de a una necesidad, y que lo que el prototipo hace mal
 - Donde el prototipo **no cumple** lo que la spec exige, no se adaptó la spec: se dejó una
   tarea explícita en `tasks.md` (sección 2). Hoy se conocen estos desvíos: `app/global-error.tsx`
   importa `next/font/google` (contradice la decisión D1); el estado `completa` de `Tablilla`
-  existe pero ninguna pantalla lo usa todavía; su paso 1 de «Así se reserva» omite la zona; las acciones de fila
+  existe pero ninguna pantalla lo usa todavía; el primer paso de «Así se reserva» de la landing
+  omite la zona; las acciones de fila
   del admin usan `pointer: fine` y no excluyen los equipos híbridos; y el aviso del login dice
   «Tu sesión venció» aun cuando el backend rechazó la sesión por otro motivo.
 - **Desviación única de `config.yaml` §14, prioridad 2.** Escribir la spec después del código
@@ -78,18 +79,28 @@ Se mantiene el mecanismo de `frontend-base` (variables CSS + `@theme inline`), p
 nuevos y un par adicional (`madera`/`madera-foreground`) para la tablilla dada vuelta y la
 viga. Regla de uso: el rojo del sello es **texto** solo sobre claros (5,7:1 sobre hinoki, 6,5:1
 sobre `card`) y **relleno** sobre oscuros. Medido: el rojo `#9A2A19` sobre `madera` da 2,0:1,
-ilegible como texto. `ring` reutiliza el rojo del sello como foco.
+ilegible como texto. `ring` reutiliza el rojo del sello como foco, y por la misma razón no
+puede tocar la madera: medido con la fórmula de luminancia de WCAG 2.1, `ring` da 5,69:1 sobre
+`background`, 6,51:1 sobre `card`, 4,82:1 sobre `muted` y 2,02:1 sobre `madera`, por debajo del
+3:1 que pide 1.4.11. La tablilla dada vuelta ya separa el anillo del control con un desplazamiento
+de 2px sobre `background`, así que el foco se mide contra el fondo y no contra la madera. Para
+cualquier control que quede pegado a la madera sin desplazamiento se define `ring-madera`
+(`#F3EBDA`, 13,14:1 sobre `madera`).
 
 Alternativa descartada: un tono más claro de rojo para texto sobre madera. Agrega un token y
-una excepción a la regla; se prefirió prohibir ese uso.
+una excepción a la regla; se prefirió prohibir ese uso. Para el foco sí se agrega un token
+(`ring-madera`), porque un anillo no puede reemplazarse por otro tratamiento: un control enfocable
+sobre madera necesita un indicador visible, no una prohibición.
 
 ### D3. La tablilla es un `<button>` con `aria-pressed`
 Un grupo de botones de alternancia en vez de `radio` o `select`: tocar otra tablilla cambia la
 elección sin un paso previo de «deseleccionar», y cada tablilla tiene su nombre accesible
 («20:00 a 23:30»). Se evaluó `role="radiogroup"` (mejor semántica de «una sola opción», pero
 exige manejo de flechas para ser correcto y el equipo no lo implementó); queda como Open
-Question. El giro 3D usa `rotateY` con `backface-visibility`, solo en `transform`, sin
-reflujo.
+Question. Una tablilla `completa` usa `aria-disabled` y no `disabled` (como los días no elegibles
+del calendario, D11): sigue en el orden de tabulación y su nombre accesible compuesto («20:00 a
+23:30, completo») la anuncia; un `aria-label` taparía un «Completo» oculto dentro del botón.
+El giro 3D usa `rotateY` con `backface-visibility`, solo en `transform`, sin reflujo.
 
 ### D4. El español siempre va en horizontal; el japonés vertical es decoración
 Riesgo de legibilidad: el texto vertical tradicional (縦書き) con letras latinas rotadas es
@@ -103,8 +114,9 @@ Las animaciones atadas al scroll usan `animation-timeline: view()` dentro de `@s
 soporte, el contenido queda en su estado final (nunca oculto). Los estados iniciales viven solo
 dentro de `@keyframes`. Con `prefers-reduced-motion: reduce` hay dos capas: una regla global
 que reduce toda duración a 0,01 ms, y `animation: none` explícito para las clases que usan
-animaciones infinitas o atadas al scroll (la duración mínima no basta para un bucle). El
-panel de admin usa la variante `motion-reduce` de Tailwind.
+animaciones infinitas o atadas al scroll (la duración mínima no basta para un bucle). La regla
+global también cubre el panel de admin; la variante `motion-reduce` de Tailwind que hoy usan
+algunos componentes es redundante y no se exige.
 
 | Alternativa | Por qué no |
 |---|---|

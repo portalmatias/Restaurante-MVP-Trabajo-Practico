@@ -36,8 +36,8 @@ SHALL apagar todas las animaciones y transiciones decorativas (su duración se r
 como máximo, de modo que el cambio es instantáneo y los eventos de fin siguen disparándose): el balanceo de tablillas, la
 apertura y el desplazamiento (parallax) de las fotografías, la entrada del nombre, la aparición
 de secciones, el giro de las tablillas y el pulso de los esqueletos de carga. El desplazamiento
-suave de la página SHALL volver a ser instantáneo. Las transiciones del panel de admin SHALL
-llevar la variante `motion-reduce`.
+suave de la página SHALL volver a ser instantáneo. La misma regla global cubre las transiciones
+del panel de admin: no hace falta una variante `motion-reduce` en cada componente.
 
 #### Scenario: El balanceo se apaga
 - **WHEN** se abre `/` con `prefers-reduced-motion: reduce`
