@@ -314,11 +314,24 @@ Cuando los cinco secrets estén cargados, **borrar la clave privada de tu comput
 (`shred -u github_actions_cd` o borrarla y vaciar la papelera). Sin los secrets, el job
 `desplegar` termina en error con un mensaje claro y el CI no se ve afectado.
 
-Los paquetes de GHCR (`reservas-backend` y `reservas-frontend`) se crean con el primer
-despliegue. Las imágenes no llevan secretos y el código ya es público, así que se pueden dejar
-públicas: de lo contrario, el servidor necesitaría credenciales para descargarlas. Después del
-primer despliegue: perfil de la organización o usuario → Packages → cada paquete → *Package
-settings* → *Change visibility* → Public.
+### Paquetes en GHCR
+
+Un paquete de contenedor nuevo se publica **privado** por defecto (documentación de GitHub,
+«Working with the Container registry»). Los paquetes `reservas-backend` y `reservas-frontend` se
+crean con el primer despliegue, así que ese primer `docker compose pull` falla en el servidor
+mientras sigan privados, y como todavía no hay una versión anterior, no hay a qué volver.
+
+Las imágenes no llevan secretos (las variables entran en tiempo de ejecución) y el código ya es
+público, así que se dejan **públicas**; la alternativa sería guardar un token de lectura en el
+servidor. Se hace una vez, desde la web (GitHub no ofrece una API para esto):
+
+1. Correr **CD** por primera vez (sección 7). El job `imagenes` publica las dos imágenes y el job
+   `desplegar` falla al descargarlas.
+2. Perfil del usuario u organización → **Packages** → cada paquete → *Package settings* →
+   *Danger Zone* → *Change visibility* → **Public**.
+3. En la corrida fallida: *Re-run failed jobs*. No se reconstruye nada: las imágenes ya están.
+
+Con los paquetes públicos, los despliegues siguientes no vuelven a necesitar nada.
 
 ## 6. Dominio
 
@@ -333,15 +346,21 @@ en `main`).
 
 1. Actions → **CD** → *Run workflow* → `sha` = SHA completo de `main` (40 caracteres en
    minúscula), `modo` = `despliegue`.
-2. Esperar el verde. El resumen del job muestra el modo, el SHA y los digests desplegados.
+2. Esperar el verde. **La primera vez el job `desplegar` falla al descargar las imágenes** porque los paquetes de GHCR nacen privados: seguir «Paquetes en GHCR» (sección 5) y reintentar con *Re-run failed jobs*. El resumen del job muestra el modo, el SHA y los digests desplegados.
 3. Abrir `http://<IP-elástica>/` **desde una IP del equipo**: se ve la aplicación.
 4. Hacer las verificaciones de las tareas 6.2 a 6.5 del change (superficie desde afuera,
    credenciales, despliegue automático y reinicio).
 5. **Probar el despliegue automático:** mergear un cambio chico a `main`, esperar el CI y mirar
    la corrida de **CD** en la pestaña Actions.
 
-Desde ahí, cada commit verde de `main` se despliega solo. Si llegan varios seguidos, GitHub deja
-una sola ejecución en espera y se despliega el más reciente (no cada commit intermedio).
+Desde ahí, cada commit verde de `main` se despliega solo. El workflow **no usa `concurrency`**:
+GitHub deja una sola ejecución en espera y la más nueva en llegar reemplaza a la anterior, por
+orden de llegada y no de commit, así que un CI viejo que termina tarde podía cancelar al commit
+más nuevo (que quedaba sin desplegar) o una vuelta atrás manual. Si llegan varios seguidos, los
+despliegues hacen cola en el servidor (`flock` en `desplegar.sh`, espera de hasta 15 minutos) y
+uno anterior al que ya está sirviendo se saltea como «versión superada». El script que corre es
+el del commit en servicio; si el commit nuevo trae otro `desplegar.sh`, el script continúa con
+esa versión en el mismo despliegue (ver `desplegar.sh`, «reejecución»).
 
 ### Qué hace el despliegue si algo falla
 
@@ -350,7 +369,14 @@ una sola ejecución en espera y se despliega el más reciente (no cada commit in
 - falla la descarga de imágenes, la base o una migración → **no se levanta la versión nueva** y
   la anterior sigue atendiendo, sin reiniciar contenedores;
 - la versión nueva no responde (`/` y `/api/zonas`, durante 90 s) → se vuelve a la versión
-  anterior y el workflow termina en rojo con `VUELTA ATRÁS` en el log.
+  anterior y el workflow termina en rojo con `VUELTA ATRÁS` en el log;
+- un **cambio de etapa** (`SITE_ADDRESS`) que falla, por ejemplo porque Caddy no consigue el
+  certificado → la vuelta atrás vuelve a la versión **y** a la etapa anteriores (el servidor
+  guarda la vigente en `/opt/reservas/.despliegue/SITE_ADDRESS_VIGENTE`). Para pasar a HTTPS la
+  comprobación espera hasta 300 s al certificado (ver sección 9).
+
+Redesplegar **el mismo SHA** que ya está sirviendo no se saltea: regenera el entorno de Compose
+y recrea lo que haya cambiado. Es la forma de aplicar un cambio de `/opt/reservas/.env`.
 
 Errores de conexión en el job `desplegar`: «No se pudo conectar o la clave del servidor no
 coincide» → revisar el security group (puerto 22), `SERVER_HOST` y `SSH_KNOWN_HOSTS` (si se
@@ -417,35 +443,60 @@ Para restaurarlo en una base vacía: `gunzip -c respaldo.sql.gz | docker compose
 
 1. Pasarle a la docente la **IP elástica** para que cree el registro `A` del subdominio.
 2. Esperar a que resuelva: `dig +short <subdominio>` tiene que devolver esa IP.
-3. **Abrir el security group** a `0.0.0.0/0` en 80 y 443. Let's Encrypt valida desde direcciones
-   que no se publican, así que el 80 tiene que estar abierto a todos para emitir y renovar el
-   certificado (también sirve para la redirección a HTTPS).
-4. En el servidor, cambiar `SITE_ADDRESS` en `/opt/reservas/.env` (sin perder modo ni dueño):
+3. **Cambiar `SITE_ADDRESS` primero** en `/opt/reservas/.env` (sin perder modo ni dueño):
    ```bash
    sudo sed -i 's/^SITE_ADDRESS=.*/SITE_ADDRESS=<subdominio>/' /opt/reservas/.env
    sudo ls -l /opt/reservas/.env      # sigue -rw------- root root
    ```
-   Después, redesplegar la versión que ya está sirviendo para que se relea el archivo: Actions →
-   **CD** → *Run workflow* con ese mismo SHA (`sudo cat /opt/reservas/.despliegue/VERSION_ACTUAL`)
-   y `modo=vuelta-atras`. En `modo=despliegue` el script lo descarta como "versión superada" y
-   no cambia nada; la vuelta atrás al mismo SHA sí rehace el env de Compose con el
-   `SITE_ADDRESS` nuevo y recrea Caddy. (Cualquier merge nuevo a `main` también lo aplica.)
-5. **Rotar la contraseña del admin** (sección 10): pudo haber viajado en claro en la etapa HTTP.
-6. Opcional: usar el subdominio como `SERVER_HOST`, pero entonces regenerar `SSH_KNOWN_HOSTS`
+4. **Redesplegar la versión que ya está sirviendo** para que se relea el archivo: Actions →
+   **CD** → *Run workflow* con ese mismo SHA (`sudo cat /opt/reservas/.despliegue/VERSION_ACTUAL`) y
+   `modo=despliegue` (o `vuelta-atras` si ya hay un commit más nuevo en `main`, donde el
+   workflow rechazaría un despliegue). El script no lo saltea («versión superada» solo vale para
+   un commit anterior al que está sirviendo): rehace el env de Compose con el `SITE_ADDRESS`
+   nuevo y recrea Caddy.
+5. **Abrir el security group** a `0.0.0.0/0` en 80 y 443 **recién ahora**, cuando el log del job
+   muestre `levantando la versión` y el aviso `cambio de etapa`. Let's Encrypt valida desde
+   direcciones que no se publican, así que el 80 tiene que estar abierto a todos para emitir y
+   renovar el certificado. La comprobación espera hasta 300 s al certificado y Caddy reintenta
+   la validación sola. Este orden evita que el login quede en HTTP, abierto a internet,
+   mientras `SITE_ADDRESS` sigue en `:80`.
+   - **Si el job termina en `VUELTA ATRÁS`** (no se emitió el certificado a tiempo): el sitio
+     volvió a la etapa HTTP con el security group **abierto**. Cerrarlo de nuevo a las IPs del
+     equipo antes de seguir, leer el log de Caddy (`sudo docker logs reservas-caddy-1` o el
+     nombre que muestre `docker ps`) y reintentar desde el paso 4.
+6. **Rotar la contraseña del admin** (sección 10): pudo haber viajado en claro en la etapa HTTP.
+7. Opcional: usar el subdominio como `SERVER_HOST`, pero entonces regenerar `SSH_KNOWN_HOSTS`
    con `ssh-keyscan` sobre el nombre.
-7. Crear la variable de **repositorio** `SUBDOMINIO` (Settings → Secrets and variables → Actions →
+8. Crear la variable de **repositorio** `SUBDOMINIO` (Settings → Secrets and variables → Actions →
    Variables) con el nombre del subdominio, y correr una vez **Certificado** a mano: con ella, el
    workflow `certificado.yml` revisa todos los días que el certificado sea válido y tenga 21 días
    o más.
-8. Verificar:
+9. Verificar:
    ```bash
    curl -I https://<subdominio>/            # 200, certificado válido (sin -k) y Strict-Transport-Security
    curl -I http://<subdominio>/reservas     # redirección permanente a https
    ```
-9. Actualizar la tabla **Estado actual** de este documento a **HTTPS**.
+10. Actualizar la tabla **Estado actual** de este documento a **HTTPS**.
 
 Caddy guarda el certificado en el volumen `caddy_data`, que se conserva entre despliegues y
 reinicios: no pide uno nuevo cada vez.
+
+### Certificado: aviso y límites
+
+Let's Encrypt ya no manda correos de vencimiento, así que lo controla `certificado.yml` todos los
+días. Dos cosas que dice la documentación de GitHub y que conviene tener presentes:
+
+- **A quién avisa un workflow programado que falla:** a quien creó el workflow (o a quien editó
+  después su cron o lo volvió a habilitar), no a todo el equipo. Por eso, cuando la verificación
+  falla, el workflow **abre un issue** (o comenta el que ya está abierto) titulado «Certificado de
+  producción: la verificación diaria falló». Hay que seguir el repositorio (*Watch*) para recibirlo.
+- **Se apaga solo:** en un repositorio público, los workflows programados se deshabilitan tras
+  **60 días sin actividad** en el repositorio. Si pasa, la pestaña Actions muestra que está
+  deshabilitado y hay que volver a habilitarlo a mano (*Enable workflow*). Mientras tanto, nadie
+  controla el certificado: revisarlo con `curl -I https://<subdominio>/` de vez en cuando.
+
+Si el issue indica que el certificado no se renueva: ver `sudo docker logs` de Caddy y comprobar que
+el puerto 80 siga abierto a `0.0.0.0/0` (la renovación valida por ahí).
 
 ### Si el DNS falla o el subdominio deja de resolver
 
@@ -454,8 +505,8 @@ a la IP **sin dejar el login en claro abierto a internet**, en este orden:
 
 1. **Primero** restringir otra vez el security group a las IPs del equipo en 80 y 443 (revocar
    `0.0.0.0/0` y volver a autorizar las IPs `/32`).
-2. Después volver a `SITE_ADDRESS=:80` en `/opt/reservas/.env` y redesplegar la versión actual con
-   `modo=vuelta-atras`, como en el paso 4.
+2. Después volver a `SITE_ADDRESS=:80` en `/opt/reservas/.env` y redesplegar la versión actual, como
+   en el paso 4.
 3. Reintentar la activación cuando el DNS resuelva.
 
 ## 10. Rotación de secretos
@@ -548,6 +599,14 @@ Para pausar sin borrar, también se puede deshabilitar el workflow **CD** desde 
 servidor sigue sirviendo la última versión.
 
 ## 13. Probar `desplegar.sh` y `ssh-entrada.sh` sin AWS (tarea 5.2)
+
+`npm run test:deploy` (también corre en CI) ejecuta `deploy/test/desplegar.test.sh`: arma un
+repositorio Git temporal y simula `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker, red ni
+root. Comprueba el primer despliegue, un cambio de etapa fallido con vuelta atrás a la etapa
+anterior, el redespliegue del mismo SHA con otro `SITE_ADDRESS`, el atajo de «versión superada»,
+la reejecución cuando cambia `desplegar.sh` y el log sin duplicar. No prueba Docker ni Caddy.
+
+Para el flujo completo con Docker:
 
 `desplegar.sh` acepta dos variables solo para pruebas locales: `RESERVAS_RAIZ` (en lugar de
 `/opt/reservas`) y `RESERVAS_REGISTRO` (en lugar de `ghcr.io/<owner>`). Con una máquina o una VM
