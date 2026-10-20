@@ -46,12 +46,13 @@ set -euo pipefail
 # aunque la salida estándar ya no exista. Si el log no se puede abrir, se sigue sin él.
 trap '' HUP PIPE
 LOG_DESPLIEGUE="${RESERVAS_LOG:-/var/log/reservas-despliegue.log}"
-if ( umask 077; : >> "$LOG_DESPLIEGUE" ) 2> /dev/null; then
+# Reejecutado por sí mismo (D7) hereda la salida ya duplicada: no se vuelve a abrir.
+if [ -z "${RESERVAS_REEJECUTADO:-}" ] && ( umask 077; : >> "$LOG_DESPLIEGUE" ) 2> /dev/null; then
   exec > >(tee --output-error=warn -a "$LOG_DESPLIEGUE") 2>&1
 fi
 
 main() {
-  # Rutas. RESERVAS_RAIZ y RESERVAS_REGISTRO existen solo para la prueba local de la tarea 5.2
+  # Rutas. RESERVAS_RAIZ, RESERVAS_REGISTRO y RESERVAS_SEGUNDOS_COMPROBACION existen solo para las pruebas locales (deploy/test/desplegar.test.sh, tarea 5.2)
   # (docs/despliegue.md); en la instancia no se definen.
   local RAIZ="${RESERVAS_RAIZ:-/opt/reservas}"
   local REPO="$RAIZ"
@@ -60,8 +61,9 @@ main() {
   local ENV_COMPOSE="$ESTADO/compose.env"
   local ARCHIVO_ACTUAL="$ESTADO/VERSION_ACTUAL"
   local ARCHIVO_HISTORIAL="$ESTADO/historial"
+  local ARCHIVO_SITE="$ESTADO/SITE_ADDRESS_VIGENTE"
   local COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
-  local SEGUNDOS_COMPROBACION=90
+  local SEGUNDOS_COMPROBACION="${RESERVAS_SEGUNDOS_COMPROBACION:-90}"
 
   log() { printf '[desplegar %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
   error() { printf '[desplegar %s] ERROR: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
@@ -100,10 +102,14 @@ main() {
   # ---------------------------------------------------------------------------------------
   umask 077
   mkdir -p "$ESTADO"
-  exec 9> "$ESTADO/desplegar.lock"
-  if ! flock -w 900 9; then
-    error "hay otro despliegue en curso desde hace más de 15 minutos."
-    return 1
+  # Si el script se reejecutó a sí mismo (ver más abajo), hereda el descriptor 9 ya bloqueado:
+  # volver a abrir el archivo soltaría el lock un instante.
+  if [ -z "${RESERVAS_REEJECUTADO:-}" ]; then
+    exec 9> "$ESTADO/desplegar.lock"
+    if ! flock -w 900 9; then
+      error "hay otro despliegue en curso desde hace más de 15 minutos."
+      return 1
+    fi
   fi
 
   # Owner del repositorio en GHCR, deducido del clon público (GHCR usa minúsculas).
@@ -186,12 +192,12 @@ main() {
 
   # Escribe el env de Compose para una versión: root, modo 600, reemplazo atómico.
   generar_env() {
-    local d_back="$1" d_front="$2" temporal
+    local d_back="$1" d_front="$2" site="$3" temporal
     temporal="$(mktemp "$ESTADO/compose.env.XXXXXX")"
     {
       printf 'POSTGRES_PASSWORD=%s\n' "$p_postgres"
       printf 'JWT_SECRET=%s\n' "$p_jwt"
-      printf 'SITE_ADDRESS=%s\n' "$p_site"
+      printf 'SITE_ADDRESS=%s\n' "$site"
       printf 'IMAGEN_BACKEND=%s\n' "$imagen_backend"
       printf 'DIGEST_BACKEND=%s\n' "$d_back"
       printf 'IMAGEN_FRONTEND=%s\n' "$imagen_frontend"
@@ -202,14 +208,16 @@ main() {
   }
 
   # Comprueba la versión a través del proxy de borde: la página principal y una consulta a
-  # la API. En la etapa HTTPS se conecta a 127.0.0.1 con el nombre del sitio (SNI).
+  # la API. Recibe la etapa (SITE_ADDRESS) con la que está levantada la versión: en la etapa
+  # HTTPS se conecta a 127.0.0.1 con el nombre del sitio (SNI), así que si Caddy no consigue el
+  # certificado la comprobación falla y se vuelve a la etapa anterior (D7).
   comprobar() {
-    local base opciones=(-s -o /dev/null --max-time 10)
-    if [ "$p_site" = ":80" ]; then
+    local site="$1" base opciones=(-s -o /dev/null --max-time 10)
+    if [ "$site" = ":80" ]; then
       base="http://127.0.0.1"
     else
-      base="https://$p_site"
-      opciones+=(--resolve "$p_site:443:127.0.0.1")
+      base="https://$site"
+      opciones+=(--resolve "$site:443:127.0.0.1")
     fi
     local limite=$((SECONDS + SEGUNDOS_COMPROBACION)) codigo_inicio codigo_api tipo_api
     while [ "$SECONDS" -lt "$limite" ]; do
@@ -259,14 +267,14 @@ main() {
 
   # Levanta una versión ya preparada (checkout + env de Compose) y la comprueba.
   levantar_y_comprobar() {
-    compose up -d --remove-orphans && comprobar
+    compose up -d --remove-orphans && comprobar "$1"
   }
 
   # Deja el checkout y el env de Compose como estaban, sin reiniciar contenedores (falla antes del up).
   restaurar_archivos() {
     if [ -n "$sha_previo" ]; then
       git -C "$REPO" checkout -q --detach "$sha_previo"
-      generar_env "$db_previo" "$df_previo"
+      generar_env "$db_previo" "$df_previo" "$site_previo"
       log "checkout y env de Compose restaurados a la versión previa ($sha_previo); los contenedores no se tocaron."
     fi
   }
@@ -274,9 +282,12 @@ main() {
   # ---------------------------------------------------------------------------------------
   # 2. Versión que está sirviendo: a ella se vuelve si algo falla.
   # ---------------------------------------------------------------------------------------
-  local sha_previo="" db_previo="" df_previo=""
+  local sha_previo="" db_previo="" df_previo="" site_previo=""
   if [ -s "$ARCHIVO_ACTUAL" ]; then
     read -r sha_previo db_previo df_previo < "$ARCHIVO_ACTUAL"
+  fi
+  if [ -s "$ARCHIVO_SITE" ]; then
+    read -r site_previo < "$ARCHIVO_SITE"
   fi
   log "versión en servicio: ${sha_previo:-ninguna (primer despliegue)}"
 
@@ -291,9 +302,15 @@ main() {
   fi
 
   if [ "$modo" = "despliegue" ]; then
-    if [ -n "$sha_previo" ] && git -C "$REPO" merge-base --is-ancestor "$sha" "$sha_previo"; then
+    # El atajo vale solo para un commit ANTERIOR al que está sirviendo. Redesplegar el mismo SHA
+    # sigue de largo: es la forma de aplicar un cambio del .env (por ejemplo SITE_ADDRESS al
+    # pasar de HTTP a HTTPS), y `--is-ancestor` también da verdadero para un SHA igual.
+    if [ -n "$sha_previo" ] && [ "$sha" != "$sha_previo" ] && git -C "$REPO" merge-base --is-ancestor "$sha" "$sha_previo"; then
       log "versión superada: $sha ya está contenido en la versión en servicio ($sha_previo). No se cambia nada."
       return 0
+    fi
+    if [ "$sha" = "$sha_previo" ]; then
+      log "redespliegue de la versión en servicio: se regenera el entorno de Compose y se recrean los contenedores que hayan cambiado."
     fi
   else
     local registrada=""
@@ -309,13 +326,32 @@ main() {
   fi
 
   leer_parametros
+  # Sin registro de etapa (instalación anterior a este archivo), la vigente es la del .env.
+  [ -n "$site_previo" ] || site_previo="$p_site"
+  if [ "$p_site" != "$site_previo" ]; then
+    log "cambio de etapa: $site_previo -> $p_site"
+  fi
+
+  # El script en ejecución es el del commit anterior: un cambio a `desplegar.sh` llegaría un
+  # despliegue tarde. Si el commit nuevo trae otra versión del script, se continúa con ella
+  # (D7). Solo en modo despliegue: una vuelta atrás no debe correr el script de una versión
+  # vieja. El lock (descriptor 9) pasa heredado al proceso nuevo.
+  local script_en_uso="" script_nuevo=""
+  if [ "$modo" = "despliegue" ] && [ -z "${RESERVAS_REEJECUTADO:-}" ]; then
+    script_en_uso="$(git -C "$REPO" hash-object "$REPO/deploy/desplegar.sh")"
+    script_nuevo="$(git -C "$REPO" rev-parse "$sha:deploy/desplegar.sh" 2> /dev/null || true)"
+  fi
   git -C "$REPO" checkout -q --detach "$sha"
+  if [ -n "$script_nuevo" ] && [ "$script_nuevo" != "$script_en_uso" ]; then
+    log "desplegar.sh cambió en $sha: se continúa con la versión nueva del script."
+    RESERVAS_REEJECUTADO=1 exec "$REPO/deploy/desplegar.sh" "$sha" "$digest_backend" "$digest_frontend" "$modo"
+  fi
 
   # 4 y 5. Env de Compose de la versión nueva e imágenes por digest.
-  generar_env "$digest_backend" "$digest_frontend"
+  generar_env "$digest_backend" "$digest_frontend" "$p_site"
   log "descargando imágenes..."
   if ! compose pull -q; then
-    error "no se pudieron descargar las imágenes de $sha."
+    error "no se pudieron descargar las imágenes de $sha. Si es el primer despliegue, comprobá que los paquetes de GHCR sean públicos (docs/despliegue.md, 'Paquetes en GHCR')."
     restaurar_archivos
     return 1
   fi
@@ -346,11 +382,17 @@ main() {
 
   # 9 y 10. Versión nueva arriba y comprobación a través del proxy de borde.
   log "levantando la versión $sha..."
-  if levantar_y_comprobar; then
-    # 11. Registro y limpieza.
-    printf '%s %s %s\n' "$sha" "$digest_backend" "$digest_frontend" > "$ARCHIVO_ACTUAL.tmp"
+  if levantar_y_comprobar "$p_site"; then
+    # 11. Registro y limpieza. La etapa vigente se guarda aparte: es a la que vuelve una vuelta
+    # atrás si un cambio de etapa falla.
+    local linea_version="$sha $digest_backend $digest_frontend"
+    printf '%s\n' "$linea_version" > "$ARCHIVO_ACTUAL.tmp"
     mv -f "$ARCHIVO_ACTUAL.tmp" "$ARCHIVO_ACTUAL"
-    printf '%s %s %s\n' "$sha" "$digest_backend" "$digest_frontend" >> "$ARCHIVO_HISTORIAL"
+    printf '%s\n' "$p_site" > "$ARCHIVO_SITE.tmp"
+    mv -f "$ARCHIVO_SITE.tmp" "$ARCHIVO_SITE"
+    if [ ! -f "$ARCHIVO_HISTORIAL" ] || [ "$(tail -n 1 "$ARCHIVO_HISTORIAL")" != "$linea_version" ]; then
+      printf '%s\n' "$linea_version" >> "$ARCHIVO_HISTORIAL"
+    fi
     limpiar_imagenes
     log "DESPLEGADO $sha"
     return 0
@@ -362,11 +404,11 @@ main() {
     compose stop || true
     return 1
   fi
-  error "la versión $sha no responde: VUELTA ATRÁS a $sha_previo"
+  error "la versión $sha no responde: VUELTA ATRÁS a $sha_previo (etapa $site_previo)"
   git -C "$REPO" checkout -q --detach "$sha_previo"
-  generar_env "$db_previo" "$df_previo"
-  if levantar_y_comprobar; then
-    log "VUELTA ATRÁS a $sha_previo completada; la versión en servicio no cambió."
+  generar_env "$db_previo" "$df_previo" "$site_previo"
+  if levantar_y_comprobar "$site_previo"; then
+    log "VUELTA ATRÁS a $sha_previo completada, con la etapa $site_previo; la versión en servicio no cambió."
   else
     error "VUELTA ATRÁS a $sha_previo: la versión previa tampoco responde. Revisar a mano (docs/despliegue.md)."
   fi
