@@ -3,10 +3,18 @@ name: Certificado
 # Control diario del certificado HTTPS de producción (D2 de
 # openspec/changes/despliegue-continuo-ec2/design.md). Let's Encrypt ya no avisa por correo los
 # vencimientos: si el certificado no es válido para el subdominio o le quedan menos de 21 días,
-# este workflow falla y el equipo recibe la notificación de GitHub.
+# este workflow falla y ABRE UN ISSUE (o comenta el que ya está abierto).
+#
+# Por qué un issue y no la notificación de GitHub: según la documentación, el aviso de un
+# workflow programado que falla le llega solo a quien lo creó, o a quien editó después su
+# cron o lo volvió a habilitar; no al equipo. Un issue lo ve todo el que sigue el repositorio.
+#
+# Limitación documentada por GitHub: en un repositorio público, los workflows programados se
+# deshabilitan solos tras 60 días sin actividad en el repositorio. Si pasa, hay que
+# volver a habilitarlo en la pestaña Actions (docs/despliegue.md).
 #
 # Solo corre en la etapa HTTPS: cuando existe la variable de repositorio `SUBDOMINIO`. No usa
-# credenciales.
+# credenciales de AWS: el token del workflow solo puede leer el código y escribir issues.
 
 on:
   schedule:
@@ -23,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,3 +46,19 @@ jobs:
             exit 1
           fi
           echo "$salida"
+
+      - name: Abrir un issue si falló
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUBDOMINIO: ${{ vars.SUBDOMINIO }}
+          URL_EJECUCION: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          titulo="Certificado de producción: la verificación diaria falló"
+          cuerpo="La verificación del certificado de \`$SUBDOMINIO\` falló. Detalle: $URL_EJECUCION. Qué hacer: docs/despliegue.md, sección \"Certificado\"."
+          existente="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$titulo\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$existente" ]; then
+            gh issue comment "$existente" --repo "$GITHUB_REPOSITORY" --body "Sigue fallando. $cuerpo"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$titulo" --body "$cuerpo"
+          fi
