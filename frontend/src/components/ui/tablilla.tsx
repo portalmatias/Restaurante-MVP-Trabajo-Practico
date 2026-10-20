@@ -60,7 +60,12 @@ function Frente({ titulo, detalle, japones }: ContenidoProps) {
  * `.impeccable/surfaces/app-page-tsx.md`). Es un `<button>` con `aria-pressed`: al elegir una,
  * las demás se dan vuelta y la elegida queda a la vista con su sello. El giro es un giro 3D de 450 ms; con `prefers-reduced-motion` el cambio
  * es instantáneo (regla global de `globals.css`). El sello rojo es decoración (`aria-hidden`):
- * el estado lo dicen `aria-pressed` y `disabled`.
+ * el estado lo dicen `aria-pressed` y, en `completa`, `aria-disabled`.
+ *
+ * Una `completa` no usa `disabled`: `aria-disabled` la deja en el orden de tabulación y un lector
+ * de pantalla la anuncia, como los días no elegibles del calendario. Como un `aria-label`
+ * reemplaza cualquier texto interno, el componente compone el sufijo «, completo» sobre el que
+ * recibe (un «Completo» oculto dentro del botón nunca se anunciaría).
  *
  * Los colores salen de los tokens; el rojo solo se usa como relleno con texto hinoki claro.
  */
@@ -71,6 +76,8 @@ export function Tablilla({
   estado = "libre",
   className,
   type = "button",
+  onClick,
+  "aria-label": etiqueta,
   ...props
 }: TablillaProps) {
   const completa = estado === "completa";
@@ -81,11 +88,14 @@ export function Tablilla({
     <button
       type={type}
       aria-pressed={completa ? undefined : elegida}
-      disabled={completa || props.disabled}
+      aria-disabled={completa ? true : undefined}
+      aria-label={completa && etiqueta ? `${etiqueta}, completo` : etiqueta}
+      // Activar una completa no hace nada; las demás conservan su `onClick`.
+      onClick={completa ? undefined : onClick}
       className={[
         "group relative mx-auto block h-48 w-[6.75rem] [perspective:900px] sm:h-56 sm:w-36",
         "rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        "disabled:cursor-not-allowed",
+        "disabled:cursor-not-allowed aria-disabled:cursor-not-allowed",
         className,
       ]
         .filter(Boolean)
@@ -102,7 +112,7 @@ export function Tablilla({
       <span
         className={[
           "absolute inset-0 block origin-top transition-transform duration-[450ms] ease-[var(--ease-out-expo)] [transform-style:preserve-3d]",
-          "group-enabled:group-hover:-translate-y-0.5",
+          completa ? "" : "group-enabled:group-hover:-translate-y-0.5",
           descartada || completa ? "[transform:rotateY(180deg)]" : "",
         ]
           .filter(Boolean)
@@ -143,7 +153,8 @@ export function Tablilla({
         </span>
       </span>
 
-      {completa ? <span className="sr-only">Completo</span> : null}
+      {/* Sin `aria-label`, el nombre sale del contenido y el «Completo» oculto lo completa. */}
+      {completa && !etiqueta ? <span className="sr-only">Completo</span> : null}
     </button>
   );
 }
