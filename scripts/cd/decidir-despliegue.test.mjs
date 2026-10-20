@@ -221,18 +221,62 @@ describe('adaptadores de la API de GitHub', () => {
     assert.equal(estadoCiPorSha(runs).get(SHA), 'en-curso');
   });
 
+  test('con la lista de posteriores truncada no se despliega, ni automático ni manual', () => {
+    for (const evento of ['workflow_run', 'workflow_dispatch']) {
+      const r = decidirDespliegue(base({ evento, truncado: true }));
+      assert.equal(r.resultado, 'rechazar');
+      assert.match(r.motivo, /demasiados commits posteriores/);
+    }
+  });
+
+  test('una vuelta atrás manual no depende de la lista de posteriores', () => {
+    const r = decidirDespliegue(
+      base({
+        evento: 'workflow_dispatch',
+        modo: 'vuelta-atras',
+        truncado: true,
+      }),
+    );
+    assert.equal(r.resultado, 'desplegar');
+  });
+
   test('datosDeCompare: main delante del SHA (o igual) lo contiene; si no, no', () => {
     assert.deepEqual(
       datosDeCompare({
         status: 'ahead',
         commits: [{ sha: POSTERIOR_1 }, { sha: POSTERIOR_2 }],
       }),
-      { enMain: true, posteriores: [POSTERIOR_1, POSTERIOR_2] },
+      {
+        enMain: true,
+        posteriores: [POSTERIOR_1, POSTERIOR_2],
+        truncado: false,
+      },
     );
     assert.deepEqual(datosDeCompare({ status: 'identical', commits: [] }), {
       enMain: true,
       posteriores: [],
+      truncado: false,
     });
+    // Con 300 commits posteriores la API devuelve solo 250: la lista está truncada.
+    const doscientosCincuenta = Array.from({ length: 250 }, (_, i) => ({
+      sha: i.toString(16).padStart(40, '0'),
+    }));
+    assert.equal(
+      datosDeCompare({
+        status: 'ahead',
+        ahead_by: 300,
+        commits: doscientosCincuenta,
+      }).truncado,
+      true,
+    );
+    assert.equal(
+      datosDeCompare({
+        status: 'ahead',
+        ahead_by: 250,
+        commits: doscientosCincuenta,
+      }).truncado,
+      false,
+    );
     for (const status of ['behind', 'diverged']) {
       assert.equal(
         datosDeCompare({ status, commits: [{ sha: POSTERIOR_1 }] }).enMain,

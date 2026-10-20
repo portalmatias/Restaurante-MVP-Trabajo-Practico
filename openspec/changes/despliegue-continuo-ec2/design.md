@@ -682,9 +682,10 @@ una línea en un workflow, dentro de un change que justamente trata del pipeline
 `config.yaml`).
 
 La función de decisión del job `decidir` (D4) vive en `scripts/cd/` con sus tests de
-`node --test`, que corre el paso `test:scripts` del CI. Ese script usa un glob
-(`scripts/*.test.mjs scripts/cd/*.test.mjs`) para que un test nuevo de `scripts/cd/` no quede
-fuera sin que nadie lo note. La lógica de `deploy/desplegar.sh` (redespliegue, etapa,
+`node --test`, que corre el paso `test:scripts` del CI. Ese script lista los archivos de test
+uno por uno (`scripts/openapi-diff.test.mjs scripts/cd/decidir-despliegue.test.mjs`): el CI usa
+Node 20, cuyo `node --test` no expande globs, y en Windows (`cmd.exe`) el shell tampoco lo hace;
+un test nuevo se agrega a esa lista. La lógica de `deploy/desplegar.sh` (redespliegue, etapa,
 vuelta atrás, reejecución) se prueba con `npm run test:deploy` (`deploy/test/desplegar.test.sh`):
 repositorio Git temporal y simulacros de `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker
 ni red, en un paso propio del CI. Sus tests cubren los escenarios del
@@ -699,7 +700,7 @@ posterior en rojo o corriendo, y despacho manual inválido.
 | 1. Redesplegar el mismo SHA no hace nada | D7 paso 3: el atajo vale solo para un SHA anterior. |
 | 2. Chequeo de salud y vuelta atrás ignoran la etapa | D7 pasos 10-12: comprueba con la etapa en curso y vuelve a la etapa vigente. |
 | 3. El orden de activación deja HTTP abierto | D9 y D7 «Cambio de etapa»: `SITE_ADDRESS` primero, security group después. |
-| 4. Los tests de `scripts/cd/` no corrían en CI | D10: `test:scripts` con glob y `test:deploy` (ya incluía el archivo de `decidir`; ahora no depende de listarlo). |
+| 4. Los tests de `scripts/cd/` no corrían en CI | D10: `test:scripts` incluye el archivo de `decidir` (lista explícita, porque Node 20 y `cmd.exe` no expanden globs) y se suma `test:deploy`. |
 | 5. Un commit verde puede cancelarse | D4: sin `concurrency`; cola con `flock` en el servidor. |
 | 6. El script corre desde el commit anterior | D7 paso 3: reejecución con la versión nueva. |
 | 7. Tag `:<sha>` ya existente | D3: se exige la etiqueta `revision` igual al SHA. |

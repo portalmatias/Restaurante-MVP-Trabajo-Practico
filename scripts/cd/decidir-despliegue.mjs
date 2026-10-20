@@ -27,6 +27,9 @@ const FORMATO_SHA = /^[0-9a-f]{40}$/;
  * @property {EstadoCi} ciDelSha        estado del CI de push del commit
  * @property {{ sha: string, ci: EstadoCi }[]} posteriores
  *   commits de main posteriores al SHA, del más viejo al más nuevo, con el estado de su CI
+ * @property {boolean} [truncado]
+ *   la API devolvió solo una parte de los posteriores (la comparación admite un máximo de
+ *   commits): faltarían los más nuevos, justo los que deciden si el SHA está superado
  *
  * @typedef {{ resultado: 'desplegar' | 'omitir' | 'rechazar', motivo: string }} Decision
  */
@@ -36,7 +39,15 @@ const FORMATO_SHA = /^[0-9a-f]{40}$/;
  * @returns {Decision}
  */
 export function decidirDespliegue(entrada) {
-  const { evento, modo, sha, enMain, ciDelSha, posteriores = [] } = entrada;
+  const {
+    evento,
+    modo,
+    sha,
+    enMain,
+    ciDelSha,
+    posteriores = [],
+    truncado = false,
+  } = entrada;
   const rechazar = (motivo) => ({ resultado: 'rechazar', motivo });
 
   if (typeof sha !== 'string' || !FORMATO_SHA.test(sha)) {
@@ -66,6 +77,15 @@ export function decidirDespliegue(entrada) {
       resultado: 'desplegar',
       motivo: `Vuelta atrás a ${sha}, que está en main.`,
     };
+  }
+
+  // Con la lista de posteriores incompleta no se puede saber si hay uno verde más nuevo: se
+  // rechaza en vez de arriesgar el despliegue de una versión superada. Más de 250 commits
+  // posteriores es, en la práctica, una versión muy vieja.
+  if (truncado) {
+    return rechazar(
+      `Hay demasiados commits posteriores a ${sha} en main para comprobar si está superado. Para volver a una versión anterior, usá modo=vuelta-atras.`,
+    );
   }
 
   if (ciDelSha !== 'success') {
@@ -120,13 +140,18 @@ export function estadoCiPorSha(runs) {
  * tiene commits que el SHA no tiene, es decir, que el SHA es ancestro de main; `identical`, que
  * es la punta. `commits` son los posteriores, del más viejo al más nuevo.
  *
- * @param {{ status: string, commits: { sha: string }[] }} compare
- * @returns {{ enMain: boolean, posteriores: string[] }}
+ * La lista `commits` está acotada (la API devuelve a lo sumo 250): si `ahead_by`, el total, es
+ * mayor que lo recibido, la lista quedó truncada y faltan los commits más nuevos.
+ *
+ * @param {{ status: string, ahead_by?: number, commits: { sha: string }[] }} compare
+ * @returns {{ enMain: boolean, posteriores: string[], truncado: boolean }}
  */
 export function datosDeCompare(compare) {
   const enMain = compare.status === 'ahead' || compare.status === 'identical';
+  const posteriores = enMain ? compare.commits.map((c) => c.sha) : [];
   return {
     enMain,
-    posteriores: enMain ? compare.commits.map((c) => c.sha) : [],
+    posteriores,
+    truncado: enMain && (compare.ahead_by ?? 0) > posteriores.length,
   };
 }

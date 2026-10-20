@@ -21,6 +21,9 @@ import {
 } from './decidir-despliegue.mjs';
 
 const API = 'https://api.github.com';
+// Tope de páginas de 100 ejecuciones del CI (1000 ejecuciones): más allá, la versión es tan
+// vieja que daría igual para la decisión (la comparación trunca a los 250 commits).
+const MAX_PAGINAS_CI = 10;
 const { GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_OUTPUT, EVENTO, MODO, SHA } =
   process.env;
 
@@ -56,7 +59,7 @@ async function main() {
     const compare = await api(`/repos/${repo}/compare/${SHA}...main`, {
       nullSi404: true,
     });
-    const { enMain, posteriores } = datosDeCompare(
+    const { enMain, posteriores, truncado } = datosDeCompare(
       compare ?? { status: 'no-existe', commits: [] },
     );
 
@@ -64,13 +67,20 @@ async function main() {
     const delSha = await api(
       `/repos/${repo}/actions/workflows/ci.yml/runs?${filtro}&head_sha=${SHA}&per_page=20`,
     );
-    const recientes = await api(
-      `/repos/${repo}/actions/workflows/ci.yml/runs?${filtro}&per_page=100`,
-    );
-    const estado = estadoCiPorSha([
-      ...recientes.workflow_runs,
-      ...delSha.workflow_runs,
-    ]);
+    // Las ejecuciones del CI se piden de a páginas de 100, de la más nueva a la más vieja,
+    // hasta cubrir todos los commits posteriores (o agotar las páginas): con una sola página,
+    // el CI verde de un commit posterior podía quedar fuera y desplegarse una versión superada.
+    const recientes = [];
+    const pendientes = new Set(posteriores);
+    for (let pagina = 1; pagina <= MAX_PAGINAS_CI; pagina++) {
+      const { workflow_runs: runs } = await api(
+        `/repos/${repo}/actions/workflows/ci.yml/runs?${filtro}&per_page=100&page=${pagina}`,
+      );
+      recientes.push(...runs);
+      for (const run of runs) pendientes.delete(run.head_sha);
+      if (runs.length < 100 || pendientes.size === 0) break;
+    }
+    const estado = estadoCiPorSha([...recientes, ...delSha.workflow_runs]);
 
     decision = decidirDespliegue({
       evento: EVENTO,
@@ -78,6 +88,7 @@ async function main() {
       sha: SHA,
       enMain,
       ciDelSha: estadoCiPorSha(delSha.workflow_runs).get(SHA) ?? null,
+      truncado,
       posteriores: posteriores.map((sha) => ({
         sha,
         ci: estado.get(sha) ?? null,

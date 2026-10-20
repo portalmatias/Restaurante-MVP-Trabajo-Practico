@@ -195,7 +195,8 @@
       etapa previa, redespliegue del mismo SHA con otro `SITE_ADDRESS`, SHA anterior superado,
       reejecución por cambio del script (una sola vez y log sin duplicar). Verificar que las
       pruebas fallan al revertir el atajo «superada» o la vuelta atrás a la etapa.
-- [ ] 5.9 CI (D10): `test:scripts` con glob (`scripts/*.test.mjs scripts/cd/*.test.mjs`) y un
+- [ ] 5.9 CI (D10): `test:scripts` con la lista explícita de archivos de test, incluido
+      `scripts/cd/decidir-despliegue.test.mjs` (Node 20 y `cmd.exe` no expanden globs), y un
       paso `npm run test:deploy` en `ci.yml`. Verificar en el PR que ambos corren.
 - [ ] 5.10 En `cd.yml` (D3, D4): sin `concurrency` (cola con `flock` en el servidor) y, si el tag
       `:<sha>` ya existe, exigir que la imagen declare `org.opencontainers.image.revision` igual
