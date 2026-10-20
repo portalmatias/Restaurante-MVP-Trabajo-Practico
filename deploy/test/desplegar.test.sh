@@ -202,6 +202,16 @@ desplegar "$SHA2" "$DB2" "$DF2" despliegue
 [ "$CODIGO" = 0 ] && ok "termina en 0" || mal "termina en 0 (código $CODIGO)" "$(cat "$T/salida.txt")"
 verificar "no se reejecuta" no_contiene "$T/salida.txt" "desplegar.sh cambió"
 
+# --- 7. Los scripts de despliegue se versionan como ejecutables ---------------------------------
+# El comando forzado de authorized_keys y el sudoers ejecutan estos archivos directamente: con
+# modo 100644 en Git, sshd responde `Permission denied` y todos los despliegues fallan.
+echo "7. Modo ejecutable en Git"
+RAIZ_REPO="$(cd "$AQUI/../.." && pwd)"
+for f in deploy/desplegar.sh deploy/ssh-entrada.sh deploy/test/desplegar.test.sh scripts/cd/verificar-certificado.sh; do
+  modo="$(git -C "$RAIZ_REPO" ls-files -s -- "$f" | cut -d" " -f1)"
+  [ "$modo" = 100755 ] && ok "$f es ejecutable" || mal "$f es ejecutable (modo en Git: ${modo:-sin versionar})"
+done
+
 echo
 echo "Resultado: $PASO comprobaciones correctas, $FALLO con fallas."
 [ "$FALLO" = 0 ]
