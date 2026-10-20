@@ -454,7 +454,8 @@ detrás. Al cerrarse sin confirmar, SHALL devolver el foco al control que lo abr
 control deja de existir, el foco SHALL pasar al aviso que explica por qué: al confirmarse la
 cancelación, al aviso de que la reserva fue cancelada; y al cerrar el diálogo después de que
 el servidor rechazó la cancelación por conflicto (`409`), al aviso de que la reserva ya no se
-puede cancelar.
+puede cancelar. Si la confirmación termina en un error y el diálogo sigue abierto, el foco
+SHALL quedar en un control del diálogo.
 
 #### Scenario: El diálogo de cancelación atrapa el foco
 - **WHEN** el diálogo de confirmación de cancelación está abierto
@@ -468,6 +469,11 @@ puede cancelar.
 #### Scenario: Confirmar la cancelación lleva el foco al aviso
 - **WHEN** la cancelación se confirma con éxito y el diálogo se cierra
 - **THEN** el foco de teclado pasa al aviso "Tu reserva fue cancelada."
+
+#### Scenario: Un error al confirmar no saca el foco del diálogo
+- **WHEN** la persona confirma con el teclado, la solicitud termina en un error y el diálogo
+  sigue abierto
+- **THEN** el foco de teclado queda en el botón de confirmar, no fuera del diálogo
 
 #### Scenario: Cerrar el diálogo tras un rechazo por conflicto lleva el foco al aviso
 - **WHEN** el servidor rechazó la cancelación con `409` y la persona cierra el diálogo

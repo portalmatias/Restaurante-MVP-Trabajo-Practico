@@ -270,8 +270,10 @@
       que confirmar con "Sí, cancelar" lleva el foco al aviso "Tu reserva fue cancelada."
       (spec "Confirmar la cancelación lleva el foco al aviso"); y que, tras un `409`, cerrar el
       diálogo lleva el foco al aviso "Esta reserva ya no se puede cancelar." (spec "Cerrar el
-      diálogo tras un rechazo por conflicto lleva el foco al aviso"). Documentar el resultado
-      en la descripción del PR.
+      diálogo tras un rechazo por conflicto lleva el foco al aviso"). Verificar también que,
+      si la confirmación termina en un error con el diálogo abierto, el foco queda en "Sí,
+      cancelar" (spec "Un error al confirmar no saca el foco del diálogo"). Documentar el
+      resultado en la descripción del PR.
 - [ ] 7.3 El change no agrega ni modifica `openapi/openapi.yaml` ni `backend/prisma`: no
       aplican migración ni contrato propios. Verificar con `git diff main --stat -- backend
       openapi` vacío.
