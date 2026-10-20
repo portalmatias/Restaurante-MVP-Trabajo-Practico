@@ -55,14 +55,24 @@ desde cero.
       sin `any-pointer: coarse` (por ejemplo con una variante propia `@custom-variant` sobre
       `@media (any-pointer: fine) and (not (any-pointer: coarse))`).
 - [ ] 2.8 `frontend-admin`, «Motivo visible en el login»: cambiar el texto de `sesion-vencida` en
-      `login-form.tsx` de «Tu sesión venció…» a «Tu sesión terminó o ya no es válida…» y ajustar
-      los tests que citan el texto anterior. El parámetro de URL `sesion-vencida` no cambia.
+      `login-form.tsx` de «Tu sesión venció…» a «Tu sesión terminó o ya no es válida…» (ya hecho
+      en la rama de implementación, commit `29de1b2`: verificarlo) y quitar la mención fija de «60
+      minutos» de los textos de `sesion-vencida` y de `renovar` (la duración es configurable con
+      `JWT_EXPIRES_IN`). Ajustar los tests que citan los textos anteriores. El parámetro de URL
+      `sesion-vencida` no cambia.
 - [ ] 2.9 `calendario-fecha`, «Días no elegibles distinguidos por texto»: en
       `formulario-seleccion.tsx`, `ultimaFecha = sumarDias(hoy, maximoDias)` ofrece `hoy + máximo`
       como último día. Escribir primero un test que falle (con zonas de 30 y 60 días, el día 60 es
       `aria-disabled` y el 59 es elegible) y cambiarlo a `maximoDias - 1`. Revisar también que
       «Mes siguiente» se deshabilite en el mes de ese último día.
-- [ ] 2.10 `experiencia-reserva-cliente`: ninguna pantalla pasa hoy `estado="completa"` a una
+- [ ] 2.10 `frontend-admin`, «Dashboard de aforo»: `leerAforo` (`nivel-aforo.ts`) redondea el
+      porcentaje con `Math.round` y decide el nivel con la razón decimal, de modo que 39 de 49
+      muestra «80 % ocupado» con el nivel «Con lugar» y 199 de 200 muestra «100 %» sin ser
+      «Completo». Escribir primero los tests (39/49 → 79 % y «Con lugar»; 199/200 → 99 % y
+      «Casi lleno»; aforo 0 con 5 comensales → «Sin aforo», sin porcentaje y 0 libres) y pasar el
+      cálculo a enteros con redondeo hacia abajo (`Math.floor(ocupado * 100 / maximo)`) y a decidir
+      el nivel con ese entero.
+- [ ] 2.11 `experiencia-reserva-cliente`: ninguna pantalla pasa hoy `estado="completa"` a una
       tablilla. Confirmarlo con `git grep 'estado='` y registrar en el PR que el estado queda
       soportado por el componente pero sin cableado a la disponibilidad (cambio futuro).
 
@@ -89,11 +99,13 @@ desde cero.
       `page.tsx` público y comprueba que los seis títulos de las rutas de `reservas/` existen y son
       distintos, que el título resuelto de `/` es exactamente «Ichigo», y que `layout.tsx` declara
       `lang="es-AR"` y la plantilla `%s | Ichigo`.
-- [ ] 3.7 `frontend-admin`: verificar `nivel-aforo.test.ts` (80 %, 100 %, sobrecupo, aforo 0),
+- [ ] 3.7 `frontend-admin`: verificar `nivel-aforo.test.ts` (80 %, 100 %, sobrecupo, aforo 0 con y
+      sin ocupación, redondeo hacia abajo),
       `dashboard-aforo.test.tsx` (porcentaje, libres, `role="meter"`, hora de la consulta),
       `listado-reservas.test.tsx` (cuatro sellos con texto, «Ausente», «Marcar ausente»,
       búsqueda local) y `admin-shell.test.tsx` / `login-form.test.tsx` (aviso a 5 minutos, singular,
-      «Renovar sesión», `motivo`). Completar lo que falte.
+      «Renovar sesión» sin pasar por `?motivo=sesion-vencida`, `401` y `403` hacia
+      `?motivo=sesion-vencida`, vencimiento por tiempo, `motivo`). Completar lo que falte.
 - [ ] 3.8 `movimiento-ui`: test que lee `globals.css` y comprueba que existe un bloque
       `prefers-reduced-motion: reduce` con `animation: none` para `.tinta-entrada`, `.balanceo`,
       `.revelar`, `.marco-organico` y `.deriva`, y que ninguna regla base de esas clases fija

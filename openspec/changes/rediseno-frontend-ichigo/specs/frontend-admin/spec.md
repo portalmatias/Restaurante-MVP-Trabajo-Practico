@@ -1,5 +1,35 @@
 ## MODIFIED Requirements
 
+### Requirement: Rutas de administración protegidas por sesión
+El sistema SHALL exigir una sesión activa para mostrar cualquier pantalla bajo `/admin/...`
+distinta de `/admin/login`, y SHALL redirigir a `/admin/login`, sin parámetros, cuando nunca
+hubo una sesión en esa pestaña. Cuando una sesión que existía deja de ser válida sin que el
+administrador activara «Cerrar sesión» ni «Renovar sesión» (porque venció por tiempo o porque una
+llamada a la API de una pantalla ya autenticada respondió `401` o `403`), el sistema SHALL
+descartar la sesión guardada y redirigir a `/admin/login?motivo=sesion-vencida`. Este es el único
+requisito que decide ese destino; el mensaje que el login muestra lo define «Motivo visible en el
+login».
+
+#### Scenario: Acceso directo sin sesión redirige al login
+- **WHEN** una persona sin sesión activa visita `/admin`, `/admin/salon` o
+  `/admin/reservas` directamente por URL
+- **THEN** el sistema la redirige a `/admin/login`, sin parámetro `motivo` y sin mostrar datos de
+  administración
+
+#### Scenario: Una sesión vencida redirige al login en el momento de la primera llamada fallida
+- **WHEN** el administrador ya está en una pantalla de `/admin` y una llamada a la API
+  responde `401` o `403`
+- **THEN** el sistema descarta la sesión guardada y redirige a `/admin/login?motivo=sesion-vencida`
+
+#### Scenario: Una sesión vencida por tiempo redirige al login
+- **WHEN** el administrador deja abierta una pantalla de `/admin` hasta que la sesión vence, sin
+  hacer pedidos a la API
+- **THEN** el sistema descarta la sesión y redirige a `/admin/login?motivo=sesion-vencida`
+
+#### Scenario: El login no aplica el guard de sesión
+- **WHEN** una persona sin sesión activa visita `/admin/login`
+- **THEN** ve el formulario de login, sin redirección
+
 ### Requirement: Dashboard de aforo
 El sistema SHALL mostrar en `/admin`, para una fecha y un turno seleccionables, la
 ocupación de cada Zona y la ocupación global, calculadas como la suma de comensales de las
@@ -10,10 +40,16 @@ un endpoint que lo exponga (decisión D5 del change archivado `frontend-admin`,
 `openspec/changes/archive/2026-10-01-frontend-admin/design.md`), la ocupación global SHALL mostrarse sin un
 aforo máximo de referencia, hasta que un change de backend lo agregue.
 
-Para cada Zona el sistema SHALL mostrar además el porcentaje de ocupación (entero, sin tope),
-los lugares libres (nunca negativos) y un nivel con nombre escrito: «Con lugar» (menos de 80 %),
-«Casi lleno» (80 % o más sin llegar al aforo), «Completo» (ocupación igual al aforo),
-«Sobrecupo» (ocupación mayor que el aforo) o «Sin aforo» (aforo máximo cero). La barra de
+Para cada Zona el sistema SHALL mostrar además el porcentaje de ocupación, los lugares libres
+(nunca negativos) y un nivel con nombre escrito. El porcentaje es un entero sin tope, **redondeado
+hacia abajo** y calculado con enteros (parte entera de ocupación × 100 ÷ aforo), para que ni el
+redondeo ni la coma flotante lo adelanten. El nivel se decide con el mismo valor que se muestra:
+«Con lugar» (porcentaje menor que 80), «Casi lleno» (80 o más sin llegar al aforo), «Completo»
+(ocupación igual al aforo), «Sobrecupo» (ocupación mayor que el aforo) o «Sin aforo» (aforo máximo
+cero). Así el porcentaje llega a 100 solo cuando la zona está completa o en sobrecupo, y 79,6 % no
+se muestra como «80 %» con el nivel «Con lugar». Con aforo máximo cero prevalece «Sin aforo» aunque
+haya ocupación: no se informa «Sobrecupo» ni porcentaje, los lugares libres son 0 y la barra se
+muestra llena si hay ocupación y vacía si no la hay. La barra de
 ocupación SHALL exponerse con `role="meter"` y un texto de valor. El sistema SHALL indicar la
 hora en que llegó la consulta y, mientras se actualiza, que se muestra la consulta anterior.
 Esta lectura es presentacional: no decide ninguna regla de negocio.
@@ -52,9 +88,18 @@ Esta lectura es presentacional: no decide ninguna regla de negocio.
 - **AND** si tuviera 45 de 40, el nivel es «Sobrecupo», los lugares libres son 0 y se informa
   «5 por encima del aforo»
 
+#### Scenario: El porcentaje se redondea hacia abajo
+- **WHEN** una zona tiene 39 comensales sobre un aforo de 49 (79,59 %)
+- **THEN** el dashboard muestra «79 % ocupado» y el nivel «Con lugar», no «80 %»
+
+#### Scenario: Casi completo no muestra 100 %
+- **WHEN** una zona tiene 199 comensales sobre un aforo de 200 (99,5 %)
+- **THEN** el dashboard muestra «99 % ocupado» y el nivel «Casi lleno», no «100 %» ni «Completo»
+
 #### Scenario: Aforo máximo cero
 - **WHEN** una zona tiene aforo máximo 0
-- **THEN** el nivel es «Sin aforo» y no se muestra un porcentaje
+- **THEN** el nivel es «Sin aforo», no se muestra un porcentaje y se informa «0 lugares libres»
+- **AND** si además hubiera 5 comensales, el nivel sigue siendo «Sin aforo» y no «Sobrecupo»
 
 #### Scenario: El nivel no depende del color
 - **WHEN** se captura el dashboard en escala de grises
@@ -134,8 +179,9 @@ cuando falten cinco minutos o menos para que venza la sesión. El aviso SHALL se
 `role="alert"` que indique los minutos restantes (con «minuto» o «minutos» según corresponda),
 advierta que los cambios sin guardar se pierden al vencer y ofrezca el botón «Renovar sesión».
 Como no hay renovación automática, «Renovar sesión» SHALL descartar la sesión y llevar a
-`/admin/login?motivo=renovar`. El sistema SHALL controlar el vencimiento por tiempo, aunque la
-pestaña no haga pedidos a la API.
+`/admin/login?motivo=renovar`. Es una acción del administrador: manda sobre la regla de sesión
+que desaparece y SHALL NOT dispararla, de modo que nunca lleva a `?motivo=sesion-vencida`. El
+sistema SHALL controlar el vencimiento por tiempo, aunque la pestaña no haga pedidos a la API.
 
 #### Scenario: Aviso con cinco minutos o menos
 - **WHEN** la sesión vence en 4 minutos
@@ -154,20 +200,31 @@ pestaña no haga pedidos a la API.
 - **WHEN** el administrador activa «Renovar sesión»
 - **THEN** el sistema descarta la sesión y lo redirige a `/admin/login?motivo=renovar`
 
+#### Scenario: Renovar no se confunde con una sesión vencida
+- **WHEN** el administrador activa «Renovar sesión» y el sistema descarta la sesión guardada
+- **THEN** el destino es únicamente `/admin/login?motivo=renovar`, sin pasar por
+  `?motivo=sesion-vencida`
+- **AND** el login muestra el aviso de renovar y no el de sesión terminada
+
 ### Requirement: Motivo visible en el login
 El formulario de `/admin/login` SHALL explicar por qué se llegó a él cuando la URL trae el
-parámetro `motivo`: con `sesion-vencida` SHALL informar, sin afirmar la causa, que la sesión terminó o ya no es
-válida, que dura 60 minutos y no se renueva sola; con `renovar` SHALL informar que se ingresa de nuevo para renovar
-la sesión por otros 60 minutos. Un valor desconocido SHALL ignorarse sin mostrar mensaje. El
-sistema SHALL redirigir con `motivo=sesion-vencida` solo cuando la sesión desapareció sin que
-el administrador activara «Cerrar sesión».
+parámetro `motivo`: con `sesion-vencida` SHALL informar, sin afirmar la causa, que la sesión
+terminó o ya no es válida y que la sesión del panel dura un tiempo limitado y no se renueva sola;
+con `renovar` SHALL informar que se ingresa de nuevo para renovar la sesión. Los textos SHALL NOT
+fijar la duración de la sesión (es configurable con `JWT_EXPIRES_IN` y el frontend no la conoce).
+Un valor desconocido SHALL ignorarse sin mostrar mensaje. Cuándo se redirige con cada `motivo` lo
+deciden «Rutas de administración protegidas por sesión» y «Aviso de sesión por vencer».
 
-#### Scenario: Sesión que deja de ser válida
-- **WHEN** una sesión que existía deja de ser válida (venció o la rechazó el backend con `401`
-  o `403`) sin que el administrador cerrara sesión
-- **THEN** el sistema lo redirige a `/admin/login?motivo=sesion-vencida`
-- **AND** el login muestra «Tu sesión terminó o ya no es válida», sin decir que venció, porque el
+#### Scenario: Aviso de sesión terminada
+- **WHEN** se abre `/admin/login?motivo=sesion-vencida`
+- **THEN** el login muestra «Tu sesión terminó o ya no es válida», sin decir que venció, porque el
   motivo puede ser otro
+- **AND** el texto no menciona una cantidad de minutos
+
+#### Scenario: Aviso de renovar
+- **WHEN** se abre `/admin/login?motivo=renovar`
+- **THEN** el login explica que se ingresa de nuevo para renovar la sesión, sin mencionar una
+  cantidad de minutos
 
 #### Scenario: Cierre voluntario sin mensaje de vencimiento
 - **WHEN** el administrador activa «Cerrar sesión»
