@@ -243,6 +243,12 @@ transparente para tecnologías de asistencia (`aria-hidden`) porque la lista lo 
 plano SHALL incluir un resumen en texto con la cantidad de mesas por estado. Las animaciones y
 transiciones SHALL desactivarse con `prefers-reduced-motion: reduce`.
 
+La norma de referencia SHALL ser WCAG 2.2, nivel AA, en estos criterios: 1.4.1 (uso del color),
+1.4.3 (contraste mínimo, 4,5:1 en textos), 1.4.11 (contraste no textual, 3:1 en marcas y
+bordes), 1.4.4 (texto al 200 %), 1.4.10 (reflow a 320 px CSS), 2.4.7 (foco visible) y 2.4.11
+(foco no oculto). La desactivación de animaciones (criterio 2.3.3, nivel AAA) se adopta como
+mejora voluntaria.
+
 #### Scenario: Lista textual equivalente al dibujo
 - **WHEN** se renderiza un plano con S1 `LIBRE`, S2 `OCUPADA` y S3 `NO_ALCANZA`
 - **THEN** la lista contiene tres entradas que dicen, en palabras, la etiqueta, la capacidad y

@@ -336,14 +336,15 @@ eligió esa mesa (ver D9). Queda como pregunta abierta.
   tablilla Kakefuda: madera (tokens de `frontend/app/globals.css`, solo mención: no se
   rediseña), `etiqueta` y `capacidad` impresas. El SVG es decorativo para tecnologías de
   asistencia (`aria-hidden="true"`); el contenido accesible es la lista (D7).
-- **Estados sin depender del color** (WCAG 1.4.1): en el dibujo, cada estado suma un patrón y una
+- **Estados sin depender del color** (WCAG 2.2, nivel AA, criterio 1.4.1 Uso del color): en el dibujo, cada estado suma un patrón y una
   marca además del color: `LIBRE` (relleno liso + marca ✓), `OCUPADA` (rayado diagonal + marca
   ×), `NO_ALCANZA` (punteado + marca –). El **texto** del estado ("Libre", "Ocupada", "No
   alcanza") va en la lista y en la leyenda, no dentro de cada mesa: una mesa de una celda mide
   unos 27 px en un celular y el texto no entra, y el texto dentro de un SVG con `viewBox` escala
   con el contenedor, así que un tamaño mínimo no se puede garantizar sin medir con JavaScript
-  (descartado arriba). Contraste de marcas y bordes ≥ 3:1 y de los textos ≥ 4.5:1 contra el
-  fondo de la tablilla, verificado con los tokens reales.
+  (descartado arriba). Contraste de marcas y bordes ≥ 3:1 (criterio 1.4.11 Contraste no textual) y
+  de los textos ≥ 4,5:1 (criterio 1.4.3 Contraste mínimo) contra el fondo de la tablilla,
+  verificado con los tokens reales.
 - **Leyenda** siempre visible con los tres estados (mismo patrón y marca que en el dibujo, con el
   texto del estado).
 - **Mesas sin ubicar** (`posX` nulo): no se dibujan; figuran en la lista con la nota
@@ -392,14 +393,19 @@ protegido por `JwtAuthGuard` + `RolesGuard`, con throttle de admin.
   interactivos**, así que no añade paradas de tabulación inútiles; la lista es texto navegable
   con lector de pantalla. Si D9 se implementa, las mesas pasan a ser `<button>` reales dentro de
   una lista, con foco visible (anillo del token de foco existente) y activación por Enter/Espacio.
-- **`prefers-reduced-motion`:** las transiciones y el brillo del esqueleto se desactivan con
+- **`prefers-reduced-motion`** (criterio 2.3.3 Animación a partir de interacciones, nivel AAA: se
+  adopta por encima del AA que exige este change): las transiciones y el brillo del esqueleto se
+  desactivan con
   `@media (prefers-reduced-motion: reduce)` en CSS; la aparición del plano no usa animación
   esencial. `jsdom` no evalúa media queries, así que esto **no** se prueba con `matchMedia`
   simulado: se verifica leyendo que la regla existe en la hoja de estilos (test que busca el
   bloque `@media (prefers-reduced-motion: reduce)` con las clases del esqueleto) y a mano en el
   navegador con la opción del sistema activada (tarea 6.1).
 - **Contraste, foco y zoom:** texto en píxeles relativos (`rem`), la página sigue usable a 200 %
-  de zoom, sin scroll horizontal del `body`.
+  de zoom (criterio 1.4.4 Cambio de tamaño del texto) y sin scroll horizontal del `body` a 320 px
+  CSS de ancho (criterio 1.4.10 Reflow). El foco es visible (criterio 2.4.7) y no queda tapado por
+  otros elementos (criterio 2.4.11 Foco no oculto, nuevo en WCAG 2.2). Si D9 se implementa, cada
+  mesa-botón mide al menos 24 × 24 px CSS (criterio 2.5.8 Tamaño del objetivo, mínimo).
 - **Celular.** La grilla escala al ancho disponible (360 px de viewport → ~328 px de dibujo →
   ~27 px por celda en STANDARD de 12 columnas). En el dibujo, la
   `etiqueta` se imprime dentro de la mesa como ayuda visual y la `capacidad` solo si la mesa mide
