@@ -190,7 +190,7 @@
       contra un sitio con certificado válido y contra uno vencido (por ejemplo,
       `expired.badssl.com`).
 
-- [ ] 5.8 Escribir `deploy/test/desplegar.test.sh` (D7, D10) con simulacros de `docker`, `curl`,
+- [x] 5.8 Escribir `deploy/test/desplegar.test.sh` (D7, D10) con simulacros de `docker`, `curl`,
       `flock`, `sleep` y `stat`: primer despliegue, cambio de etapa fallido con vuelta atrás a la
       etapa previa, redespliegue del mismo SHA con otro `SITE_ADDRESS`, SHA anterior superado,
       reejecución por cambio del script (una sola vez y log sin duplicar). Verificar que las
