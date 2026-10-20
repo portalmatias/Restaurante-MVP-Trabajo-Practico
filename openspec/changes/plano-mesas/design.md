@@ -356,9 +356,10 @@ eligió esa mesa (ver D9). Queda como pregunta abierta.
   (`disponible`, `lugaresRestantes`, `motivos`) gobierna el mensaje, el botón "Continuar" y el
   atenuado: no hay dos respuestas que puedan discrepar si se crea una reserva entre medio, y se
   evita duplicar las consultas de `cargarContexto` en cada visita. `/disponibilidad` se pide
-  **solo como respaldo** cuando el plano falla (red, `5xx`, `429` o `404`); en ese caso el
-  veredicto sale de `/disponibilidad`, como hoy, y la sección del plano muestra su error o su
-  mensaje (D7). La página sigue pidiendo el catálogo como hasta ahora.
+  **solo como respaldo** cuando el plano falla (red, `5xx`, `429`, `404` o `400`: la misma lista
+  que D7); en ese caso el veredicto sale de `/disponibilidad`, como hoy, y la sección del plano
+  muestra su error o su mensaje (D7). Un `400` del plano sin un `400` de `/disponibilidad` es un
+  desacuerdo entre los dos validadores, no una selección inválida: por eso no redirige. La página sigue pidiendo el catálogo como hasta ahora.
 - **Obtención de datos.** El plano se pide en el Server Component de la página
   (`cache: "no-store"`) y **su fallo no tumba la página**: se captura y se degrada a la sección
   de error de D7, con `ErrorConReintento` (ya existe). Tipos de `schema.d.ts` regenerados.

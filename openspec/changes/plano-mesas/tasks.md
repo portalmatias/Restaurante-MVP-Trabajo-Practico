@@ -137,13 +137,13 @@
       reintento automático.
 - [ ] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: el plano es la fuente
       del veredicto (`disponible`, `motivos`) y se pide con `cache: "no-store"` junto al
-      catálogo; `/disponibilidad` se pide solo si el plano falla (red, `5xx`, `429` o `404`), y
+      catálogo; `/disponibilidad` se pide solo si el plano falla (red, `5xx`, `429`, `404` o `400`), y
       entonces la sección del plano muestra su error (D7). Solo un `404/400` de
       `/disponibilidad` redirige al paso 1. El error del plano no tumba la página. La página hoy
       retorna antes cuando `disponible` es `false` (lista los motivos); esa rama también debe
       renderizar el plano atenuado con su aviso, después de los motivos, y se cubre con un test
-      propio. Tests: plano `404` ⇒ sin redirección y veredicto de `/disponibilidad`; ambos
-      `404` ⇒ redirección. Verificar que los tests existentes de la página siguen en verde.
+      propio. Tests: plano `404` o `400` ⇒ sin redirección y veredicto de `/disponibilidad`;
+      plano y `/disponibilidad` con `404` o con `400` ⇒ redirección. Verificar que los tests existentes de la página siguen en verde.
 - [ ] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
       la página a 360 px (test del componente con las clases de orden y revisión visual).
 

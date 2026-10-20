@@ -297,8 +297,13 @@ siguiente.
 - **THEN** la pantalla muestra el veredicto de disponibilidad y la sección del plano degradada
 - **AND** no redirige al paso 1 y la acción para continuar sigue disponible
 
+#### Scenario: El plano rechaza la consulta pero la disponibilidad no
+- **WHEN** el plano responde `400` y la consulta de disponibilidad responde `disponible: true`
+- **THEN** la pantalla muestra el veredicto de disponibilidad y la sección del plano degradada
+- **AND** no redirige al paso 1 y la acción para continuar sigue disponible
+
 #### Scenario: Selección inválida
-- **WHEN** el plano y la consulta de disponibilidad responden `404`
+- **WHEN** el plano y la consulta de disponibilidad responden ambos `404`, o ambos `400`
 - **THEN** el sistema trata la selección como inválida y vuelve al paso 1
 
 #### Scenario: Demasiadas consultas
