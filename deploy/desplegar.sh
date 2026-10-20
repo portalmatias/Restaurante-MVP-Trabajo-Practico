@@ -52,7 +52,7 @@ if [ -z "${RESERVAS_REEJECUTADO:-}" ] && ( umask 077; : >> "$LOG_DESPLIEGUE" ) 2
 fi
 
 main() {
-  # Rutas. RESERVAS_RAIZ, RESERVAS_REGISTRO y RESERVAS_SEGUNDOS_COMPROBACION existen solo para las pruebas locales (deploy/test/desplegar.test.sh, tarea 5.2)
+  # Rutas. RESERVAS_RAIZ, RESERVAS_REGISTRO y RESERVAS_SEGUNDOS_COMPROBACION y RESERVAS_SEGUNDOS_CAMBIO_ETAPA existen solo para las pruebas locales (deploy/test/desplegar.test.sh, tarea 5.2)
   # (docs/despliegue.md); en la instancia no se definen.
   local RAIZ="${RESERVAS_RAIZ:-/opt/reservas}"
   local REPO="$RAIZ"
@@ -330,6 +330,13 @@ main() {
   [ -n "$site_previo" ] || site_previo="$p_site"
   if [ "$p_site" != "$site_previo" ]; then
     log "cambio de etapa: $site_previo -> $p_site"
+    # Pasar a HTTPS: el security group se abre DESPUÉS de cambiar SITE_ADDRESS (si no, el login
+    # quedaría en HTTP abierto a internet), así que la comprobación espera al certificado más
+    # que de costumbre. Let's Encrypt valida por el puerto 80 y Caddy reintenta solo.
+    if [ "$p_site" != ":80" ]; then
+      SEGUNDOS_COMPROBACION="${RESERVAS_SEGUNDOS_CAMBIO_ETAPA:-300}"
+      log "la comprobación espera hasta ${SEGUNDOS_COMPROBACION} s a que Caddy obtenga el certificado: cuando aparezca «levantando la versión», abrí 80 y 443 en el security group (docs/despliegue.md, sección 9)."
+    fi
   fi
 
   # El script en ejecución es el del commit anterior: un cambio a `desplegar.sh` llegaría un
@@ -407,6 +414,7 @@ main() {
   error "la versión $sha no responde: VUELTA ATRÁS a $sha_previo (etapa $site_previo)"
   git -C "$REPO" checkout -q --detach "$sha_previo"
   generar_env "$db_previo" "$df_previo" "$site_previo"
+  SEGUNDOS_COMPROBACION="${RESERVAS_SEGUNDOS_COMPROBACION:-90}"
   if levantar_y_comprobar "$site_previo"; then
     log "VUELTA ATRÁS a $sha_previo completada, con la etapa $site_previo; la versión en servicio no cambió."
   else

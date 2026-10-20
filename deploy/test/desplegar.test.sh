@@ -131,7 +131,7 @@ EOF
 desplegar() { # desplegar <sha> <db> <df> <modo>; deja la salida en $T/salida.txt
   : > "$FAKE_DIR/docker.log"; : > "$FAKE_DIR/curl.log"
   PATH="$BIN:$PATH" RESERVAS_RAIZ="$T/raiz" RESERVAS_REGISTRO="registro.prueba/x" \
-    RESERVAS_LOG="$T/despliegue.log" RESERVAS_SEGUNDOS_COMPROBACION=2 \
+    RESERVAS_LOG="$T/despliegue.log" RESERVAS_SEGUNDOS_COMPROBACION=2 RESERVAS_SEGUNDOS_CAMBIO_ETAPA=3 \
     bash "$T/raiz/deploy/desplegar.sh" "$@" > "$T/salida.txt" 2>&1
   CODIGO=$?
 }
@@ -155,6 +155,7 @@ FAKE_CURL_FALLA_HTTPS=1 desplegar "$SHA1" "$DB" "$DF" despliegue
 [ "$CODIGO" = 1 ] && ok "termina en 1" || mal "termina en 1 (código $CODIGO)" "$(cat "$T/salida.txt")"
 verificar "redesplegar el mismo SHA no se saltea" no_contiene "$T/salida.txt" "versión superada"
 verificar "avisa el cambio de etapa" contiene "$T/salida.txt" "cambio de etapa: :80 -> falla.prueba.test"
+verificar "pide abrir el security group y espera más al certificado" contiene "$T/salida.txt" "espera hasta 3 s a que Caddy obtenga el certificado"
 verificar "prueba HTTPS con el nombre del sitio (--resolve)" contiene "$FAKE_DIR/curl.log" "resolve falla.prueba.test:443:127.0.0.1"
 verificar "la vuelta atrás vuelve a la etapa :80" contiene "$T/salida.txt" "VUELTA ATRÁS a $SHA1 completada, con la etapa :80"
 verificar "la vuelta atrás comprueba por HTTP" contiene "$FAKE_DIR/curl.log" "^url http://127.0.0.1"
