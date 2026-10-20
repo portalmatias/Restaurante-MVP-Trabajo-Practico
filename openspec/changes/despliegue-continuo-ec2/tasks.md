@@ -102,8 +102,13 @@
       - `SIGHUP` y `SIGPIPE` ignorados y salida duplicada en
         `/var/log/reservas-despliegue.log` (conexión SSH cortada);
       - ruta `/opt/reservas` (el repositorio clonado directo ahí, sin nivel `repo/`);
-      - `version_previa` leída al inicio, chequeo de ancestro en modo `despliegue` y búsqueda
+      - `version_previa` y etapa vigente (`SITE_ADDRESS_VIGENTE`) leídas al inicio; en modo
+        `despliegue`, saltear solo un SHA **anterior** al que sirve (no el igual); búsqueda
         en `historial` en modo `vuelta-atras`;
+      - comprobación según la etapa (`curl --resolve` en HTTPS), con espera de hasta 300 s en un
+        cambio de etapa a un dominio, y vuelta atrás a la versión **y la etapa** previas;
+      - reejecución una sola vez cuando el commit nuevo trae otro `desplegar.sh` (solo en modo
+        `despliegue`);
       - checkout, escritura de `.despliegue/compose.env` (modo `600`) con las imágenes por
         digest, pull, migraciones, seed, `up` y comprobación;
       - vuelta atrás a `version_previa`, registro en `VERSION_ACTUAL` e `historial`, y
@@ -180,9 +185,22 @@
       Verificar que fallan sin la implementación y que pasan con `npm run test:scripts`.
 - [ ] 5.7 Escribir `.github/workflows/certificado.yml` (D2): ejecución diaria y manual, que
       solo corre si existe la variable `SUBDOMINIO`, y falla si el certificado no es válido para
-      ese nombre o le quedan menos de 21 días. Verificar con `actionlint`, y probar el chequeo
+      ese nombre o le quedan menos de 21 días, y al fallar abre un issue (o comenta el abierto)
+      con `permissions: issues: write` (D2). Verificar con `actionlint`, y probar el chequeo
       contra un sitio con certificado válido y contra uno vencido (por ejemplo,
       `expired.badssl.com`).
+
+- [ ] 5.8 Escribir `deploy/test/desplegar.test.sh` (D7, D10) con simulacros de `docker`, `curl`,
+      `flock`, `sleep` y `stat`: primer despliegue, cambio de etapa fallido con vuelta atrás a la
+      etapa previa, redespliegue del mismo SHA con otro `SITE_ADDRESS`, SHA anterior superado,
+      reejecución por cambio del script (una sola vez y log sin duplicar). Verificar que las
+      pruebas fallan al revertir el atajo «superada» o la vuelta atrás a la etapa.
+- [ ] 5.9 CI (D10): `test:scripts` con glob (`scripts/*.test.mjs scripts/cd/*.test.mjs`) y un
+      paso `npm run test:deploy` en `ci.yml`. Verificar en el PR que ambos corren.
+- [ ] 5.10 En `cd.yml` (D3, D4): sin `concurrency` (cola con `flock` en el servidor) y, si el tag
+      `:<sha>` ya existe, exigir que la imagen declare `org.opencontainers.image.revision` igual
+      al SHA (si no, el job falla). Verificar con un registro local que la lectura de la etiqueta
+      funciona.
 
 ## 6. Infraestructura y primer despliegue (D9)
 
@@ -259,8 +277,9 @@
       creada antes del despliegue sigue consultable. Reiniciar la instancia y verificar que la
       app vuelve sola con los mismos datos.
 - [ ] 6.6 Activar HTTPS cuando la docente confirme el subdominio: pasarle la IP elástica,
-      verificar con `dig +short <subdominio>` que resuelve a esa IP, cambiar `SITE_ADDRESS` en
-      `/opt/reservas/.env` y redesplegar. Verificar:
+      verificar con `dig +short <subdominio>` que resuelve a esa IP, **cambiar `SITE_ADDRESS` en
+      `/opt/reservas/.env` y redesplegar primero, y abrir 80 y 443 a `0.0.0.0/0` después**, cuando
+      el log lo indique (D7, D9). Verificar:
       - `curl -I https://<subdominio>/` responde `200` con un certificado válido (sin `-k`) y
         con `Strict-Transport-Security`;
       - `curl -I http://<subdominio>/reservas` responde con una redirección permanente a
@@ -273,6 +292,10 @@
         verde.
 
       Actualizar la documentación para indicar que producción ya está en la etapa HTTPS.
+
+- [ ] 6.7 Hacer públicos los paquetes `reservas-backend` y `reservas-frontend` de GHCR tras la
+      primera publicación y reintentar el primer despliegue (D3, runbook «Paquetes en GHCR»).
+      Verificar que los despliegues siguientes descargan sin credenciales.
 
 ## 7. Documentación y cierre
 
