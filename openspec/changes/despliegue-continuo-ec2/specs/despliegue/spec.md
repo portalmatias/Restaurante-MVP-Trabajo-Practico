@@ -35,6 +35,17 @@ vieja, salvo una vuelta atrás pedida explícitamente.
 - **WHEN** se mergean dos commits a `main` mientras el primero todavía se está desplegando
 - **THEN** los despliegues corren de a uno, sin superponerse
 - **AND** producción termina sirviendo el commit más reciente
+- **AND** ninguna ejecución se cancela por la llegada de otra: la espera la resuelve el servidor
+
+#### Scenario: Despliegue anterior que llega después de uno más nuevo
+- **WHEN** el despliegue de un commit anterior llega al servidor después de que el de un commit
+  más nuevo ya quedó sirviendo
+- **THEN** el servidor lo saltea como versión superada y producción conserva el más nuevo
+
+#### Scenario: Redespliegue del mismo commit
+- **WHEN** se despliega el mismo SHA que ya está sirviendo, por ejemplo después de cambiar un
+  valor del `.env`
+- **THEN** el servidor no lo saltea: regenera la configuración y recrea lo que cambió
 
 #### Scenario: CI viejo que termina después de uno nuevo
 - **WHEN** el CI de un commit termina en verde después de que un commit posterior de `main` ya
@@ -70,6 +81,11 @@ ejecute exactamente lo mismo.
   después se vuelve a esa versión
 - **THEN** el servidor usa los artefactos registrados para ese SHA, no los del tag nuevo
 
+#### Scenario: Tag publicado antes del despliegue con otro origen
+- **WHEN** el tag `:<sha>` ya existe en el registro y la imagen no declara ese SHA como su
+  revisión
+- **THEN** el job de imágenes falla y no se despliega ni se sobrescribe nada
+
 #### Scenario: Despliegue con un identificador inválido
 - **WHEN** el procedimiento de despliegue recibe un valor que no es un SHA completo de commit
 - **THEN** lo rechaza sin modificar nada en el servidor
@@ -93,6 +109,12 @@ terminar en error.
 - **WHEN** falla la comprobación de una versión nueva
 - **THEN** el servidor vuelve a la versión que estaba sirviendo justo antes de ese intento, no
   a una más vieja
+
+#### Scenario: Cambio de etapa que no se puede completar
+- **WHEN** se cambia `SITE_ADDRESS` para pasar a HTTPS y el proxy de borde no obtiene el
+  certificado dentro del tiempo límite
+- **THEN** el servidor vuelve a la versión y a la etapa que estaban sirviendo
+- **AND** el workflow termina en error indicando la vuelta atrás
 
 #### Scenario: Vuelta atrás manual
 - **WHEN** el equipo necesita volver a una versión anterior ya desplegada
@@ -273,7 +295,7 @@ cliente no puede falsificarla.
 ### Requirement: HTTPS con el subdominio de producción
 Cuando el subdominio de producción apunte a la IP pública del servidor, el proxy de borde SHALL
 servir la aplicación por HTTPS con un certificado válido que obtiene y renueva solo. Un control
-automático SHALL avisar al equipo si el certificado está por vencer o deja de ser válido. SHALL
+automático SHALL avisar al equipo (con un issue) si el certificado está por vencer o deja de ser válido. SHALL
 redirigir a HTTPS toda solicitud HTTP que no sea la validación del certificado, y las
 respuestas por HTTPS SHALL incluir `Strict-Transport-Security`. Activar HTTPS SHALL ser un
 cambio de configuración, sin cambios de código en la aplicación. Los certificados SHALL
@@ -288,10 +310,22 @@ conservarse entre despliegues y reinicios.
 - **WHEN** un cliente abre `http://<subdominio>/reservas`
 - **THEN** recibe una redirección permanente a `https://<subdominio>/reservas`
 
+#### Scenario: Orden de activación
+- **WHEN** el equipo activa HTTPS siguiendo el runbook
+- **THEN** primero cambia `SITE_ADDRESS` y redespliega, y recién después abre los puertos 80 y
+  443 a internet
+- **AND** el login del admin no queda en HTTP abierto a internet en ningún momento
+
 #### Scenario: Certificado por vencer
 - **WHEN** al certificado de producción le quedan menos de 21 días de validez o deja de ser
   válido
-- **THEN** el control automático falla y el equipo recibe el aviso de GitHub
+- **THEN** el control automático falla y abre un issue en el repositorio (o comenta el que ya
+  está abierto), sin depender de la notificación de GitHub al creador del workflow
+
+#### Scenario: Control del certificado deshabilitado por inactividad
+- **WHEN** GitHub deshabilita el workflow programado tras 60 días sin actividad del
+  repositorio
+- **THEN** la documentación indica cómo detectarlo y volver a habilitarlo
 
 #### Scenario: Despliegue con el certificado ya emitido
 - **WHEN** se despliega una versión nueva o se reinicia la instancia
