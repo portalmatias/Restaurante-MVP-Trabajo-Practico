@@ -67,8 +67,10 @@ main() {
   local COMPOSE_FILE="$REPO/deploy/docker-compose.prod.yml"
   local SEGUNDOS_COMPROBACION="${RESERVAS_SEGUNDOS_COMPROBACION:-90}"
 
-  log() { printf '[desplegar %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
-  error() { printf '[desplegar %s] ERROR: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
+  # `|| true`: si la salida ya no existe (SSH cortado y el log sin abrir), un `printf` fallido
+  # con EPIPE no debe abortar el despliegue por el `set -e`.
+  log() { printf '[desplegar %s] %s\n' "$(date -u +%H:%M:%S)" "$*" || true; }
+  error() { printf '[desplegar %s] ERROR: %s\n' "$(date -u +%H:%M:%S)" "$*" >&2 || true; }
 
   # ---------------------------------------------------------------------------------------
   # 1. Validación de parámetros (defensa en profundidad: ssh-entrada.sh ya los validó). Antes de tocar
@@ -146,7 +148,7 @@ main() {
       return 1
     fi
     if [ "$modo" != "600" ] && [ "$modo" != "400" ]; then
-      error "$ENV_FILE tiene modo $modo: tiene que ser 600 (chmod 600), porque tiene secretos."
+      error "$ENV_FILE tiene modo $modo: tiene que ser 600 o 400 (chmod 600), porque tiene secretos."
       return 1
     fi
     while IFS= read -r linea || [ -n "$linea" ]; do
@@ -395,10 +397,15 @@ main() {
     # 11. Registro y limpieza. La etapa vigente se guarda aparte: es a la que vuelve una vuelta
     # atrás si un cambio de etapa falla.
     local linea_version="$sha $digest_backend $digest_frontend"
-    printf '%s\n' "$linea_version" > "$ARCHIVO_ACTUAL.tmp"
-    mv -f "$ARCHIVO_ACTUAL.tmp" "$ARCHIVO_ACTUAL"
+    # Son dos archivos y dos reemplazos atómicos, no uno solo. El orden importa si el proceso
+    # muere entre ellos: primero la etapa y después la versión deja «versión vieja con la etapa
+    # nueva», un par que sirve (la etapa es solo un valor del entorno). Al revés quedaría «versión
+    # nueva con la etapa vieja», y una vuelta atrás posterior restauraría la etapa vieja sobre un
+    # sitio que ya pasó a HTTPS.
     printf '%s\n' "$p_site" > "$ARCHIVO_SITE.tmp"
     mv -f "$ARCHIVO_SITE.tmp" "$ARCHIVO_SITE"
+    printf '%s\n' "$linea_version" > "$ARCHIVO_ACTUAL.tmp"
+    mv -f "$ARCHIVO_ACTUAL.tmp" "$ARCHIVO_ACTUAL"
     if [ ! -f "$ARCHIVO_HISTORIAL" ] || [ "$(tail -n 1 "$ARCHIVO_HISTORIAL")" != "$linea_version" ]; then
       printf '%s\n' "$linea_version" >> "$ARCHIVO_HISTORIAL"
     fi
