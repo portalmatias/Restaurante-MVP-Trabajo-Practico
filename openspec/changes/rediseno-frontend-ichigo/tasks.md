@@ -57,7 +57,12 @@ desde cero.
 - [ ] 2.8 `frontend-admin`, «Motivo visible en el login»: cambiar el texto de `sesion-vencida` en
       `login-form.tsx` de «Tu sesión venció…» a «Tu sesión terminó o ya no es válida…» y ajustar
       los tests que citan el texto anterior. El parámetro de URL `sesion-vencida` no cambia.
-- [ ] 2.9 `experiencia-reserva-cliente`: ninguna pantalla pasa hoy `estado="completa"` a una
+- [ ] 2.9 `calendario-fecha`, «Días no elegibles distinguidos por texto»: en
+      `formulario-seleccion.tsx`, `ultimaFecha = sumarDias(hoy, maximoDias)` ofrece `hoy + máximo`
+      como último día. Escribir primero un test que falle (con zonas de 30 y 60 días, el día 60 es
+      `aria-disabled` y el 59 es elegible) y cambiarlo a `maximoDias - 1`. Revisar también que
+      «Mes siguiente» se deshabilite en el mes de ese último día.
+- [ ] 2.10 `experiencia-reserva-cliente`: ninguna pantalla pasa hoy `estado="completa"` a una
       tablilla. Confirmarlo con `git grep 'estado='` y registrar en el PR que el estado queda
       soportado por el componente pero sin cableado a la disponibilidad (cambio futuro).
 
@@ -96,8 +101,8 @@ desde cero.
 
 - [ ] 3.9 `calendario-fecha`: tests de `Calendario` y de su uso en `formulario-seleccion.test.tsx`
       que cubran cada escenario de la capability: semana desde el lunes, mes de 28/30/31 días,
-      día pasado, día cerrado y día más allá del máximo con `aria-disabled` y sufijo en el nombre
-      accesible, activar un día no elegible sin cambiar la fecha, un solo `tabindex="0"`, flechas,
+      día pasado, día cerrado y día más allá del último elegible (`hoy + máximo − 1`) con
+      `aria-disabled` y sufijo en el nombre accesible, activar un día no elegible sin cambiar la fecha, un solo `tabindex="0"`, flechas,
       Inicio, Fin, RePág y AvPág (incluido 31 de enero a febrero), destino fuera de rango sin mover
       el foco, límites de «Mes anterior» y «Mes siguiente», y nombre accesible «…, hoy».
 - [ ] 3.10 `calendario-fecha`, «El día de hoy lo calcula el servidor»: test de `fechaLocalDeHoy`

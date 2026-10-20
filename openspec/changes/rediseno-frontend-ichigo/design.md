@@ -189,8 +189,13 @@ vistazo y, en pantallas anchas, queda a la izquierda de los turnos. Decisiones:
 - Cero dependencias: la aritmética de fechas usa `Date.UTC` y `getUTC*` (`config.yaml` §7); el
   día de hoy se calcula en el servidor con el offset de Argentina y llega como propiedad, de modo
   que el huso del dispositivo no cambie qué días son pasados.
-- El límite superior es hoy más el mayor `anticipacionMaxDias` de las zonas; la anticipación
-  exacta de cada zona la sigue validando el servidor.
+- El último día elegible es hoy más el mayor `anticipacionMaxDias` de las zonas menos un día. El
+  backend compara el margen entre el instante actual y el inicio del turno contra
+  `anticipacionMaxDias × 24 h`: con `hoy + máximo` el margen supera el tope en cuanto el turno
+  empieza después de la hora actual (a las 10:00, la cena de las 20:00 da 60 días y 10 horas y
+  responde `ANTICIPACION_MAXIMA`), mientras que con `hoy + máximo − 1` el margen es siempre
+  menor que el tope. Ofrecer `hoy + máximo` mostraría como elegible un día que casi siempre falla.
+  La anticipación exacta de cada zona la sigue validando el servidor.
 
 | Alternativa | Por qué no |
 |---|---|
