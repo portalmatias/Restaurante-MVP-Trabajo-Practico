@@ -85,12 +85,19 @@ COLUMN` con defaults o nulos: no reescribe filas problemáticas, no rompe a `res
 `gestion-salon` (sus DTOs usan `whitelist` y `forbidNonWhitelisted`, así que `POST/PATCH
 /admin/mesas` no aceptan las columnas nuevas y una mesa dada de alta por el admin queda "sin
 ubicar"). **La salida sí hay que protegerla:** los DTO filtran la entrada, pero no la respuesta.
-`ZonasService.listar` hace `zona.findMany()` sin `select` y los servicios de mesas devuelven la
-fila de Prisma tal cual, así que después de la migración `/admin/mesas` devolvería `posX`,
-`posY`, `ancho`, `alto` y `forma`, y `/admin/zonas` devolvería `planoColumnas` y `planoFilas`,
-campos que no están en `openapi/openapi.yaml` (y `openapi:check` es estático: no lo detecta). Se
-agrega un `select` explícito, con exactamente los campos actuales, en esas lecturas (tarea 2.8) y
-un test que fija las claves de la respuesta de ambos endpoints. Los campos del plano solo salen
+`ZonasService.listar` hace `zona.findMany()` sin `select`, y las **escrituras** también
+devuelven la fila de Prisma tal cual: `ZonasService.ejecutarActualizacion` (`tx.zona.update`),
+`MesasService.crear` (`mesa.create`) y `MesasService.actualizar` (`tx.mesa.update`), además de
+`MesasService.listar` (`mesa.findMany`). Después de la migración, `GET`/`POST`/`PATCH
+/admin/mesas` devolverían `posX`, `posY`, `ancho`, `alto` y `forma`, y `GET`/`PATCH
+/admin/zonas` devolverían `planoColumnas` y `planoFilas`, campos que no están en
+`openapi/openapi.yaml` (y `openapi:check` es estático: no lo detecta). Se agrega un `select`
+explícito, con exactamente los campos actuales, en **esas cinco salidas** (tarea 2.8), y un test
+de integración que fija las claves de la respuesta de cada una. Superficies revisadas que **no**
+necesitan cambio: `MesasService.eliminar` no devuelve cuerpo (`204`); el catálogo público
+(`ZonasService` de `catalogo-publico`) ya usa `select`; y los mappers de reservas
+(`reserva-admin.mapper.ts`, `reserva-consultada.mapper.ts`) arman `zona` y `mesa` campo por campo,
+aunque la consulta traiga `include: { mesa: { include: { zona: true } } }`. Los campos del plano solo salen
 por `GET /plano-mesas`. Rollback: `DROP COLUMN` de las siete columnas (cinco de `Mesa` y dos de `Zona`) y,
 después de la columna `forma`, `DROP TYPE` del enum, sin pérdida de datos de negocio. La
 migración se genera con `prisma migrate dev --create-only --name plano_mesas` (sin aplicarla),

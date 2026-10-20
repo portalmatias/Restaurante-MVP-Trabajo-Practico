@@ -38,13 +38,17 @@
 - [ ] 2.7 Confirmar a mano que `POST/PATCH /admin/mesas` siguen funcionando sin enviar las
       columnas nuevas (suite `gestion-salon-admin` y `mesas.integration-spec.ts` en verde).
 
-- [ ] 2.8 Escribir (rojo) un test de integración que fije las claves exactas de `GET
-      /admin/mesas`, `GET /admin/zonas` y de las altas y ediciones de mesa (`Object.keys` iguales
-      a las actuales, sin `posX`, `posY`, `ancho`, `alto`, `forma`, `planoColumnas` ni
-      `planoFilas`). Agregar un `select` explícito con los campos actuales en `ZonasService`
-      (`listar` y las lecturas que devuelvan la zona) y en `MesasService` de `gestion-salon`
-      (`listar`, `crear`, `actualizar`), y actualizar sus `*.spec.ts` unitarios (hoy fijan
-      `findMany({ where })` sin `select`). Verificar que pasa.
+- [ ] 2.8 Escribir (rojo) un test de integración que fije las claves exactas (`Object.keys`
+      iguales a las actuales, sin `posX`, `posY`, `ancho`, `alto`, `forma`, `planoColumnas` ni
+      `planoFilas`) de las **cinco salidas** de admin que hoy devuelven la fila de Prisma:
+      `GET /admin/zonas`, `PATCH /admin/zonas/:id`, `GET /admin/mesas`, `POST /admin/mesas` y
+      `PATCH /admin/mesas/:id`. Agregar un `select` explícito con los campos actuales en
+      `ZonasService` (`listar` y `ejecutarActualizacion`, el `tx.zona.update`) y en
+      `MesasService` (`listar`, `crear` y `actualizar`, el `mesa.create` y el `tx.mesa.update`), y
+      actualizar sus `*.spec.ts` unitarios (hoy fijan `findMany({ where })`, `create` y `update`
+      sin `select`). Confirmar con `git grep` que no queda otra salida de `zona` o `mesa`
+      que devuelva la fila completa (`eliminar` no devuelve cuerpo y los mappers de reservas ya
+      eligen los campos). Verificar que pasa.
 
 ## 3. Backend: servicio y reglas del plano (tests primero)
 
