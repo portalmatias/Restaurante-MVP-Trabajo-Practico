@@ -212,3 +212,68 @@ export async function seedCatalogo(
 
   return { mesas, turnos };
 }
+
+/**
+ * Carga solo lo que falta, sin tocar lo que ya existe. Es el que usa el seed de producción en
+ * cada despliegue: `seedCatalogo` reescribe con `upsert` las reglas de zona, el aforo, la
+ * capacidad y zona de cada mesa y el estado de cada turno, así que un cambio hecho por el
+ * administrador desde la API se revertiría en el siguiente despliegue.
+ *
+ * Cada tabla se trata por separado y se carga completa solo si está vacía (zonas, configuración
+ * global, mesas y turnos): un catálogo que el administrador ya fue ajustando no se vuelve a
+ * escribir, y una base nueva queda con el catálogo inicial. Devuelve qué tablas se cargaron.
+ */
+export async function seedCatalogoSiFalta(
+  prisma: PrismaClient,
+  log: (mensaje: string) => void = console.log,
+) {
+  const cargadas: string[] = [];
+
+  let standardId: string | undefined;
+  let vipId: string | undefined;
+  if ((await prisma.zona.count()) === 0) {
+    log('Seed: zonas...');
+    const { standard, vip } = await seedZonas(prisma);
+    standardId = standard.id;
+    vipId = vip.id;
+    cargadas.push('zonas');
+  } else {
+    log('Seed: ya hay zonas, no se modifican.');
+  }
+
+  if ((await prisma.configuracionNegocio.count()) === 0) {
+    log('Seed: configuración global...');
+    await seedConfiguracionGlobal(prisma);
+    cargadas.push('configuración global');
+  } else {
+    log('Seed: ya hay configuración global, no se modifica.');
+  }
+
+  if ((await prisma.mesa.count()) === 0) {
+    standardId ??= (
+      await prisma.zona.findUnique({ where: { nombre: 'STANDARD' } })
+    )?.id;
+    vipId ??= (await prisma.zona.findUnique({ where: { nombre: 'VIP' } }))?.id;
+    if (!standardId || !vipId) {
+      log(
+        'Seed: no hay zonas STANDARD y VIP (el administrador las renombró o borró): no se cargan las mesas iniciales.',
+      );
+    } else {
+      log('Seed: mesas...');
+      await seedMesas(prisma, standardId, vipId);
+      cargadas.push('mesas');
+    }
+  } else {
+    log('Seed: ya hay mesas, no se modifican.');
+  }
+
+  if ((await prisma.turno.count()) === 0) {
+    log('Seed: turnos...');
+    await seedTurnos(prisma);
+    cargadas.push('turnos');
+  } else {
+    log('Seed: ya hay turnos, no se modifican.');
+  }
+
+  return { cargadas };
+}

@@ -2,8 +2,9 @@
  * Seed de producción (D8 de `despliegue-continuo-ec2`, requisito "Datos iniciales y admin
  * propios de producción").
  *
- * - Carga el catálogo necesario para operar (configuración global, zonas, mesas y turnos),
- *   idempotente, igual que el seed de desarrollo.
+ * - Carga el catálogo necesario para operar (configuración global, zonas, mesas y turnos) solo
+ *   donde falta: una tabla que ya tiene filas no se toca, para que un despliegue nunca revierta
+ *   lo que el administrador cambió desde la API (`seedCatalogoSiFalta`).
  * - Crea el admin con `ADMIN_EMAIL` y `ADMIN_PASSWORD`, que en producción salen de los
  *   variables del `.env` del servidor (D6). Nunca con las credenciales del README.
  * - No crea reservas de ejemplo.
@@ -16,12 +17,13 @@
  */
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { isEmail } from 'class-validator';
 
 import {
   ADMIN_EMAIL_DESARROLLO,
   ADMIN_PASSWORD_DESARROLLO,
 } from './admin-desarrollo';
-import { seedCatalogo } from './catalogo';
+import { seedCatalogoSiFalta } from './catalogo';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
@@ -45,12 +47,19 @@ function validarCredenciales(
 
   if (!email) {
     throw new Error(
-      'Falta ADMIN_EMAIL: el seed de producción necesita el email del admin (secreto /reservas/prod/ADMIN_EMAIL).',
+      'Falta ADMIN_EMAIL: el seed de producción necesita el email del admin (variable del .env del servidor).',
     );
   }
   if (!password) {
     throw new Error(
-      'Falta ADMIN_PASSWORD: el seed de producción necesita la contraseña del admin (secreto /reservas/prod/ADMIN_PASSWORD).',
+      'Falta ADMIN_PASSWORD: el seed de producción necesita la contraseña del admin (variable del .env del servidor).',
+    );
+  }
+  // Misma regla que `LoginDto` (`@IsEmail()`): un valor que el login rechazaría dejaría al
+  // administrador sin poder entrar.
+  if (!isEmail(email)) {
+    throw new Error(
+      'ADMIN_EMAIL no es una dirección de email válida (es la misma regla que aplica el login).',
     );
   }
   // El email se compara sin distinguir mayúsculas: una variante de la dirección del README
@@ -87,7 +96,7 @@ export async function seedProduccion(
   // Primero se valida: con credenciales inválidas no se escribe nada, ni el catálogo.
   const { email, password } = validarCredenciales(entorno);
 
-  await seedCatalogo(prisma, log);
+  await seedCatalogoSiFalta(prisma, log);
 
   log('Seed: usuario admin de producción...');
   const existente = await prisma.usuario.findUnique({ where: { email } });

@@ -121,6 +121,16 @@ describe('seed de producción (integración)', () => {
         /ADMIN_EMAIL/,
       ],
       [
+        'con un ADMIN_EMAIL que no es un email',
+        { ADMIN_EMAIL: 'admin', ADMIN_PASSWORD: PASSWORD_PRODUCCION },
+        /no es una dirección de email válida/,
+      ],
+      [
+        'con un ADMIN_EMAIL sin dominio',
+        { ADMIN_EMAIL: 'admin@', ADMIN_PASSWORD: PASSWORD_PRODUCCION },
+        /no es una dirección de email válida/,
+      ],
+      [
         'con una contraseña de 15 caracteres',
         { ADMIN_EMAIL: EMAIL_PRODUCCION, ADMIN_PASSWORD: 'a'.repeat(15) },
         /16 caracteres/,
@@ -214,6 +224,81 @@ describe('seed de producción (integración)', () => {
       await seedProduccion(prisma, entorno, silencio);
 
       expect(await conteos()).toEqual(primera);
+    });
+
+    it('un despliegue posterior no revierte lo que el administrador cambió', async () => {
+      await seedProduccion(prisma, entorno, silencio);
+
+      // Cambios que el administrador hace desde la API de gestión del salón.
+      await prisma.zona.update({
+        where: { nombre: 'STANDARD' },
+        data: { maxComensales: 6, aforoMaximo: 33, anticipacionMinHoras: 4 },
+      });
+      await prisma.mesa.update({
+        where: { etiqueta: 'S1' },
+        data: { capacidad: 3 },
+      });
+      const vip = await prisma.zona.findUniqueOrThrow({
+        where: { nombre: 'VIP' },
+      });
+      await prisma.mesa.update({
+        where: { etiqueta: 'S2' },
+        data: { zonaId: vip.id },
+      });
+      await prisma.turno.updateMany({
+        where: { diaSemana: 'MARTES' },
+        data: { activo: false },
+      });
+      await prisma.configuracionNegocio.update({
+        where: { id: 1 },
+        data: { aforoGlobal: 50 },
+      });
+
+      await seedProduccion(prisma, entorno, silencio);
+
+      const standard = await prisma.zona.findUniqueOrThrow({
+        where: { nombre: 'STANDARD' },
+      });
+      expect(standard.maxComensales).toBe(6);
+      expect(standard.aforoMaximo).toBe(33);
+      expect(standard.anticipacionMinHoras).toBe(4);
+      expect(
+        (await prisma.mesa.findUniqueOrThrow({ where: { etiqueta: 'S1' } }))
+          .capacidad,
+      ).toBe(3);
+      expect(
+        (await prisma.mesa.findUniqueOrThrow({ where: { etiqueta: 'S2' } }))
+          .zonaId,
+      ).toBe(vip.id);
+      expect(
+        await prisma.turno.count({
+          where: { diaSemana: 'MARTES', activo: true },
+        }),
+      ).toBe(0);
+      expect(
+        (
+          await prisma.configuracionNegocio.findUniqueOrThrow({
+            where: { id: 1 },
+          })
+        ).aforoGlobal,
+      ).toBe(50);
+    });
+
+    it('si falta una tabla del catálogo, la carga sin tocar las demás', async () => {
+      await seedProduccion(prisma, entorno, silencio);
+      await prisma.zona.update({
+        where: { nombre: 'VIP' },
+        data: { aforoMaximo: 18 },
+      });
+      await prisma.turno.deleteMany({});
+
+      await seedProduccion(prisma, entorno, silencio);
+
+      expect(await prisma.turno.count()).toBe(14);
+      expect(
+        (await prisma.zona.findUniqueOrThrow({ where: { nombre: 'VIP' } }))
+          .aforoMaximo,
+      ).toBe(18);
     });
 
     it('con otra contraseña en la segunda corrida, no cambia el hash del admin existente', async () => {
