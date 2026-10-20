@@ -90,7 +90,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     }
   }, [hidratado, autenticado, router]);
 
-  // Aviso previo al vencimiento (la sesión dura 60 minutos y no se renueva sola). Una pestaña
+  // Aviso previo al vencimiento (la sesión dura un tiempo limitado, configurable, y no se renueva sola). Una pestaña
   // quieta no hace pedidos, así que también se controla por tiempo: `leerSesion` borra la sesión
   // vencida y eso dispara la salida al login con su mensaje.
   useEffect(() => {

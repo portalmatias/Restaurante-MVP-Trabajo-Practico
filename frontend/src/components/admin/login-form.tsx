@@ -20,8 +20,8 @@ export const MENSAJE_LIMITE_INTENTOS =
 /** Por qué se llegó al login, según el `?motivo=` que arma `AdminShell`. */
 const MENSAJES_MOTIVO: Record<string, string> = {
   "sesion-vencida":
-    "Tu sesión terminó o ya no es válida. Por seguridad, la sesión del panel dura 60 minutos y no se renueva sola: ingresá de nuevo para seguir.",
-  renovar: "Ingresá de nuevo para renovar tu sesión por otros 60 minutos.",
+    "Tu sesión terminó o ya no es válida. Por seguridad, la sesión del panel dura un tiempo limitado y no se renueva sola: ingresá de nuevo para seguir.",
+  renovar: "Ingresá de nuevo para renovar tu sesión.",
 };
 
 type ErroresCampo = { email?: string; password?: string };
