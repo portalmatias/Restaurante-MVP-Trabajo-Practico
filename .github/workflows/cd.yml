@@ -133,17 +133,29 @@ jobs:
           # workflow al construir (`org.opencontainers.image.revision`).
           for imagen in backend frontend; do
             referencia="$registro/reservas-$imagen:$SHA"
-            if digest="$(docker buildx imagetools inspect "$referencia" --format '{{json .Manifest.Digest}}' 2> /dev/null)"; then
-              digest="${digest//\"/}"
-              revision="$(docker buildx imagetools inspect "$referencia" --format '{{json .Image}}' |
-                jq -r '[.. | objects | select(has("Labels")) | .Labels["org.opencontainers.image.revision"] // empty] | first // ""')"
+            # Una sola consulta al registro: el digest y la etiqueta salen de la misma lectura
+            # del tag, así que no puede cambiar entre una y otra. Solo «no encontrado» cuenta
+            # como imagen ausente (se construye); cualquier otro error del registro (red,
+            # autenticación, límite de tasa) corta el job en lugar de reconstruir encima de un
+            # tag que quizá ya existe.
+            if ! consulta="$(docker buildx imagetools inspect "$referencia" --format '{{json .}}' 2> "$RUNNER_TEMP/imagetools.err")"; then
+              if grep -Eiq 'not found|MANIFEST_UNKNOWN|NAME_UNKNOWN|404' "$RUNNER_TEMP/imagetools.err"; then
+                continue
+              fi
+              echo "::error title=No se pudo consultar el registro::$referencia: $(head -c 300 "$RUNNER_TEMP/imagetools.err" | paste -sd' ' -). No se reconstruye sin saber si el tag ya existe."
+              exit 1
+            fi
+            {
+              digest="$(jq -r '.Manifest.Digest // empty' <<< "$consulta")"
+              revision="$(jq -r '[.. | objects | select(has("Labels")) | .Labels["org.opencontainers.image.revision"] // empty] | first // ""' <<< "$consulta")"
+              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error title=Respuesta inesperada del registro::$referencia no devolvió un digest válido."; exit 1; }
               if [ "$revision" != "$SHA" ]; then
                 echo "::error title=Imagen con un tag que no le corresponde::$referencia ya existe, pero declara revision='$revision' y no '$SHA'. No se despliega ni se sobrescribe: revisar quién publicó el tag."
                 exit 1
               fi
               echo "$imagen=$digest" >> "$GITHUB_OUTPUT"
               echo "::notice title=Imagen ya publicada::reservas-$imagen:$SHA ya existe ($digest) y declara este commit; no se reconstruye."
-            fi
+            }
           done
 
       - name: Construir y publicar el backend
@@ -235,7 +247,7 @@ jobs:
           # Formatos: evitan que un valor mal copiado llegue a ssh como una opción.
           [[ "$SERVER_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$ ]] || { echo "::error title=SERVER_HOST inválido::Tiene que ser una IP o un nombre de dominio, sin espacios ni caracteres especiales."; exit 1; }
           [[ "$SERVER_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "::error title=SERVER_USER inválido::Tiene que ser un nombre de usuario de Linux (por ejemplo deploy)."; exit 1; }
-          [[ "$SERVER_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "::error title=SERVER_PORT inválido::Tiene que ser un número de puerto (por ejemplo 22)."; exit 1; }
+          [[ "$SERVER_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$SERVER_PORT))" -ge 1 ] && [ "$((10#$SERVER_PORT))" -le 65535 ] || { echo "::error title=SERVER_PORT inválido::Tiene que ser un número de puerto entre 1 y 65535 (por ejemplo 22)."; exit 1; }
 
       - name: Ejecutar el despliegue en el servidor
         run: |
@@ -265,7 +277,7 @@ jobs:
           if [ "$estado" -ne 0 ]; then
             case "$estado" in
               255) detalle="No se pudo conectar o la clave del servidor no coincide con SSH_KNOWN_HOSTS." ;;
-              124) detalle="Pasaron 30 minutos sin que termine el despliegue." ;;
+              124) detalle="Pasaron 30 minutos y el cliente cortó la conexión. El despliegue en el servidor NO se interrumpe (desplegar.sh ignora el corte y termina, o vuelve atrás por su cuenta): ver /var/log/reservas-despliegue.log y no relanzar hasta que termine; un despliegue nuevo espera su turno en el lock." ;;
               2) detalle="El servidor rechazó el pedido (formato inválido)." ;;
               *) detalle="desplegar.sh terminó con código $estado. Si dice VUELTA ATRÁS, producción sigue en la versión anterior." ;;
             esac
