@@ -155,6 +155,11 @@ se tocó, el foco caería en `body`. Se enfoca por programa el `h1` de la vista 
 (`tabindex="-1"`, sin contorno propio). Alternativa: un contenedor `aria-live`; descartada
 porque lee todo el detalle y no ubica al usuario de teclado.
 
+Cancelar con éxito **no** entra en esta regla: la vista no cambia, solo aparece el aviso «Tu
+reserva fue cancelada.», y el destino del foco (el aviso) lo fija `frontend-cliente` y ya lo
+implementan los PR #74 y #75, mergeados en `main`. Una versión anterior de esta spec mandaba el
+foco al `h1` del detalle; habría hecho fallar los tests de #74, así que se descartó.
+
 ### D9. Estados del panel por texto, forma y pictograma
 El sello de estado (`Sello`) lleva nombre escrito + un pictograma SVG + un tratamiento de borde
 distinto (relleno, contorno grueso, punteado, fino). Cumple WCAG 1.4.1 (uso del color) sin
@@ -218,10 +223,16 @@ hoy…», «Copy en voseo») están redactados sin fijar el tipo de control («o
 «selector de fecha»), así que no se contradicen con las tablillas ni con el calendario: esta
 capability los **refina** y no los reemplaza. Regla de precedencia, para que haya una sola
 autoridad: ante cualquier diferencia de comportamiento del Paso 1, manda `experiencia-reserva-cliente`
-(y `calendario-fecha`) sobre `frontend-cliente`. Orden de archivado: primero `frontend-cliente`;
+(y `calendario-fecha`) sobre `frontend-cliente`. La excepción es el foco del diálogo de
+cancelación, de los avisos que lo siguen y de su devolución al control que lo abrió: pertenece a
+`frontend-cliente` («Accesibilidad heredada en toda pantalla nueva»), este change no lo
+modifica y manda esa capability. Orden de archivado: primero `frontend-cliente`;
 después este change, y al archivarlo se revisa que el texto fundido de ambos no repita ni
 contradiga (tarea 6.3). El único punto de superposición real es el aviso de «día sin turnos»,
-que `frontend-cliente` ya exigía y `experiencia-reserva-cliente` concreta con su texto.
+que `frontend-cliente` ya exigía y `experiencia-reserva-cliente` concreta con su texto. Como el
+calendario no deja elegir un día sin turnos, el aviso solo se muestra con una fecha cargada desde
+la URL. El design y las tareas de `frontend-cliente` nombran un `Select` de turnos, pero su spec
+no lo exige: las tablillas lo reemplazan sin contradecirla.
 
 ## Risks / Trade-offs
 

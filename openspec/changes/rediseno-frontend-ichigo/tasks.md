@@ -75,7 +75,9 @@ desde cero.
       test: el backend actual no limita `POST /reservas` (design D7).
 - [ ] 3.4 `experiencia-reserva-cliente`: verificar los tests de `consulta-reserva.test.tsx` para
       el `429` al verificar la ventana (sin «Reintentar» ni «Cancelar reserva»), el otro error
-      (con «Reintentar») y los tres movimientos del foco.
+      (con «Reintentar») y los tres movimientos del foco (detalle, vuelta al formulario y, tras
+      cancelar, el aviso «Tu reserva fue cancelada.», que ya cubre `confirmar-cancelacion.test.tsx`
+      de #74: no duplicarlo ni cambiarlo).
 - [ ] 3.5 `experiencia-reserva-cliente`: tests de `not-found.tsx` y `PantallaDeEstado`
       (título, acciones, tablilla `aria-hidden`).
 - [ ] 3.6 `identidad-visual-ichigo`, «Metadatos»: test que importa el `metadata` de cada
@@ -104,9 +106,10 @@ desde cero.
 - [ ] 3.11 `frontend-base`, «Layout compartido»: verificar `marco-publico.test.tsx` con `/`,
       `/reservas`, `/admin`, `/admin/reservas` y `/administrar` (esta última conserva el marco
       público); completar lo que falte.
-- [ ] 3.12 `experiencia-reserva-cliente`: test de «Fecha elegible sin turnos ese día» (aviso «No hay
-      turnos disponibles ese día. Elegí otra fecha.») y de la regla de zona en singular («1 hora»,
-      «1 día»).
+- [ ] 3.12 `experiencia-reserva-cliente`: test de «Fecha de la URL en un día sin turnos» (abrir el
+      Paso 1 con `?fecha=` de un lunes sin turnos activos muestra el aviso «No hay turnos
+      disponibles ese día. Elegí otra fecha.»; desde el calendario ese día no se puede elegir) y de
+      la regla de zona en singular («1 hora», «1 día»).
 - [ ] 3.13 `tablilla-turnos`: test de que una `completa` sigue deshabilitada y sin `aria-pressed`
       cuando se elige otra tablilla.
 
@@ -136,8 +139,8 @@ desde cero.
       confirmar que el contenido queda visible.
 - [ ] 4.6 Teclado y lector de pantalla: recorrer el Paso 1 solo con teclado (Tab, Enter, Espacio)
       y con NVDA o VoiceOver; comprobar el nombre de cada tablilla («20:00 a 23:30»), que el
-      japonés no se lee, y que el foco llega al título al abrir el detalle, volver al formulario y
-      cancelar una reserva.
+      japonés no se lee, y que el foco llega al título al abrir el detalle y al volver al
+      formulario, y al aviso «Tu reserva fue cancelada.» al cancelar una reserva.
 - [ ] 4.7 Red: con la caché vacía y la pestaña de red abierta en `/`, confirmar que no hay
       pedidos a `fonts.googleapis.com` ni `fonts.gstatic.com`, medir el peso transferido de las
       imágenes WebP (la suma de los archivos de `public/ichigo/` debe ser menor que 300 KB) y el desplazamiento acumulado de diseño (Lighthouse), y anotar los valores.

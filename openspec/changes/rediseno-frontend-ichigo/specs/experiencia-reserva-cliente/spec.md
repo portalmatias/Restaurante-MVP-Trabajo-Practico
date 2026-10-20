@@ -1,19 +1,21 @@
 ## ADDED Requirements
 
 ### Requirement: Los turnos del día se eligen como tablillas
-En el Paso 1 de `/reservas/nueva`, una vez elegida una fecha elegible, el sistema SHALL ofrecer
-los turnos de ese día de la semana como un grupo de `Tablilla` rotulado «Turno», en lugar de un
-control `<select>`. Cada tablilla SHALL mostrar la hora de inicio, «a» y la hora de fin, y SHALL
+En el Paso 1 de `/reservas/nueva`, una vez elegida una fecha en el calendario, el sistema SHALL
+ofrecer los turnos de ese día de la semana como un grupo de `Tablilla` rotulado «Turno», en lugar
+de un control `<select>`. Cada tablilla SHALL mostrar la hora de inicio, «a» y la hora de fin, y SHALL
 tener como nombre accesible el rango completo (por ejemplo, «20:00 a 23:30»). Mientras no haya
-fecha elegible, el sistema SHALL mostrar el texto «Elegí una fecha para ver los turnos de ese
-día». Elegir una tablilla SHALL fijar el `turnoId` del asistente sin cambiar las reglas de
+una fecha válida (con formato correcto y no anterior a hoy), el sistema SHALL mostrar el texto
+«Elegí una fecha para ver los turnos de ese día». Elegir una tablilla SHALL fijar el `turnoId` del asistente sin cambiar las reglas de
 validación ni los parámetros de URL que ya definía `frontend-cliente`.
 
-Cuando la fecha elegida es elegible pero ese día de la semana no tiene turnos activos, el
-sistema SHALL mostrar el aviso informativo «No hay turnos disponibles ese día. Elegí otra
-fecha.» en lugar del grupo «Turno» y de la indicación «Elegí una fecha…». Este requisito
-reemplaza al del Paso 1 de `frontend-cliente` que habla de un `<select>` de turnos (ver
-`design.md`, «Precedencia sobre `frontend-cliente`»).
+Cuando la fecha es válida pero su día de la semana no tiene turnos activos, el sistema SHALL
+mostrar el aviso informativo «No hay turnos disponibles ese día. Elegí otra fecha.» en lugar del
+grupo «Turno» y de la indicación «Elegí una fecha…». Ese caso solo se alcanza con una fecha
+cargada desde la URL (`?fecha=`): el calendario no deja elegir un día sin turnos
+(`calendario-fecha`, «Días no elegibles distinguidos por texto»). Este requisito refina, y no
+reemplaza, a los del Paso 1 de `frontend-cliente`, que no fijan el tipo de control de los turnos
+(ver `design.md`, «Precedencia sobre `frontend-cliente`»).
 
 #### Scenario: Turnos como botones dentro de un grupo
 - **WHEN** la persona elige una fecha con dos turnos activos
@@ -27,12 +29,13 @@ reemplaza al del Paso 1 de `frontend-cliente` que habla de un `<select>` de turn
 
 #### Scenario: Sin fecha, sin turnos
 - **WHEN** todavía no se eligió ninguna fecha en el calendario o la fecha cargada desde la URL no
-  es elegible
+  es válida (formato incorrecto o anterior a hoy)
 - **THEN** no se muestra ninguna tablilla y aparece el texto «Elegí una fecha para ver los
   turnos de ese día»
 
-#### Scenario: Fecha elegible sin turnos ese día
-- **WHEN** se elige una fecha elegible cuyo día de la semana no tiene turnos activos
+#### Scenario: Fecha de la URL en un día sin turnos
+- **WHEN** se abre el Paso 1 con `?fecha=` igual a una fecha futura cuyo día de la semana no tiene
+  turnos activos
 - **THEN** se muestra el aviso «No hay turnos disponibles ese día. Elegí otra fecha.»
 - **AND** no se muestra la indicación «Elegí una fecha para ver los turnos de ese día»
 
@@ -130,9 +133,14 @@ verificación no haya confirmado que la ventana lo permite.
 ### Requirement: Gestión del foco al cambiar de vista
 Cuando el detalle de una reserva reemplaza al formulario de consulta, el foco SHALL pasar al
 título del detalle. Cuando la persona vuelve del detalle al formulario, el foco SHALL pasar al
-título del formulario. Tras cancelar una reserva con éxito, el foco SHALL pasar al título del
-detalle, porque el botón que abrió el diálogo deja de existir. Los títulos SHALL ser
-focalizables por programa (`tabindex="-1"`) sin mostrar un contorno de foco propio.
+título del formulario. Los títulos SHALL ser focalizables por programa (`tabindex="-1"`) sin
+mostrar un contorno de foco propio.
+
+El foco del diálogo de cancelación no lo define este requisito: lo fija `frontend-cliente`
+(«Accesibilidad heredada en toda pantalla nueva») y ya está implementado en `main` (#74 y #75).
+Cancelar con éxito no cambia de vista, solo hace aparecer un aviso, así que el rediseño SHALL
+conservar ese comportamiento: tras confirmar la cancelación el foco pasa al aviso «Tu reserva
+fue cancelada.», no al título del detalle.
 
 #### Scenario: Foco al abrir el detalle
 - **WHEN** una consulta exitosa muestra el detalle
@@ -142,9 +150,10 @@ focalizables por programa (`tabindex="-1"`) sin mostrar un contorno de foco prop
 - **WHEN** desde el detalle la persona activa «Consultar otra reserva»
 - **THEN** `document.activeElement` es el `h1` «Consultá tu reserva»
 
-#### Scenario: Foco tras cancelar
-- **WHEN** la cancelación se confirma y el detalle muestra la reserva cancelada
-- **THEN** `document.activeElement` es el `h1` del detalle y no `body`
+#### Scenario: Foco tras cancelar (heredado de `frontend-cliente`)
+- **WHEN** la cancelación se confirma con éxito y el diálogo se cierra
+- **THEN** `document.activeElement` es el aviso «Tu reserva fue cancelada.» (focalizable por
+  programa, `tabindex="-1"`), no el `h1` del detalle ni `body`
 
 ### Requirement: Los estados del flujo se distinguen por texto
 El estado de una reserva consultada y los avisos del flujo (error, información, límite de
