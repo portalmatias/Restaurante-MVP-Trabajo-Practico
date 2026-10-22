@@ -32,6 +32,20 @@ describe('MarcoPublico', () => {
     },
   );
 
+  // Tarea 3.11: las rutas de la spec «Layout compartido», incluida `/administrar`.
+  it.each(['/', '/reservas', '/administrar', '/administracion-de-menus'])(
+    '%s es pública y conserva el encabezado y el pie',
+    (rutaPublica) => {
+      ruta = rutaPublica;
+      render(<MarcoPublico>contenido</MarcoPublico>);
+
+      expect(
+        screen.getByRole('navigation', { name: 'Navegación principal' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/restaurante ficticio/i)).toBeInTheDocument();
+    },
+  );
+
   it('una ruta que solo empieza parecido a /admin sigue siendo pública', () => {
     ruta = '/administracion-de-menus';
     render(<MarcoPublico>contenido</MarcoPublico>);

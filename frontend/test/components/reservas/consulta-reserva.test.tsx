@@ -385,6 +385,17 @@ describe("ConsultaReserva - detalle", () => {
     expect(screen.getByRole("button", { name: "Buscar mi reserva" })).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toHaveValue("");
   });
+
+  // Tarea 3.4 («Gestión del foco al cambiar de vista»): el botón tocado desaparece con el detalle.
+  it("al volver al formulario el foco pasa a su título", async () => {
+    await verDetalle();
+
+    fireEvent.click(screen.getByRole("button", { name: "Consultar otra reserva" }));
+
+    const titulo = screen.getByRole("heading", { level: 1 });
+    expect(titulo).toHaveFocus();
+    expect(titulo).toHaveAttribute("tabindex", "-1");
+  });
 });
 
 // La fecha de `RESERVA` ya pasó: "muy por delante" y "turno ya pasado" se arman con fechas

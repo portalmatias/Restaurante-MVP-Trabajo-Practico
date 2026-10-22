@@ -17,7 +17,7 @@ export default function NotFound() {
           Volver al inicio
         </Link>
         <Link href="/reservas/nueva" className={buttonVariants({ variant: "secondary", size: "lg" })}>
-          Reservá una mesa
+          Reservar una mesa
         </Link>
       </div>
     </PantallaDeEstado>

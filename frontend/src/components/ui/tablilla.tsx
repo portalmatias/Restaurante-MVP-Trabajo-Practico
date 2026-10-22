@@ -2,6 +2,16 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export type TablillaEstado = "libre" | "elegida" | "descartada" | "completa";
 
+/**
+ * Estado de una tablilla dentro de un grupo (spec «Estados descartada y completa»): una
+ * `completa` sigue completa aunque se elija otra; las demás se dan vuelta al haber una elegida.
+ */
+export function estadoDeTablilla(id: string, elegidaId: string | undefined, completa = false): TablillaEstado {
+  if (completa) return "completa";
+  if (id === elegidaId) return "elegida";
+  return elegidaId ? "descartada" : "libre";
+}
+
 type ContenidoProps = {
   /** Lo principal, en español y en horizontal (por ejemplo, «Cena, 20:30»). */
   titulo: ReactNode;

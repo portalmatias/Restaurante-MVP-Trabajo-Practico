@@ -138,4 +138,19 @@ describe("DashboardAforo", () => {
     expect(await screen.findByText(/No hay turnos configurados para los lunes/)).toBeInTheDocument();
     expect(llamadasA("/admin/reservas")).toHaveLength(0);
   });
+
+  // Tarea 3.7: medidor accesible y hora de la consulta («Dashboard de aforo»).
+  it("cada zona tiene un medidor con su porcentaje y se muestra la hora de los datos", async () => {
+    render(<DashboardAforo hoy="2026-10-02" />);
+    await screen.findByTestId("aforo-zona-STANDARD");
+
+    const medidores = screen.getAllByRole("meter");
+    expect(medidores.length).toBeGreaterThanOrEqual(2);
+    const standard = medidores.find((m) => m.getAttribute("aria-valuetext") === "15 % ocupado");
+    expect(standard).toBeDefined();
+    expect(standard).toHaveAttribute("aria-valuemin", "0");
+    expect(standard).toHaveAttribute("aria-valuemax", "100");
+    expect(standard).toHaveAttribute("aria-valuenow", "15");
+    expect(screen.getAllByText(/^Datos de las \d{2}:\d{2}/).length).toBeGreaterThan(0);
+  });
 });

@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import { Alert } from '../ui/alert';
 import { Button, buttonVariants } from '../ui/button';
 import { Calendario, nombreLargoDeFecha, sumarDias } from '../ui/calendario';
-import { Tablilla } from '../ui/tablilla';
+import { estadoDeTablilla, Tablilla } from '../ui/tablilla';
 import type { components } from '../../lib/api/schema';
 import {
   diaSemanaDeFechaLocal,
@@ -288,13 +288,7 @@ export function FormularioSeleccion({
                               : '夕食'
                           }
                           detalle={`a ${formatearHoraTurno(turno.horaFin)}`}
-                          estado={
-                            turno.id === turnoId
-                              ? 'elegida'
-                              : turnoId
-                                ? 'descartada'
-                                : 'libre'
-                          }
+                          estado={estadoDeTablilla(turno.id, turnoId)}
                           aria-label={horario}
                           onClick={() => setTurnoId(turno.id)}
                         />

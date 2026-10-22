@@ -268,4 +268,28 @@ describe("ListadoReservas - marcar no show", () => {
     await waitFor(() => expect(consultasDeReservas()).toHaveLength(2));
     expect(within(fila("CONF0002")).getByText("Confirmada")).toBeInTheDocument();
   });
+
+  // Tarea 3.7: sellos por texto y búsqueda local (frontend-admin, listado de reservas).
+  it("cada estado se lee en su sello con texto, y NO_SHOW como «Ausente»", async () => {
+    await renderizar();
+
+    expect(within(fila("PEND0001")).getByText("Pendiente")).toBeInTheDocument();
+    expect(within(fila("CONF0002")).getByText("Confirmada")).toBeInTheDocument();
+    expect(within(fila("CANC0003")).getByText("Cancelada")).toBeInTheDocument();
+    expect(within(fila("NOSH0004")).getByText("Ausente")).toBeInTheDocument();
+    expect(screen.queryByText("NO_SHOW")).not.toBeInTheDocument();
+  });
+
+  it("la búsqueda filtra la página cargada sin pedir de nuevo ni tocar la URL", async () => {
+    await renderizar();
+    const pedidos = consultasDeReservas().length;
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "CONF0002" } });
+
+    expect(screen.getByRole("rowheader", { name: "CONF0002" })).toBeInTheDocument();
+    expect(screen.queryByRole("rowheader", { name: "PEND0001" })).not.toBeInTheDocument();
+    expect(consultasDeReservas()).toHaveLength(pedidos);
+    expect(push).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
 });

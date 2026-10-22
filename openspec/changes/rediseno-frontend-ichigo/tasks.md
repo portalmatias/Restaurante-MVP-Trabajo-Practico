@@ -88,35 +88,35 @@ desde cero.
 
 ## 3. Pruebas automatizadas que faltan (escribirlas antes de tocar el código que cubren)
 
-- [ ] 3.1 `tablilla-turnos`: tests de `Tablilla` (libre, elegida, descartada, completa;
+- [x] 3.1 `tablilla-turnos`: tests de `Tablilla` (libre, elegida, descartada, completa;
       `aria-pressed`; japonés con `aria-hidden` y `lang="ja"`; objetivo táctil por clases) y de
       `TablillaPaso` (no focalizable).
 - [ ] 3.2 `experiencia-reserva-cliente`: verificar que `formulario-seleccion.test.tsx` cubre los
       cinco escenarios de «Los turnos del día se eligen como tablillas» y los dos de «Pantalla
       cuando no hay nada para reservar»; completar los que falten.
-- [ ] 3.3 `experiencia-reserva-cliente`: verificar los tests de espera tras `429` (botón
+- [x] 3.3 `experiencia-reserva-cliente`: verificar los tests de espera tras `429` (botón
       deshabilitado, texto, rehabilitación a los 30 s con reloj simulado, Enter sin envío) en
       `formulario-datos-contacto.test.tsx`; completar los que falten. El `429` se simula en el
       test: el backend actual no limita `POST /reservas` (design D7).
-- [ ] 3.4 `experiencia-reserva-cliente`: verificar los tests de `consulta-reserva.test.tsx` para
+- [x] 3.4 `experiencia-reserva-cliente`: verificar los tests de `consulta-reserva.test.tsx` para
       el `429` al verificar la ventana (sin «Reintentar» ni «Cancelar reserva»), el otro error
       (con «Reintentar») y los tres movimientos del foco (detalle, vuelta al formulario y, tras
       cancelar, el aviso «Tu reserva fue cancelada.», que ya cubre `confirmar-cancelacion.test.tsx`
       de #74: no duplicarlo ni cambiarlo).
-- [ ] 3.5 `experiencia-reserva-cliente`: tests de `not-found.tsx` y `PantallaDeEstado`
+- [x] 3.5 `experiencia-reserva-cliente`: tests de `not-found.tsx` y `PantallaDeEstado`
       (título, acciones, tablilla `aria-hidden`).
-- [ ] 3.6 `identidad-visual-ichigo`, «Metadatos»: test que importa el `metadata` de cada
+- [x] 3.6 `identidad-visual-ichigo`, «Metadatos»: test que importa el `metadata` de cada
       `page.tsx` público y comprueba que los seis títulos de las rutas de `reservas/` existen y son
       distintos, que el título resuelto de `/` es exactamente «Ichigo», y que `layout.tsx` declara
       `lang="es-AR"` y la plantilla `%s | Ichigo`.
-- [ ] 3.7 `frontend-admin`: verificar `nivel-aforo.test.ts` (80 %, 100 %, sobrecupo, aforo 0 con y
+- [x] 3.7 `frontend-admin`: verificar `nivel-aforo.test.ts` (80 %, 100 %, sobrecupo, aforo 0 con y
       sin ocupación, redondeo hacia abajo),
       `dashboard-aforo.test.tsx` (porcentaje, libres, `role="meter"`, hora de la consulta),
       `listado-reservas.test.tsx` (cuatro sellos con texto, «Ausente», «Marcar ausente»,
       búsqueda local) y `admin-shell.test.tsx` / `login-form.test.tsx` (aviso a 5 minutos, singular,
       «Renovar sesión» sin pasar por `?motivo=sesion-vencida`, `401` y `403` hacia
       `?motivo=sesion-vencida`, vencimiento por tiempo, `motivo`). Completar lo que falte.
-- [ ] 3.8 `movimiento-ui`: test que lee `globals.css` y comprueba que existe un bloque
+- [x] 3.8 `movimiento-ui`: test que lee `globals.css` y comprueba que existe un bloque
       `prefers-reduced-motion: reduce` con `animation: none` para `.tinta-entrada`, `.balanceo`,
       `.revelar`, `.marco-organico` y `.deriva`, y que ninguna regla base de esas clases fija
       `opacity: 0`.
@@ -127,17 +127,17 @@ desde cero.
       `aria-disabled` y sufijo en el nombre accesible, activar un día no elegible sin cambiar la fecha, un solo `tabindex="0"`, flechas,
       Inicio, Fin, RePág y AvPág (incluido 31 de enero a febrero), destino fuera de rango sin mover
       el foco, límites de «Mes anterior» y «Mes siguiente», y nombre accesible «…, hoy».
-- [ ] 3.10 `calendario-fecha`, «El día de hoy lo calcula el servidor»: test de `fechaLocalDeHoy`
+- [x] 3.10 `calendario-fecha`, «El día de hoy lo calcula el servidor»: test de `fechaLocalDeHoy`
       con `2026-09-20T02:30:00Z` (debe dar `2026-09-19`) y test de que `Calendario` y
       `formulario-seleccion.tsx` no llaman a `new Date()` sin argumentos ni a `Date.now()`.
-- [ ] 3.11 `frontend-base`, «Layout compartido»: verificar `marco-publico.test.tsx` con `/`,
+- [x] 3.11 `frontend-base`, «Layout compartido»: verificar `marco-publico.test.tsx` con `/`,
       `/reservas`, `/admin`, `/admin/reservas` y `/administrar` (esta última conserva el marco
       público); completar lo que falte.
 - [ ] 3.12 `experiencia-reserva-cliente`: test de «Fecha de la URL en un día sin turnos» (abrir el
       Paso 1 con `?fecha=` de un lunes sin turnos activos muestra el aviso «No hay turnos
       disponibles ese día. Elegí otra fecha.»; desde el calendario ese día no se puede elegir) y de
       la regla de zona en singular («1 hora», «1 día»).
-- [ ] 3.13 `tablilla-turnos`: test de que una `completa` sigue con `aria-disabled="true"` y sin
+- [x] 3.13 `tablilla-turnos`: test de que una `completa` sigue con `aria-disabled="true"` y sin
       `aria-pressed` cuando se elige otra tablilla, de que se alcanza con Tab y de que activarla
       no cambia la elección.
 
