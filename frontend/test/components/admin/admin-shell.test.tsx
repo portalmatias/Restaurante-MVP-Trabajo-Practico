@@ -90,10 +90,139 @@ describe("AdminShell", () => {
       );
     });
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/admin/login"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/admin/login?motivo=sesion-vencida"));
     // El manejador del 401 y el cambio de sesión no navegan dos veces.
     expect(replace).toHaveBeenCalledTimes(1);
     expect(leerSesion()).toBeNull();
     expect(screen.queryByText("Contenido protegido")).not.toBeInTheDocument();
+  });
+
+  it("avisa cuando faltan menos de 5 minutos y renovar lleva al login con su motivo", () => {
+    jest.useFakeTimers();
+    try {
+      const ahora = Math.floor(Date.now() / 1000);
+      const token = `cabecera.${btoa(JSON.stringify({ sub: "1", exp: ahora + 180 }))}.firma`;
+      guardarSesion(token);
+      render(
+        <AdminShell>
+          <p>Contenido protegido</p>
+        </AdminShell>,
+      );
+      act(() => {
+        jest.advanceTimersByTime(20_000);
+      });
+
+      expect(screen.getByRole("alert")).toHaveTextContent(/Tu sesión vence en \d minutos?/);
+      fireEvent.click(screen.getByRole("button", { name: "Renovar sesión" }));
+      expect(replace).toHaveBeenCalledWith("/admin/login?motivo=renovar");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("sin aviso mientras queda tiempo de sobra", () => {
+    guardarSesion(TOKEN);
+    render(
+      <AdminShell>
+        <p>Contenido protegido</p>
+      </AdminShell>,
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  // Tarea 3.7: lo que faltaba de «Rutas de administración protegidas por sesión» y del aviso.
+  function tokenQueVenceEn(segundos: number) {
+    const exp = Math.floor(Date.now() / 1000) + segundos;
+    return `cabecera.${btoa(JSON.stringify({ sub: "1", exp }))}.firma`;
+  }
+
+  it("con un solo minuto restante el aviso va en singular", () => {
+    jest.useFakeTimers();
+    try {
+      guardarSesion(tokenQueVenceEn(50));
+      render(
+        <AdminShell>
+          <p>Contenido protegido</p>
+        </AdminShell>,
+      );
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Tu sesión vence en 1 minuto.");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("«Renovar sesión» nunca pasa por ?motivo=sesion-vencida", () => {
+    jest.useFakeTimers();
+    try {
+      guardarSesion(tokenQueVenceEn(180));
+      render(
+        <AdminShell>
+          <p>Contenido protegido</p>
+        </AdminShell>,
+      );
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Renovar sesión" }));
+      act(() => {
+        jest.advanceTimersByTime(20_000);
+      });
+
+      expect(replace).toHaveBeenCalledWith("/admin/login?motivo=renovar");
+      expect(replace).not.toHaveBeenCalledWith("/admin/login?motivo=sesion-vencida");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("un 403 en una llamada de un hijo también lleva a ?motivo=sesion-vencida", async () => {
+    guardarSesion(TOKEN);
+    GET.mockResolvedValue({
+      error: { statusCode: 403, message: "Forbidden" },
+      response: { ok: false, status: 403 },
+    });
+
+    function HijoQueLlamaALaApi() {
+      useEffect(() => {
+        void toAdminApiResult(adminClient.GET("/admin/zonas"));
+      }, []);
+      return <p>Contenido protegido</p>;
+    }
+
+    await act(async () => {
+      render(
+        <AdminShell>
+          <HijoQueLlamaALaApi />
+        </AdminShell>,
+      );
+    });
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/admin/login?motivo=sesion-vencida"));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("una pestaña quieta cuya sesión vence por tiempo va a ?motivo=sesion-vencida", () => {
+    jest.useFakeTimers();
+    try {
+      guardarSesion(tokenQueVenceEn(10));
+      render(
+        <AdminShell>
+          <p>Contenido protegido</p>
+        </AdminShell>,
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(replace).toHaveBeenCalledWith("/admin/login?motivo=sesion-vencida");
+      expect(screen.queryByText("Contenido protegido")).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

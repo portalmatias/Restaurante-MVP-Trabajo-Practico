@@ -33,7 +33,7 @@ export function Select({
   const { "aria-describedby": callerDescribedBy, ...restSelectProps } = selectProps;
   const describedBy = mergeDescribedBy(callerDescribedBy, error ? errorId : undefined);
   const classes = [
-    "min-h-11 w-full rounded-md border bg-background px-3 text-base text-foreground",
+    "min-h-11 w-full rounded-sm border bg-background px-3 text-base text-foreground",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     "disabled:cursor-not-allowed disabled:opacity-50",
     error ? "border-destructive" : "border-border",

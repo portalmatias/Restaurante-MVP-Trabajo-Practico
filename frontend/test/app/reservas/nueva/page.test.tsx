@@ -60,7 +60,9 @@ describe("/reservas/nueva", () => {
       jest.useRealTimers();
     }
 
-    expect(screen.getByLabelText("Fecha")).toHaveAttribute("min", "2026-09-14");
+    // El calendario marca como «hoy» el 14 (día en Argentina), no el 15 (día UTC).
+    expect(screen.getByRole("button", { name: /14 de septiembre de 2026, hoy/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /15 de septiembre de 2026, hoy/ })).not.toBeInTheDocument();
   });
 
   it("prellena el formulario con la selección de searchParams", async () => {

@@ -2,15 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "../ui/alert";
-import { Card } from "../ui/card";
 import { Field } from "../ui/field";
 import { Select } from "../ui/select";
 import { adminClient, toAdminApiResult } from "../../lib/api/admin-client";
 import type { ApiResult } from "../../lib/api/errors";
 import type { components } from "../../lib/api/schema";
 import { calcularAforo, type Aforo } from "../../lib/aforo/calcular-aforo";
-import { diaSemanaDeFechaLocal, fechaLocalDeHoy, type DiaSemana } from "../../lib/fecha-hora";
+import {
+  diaSemanaDeFechaLocal,
+  fechaLocalDeHoy,
+  formatearFechaLargaEs,
+  type DiaSemana,
+} from "../../lib/fecha-hora";
 import { ETIQUETA_DIA, ordenarTurnos, rangoTurno } from "./formato";
+import { ETIQUETA_NIVEL, leerAforo, type NivelAforo } from "./nivel-aforo";
+import { Sello } from "./sello";
 
 type Zona = components["schemas"]["ZonaRespuestaDto"];
 type Turno = components["schemas"]["TurnoRespuestaDto"];
@@ -68,7 +74,68 @@ function turnosDelDia(turnos: Turno[], fecha: string): Turno[] {
   return [...delDia.filter((t) => t.activo), ...delDia.filter((t) => !t.activo)];
 }
 
-type ResultadoAforo = { clave: string; aforo?: Aforo; error?: string };
+/** `recibidoEn` es la hora en que llegó la consulta: se muestra para que se note si es vieja. */
+type ResultadoAforo = { clave: string; aforo?: Aforo; error?: string; recibidoEn?: Date };
+
+function horaCorta(fecha: Date): string {
+  return fecha.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function fechaLegible(fecha: string): string {
+  try {
+    return formatearFechaLargaEs(fecha);
+  } catch {
+    return fecha;
+  }
+}
+
+// Relleno de la barra por nivel: nogal con lugar, sumi casi lleno, sello cuando no queda nada.
+const RELLENO_BARRA: Record<NivelAforo, string> = {
+  holgado: "bg-secondary",
+  "casi-lleno": "bg-foreground",
+  completo: "bg-accent",
+  sobrecupo: "bg-accent",
+  "sin-aforo": "bg-muted",
+};
+
+const TONO_NIVEL: Record<NivelAforo, "holgado" | "casi-lleno" | "completo"> = {
+  holgado: "holgado",
+  "casi-lleno": "casi-lleno",
+  completo: "completo",
+  sobrecupo: "completo",
+  "sin-aforo": "holgado",
+};
+
+function FilaZona({ nombre, ocupado, maximo }: { nombre: string; ocupado: number; maximo: number }) {
+  const { nivel, porcentaje, libres, ancho } = leerAforo(ocupado, maximo);
+  return (
+    <li className="flex flex-col gap-3 rounded-sm border border-border bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-lg">Zona {nombre}</h3>
+        <Sello tono={TONO_NIVEL[nivel]}>{ETIQUETA_NIVEL[nivel]}</Sello>
+      </div>
+      <p className="tabular font-display text-2xl" data-testid={`aforo-zona-${nombre}`}>
+        {ocupado} / {maximo}
+      </p>
+      <div
+        role="meter"
+        aria-label={`Ocupación de la zona ${nombre}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.min(100, porcentaje)}
+        aria-valuetext={`${porcentaje} % ocupado`}
+        className="h-3 w-full border border-border bg-muted"
+      >
+        <div className={`h-full ${RELLENO_BARRA[nivel]}`} style={{ width: `${ancho}%` }} />
+      </div>
+      <p className="tabular text-sm text-muted-foreground">
+        {maximo > 0 ? `${porcentaje} % ocupado · ` : null}
+        {libres === 1 ? "1 lugar libre" : `${libres} lugares libres`}
+        {nivel === "sobrecupo" ? ` · ${ocupado - maximo} por encima del aforo` : null}
+      </p>
+    </li>
+  );
+}
 
 /**
  * Dashboard de aforo (spec "Dashboard de aforo", design.md D5). Las Zonas y los Turnos se
@@ -140,6 +207,7 @@ export function DashboardAforo({ hoy }: { hoy?: string }) {
         setResultado({
           clave: claveConsulta,
           aforo: calcularAforo(zonas, [...confirmadas.data, ...pendientes.data]),
+          recibidoEn: new Date(),
         });
       },
     );
@@ -154,11 +222,13 @@ export function DashboardAforo({ hoy }: { hoy?: string }) {
   const errorAforo = resultado?.clave === clave ? resultado.error : undefined;
   const dia = diaSemanaSeguro(fecha);
 
+  const turnoActual = opcionesTurno.find((t) => t.id === turnoId);
+
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-foreground">Aforo</h1>
+      <h1 className="font-display text-3xl">Aforo</h1>
       {errorCatalogo ? <Alert variant="error">{errorCatalogo}</Alert> : null}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:max-w-2xl sm:grid-cols-2">
         <Field
           label="Fecha"
           type="date"
@@ -188,35 +258,55 @@ export function DashboardAforo({ hoy }: { hoy?: string }) {
         <Alert>
           {dia
             ? `No hay turnos configurados para los ${ETIQUETA_DIA[dia].toLowerCase()}. Elegí otra fecha.`
-            : "La fecha elegida no es válida."}
+            : "La fecha elegida no es válida. Elegí otra fecha."}
         </Alert>
       ) : null}
       {errorAforo ? <Alert variant="error">{errorAforo}</Alert> : null}
 
       {zonas && aforo && !errorAforo ? (
-        <div aria-busy={cargando} className="grid gap-4 sm:grid-cols-3">
-          <Card title="Ocupación total">
-            <p className="text-3xl font-semibold" data-testid="aforo-global">
-              {aforo.global.ocupado}
+        <section
+          aria-label="Aforo de la noche"
+          aria-busy={cargando}
+          className={`flex flex-col gap-4 transition-opacity duration-200 motion-reduce:transition-none ${
+            cargando ? "opacity-60" : ""
+          }`}
+        >
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-border pb-3">
+            <div>
+              <h2 className="font-display text-xl">
+                {fechaLegible(fecha)}
+                {turnoActual ? `, ${rangoTurno(turnoActual)}` : null}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                <span className="tabular font-display text-lg text-foreground" data-testid="aforo-global">
+                  {aforo.global.ocupado}
+                </span>{" "}
+                comensales en todo el salón
+              </p>
+            </div>
+            <p aria-live="polite" className="tabular text-sm text-muted-foreground">
+              {cargando
+                ? "Actualizando: se muestra la consulta anterior."
+                : resultado?.recibidoEn
+                  ? `Datos de las ${horaCorta(resultado.recibidoEn)}`
+                  : null}
             </p>
-            <p className="text-sm text-muted-foreground">comensales en todo el salón</p>
-          </Card>
-          {zonas.map((zona) => {
-            const { ocupado, maximo } = aforo.porZona[zona.id];
-            return (
-              <Card key={zona.id} title={`Zona ${zona.nombre}`}>
-                <p className="text-3xl font-semibold" data-testid={`aforo-zona-${zona.nombre}`}>
-                  {ocupado} <span className="text-lg text-muted-foreground">/ {maximo}</span>
-                </p>
-                <p className="text-sm text-muted-foreground">comensales</p>
-              </Card>
-            );
-          })}
-        </div>
+          </div>
+          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {zonas.map((zona) => (
+              <FilaZona
+                key={zona.id}
+                nombre={zona.nombre}
+                ocupado={aforo.porZona[zona.id].ocupado}
+                maximo={aforo.porZona[zona.id].maximo}
+              />
+            ))}
+          </ul>
+        </section>
       ) : null}
       {cargando && !aforo ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Calculando el aforo…
+          Cargando aforo…
         </p>
       ) : null}
     </div>

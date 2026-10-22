@@ -20,7 +20,7 @@ export type CardProps = HTMLAttributes<HTMLDivElement> & {
 export function Card({ title, headingLevel = 2, children, className, ...props }: CardProps) {
   const titleId = useId();
   const classes = [
-    "rounded-lg border border-border bg-card p-4 text-card-foreground",
+    "rounded-sm border border-border bg-card p-4 text-card-foreground",
     className,
   ]
     .filter(Boolean)
@@ -30,7 +30,7 @@ export function Card({ title, headingLevel = 2, children, className, ...props }:
     const Encabezado = `h${headingLevel}` as "h1" | "h2" | "h3";
     return (
       <section aria-labelledby={titleId} className={classes} {...props}>
-        <Encabezado id={titleId} className="text-base font-semibold">
+        <Encabezado id={titleId} className="font-display text-lg font-medium">
           {title}
         </Encabezado>
         <div className="mt-2">{children}</div>

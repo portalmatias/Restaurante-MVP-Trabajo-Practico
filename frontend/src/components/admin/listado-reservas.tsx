@@ -24,8 +24,10 @@ import {
   ETIQUETA_ESTADO,
   ordenarTurnos,
   rangoTurno,
+  TONO_ESTADO,
   type EstadoReserva,
 } from "./formato";
+import { Sello } from "./sello";
 
 type Reserva = components["schemas"]["ReservaAdminRespuesta"];
 type Listado = components["schemas"]["ListadoReservasRespuesta"];
@@ -73,6 +75,8 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
   const [avisoFila, setAvisoFila] = useState<{ reservaId: string; mensaje: string }>();
   const [errorCatalogo, setErrorCatalogo] = useState<string>();
   const [cargasCatalogo, setCargasCatalogo] = useState(0);
+  // Búsqueda dentro de la página cargada: no toca los filtros de la URL ni el pedido a la API.
+  const [busqueda, setBusqueda] = useState("");
 
   // Catálogo para los selectores de filtro: una sola vez (o al reintentar), no en cada cambio
   // de filtro. Si falla, se avisa: unos selectores vacíos no deben pasar por "sin zonas".
@@ -115,7 +119,7 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
               clave: claveConsulta,
               error:
                 resultado.error.tipo === "validacion"
-                  ? "Alguno de los filtros no es válido. Revisalos o quitá todos los filtros."
+                  ? "Alguno de los filtros no es válido. Revisá los filtros o quitalos todos."
                   : resultado.error.mensaje,
             }
           : { clave: claveConsulta, listado: resultado.data },
@@ -181,17 +185,33 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
   }
 
   const paginas = listado ? totalPaginas(listado.total) : 1;
+  const termino = busqueda.trim().toLowerCase();
+  const visibles = (listado?.items ?? []).filter(
+    (r) =>
+      termino === "" ||
+      [r.codigoReserva, r.nombreCliente, r.emailCliente].some((dato) =>
+        dato.toLowerCase().includes(termino),
+      ),
+  );
   const hayFiltros = Boolean(fecha || estado || zonaId || turnoId);
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-foreground">Reservas</h1>
+      <h1 className="font-display text-3xl">Reservas</h1>
 
       <form
         aria-label="Filtros"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
         onSubmit={(e) => e.preventDefault()}
       >
+        <Field
+          label="Buscar en esta página"
+          type="search"
+          autoComplete="off"
+          placeholder="Código, nombre o email"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
         <Field
           label="Fecha"
           type="date"
@@ -261,26 +281,41 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
           {hayFiltros ? "No hay reservas para esos filtros." : "Todavía no hay reservas."}
         </Alert>
       ) : null}
+      {listado && listado.items.length > 0 && visibles.length === 0 ? (
+        <Alert>
+          Ninguna reserva de esta página coincide con «{busqueda.trim()}». Probá con otro código o
+          nombre, o cambiá de página.
+        </Alert>
+      ) : null}
 
-      {listado && listado.items.length > 0 ? (
-        <div className="relative overflow-x-auto" aria-busy={cargando}>
-          <table className="w-full text-left text-sm">
+      {visibles.length > 0 ? (
+        <div
+          className={`relative overflow-x-auto border border-border bg-card transition-opacity duration-200 motion-reduce:transition-none ${
+            cargando ? "opacity-60" : ""
+          }`}
+          aria-busy={cargando}
+        >
+          <table className="w-full min-w-[64rem] text-left text-sm">
             <caption className="sr-only">
               Reservas, página {pagina} de {paginas}
             </caption>
-            <thead className="text-muted-foreground">
+            <thead className="bg-muted text-foreground">
               <tr>
-                <th scope="col" className="py-2 pr-3">Código</th>
-                <th scope="col" className="py-2 pr-3">Estado</th>
-                <th scope="col" className="py-2 pr-3">Fecha y turno</th>
-                <th scope="col" className="py-2 pr-3">Zona y mesa</th>
-                <th scope="col" className="py-2 pr-3">Comensales</th>
-                <th scope="col" className="py-2 pr-3">Contacto</th>
-                <th scope="col" className="py-2"><span className="sr-only">Acciones</span></th>
+                <th scope="col" className="px-3 py-2 font-medium">Código</th>
+                <th scope="col" className="px-3 py-2 font-medium">Estado</th>
+                <th scope="col" className="px-3 py-2 font-medium">Fecha</th>
+                <th scope="col" className="px-3 py-2 font-medium">Turno</th>
+                <th scope="col" className="px-3 py-2 font-medium">Zona</th>
+                <th scope="col" className="px-3 py-2 font-medium">Mesa</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Comensales</th>
+                <th scope="col" className="px-3 py-2 font-medium">Nombre</th>
+                <th scope="col" className="px-3 py-2 font-medium">Email</th>
+                <th scope="col" className="px-3 py-2 font-medium">Teléfono</th>
+                <th scope="col" className="px-3 py-2"><span className="sr-only">Acciones</span></th>
               </tr>
             </thead>
             <tbody>
-              {listado.items.map((reserva) => (
+              {visibles.map((reserva) => (
                 <FilaReserva
                   key={reserva.id}
                   reserva={reserva}
@@ -296,7 +331,7 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
 
       {listado && listado.total > 0 ? (
         <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">
+          <p className="tabular text-sm text-muted-foreground">
             Página {pagina} de {paginas} · {listado.total} reservas
           </p>
           <div className="flex gap-2">
@@ -334,36 +369,24 @@ function FilaReserva({
 }) {
   return (
     <tr className="border-t border-border align-top">
-      <th scope="row" className="py-2 pr-3 font-mono font-semibold tracking-wider">
+      <th scope="row" className="tabular whitespace-nowrap px-3 py-2 font-bold tracking-wider">
         {reserva.codigoReserva}
       </th>
-      <td className="py-2 pr-3">
-        <span className="inline-block rounded-md bg-muted px-2 py-0.5 font-medium">
-          {ETIQUETA_ESTADO[reserva.estado]}
-        </span>
+      <td className="px-3 py-2">
+        <Sello tono={TONO_ESTADO[reserva.estado]}>{ETIQUETA_ESTADO[reserva.estado]}</Sello>
       </td>
-      <td className="py-2 pr-3">
-        {fechaSinRomper(reserva.fecha)}
-        <br />
-        {/* La API entrega `HH:mm`, ya en hora local del restaurante. */}
-        <span className="text-muted-foreground">
-          {reserva.turno.horaInicio} a {reserva.turno.horaFin}
-        </span>
+      <td className="px-3 py-2">{fechaSinRomper(reserva.fecha)}</td>
+      {/* La API entrega `HH:mm`, ya en hora local del restaurante. */}
+      <td className="tabular whitespace-nowrap px-3 py-2">
+        {reserva.turno.horaInicio} a {reserva.turno.horaFin}
       </td>
-      <td className="py-2 pr-3">
-        {reserva.zona.nombre}
-        <br />
-        <span className="text-muted-foreground">Mesa {reserva.mesa.etiqueta}</span>
-      </td>
-      <td className="py-2 pr-3">{reserva.comensales}</td>
-      <td className="py-2 pr-3">
-        {reserva.nombreCliente}
-        <br />
-        <span className="break-all text-muted-foreground">{reserva.emailCliente}</span>
-        <br />
-        <span className="text-muted-foreground">{reserva.telefonoCliente}</span>
-      </td>
-      <td className="py-2">
+      <td className="whitespace-nowrap px-3 py-2">{reserva.zona.nombre}</td>
+      <td className="whitespace-nowrap px-3 py-2">{reserva.mesa.etiqueta}</td>
+      <td className="tabular px-3 py-2 text-right">{reserva.comensales}</td>
+      <td className="px-3 py-2">{reserva.nombreCliente}</td>
+      <td className="break-all px-3 py-2">{reserva.emailCliente}</td>
+      <td className="tabular whitespace-nowrap px-3 py-2">{reserva.telefonoCliente}</td>
+      <td className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
           {reserva.estado === "PENDIENTE" ? (
             <>
@@ -385,9 +408,9 @@ function FilaReserva({
           ) : null}
           {reserva.estado === "CONFIRMADA" ? (
             <ConfirmacionEnLinea
-              etiqueta="Marcar no show"
-              pregunta={`¿Confirmás que ${reserva.codigoReserva} no se presentó?`}
-              confirmar="Sí, marcar no show"
+              etiqueta="Marcar ausente"
+              pregunta={`¿Confirmás que ${reserva.codigoReserva} estuvo ausente?`}
+              confirmar="Sí, marcar ausente"
               deshabilitado={ocupada}
               onConfirmar={() => onAccion("no-show")}
             />

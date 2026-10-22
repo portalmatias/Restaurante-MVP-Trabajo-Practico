@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { ConsultaReserva } from "../../../src/components/reservas/consulta-reserva";
 import { esCodigoReservaValido } from "../../../src/lib/reserva-codigo";
+
+export const metadata: Metadata = { title: "Consultá tu reserva" };
 
 type ConsultarPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

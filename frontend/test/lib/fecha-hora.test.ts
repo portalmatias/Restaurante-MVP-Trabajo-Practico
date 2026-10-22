@@ -6,6 +6,11 @@ import {
 } from '../../src/lib/fecha-hora';
 
 describe('fechaLocalDeHoy', () => {
+  // Tarea 3.10 (calendario-fecha, «El día de hoy lo calcula el servidor»).
+  it('a las 02:30 UTC del 20 de septiembre todavía es 19 en Argentina', () => {
+    expect(fechaLocalDeHoy(new Date('2026-09-20T02:30:00Z'))).toBe('2026-09-19');
+  });
+
   it('devuelve el día anterior cuando en UTC ya es el día siguiente pero en Argentina todavía no', () => {
     // 02:00 UTC del 15 = 23:00 del 14 en Argentina (UTC-3).
     expect(fechaLocalDeHoy(new Date('2026-09-15T02:00:00.000Z'))).toBe(
