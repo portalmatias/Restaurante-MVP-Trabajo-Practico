@@ -241,6 +241,36 @@ describe("FormularioSeleccion - turnos del día", () => {
 
     expect(screen.getByText("No hay turnos disponibles ese día. Elegí otra fecha.")).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Turno" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Elegí una fecha para ver los turnos de ese día.")).not.toBeInTheDocument();
+    // Tarea 3.12: ese mismo lunes, en el calendario, está cerrado y no se puede elegir.
+    expect(diaDelCalendario(LUNES)).toHaveAttribute("aria-disabled", "true");
+    expect(diaDelCalendario(LUNES).getAttribute("aria-label")).toMatch(/, cerrado$/);
+  });
+
+  // Tarea 3.2: escenarios de «Los turnos del día se eligen como tablillas» que faltaban.
+  it("elegir la cena la deja elegida y el almuerzo queda descartado pero habilitado", () => {
+    renderizar();
+    elegirFecha(SABADO);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "false");
+
+    elegirTurno(TURNO_CENA_SABADO.id);
+
+    const almuerzo = tablillaDe(TURNO_ALMUERZO_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
+    expect(almuerzo).toHaveAttribute("aria-pressed", "false");
+    expect(almuerzo.querySelector(".origin-top")?.className).toContain("rotateY(180deg)");
+    expect(almuerzo).not.toHaveAttribute("aria-disabled");
+    expect(almuerzo).toBeEnabled();
+  });
+
+  it.each([
+    ["mal formada", "19/09/2026"],
+    ["anterior a hoy", "2026-09-13"],
+  ])("una fecha de la URL %s no muestra tablillas y pide elegir una fecha", (_motivo, fecha) => {
+    renderizar({ fecha });
+
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("Elegí una fecha para ver los turnos de ese día.")).toBeInTheDocument();
   });
 
   it("cambiar la fecha a otro día limpia el turno que ya no corresponde", () => {
@@ -283,6 +313,19 @@ describe("FormularioSeleccion - zona", () => {
     expect(within(standard).getByText("1 a 8 comensales")).toBeInTheDocument();
     expect(within(standard).getByText(/al menos 2 horas de anticipación y hasta 30 días/)).toBeInTheDocument();
     expect(within(standard).queryByText(/pendiente de confirmación/)).not.toBeInTheDocument();
+  });
+
+  // Tarea 3.12 («Regla de anticipación con valores en singular»).
+  it("con 1 hora mínima y 1 día máximo la regla va en singular", () => {
+    const zonaDeUno = { ...ZONA_STANDARD, anticipacionMinHoras: 1, anticipacionMaxDias: 1 };
+    render(<FormularioSeleccion zonas={[zonaDeUno, ZONA_VIP]} turnos={TURNOS} hoy={HOY} />);
+
+    expect(
+      within(opcionZona("STANDARD")).getByText("Reservá con al menos 1 hora de anticipación y hasta 1 día antes."),
+    ).toBeInTheDocument();
+    expect(
+      within(opcionZona("VIP")).getByText("Reservá con al menos 24 horas de anticipación y hasta 60 días antes."),
+    ).toBeInTheDocument();
   });
 
   it("marca con aria-checked solo la zona elegida", () => {

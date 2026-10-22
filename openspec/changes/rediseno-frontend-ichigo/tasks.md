@@ -91,7 +91,7 @@ desde cero.
 - [x] 3.1 `tablilla-turnos`: tests de `Tablilla` (libre, elegida, descartada, completa;
       `aria-pressed`; japonés con `aria-hidden` y `lang="ja"`; objetivo táctil por clases) y de
       `TablillaPaso` (no focalizable).
-- [ ] 3.2 `experiencia-reserva-cliente`: verificar que `formulario-seleccion.test.tsx` cubre los
+- [x] 3.2 `experiencia-reserva-cliente`: verificar que `formulario-seleccion.test.tsx` cubre los
       cinco escenarios de «Los turnos del día se eligen como tablillas» y los dos de «Pantalla
       cuando no hay nada para reservar»; completar los que falten.
 - [x] 3.3 `experiencia-reserva-cliente`: verificar los tests de espera tras `429` (botón
@@ -121,7 +121,7 @@ desde cero.
       `.revelar`, `.marco-organico` y `.deriva`, y que ninguna regla base de esas clases fija
       `opacity: 0`.
 
-- [ ] 3.9 `calendario-fecha`: tests de `Calendario` y de su uso en `formulario-seleccion.test.tsx`
+- [x] 3.9 `calendario-fecha`: tests de `Calendario` y de su uso en `formulario-seleccion.test.tsx`
       que cubran cada escenario de la capability: semana desde el lunes, mes de 28/30/31 días,
       día pasado, día cerrado y día más allá del último elegible (`hoy + máximo − 1`) con
       `aria-disabled` y sufijo en el nombre accesible, activar un día no elegible sin cambiar la fecha, un solo `tabindex="0"`, flechas,
@@ -133,7 +133,7 @@ desde cero.
 - [x] 3.11 `frontend-base`, «Layout compartido»: verificar `marco-publico.test.tsx` con `/`,
       `/reservas`, `/admin`, `/admin/reservas` y `/administrar` (esta última conserva el marco
       público); completar lo que falte.
-- [ ] 3.12 `experiencia-reserva-cliente`: test de «Fecha de la URL en un día sin turnos» (abrir el
+- [x] 3.12 `experiencia-reserva-cliente`: test de «Fecha de la URL en un día sin turnos» (abrir el
       Paso 1 con `?fecha=` de un lunes sin turnos activos muestra el aviso «No hay turnos
       disponibles ese día. Elegí otra fecha.»; desde el calendario ese día no se puede elegir) y de
       la regla de zona en singular («1 hora», «1 día»).
