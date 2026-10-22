@@ -10,12 +10,14 @@ desde cero.
 
 ## 1. Preparación del PR de implementación
 
-- [ ] 1.1 Rebasar `feature/diseno-frontend` sobre `origin/main` (hoy `main` tiene
+- [x] 1.1 Rebasar `feature/diseno-frontend` sobre `origin/main` (hoy `main` tiene
       `frontend-cliente` y `frontend-admin` mergeados) y resolver conflictos. Verificar con
       `git log origin/main..HEAD --oneline` que solo quedan los nueve commits del rediseño.
-- [ ] 1.2 Confirmar con `git diff origin/main --stat -- frontend/src/lib openapi backend` que
+      Hecho con merge (`8be6b9d`) en lugar de rebase porque la rama ya estaba publicada; quedan
+      19 commits propios: los nueve originales y diez de correcciones de la sección 2.
+- [x] 1.2 Confirmar con `git diff origin/main --stat -- frontend/src/lib openapi backend` que
       el diff está vacío (el rediseño no toca lógica, API ni contrato).
-- [ ] 1.3 Correr `npm run lint` (desde la raíz: `eslint .` ya cubre `frontend/`; el workspace
+- [x] 1.3 Correr `npm run lint` (desde la raíz: `eslint .` ya cubre `frontend/`; el workspace
       `frontend` no tiene script `lint`), `npm run typecheck -w frontend` y `npm test -w frontend`
       sobre la rama rebasada y anotar el resultado real en el PR.
 - [ ] 1.4 Revisar que ningún archivo de `frontend/` incluya `.env`, claves ni datos personales
@@ -29,7 +31,7 @@ desde cero.
       falle si algún archivo de `frontend/app` o `frontend/src` contiene `next/font/google`
       (hoy falla por `app/global-error.tsx`). Luego migrar `global-error.tsx` a
       `next/font/local` con los mismos archivos de `src/fonts/` y comprobar que el test pasa.
-- [ ] 2.2 `tablilla-turnos`, «Estados descartada y completa»: escribir
+- [x] 2.2 `tablilla-turnos`, «Estados descartada y completa»: escribir
       `frontend/test/components/ui/tablilla.test.tsx` con el caso `completa` pasando
       `aria-label="20:00 a 23:30"`; debe fallar (hoy usa `disabled` y un `sr-only` que el
       `aria-label` tapa). Ajustar el componente: `aria-disabled="true"` en lugar de `disabled`,
@@ -48,38 +50,38 @@ desde cero.
       mesa», «Ya tengo un código», «Elegir fecha y turno») por decisión expresa del equipo. No
       requiere cambios en `app/page.tsx`: agregar un test que fije esos textos y que compruebe
       que los títulos y textos explicativos usan voseo y ninguno usa tuteo.
-- [ ] 2.6 `landing-ichigo`, «Los pasos de reserva coinciden con el flujo real»: el primer paso de
+- [x] 2.6 `landing-ichigo`, «Los pasos de reserva coinciden con el flujo real»: el primer paso de
       `PASOS` dice «Elegí fecha, turno y cantidad de comensales» y omite la zona. Corregirlo a
       «Elegí fecha, turno, zona y cantidad de comensales» (ya hecho en la rama de implementación,
       commit `ae4086c`: verificarlo contra el escenario).
-- [ ] 2.7 `frontend-base`, «Objetivos táctiles mínimos»: `BotonCompacto` usa la variante
+- [x] 2.7 `frontend-base`, «Objetivos táctiles mínimos»: `BotonCompacto` usa la variante
       `pointer-fine:` de Tailwind, que mira solo el puntero principal. Escribir un test o una
       verificación manual en un equipo híbrido y cambiarla para que el alto de 36px aplique solo
       sin `any-pointer: coarse` (por ejemplo con una variante propia `@custom-variant` sobre
       `@media (any-pointer: fine) and (not (any-pointer: coarse))`). Ya hecho en la rama de
       implementación, commit `abff7bc`: verificarlo contra los escenarios.
-- [ ] 2.8 `frontend-admin`, «Motivo visible en el login»: cambiar el texto de `sesion-vencida` en
+- [x] 2.8 `frontend-admin`, «Motivo visible en el login»: cambiar el texto de `sesion-vencida` en
       `login-form.tsx` de «Tu sesión venció…» a «Tu sesión terminó o ya no es válida…» (ya hecho
       en la rama de implementación, commit `29de1b2`: verificarlo) y quitar la mención fija de «60
       minutos» de los textos de `sesion-vencida` y de `renovar` (la duración es configurable con
       `JWT_EXPIRES_IN`). Ajustar los tests que citan los textos anteriores. El parámetro de URL
       `sesion-vencida` no cambia.
-- [ ] 2.9 `calendario-fecha`, «Días no elegibles distinguidos por texto»: en
+- [x] 2.9 `calendario-fecha`, «Días no elegibles distinguidos por texto»: en
       `formulario-seleccion.tsx`, `ultimaFecha = sumarDias(hoy, maximoDias)` ofrece `hoy + máximo`
       como último día. Escribir primero un test que falle (con zonas de 30 y 60 días, el día 60 es
       `aria-disabled` y el 59 es elegible) y cambiarlo a `maximoDias - 1`. Revisar también que
       «Mes siguiente» se deshabilite en el mes de ese último día.
-- [ ] 2.10 `frontend-admin`, «Dashboard de aforo»: `leerAforo` (`nivel-aforo.ts`) redondea el
+- [x] 2.10 `frontend-admin`, «Dashboard de aforo»: `leerAforo` (`nivel-aforo.ts`) redondea el
       porcentaje con `Math.round` y decide el nivel con la razón decimal, de modo que 39 de 49
       muestra «80 % ocupado» con el nivel «Con lugar» y 199 de 200 muestra «100 %» sin ser
       «Completo». Escribir primero los tests (39/49 → 79 % y «Con lugar»; 199/200 → 99 % y
       «Casi lleno»; aforo 0 con 5 comensales → «Sin aforo», sin porcentaje y 0 libres) y pasar el
       cálculo a enteros con redondeo hacia abajo (`Math.floor(ocupado * 100 / maximo)`) y a decidir
       el nivel con ese entero.
-- [ ] 2.11 `experiencia-reserva-cliente`: ninguna pantalla pasa hoy `estado="completa"` a una
+- [x] 2.11 `experiencia-reserva-cliente`: ninguna pantalla pasa hoy `estado="completa"` a una
       tablilla. Confirmarlo con `git grep 'estado='` y registrar en el PR que el estado queda
       soportado por el componente pero sin cableado a la disponibilidad (cambio futuro).
-- [ ] 2.12 `identidad-visual-ichigo`, «Contrastes»: agregar a `globals.css` `--ring-madera: #f3ebda`
+- [x] 2.12 `identidad-visual-ichigo`, «Contrastes»: agregar a `globals.css` `--ring-madera: #f3ebda`
       y `--color-ring-madera`, y comprobar que la `Tablilla` descartada o completa dibuja el foco
       con `ring-offset-2 ring-offset-background` (o con `ring-madera`) y no con el rojo pegado a
       la madera. Anotar los contrastes de foco medidos (5,69, 6,51, 4,82 y 13,14:1).
