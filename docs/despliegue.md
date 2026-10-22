@@ -14,7 +14,8 @@ commit verde de `main` se despliega solo.
 
 | Dato | Valor |
 |---|---|
-| Etapa | **HTTP** (sin subdominio todavía). Cuando se active HTTPS, cambiar esta fila a **HTTPS** y completar el nombre. |
+| Etapa | **HTTPS** en `ichigo.alquilerespunilla.com.ar` (activada el 21/10/2026, sección 9). |
+| DNS | Zona de la docente en **Cloudflare, con proxy** (nube naranja): el subdominio resuelve a IPs de Cloudflare, no a la IP elástica. Ver [El subdominio pasa por Cloudflare](#el-subdominio-pasa-por-cloudflare). |
 | Región | `us-east-1` (ver [Región](#región)) |
 | Vencimiento del plan Free | _a completar con la fecha de la cuenta (tarea 1.3)_ |
 | Fecha de entrega del TP | _a completar_ |
@@ -310,6 +311,10 @@ sudo install -m 644 -o root -g root /opt/reservas/deploy/logrotate-reservas /etc
 sudo logrotate --debug /etc/logrotate.d/reservas-despliegue    # simulación: tiene que terminar sin errores
 ```
 
+Si la simulación dice `parent directory has insecure permissions`, el archivo instalado es una
+versión anterior sin la directiva `su root syslog` (en Ubuntu, `/var/log` es `root:syslog` con
+modo 775): volver a instalarlo desde el repositorio actualizado con el mismo `install`.
+
 ## 5. GitHub: environment `produccion` y secrets
 
 Settings → Environments → **New environment** → `produccion`:
@@ -365,6 +370,38 @@ Con los paquetes públicos, los despliegues siguientes no vuelven a necesitar na
 Pedirle a la docente (Ivana) un **subdominio** y que lo apunte a la IP elástica (registro `A`).
 Mientras tanto, producción corre en la etapa HTTP (sección 11). La activación de HTTPS es la
 sección 9.
+
+### El subdominio pasa por Cloudflare
+
+La zona de la docente está en Cloudflare con el **proxy activado**. Eso cambia algunas cosas
+respecto de lo que supone el resto de este runbook (un registro `A` directo a la IP elástica):
+
+- **`dig +short <subdominio>` devuelve IPs de Cloudflare**, no la IP elástica. Es lo esperado;
+  para comprobar que llega al servidor, usar `curl -I http://<subdominio>/` (un `521` de
+  Cloudflare significa que en el servidor no hay nada escuchando todavía).
+- **El certificado de Let's Encrypt se emite igual.** Cloudflare deja pasar HTTP hasta el
+  servidor sin forzar HTTPS, así que la validación HTTP-01 de Caddy funciona a través del proxy
+  (en el log de Caddy: `served key authentication` desde IPs de Cloudflare y después
+  `certificate obtained successfully`).
+- **El modo SSL/TLS de la zona es Full o Full (strict)**: Cloudflare se conecta al servidor por
+  443. Con *Flexible* el sitio entraría en un bucle de redirecciones, porque Caddy redirige HTTP
+  a HTTPS.
+- **El público ve el certificado de Cloudflare**, no el de Let's Encrypt. El de Let's Encrypt
+  solo lo ve Cloudflare. Para revisarlo, conectarse directo al servidor:
+  `echo | openssl s_client -connect <IP-ELASTICA>:443 -servername <subdominio> 2>/dev/null | openssl x509 -noout -issuer -enddate`.
+- **SSH no pasa por Cloudflare:** `SERVER_HOST` tiene que seguir siendo la IP elástica (no usar
+  el subdominio, a diferencia de lo que sugiere el paso 7 de la sección 9).
+
+**Pendiente (otro change):**
+
+- **IP real del cliente.** Caddy ve como cliente a Cloudflare, así que el límite de intentos y
+  los registros agrupan a todos los visitantes detrás de las mismas IPs. Hay que configurar
+  `trusted_proxies` con los rangos de Cloudflare y leer `CF-Connecting-IP`.
+- **Security group.** Con proxy, lo correcto es abrir 80 y 443 solo a los rangos de Cloudflare
+  (lista de prefijos administrada con <https://www.cloudflare.com/ips-v4>), en lugar de
+  `0.0.0.0/0`. Así nadie llega al servidor salteando Cloudflare. La renovación del certificado
+  no se ve afectada: Let's Encrypt resuelve el subdominio a Cloudflare y valida a través del
+  proxy.
 
 ## 7. Primer despliegue y pruebas
 
@@ -479,7 +516,9 @@ Para restaurarlo en una base vacía: `gunzip -c respaldo.sql.gz | docker compose
 ## 9. Activar HTTPS con el subdominio
 
 1. Pasarle a la docente la **IP elástica** para que cree el registro `A` del subdominio.
-2. Esperar a que resuelva: `dig +short <subdominio>` tiene que devolver esa IP.
+2. Esperar a que resuelva: `dig +short <subdominio>` tiene que devolver esa IP (o IPs de
+   Cloudflare si la zona tiene el proxy activado; ver
+   [El subdominio pasa por Cloudflare](#el-subdominio-pasa-por-cloudflare)).
 3. **Cambiar `SITE_ADDRESS` primero** en `/opt/reservas/.env` (sin perder modo ni dueño):
    ```bash
    sudo sed -i 's/^SITE_ADDRESS=.*/SITE_ADDRESS=<subdominio>/' /opt/reservas/.env
@@ -503,7 +542,8 @@ Para restaurarlo en una base vacía: `gunzip -c respaldo.sql.gz | docker compose
      nombre que muestre `docker ps`) y reintentar desde el paso 4.
 6. **Rotar la contraseña del admin** (sección 10): pudo haber viajado en claro en la etapa HTTP.
 7. Opcional: usar el subdominio como `SERVER_HOST`, pero entonces regenerar `SSH_KNOWN_HOSTS`
-   con `ssh-keyscan` sobre el nombre.
+   con `ssh-keyscan` sobre el nombre. **No aplica si el subdominio pasa por el proxy de
+   Cloudflare**, que no reenvía SSH: ahí `SERVER_HOST` sigue siendo la IP elástica.
 8. Crear la variable de **repositorio** `SUBDOMINIO` (Settings → Secrets and variables → Actions →
    Variables) con el nombre del subdominio, y correr una vez **Certificado** a mano: con ella, el
    workflow `certificado.yml` revisa todos los días que el certificado sea válido y tenga 21 días
@@ -521,7 +561,13 @@ reinicios: no pide uno nuevo cada vez.
 ### Certificado: aviso y límites
 
 Let's Encrypt ya no manda correos de vencimiento, así que lo controla `certificado.yml` todos los
-días. Dos cosas que dice la documentación de GitHub y que conviene tener presentes:
+días. Con el proxy de Cloudflare, el workflow ve el certificado **de Cloudflare**, no el de
+Let's Encrypt del servidor. Como el script solo verifica el handshake TLS, **no detecta** que
+venza el del servidor: en ese caso Cloudflare respondería `526` y el control seguiría en verde.
+Mientras no se cambie el control (pendiente, otro change), revisar el del servidor de vez en
+cuando con el `openssl s_client` de
+[El subdominio pasa por Cloudflare](#el-subdominio-pasa-por-cloudflare).
+Dos cosas que dice la documentación de GitHub y que conviene tener presentes:
 
 - **A quién avisa un workflow programado que falla:** a quien creó el workflow (o a quien editó
   después su cron o lo volvió a habilitar), no a todo el equipo. Por eso, cuando la verificación
