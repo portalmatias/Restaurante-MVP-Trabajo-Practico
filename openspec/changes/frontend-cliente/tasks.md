@@ -257,7 +257,7 @@
 - [ ] 7.1 `openspec validate frontend-cliente --strict` pasa y todas las tareas de este
       archivo están marcadas o explícitamente pospuestas con su motivo. Verificar con el
       comando y revisando que no quede ningún `- [ ]` sin justificar.
-- [ ] 7.2 Verificación manual de accesibilidad visual (mismo criterio que D9 de
+- [x] 7.2 Verificación manual de accesibilidad visual (mismo criterio que D9 de
       `frontend-base`: sin herramienta automatizada) en 375px, 768px, 1024px y 1440px para las
       nueve pantallas: sin scroll horizontal, contraste de la insignia dorada y del texto sobre
       `muted`, área táctil ≥44×44px del stepper y de los botones `size="lg"` (≥56px de alto),
@@ -265,19 +265,25 @@
       sobre `Dialog` (spec "El diálogo de cancelación atrapa el foco" / "Cerrar el diálogo
       devuelve el foco"; D5 documenta que `jsdom` no puede probar esto, ver 3.3): abrir el
       diálogo de confirmar cancelación en un navegador real y verificar que Tab/Shift+Tab no
-      saca el foco de sus controles mientras está abierto, y que cerrarlo (con "Volver", con
-      "Sí, cancelar", o con Escape) devuelve el foco al botón "Cancelar mi reserva" que lo
-      abrió. Documentar el resultado en la descripción del PR.
-- [ ] 7.3 El change no agrega ni modifica `openapi/openapi.yaml` ni `backend/prisma`: no
+      llega a ningún control de la página que queda detrás mientras está abierto; que cerrarlo
+      con "Volver" o con Escape devuelve el foco al botón "Cancelar mi reserva" que lo abrió; y
+      que confirmar con "Sí, cancelar" lleva el foco al aviso "Tu reserva fue cancelada."
+      (spec "Confirmar la cancelación lleva el foco al aviso"); y que, tras un `409`, cerrar el
+      diálogo lleva el foco al aviso "Esta reserva ya no se puede cancelar." (spec "Cerrar el
+      diálogo tras un rechazo por conflicto lleva el foco al aviso"). Verificar también que,
+      si la confirmación termina en un error con el diálogo abierto, el foco queda en "Sí,
+      cancelar" (spec "Un error al confirmar no saca el foco del diálogo"). Documentar el
+      resultado en la descripción del PR.
+- [x] 7.3 El change no agrega ni modifica `openapi/openapi.yaml` ni `backend/prisma`: no
       aplican migración ni contrato propios. Verificar con `git diff main --stat -- backend
       openapi` vacío.
-- [ ] 7.4 No se agregaron variables de entorno ni dependencias nuevas. Verificar con
+- [x] 7.4 No se agregaron variables de entorno ni dependencias nuevas. Verificar con
       `git diff main -- .env.example frontend/package.json` (el segundo, sin cambios en
       `dependencies`/`devDependencies`, solo posibles cambios de `package-lock.json` si
       `api:types` regeneró algo).
-- [ ] 7.5 Tests de todas las utilidades puras y de los componentes de este change en verde:
+- [x] 7.5 Tests de todas las utilidades puras y de los componentes de este change en verde:
       `npm test -w frontend`, con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
-- [ ] 7.6 `npm run lint` y `npm run typecheck` (`tsc --noEmit`) en limpio, sin warnings nuevos,
+- [x] 7.6 `npm run lint` y `npm run typecheck` (`tsc --noEmit`) en limpio, sin warnings nuevos,
       desde la raíz.
 - [ ] 7.7 CI en verde en el PR `feature/frontend-cliente`. Verificar en la pestaña Checks.
 - [ ] 7.8 PR con descripción en español, enlazado a `openspec/changes/frontend-cliente/`, con
