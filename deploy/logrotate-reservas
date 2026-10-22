@@ -1,0 +1,16 @@
+# Rotación del log de despliegues de desplegar.sh (se instala como
+# /etc/logrotate.d/reservas-despliegue; ver docs/despliegue.md, sección 4.7).
+#
+# desplegar.sh abre el archivo en modo append en cada despliegue (con `tee -a`) y no lo mantiene
+# abierto entre uno y otro, así que alcanza con rotar y volver a crearlo. El log no lleva
+# secretos: el script nunca imprime los valores del .env.
+/var/log/reservas-despliegue.log {
+    weekly
+    rotate 8
+    maxsize 5M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 600 root root
+}

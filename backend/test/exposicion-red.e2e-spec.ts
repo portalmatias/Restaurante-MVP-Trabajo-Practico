@@ -128,6 +128,30 @@ describe('Origen del cliente y X-Forwarded-For (e2e)', () => {
     });
   });
 
+  /**
+   * Escenario "Confianza declarada solo en el proxy de borde detrás de /api" de
+   * `exposicion-red` (change `despliegue-continuo-ec2`, tarea 1.4). Detrás de `/api`, el salto
+   * que se conecta al backend es el frontend, no el proxy de borde. Si `TRUST_PROXY` declara
+   * solo la dirección del proxy de borde, la conexión llega desde otra dirección (acá,
+   * loopback de Supertest, que hace de frontend), Express no confía en ella y el límite se
+   * cuenta por esa conexión: inventar `X-Forwarded-For` no evita el `429`, pero los límites
+   * quedan por máquina (lo que advierte el README).
+   */
+  describe('con TRUST_PROXY apuntando solo al proxy de borde (no al salto que se conecta)', () => {
+    // Dirección de documentación (RFC 5737): no es la de la conexión de Supertest.
+    const IP_PROXY_DE_BORDE = '192.0.2.1';
+
+    it('cambiar X-Forwarded-For en cada intento no evita el límite de login', async () => {
+      await crearApp(IP_PROXY_DE_BORDE);
+
+      for (let i = 1; i <= LIMITE_LOGIN; i++) {
+        await loginFallido(`198.51.100.${i}`).expect(401);
+      }
+
+      await loginFallido('198.51.100.99').expect(429);
+    });
+  });
+
   describe('con TRUST_PROXY=loopback (salto confiable declarado)', () => {
     // Supertest se conecta por loopback, así que hace de proxy de borde: agrega la IP "real"
     // al final del encabezado, después de lo que haya inventado el cliente.

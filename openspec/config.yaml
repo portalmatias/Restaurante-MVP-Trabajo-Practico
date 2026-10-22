@@ -44,6 +44,11 @@ context: |
   - **No** introducir librerías nuevas sin justificarlo en el `design.md` del cambio correspondiente.
   - **No** usar ORMs, query builders ni acceso SQL directo por fuera de Prisma.
   - **No** agregar servicios externos de pago ni que requieran API keys privadas (el repo es público / evaluable).
+    **Excepción (change `despliegue-continuo-ec2`):** el despliegue usa AWS (EC2, security group e IP elástica) dentro
+    del Tier gratuito, a propuesta de la docente en la clase del 2026-10-05. Es infraestructura
+    de despliegue, no una dependencia de la aplicación: el sistema se levanta en local sin AWS ni ninguna API key, y
+    ninguna credencial vive en el repositorio. Ningún otro servicio de pago queda habilitado
+    por esta excepción.
   - Preferir lo que ya viene en NestJS antes que sumar dependencias (validación con `class-validator`, config con `@nestjs/config`, etc.).
 
   ---
@@ -80,21 +85,28 @@ context: |
   ├── package.json              # workspaces: ["backend", "frontend"]
   ├── docker-compose.yml        # solo PostgreSQL para desarrollo local
   ├── .env.example              # plantilla, sin valores reales
-  ├── .github/workflows/ci.yml
+  ├── .github/workflows/
+  │   ├── ci.yml
+  │   ├── cd.yml            # despliegue continuo a EC2 (change despliegue-continuo-ec2)
+  │   └── certificado.yml   # control diario del certificado HTTPS
+  ├── deploy/               # composición de producción, Caddyfile, desplegar.sh, ssh-entrada.sh
+  ├── docs/
+  │   └── despliegue.md     # runbook de AWS
   ├── openapi/
   │   └── openapi.yaml          # contrato formal de la API
   ├── openspec/
   │   ├── config.yaml           # este archivo (constitución del proyecto)
   │   ├── specs/                # specs vigentes (post-archive)
   │   └── changes/              # cambios en curso
-  ├── backend/                  # NestJS
+  ├── backend/                  # NestJS (con su Dockerfile)
   │   ├── prisma/
   │   │   ├── schema.prisma
   │   │   ├── migrations/
-  │   │   └── seed.ts
+  │   │   ├── seed.ts             # desarrollo: catálogo, admin del README y reservas de ejemplo
+  │   │   └── seed-produccion.ts  # producción: catálogo y admin propio, sin reservas
   │   ├── src/
   │   └── test/
-  └── frontend/                 # Next.js
+  └── frontend/                 # Next.js (con su Dockerfile)
       ├── src/
       └── test/
   ```
@@ -339,6 +351,15 @@ context: |
   PostgreSQL escuchan solo en loopback. `TRUST_PROXY` nunca es `true`, `*` ni un número de
   saltos: el backend no arranca si no es una lista de formatos admitidos.
 
+  Variables solo de producción (change `despliegue-continuo-ec2`): `ADMIN_EMAIL` y
+  `ADMIN_PASSWORD` las lee únicamente `backend/prisma/seed-produccion.ts` (el seed de desarrollo
+  no las usa). En producción salen del `.env` del servidor (`/opt/reservas/.env`, que se copia a
+  mano, es de root y de modo 600) y las pasa `deploy/desplegar.sh` por el entorno del proceso
+  del seed; **nunca** van en el repositorio, en las imágenes ni en GitHub. El seed rechaza las
+  credenciales del README y una contraseña de menos de 16 caracteres. Los secretos de
+  producción (`JWT_SECRET`, `POSTGRES_PASSWORD`) viven en ese mismo `.env` del servidor; ver
+  `docs/despliegue.md`.
+
   ### Base de datos
   - PostgreSQL corre en Docker, nunca instalado directo en la máquina — así los tres tienen
     la misma versión.
@@ -388,6 +409,14 @@ context: |
   4. **Bloquear el merge** si cualquiera de los pasos falla.
 
   Regla: **un PR con CI en rojo no se mergea nunca**, aunque "funcione localmente".
+
+  **CD:** `.github/workflows/cd.yml` despliega a la instancia EC2 de producción cuando el CI
+  termina en verde sobre un push a `main` (o a mano con `workflow_dispatch`: `despliegue` o
+  `vuelta-atras`). Entra al servidor por SSH con una clave dedicada, guardada como secret del
+  environment `produccion` (solo `main`) y limitada a un comando forzado, sin claves de AWS en
+  GitHub, y las acciones de terceros van fijadas por SHA de commit. `.github/workflows/certificado.yml` controla
+  a diario el certificado HTTPS. Las decisiones están en el change `despliegue-continuo-ec2` y
+  el runbook en `docs/despliegue.md`.
 
   ---
 
