@@ -26,7 +26,8 @@ ajusten al código en vez de a una necesidad, y que lo que el prototipo hace mal
 - Donde el prototipo **no cumple** lo que la spec exige, no se adaptó la spec: se dejó una
   tarea explícita en `tasks.md` (sección 2). Hoy se conocen estos desvíos: `app/global-error.tsx`
   importa `next/font/google` (contradice la decisión D1); el estado `completa` de `Tablilla`
-  existe pero ninguna pantalla lo usa todavía; su paso 1 de «Así se reserva» omite la zona; las acciones de fila
+  existe pero ninguna pantalla lo usa todavía; el primer paso de «Así se reserva» de la landing
+  omite la zona; las acciones de fila
   del admin usan `pointer: fine` y no excluyen los equipos híbridos; y el aviso del login dice
   «Tu sesión venció» aun cuando el backend rechazó la sesión por otro motivo.
 - **Desviación única de `config.yaml` §14, prioridad 2.** Escribir la spec después del código
@@ -78,18 +79,28 @@ Se mantiene el mecanismo de `frontend-base` (variables CSS + `@theme inline`), p
 nuevos y un par adicional (`madera`/`madera-foreground`) para la tablilla dada vuelta y la
 viga. Regla de uso: el rojo del sello es **texto** solo sobre claros (5,7:1 sobre hinoki, 6,5:1
 sobre `card`) y **relleno** sobre oscuros. Medido: el rojo `#9A2A19` sobre `madera` da 2,0:1,
-ilegible como texto. `ring` reutiliza el rojo del sello como foco.
+ilegible como texto. `ring` reutiliza el rojo del sello como foco, y por la misma razón no
+puede tocar la madera: medido con la fórmula de luminancia de WCAG 2.1, `ring` da 5,69:1 sobre
+`background`, 6,51:1 sobre `card`, 4,82:1 sobre `muted` y 2,02:1 sobre `madera`, por debajo del
+3:1 que pide 1.4.11. La tablilla dada vuelta ya separa el anillo del control con un desplazamiento
+de 2px sobre `background`, así que el foco se mide contra el fondo y no contra la madera. Para
+cualquier control que quede pegado a la madera sin desplazamiento se define `ring-madera`
+(`#F3EBDA`, 13,14:1 sobre `madera`).
 
 Alternativa descartada: un tono más claro de rojo para texto sobre madera. Agrega un token y
-una excepción a la regla; se prefirió prohibir ese uso.
+una excepción a la regla; se prefirió prohibir ese uso. Para el foco sí se agrega un token
+(`ring-madera`), porque un anillo no puede reemplazarse por otro tratamiento: un control enfocable
+sobre madera necesita un indicador visible, no una prohibición.
 
 ### D3. La tablilla es un `<button>` con `aria-pressed`
 Un grupo de botones de alternancia en vez de `radio` o `select`: tocar otra tablilla cambia la
 elección sin un paso previo de «deseleccionar», y cada tablilla tiene su nombre accesible
 («20:00 a 23:30»). Se evaluó `role="radiogroup"` (mejor semántica de «una sola opción», pero
 exige manejo de flechas para ser correcto y el equipo no lo implementó); queda como Open
-Question. El giro 3D usa `rotateY` con `backface-visibility`, solo en `transform`, sin
-reflujo.
+Question. Una tablilla `completa` usa `aria-disabled` y no `disabled` (como los días no elegibles
+del calendario, D11): sigue en el orden de tabulación y su nombre accesible compuesto («20:00 a
+23:30, completo») la anuncia; un `aria-label` taparía un «Completo» oculto dentro del botón.
+El giro 3D usa `rotateY` con `backface-visibility`, solo en `transform`, sin reflujo.
 
 ### D4. El español siempre va en horizontal; el japonés vertical es decoración
 Riesgo de legibilidad: el texto vertical tradicional (縦書き) con letras latinas rotadas es
@@ -103,8 +114,9 @@ Las animaciones atadas al scroll usan `animation-timeline: view()` dentro de `@s
 soporte, el contenido queda en su estado final (nunca oculto). Los estados iniciales viven solo
 dentro de `@keyframes`. Con `prefers-reduced-motion: reduce` hay dos capas: una regla global
 que reduce toda duración a 0,01 ms, y `animation: none` explícito para las clases que usan
-animaciones infinitas o atadas al scroll (la duración mínima no basta para un bucle). El
-panel de admin usa la variante `motion-reduce` de Tailwind.
+animaciones infinitas o atadas al scroll (la duración mínima no basta para un bucle). La regla
+global también cubre el panel de admin; la variante `motion-reduce` de Tailwind que hoy usan
+algunos componentes es redundante y no se exige.
 
 | Alternativa | Por qué no |
 |---|---|
@@ -155,6 +167,11 @@ se tocó, el foco caería en `body`. Se enfoca por programa el `h1` de la vista 
 (`tabindex="-1"`, sin contorno propio). Alternativa: un contenedor `aria-live`; descartada
 porque lee todo el detalle y no ubica al usuario de teclado.
 
+Cancelar con éxito **no** entra en esta regla: la vista no cambia, solo aparece el aviso «Tu
+reserva fue cancelada.», y el destino del foco (el aviso) lo fija `frontend-cliente` y ya lo
+implementan los PR #74 y #75, mergeados en `main`. Una versión anterior de esta spec mandaba el
+foco al `h1` del detalle; habría hecho fallar los tests de #74, así que se descartó.
+
 ### D9. Estados del panel por texto, forma y pictograma
 El sello de estado (`Sello`) lleva nombre escrito + un pictograma SVG + un tratamiento de borde
 distinto (relleno, contorno grueso, punteado, fino). Cumple WCAG 1.4.1 (uso del color) sin
@@ -184,8 +201,13 @@ vistazo y, en pantallas anchas, queda a la izquierda de los turnos. Decisiones:
 - Cero dependencias: la aritmética de fechas usa `Date.UTC` y `getUTC*` (`config.yaml` §7); el
   día de hoy se calcula en el servidor con el offset de Argentina y llega como propiedad, de modo
   que el huso del dispositivo no cambie qué días son pasados.
-- El límite superior es hoy más el mayor `anticipacionMaxDias` de las zonas; la anticipación
-  exacta de cada zona la sigue validando el servidor.
+- El último día elegible es hoy más el mayor `anticipacionMaxDias` de las zonas menos un día. El
+  backend compara el margen entre el instante actual y el inicio del turno contra
+  `anticipacionMaxDias × 24 h`: con `hoy + máximo` el margen supera el tope en cuanto el turno
+  empieza después de la hora actual (a las 10:00, la cena de las 20:00 da 60 días y 10 horas y
+  responde `ANTICIPACION_MAXIMA`), mientras que con `hoy + máximo − 1` el margen es siempre
+  menor que el tope. Ofrecer `hoy + máximo` mostraría como elegible un día que casi siempre falla.
+  La anticipación exacta de cada zona la sigue validando el servidor.
 
 | Alternativa | Por qué no |
 |---|---|
@@ -218,10 +240,16 @@ hoy…», «Copy en voseo») están redactados sin fijar el tipo de control («o
 «selector de fecha»), así que no se contradicen con las tablillas ni con el calendario: esta
 capability los **refina** y no los reemplaza. Regla de precedencia, para que haya una sola
 autoridad: ante cualquier diferencia de comportamiento del Paso 1, manda `experiencia-reserva-cliente`
-(y `calendario-fecha`) sobre `frontend-cliente`. Orden de archivado: primero `frontend-cliente`;
+(y `calendario-fecha`) sobre `frontend-cliente`. La excepción es el foco del diálogo de
+cancelación, de los avisos que lo siguen y de su devolución al control que lo abrió: pertenece a
+`frontend-cliente` («Accesibilidad heredada en toda pantalla nueva»), este change no lo
+modifica y manda esa capability. Orden de archivado: primero `frontend-cliente`;
 después este change, y al archivarlo se revisa que el texto fundido de ambos no repita ni
 contradiga (tarea 6.3). El único punto de superposición real es el aviso de «día sin turnos»,
-que `frontend-cliente` ya exigía y `experiencia-reserva-cliente` concreta con su texto.
+que `frontend-cliente` ya exigía y `experiencia-reserva-cliente` concreta con su texto. Como el
+calendario no deja elegir un día sin turnos, el aviso solo se muestra con una fecha cargada desde
+la URL. El design y las tareas de `frontend-cliente` nombran un `Select` de turnos, pero su spec
+no lo exige: las tablillas lo reemplazan sin contradecirla.
 
 ## Risks / Trade-offs
 

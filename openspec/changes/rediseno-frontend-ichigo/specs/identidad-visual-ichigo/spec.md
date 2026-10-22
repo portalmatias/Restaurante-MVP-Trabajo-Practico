@@ -8,7 +8,8 @@ identidad de Ichigo: `background` (hinoki, `#E8DCC4`), `foreground`, `card-foreg
 `#8A6A43`), `accent`, `destructive` y `ring` (sello, `#9A2A19`), `madera` (`#2B221B`) y los
 tokens de texto sobre relleno `primary-foreground`, `secondary-foreground`,
 `accent-foreground`, `destructive-foreground` y `madera-foreground` (todos hinoki claro,
-`#F3EBDA`). Los componentes SHALL consumir esos tokens a través de las utilidades de
+`#F3EBDA`), más `ring-madera` (hinoki claro, `#F3EBDA`), el anillo de foco para los controles
+cuyo fondo contiguo es `madera`. Los componentes SHALL consumir esos tokens a través de las utilidades de
 Tailwind y SHALL NOT escribir un color hexadecimal propio. El sistema SHALL ofrecer solo modo
 claro.
 
@@ -35,6 +36,13 @@ contra el fondo sobre el que se dibujan. El rojo del sello (`accent`) SHALL usar
 solo sobre `background`, `card` o `muted`, y SHALL NOT usarse como texto sobre `madera`;
 sobre `madera` SHALL aparecer solo como relleno, con texto `accent-foreground`.
 
+El indicador de foco SHALL alcanzar al menos 3:1 contra los colores contiguos (WCAG 1.4.11). El
+anillo `ring` mide 5,7:1 sobre `background`, 6,5:1 sobre `card` y 4,8:1 sobre `muted`, pero solo
+2,0:1 sobre `madera`, así que SHALL NOT dibujarse pegado a un fondo `madera`. Un control con fondo
+`madera` (la tablilla descartada o completa) SHALL separar el anillo con un desplazamiento de al
+menos 2px sobre el fondo de la página (`ring-offset-2` con `ring-offset-background`) o usar
+`ring-madera`, que mide 13,1:1 sobre `madera`.
+
 #### Scenario: Contraste de texto de las combinaciones definidas
 - **WHEN** se calcula la relación de contraste de `foreground` y `card-foreground` sobre
   `background`, `card` y `muted`, de `muted-foreground` (igual a `secondary`) sobre
@@ -51,6 +59,13 @@ sobre `madera` SHALL aparecer solo como relleno, con texto `accent-foreground`.
 #### Scenario: Contraste de bordes de controles
 - **WHEN** se calcula el contraste de `border` contra `background` y contra `card`
 - **THEN** es de al menos 3:1 (3,66 y 4,19 respectivamente)
+
+#### Scenario: El foco sobre una tablilla dada vuelta se distingue
+- **WHEN** una tablilla descartada o completa recibe el foco del teclado
+- **THEN** su anillo de foco está separado del control por un desplazamiento de al menos 2px sobre
+  el fondo de la página, y mide al menos 3:1 contra ese fondo (5,7:1 sobre `background`)
+- **AND** ningún anillo `ring` (rojo) toca un fondo `madera`: cuando no hay desplazamiento se usa
+  `ring-madera`
 
 #### Scenario: El rojo del sello nunca es texto sobre madera oscura
 - **WHEN** se recorren las clases de los componentes que se dibujan sobre `madera`
@@ -112,7 +127,8 @@ pantallas del panel de administración quedan fuera de este requisito.
 Toda imagen raster que se sirva desde `frontend/public/ichigo/` SHALL estar en formato WebP,
 SHALL ser una fotografía sintética o propia y SHALL estar listada en `frontend/public/ichigo/PROCEDENCIA.md` con su
 herramienta de origen, la fecha, el prompt o autoría y su uso. El documento SHALL registrar
-además la conversión a WebP (herramienta y calidad) y el peso total resultante. Las imágenes SHALL NOT contener
+además la conversión a WebP (herramienta y calidad) y el peso total resultante, y la suma de los
+pesos de los archivos SHALL ser menor que 300 KB. Las imágenes SHALL NOT contener
 texto, logotipos ni personas reconocibles, y SHALL llevar un texto alternativo descriptivo
 cuando comunican contenido.
 
@@ -121,6 +137,8 @@ cuando comunican contenido.
   `PROCEDENCIA.md`
 - **THEN** cada archivo `.webp` tiene su fila con herramienta, fecha, prompt y uso
 - **AND** no queda ningún `.png` en la carpeta
+- **AND** la suma de los pesos de los `.webp` es menor que 300 KB y coincide con el total que
+  registra el documento
 - **AND** el documento indica que las imágenes se convirtieron a WebP y con qué calidad
 - **AND** el documento aclara que las fotos no son de un local real
 

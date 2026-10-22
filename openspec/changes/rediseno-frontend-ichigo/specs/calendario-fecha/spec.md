@@ -27,8 +27,13 @@ validación real de la fecha y de la anticipación de cada zona sigue siendo la 
 
 ### Requirement: Días no elegibles distinguidos por texto
 El calendario SHALL tratar como no elegible todo día anterior a hoy, todo día cuyo día de la
-semana no tiene turnos activos («cerrado») y todo día posterior al máximo de anticipación de
-cualquier zona (hoy más el mayor `anticipacionMaxDias` de las zonas). Un día no elegible SHALL
+semana no tiene turnos activos («cerrado») y todo día posterior al último día elegible, que es
+hoy más el mayor `anticipacionMaxDias` de las zonas **menos un día**. El motivo es que el servidor
+mide la anticipación máxima desde el instante en que empieza el turno, no por día calendario
+(`backend/src/disponibilidad/reglas/evaluar-reglas.ts`, `ANTICIPACION_MAXIMA`): el día
+`hoy + máximo` solo se admite para los turnos que empiezan antes de la hora actual, mientras que
+`hoy + máximo − 1` se admite para cualquier turno y a cualquier hora. Si el resultado es anterior a
+hoy (máximo 0), ningún día es elegible. Un día no elegible SHALL
 llevar `aria-disabled="true"`, SHALL seguir siendo enfocable con el teclado, SHALL NOT fijar la
 fecha al activarlo y SHALL distinguirse por texto y no solo por color: su nombre accesible
 termina en «, cerrado» (día de la semana sin turnos) o «, no disponible» (anterior a hoy o más
@@ -44,11 +49,18 @@ tachados están cerrados.».
 - **THEN** tiene `aria-disabled="true"`, su nombre accesible termina en «, cerrado» y se muestra
   tachado
 
-#### Scenario: Más allá del máximo de anticipación
-- **WHEN** las zonas admiten 30 y 60 días de anticipación y se inspecciona el día 61 contando
+#### Scenario: Más allá del último día elegible
+- **WHEN** las zonas admiten 30 y 60 días de anticipación y se inspecciona el día 60 contando
   desde hoy
 - **THEN** tiene `aria-disabled="true"` y su nombre accesible termina en «, no disponible»
-- **AND** el día 60 contando desde hoy, si su día de la semana tiene turnos, es elegible
+- **AND** el día 59 contando desde hoy, si su día de la semana tiene turnos, es elegible
+
+#### Scenario: El último día elegible se acepta a cualquier hora
+- **WHEN** son las 10:00 en Argentina, las zonas admiten hasta 60 días y se elige el día 59
+  contando desde hoy para el turno de las 20:00
+- **THEN** el servidor no responde `ANTICIPACION_MAXIMA` (el margen es de 59 días y 10 horas)
+- **AND** el mismo turno el día 60 sí lo respondería (60 días y 10 horas), por lo que ese día no se
+  ofrece
 
 #### Scenario: Activar un día no elegible no elige nada
 - **WHEN** la persona activa un día no elegible
