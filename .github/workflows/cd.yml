@@ -1,0 +1,310 @@
+name: CD
+
+# Despliegue continuo a la instancia EC2 de producción (D4 de
+# openspec/changes/despliegue-continuo-ec2/design.md; runbook en docs/despliegue.md).
+#
+# - Automático: cuando el workflow CI termina en verde sobre un push a main.
+# - Manual (workflow_dispatch): `modo=despliegue` con los mismos controles que el automático, o
+#   `modo=vuelta-atras` a un SHA ya desplegado con éxito (sin reconstruir nada).
+#
+# Seguridad:
+# - El despliegue entra por SSH con una clave dedicada, guardada como secret del environment
+#   `produccion` (restringido a main) y usada solo en el job `desplegar`. En el servidor esa
+#   clave tiene un comando forzado (deploy/ssh-entrada.sh): solo puede pedir un despliegue o
+#   una vuelta atrás con un SHA y dos digests validados, nada más. Sin claves de AWS.
+# - La identidad del servidor se verifica con SSH_KNOWN_HOSTS (StrictHostKeyChecking=yes).
+# - Permisos mínimos por job y acciones de terceros fijadas por SHA de commit.
+# - Los inputs del usuario llegan a los pasos por variables de entorno, nunca interpolados en
+#   el código de un `run`.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: SHA completo del commit de main (40 caracteres hexadecimales en minúscula)
+        required: true
+        type: string
+      modo:
+        description: despliegue (mismos controles que el automático) o vuelta-atras (a un SHA ya desplegado)
+        required: true
+        type: choice
+        options: [despliegue, vuelta-atras]
+        default: despliegue
+
+permissions: {}
+
+# Sin `concurrency` (D4). Un grupo de concurrencia deja UNA sola ejecución en espera y la más
+# nueva en llegar reemplaza a la que esperaba, por orden de llegada y no de commit: el CI de un
+# commit viejo que termina tarde cancelaría la ejecución pendiente del commit más nuevo (que
+# quedaría sin desplegar) o una vuelta atrás manual. La exclusión mutua la da el servidor:
+# `desplegar.sh` toma un `flock` y los despliegues esperan su turno; y si llega un commit
+# anterior al que ya está sirviendo, `desplegar.sh` lo saltea como «versión superada».
+
+jobs:
+  decidir:
+    name: Decidir si se despliega
+    # Por workflow_run, solo un CI en verde de un push a main de este mismo repositorio.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      desplegar: ${{ steps.decision.outputs.desplegar }}
+      sha: ${{ steps.datos.outputs.sha }}
+      modo: ${{ steps.datos.outputs.modo }}
+    steps:
+      - name: Datos del pedido
+        id: datos
+        env:
+          SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.sha || github.event.workflow_run.head_sha }}
+          MODO: ${{ github.event_name == 'workflow_dispatch' && inputs.modo || 'despliegue' }}
+        run: |
+          # El SHA solo se pasa a las salidas si tiene el formato correcto; la decisión
+          # rechaza cualquier otro valor.
+          if [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then echo "sha=$SHA" >> "$GITHUB_OUTPUT"; fi
+          if [[ "$MODO" =~ ^(despliegue|vuelta-atras)$ ]]; then echo "modo=$MODO" >> "$GITHUB_OUTPUT"; fi
+
+      # La función de decisión sale siempre de main, no de la rama desde la que se despachó.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Decidir (scripts/cd/decidir-despliegue.mjs)
+        id: decision
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENTO: ${{ github.event_name }}
+          SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.sha || github.event.workflow_run.head_sha }}
+          MODO: ${{ github.event_name == 'workflow_dispatch' && inputs.modo || 'despliegue' }}
+        run: node scripts/cd/decidir.mjs
+
+  imagenes:
+    name: Imágenes en GHCR
+    needs: decidir
+    # En una vuelta atrás no se construye ni se consulta nada: los digests salen del
+    # historial de la instancia.
+    if: needs.decidir.outputs.desplegar == 'true' && needs.decidir.outputs.modo == 'despliegue'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest-backend: ${{ steps.backend.outputs.digest }}
+      digest-frontend: ${{ steps.frontend.outputs.digest }}
+    env:
+      SHA: ${{ needs.decidir.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decidir.outputs.sha }}
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Nombres de las imágenes y tags ya publicados
+        id: existentes
+        run: |
+          registro="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          echo "registro=$registro" >> "$GITHUB_OUTPUT"
+          # Un tag publicado no se sobrescribe (D3): si ya existe, se usa su digest, pero solo si
+          # la imagen declara que se construyó de este commit. Quien tuviera permiso de push
+          # podría publicar `reservas-backend:<sha>` con otro contenido antes que el CD, y sin
+          # esta comprobación el CD desplegaría ese digest. La etiqueta la pone este mismo
+          # workflow al construir (`org.opencontainers.image.revision`).
+          for imagen in backend frontend; do
+            referencia="$registro/reservas-$imagen:$SHA"
+            # Una sola consulta al registro: el digest y la etiqueta salen de la misma lectura
+            # del tag, así que no puede cambiar entre una y otra. Solo «no encontrado» cuenta
+            # como imagen ausente (se construye); cualquier otro error del registro (red,
+            # autenticación, límite de tasa) corta el job en lugar de reconstruir encima de un
+            # tag que quizá ya existe.
+            if ! consulta="$(docker buildx imagetools inspect "$referencia" --format '{{json .}}' 2> "$RUNNER_TEMP/imagetools.err")"; then
+              if grep -Eiq 'not found|MANIFEST_UNKNOWN|NAME_UNKNOWN|404' "$RUNNER_TEMP/imagetools.err"; then
+                continue
+              fi
+              echo "::error title=No se pudo consultar el registro::$referencia: $(head -c 300 "$RUNNER_TEMP/imagetools.err" | paste -sd' ' -). No se reconstruye sin saber si el tag ya existe."
+              exit 1
+            fi
+            {
+              # `{{json .}}` serializa con las claves en minúscula (`manifest.digest`), no con
+              # los nombres de los campos de Go (`.Manifest.Digest` da vacío).
+              digest="$(jq -r '.manifest.digest // empty' <<< "$consulta")"
+              revision="$(jq -r '[.. | objects | select(has("Labels")) | .Labels["org.opencontainers.image.revision"] // empty] | first // ""' <<< "$consulta")"
+              [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error title=Respuesta inesperada del registro::$referencia no devolvió un digest válido."; exit 1; }
+              if [ "$revision" != "$SHA" ]; then
+                echo "::error title=Imagen con un tag que no le corresponde::$referencia ya existe, pero declara revision='$revision' y no '$SHA'. No se despliega ni se sobrescribe: revisar quién publicó el tag."
+                exit 1
+              fi
+              echo "$imagen=$digest" >> "$GITHUB_OUTPUT"
+              echo "::notice title=Imagen ya publicada::reservas-$imagen:$SHA ya existe ($digest) y declara este commit; no se reconstruye."
+            }
+          done
+
+      - name: Construir y publicar el backend
+        id: build-backend
+        if: steps.existentes.outputs.backend == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.existentes.outputs.registro }}/reservas-backend:${{ needs.decidir.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.decidir.outputs.sha }}
+
+      - name: Construir y publicar el frontend
+        id: build-frontend
+        if: steps.existentes.outputs.frontend == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: NEXT_PUBLIC_API_URL=http://backend:3001
+          tags: ${{ steps.existentes.outputs.registro }}/reservas-frontend:${{ needs.decidir.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.decidir.outputs.sha }}
+
+      - name: Digest del backend
+        id: backend
+        env:
+          EXISTENTE: ${{ steps.existentes.outputs.backend }}
+          CONSTRUIDO: ${{ steps.build-backend.outputs.digest }}
+        run: |
+          digest="${EXISTENTE:-$CONSTRUIDO}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest del backend inválido: '$digest'"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Digest del frontend
+        id: frontend
+        env:
+          EXISTENTE: ${{ steps.existentes.outputs.frontend }}
+          CONSTRUIDO: ${{ steps.build-frontend.outputs.digest }}
+        run: |
+          digest="${EXISTENTE:-$CONSTRUIDO}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest del frontend inválido: '$digest'"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+  desplegar:
+    name: Desplegar en la instancia (SSH)
+    needs: [decidir, imagenes]
+    # `imagenes` se saltea en una vuelta atrás; en un despliegue tiene que haber terminado bien.
+    if: >-
+      always() &&
+      needs.decidir.outputs.desplegar == 'true' &&
+      (needs.imagenes.result == 'success' ||
+       (needs.decidir.outputs.modo == 'vuelta-atras' && needs.imagenes.result == 'skipped'))
+    runs-on: ubuntu-latest
+    environment: produccion
+    permissions:
+      contents: read
+    env:
+      SHA: ${{ needs.decidir.outputs.sha }}
+      MODO: ${{ needs.decidir.outputs.modo }}
+      # Vacíos en una vuelta atrás: desplegar.sh usa los del historial.
+      DIGEST_BACKEND: ${{ needs.imagenes.outputs.digest-backend }}
+      DIGEST_FRONTEND: ${{ needs.imagenes.outputs.digest-frontend }}
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+    steps:
+      - name: Verificar los secrets del environment
+        run: |
+          faltan=()
+          [ -n "$SERVER_HOST" ] || faltan+=(SERVER_HOST)
+          [ -n "$SERVER_USER" ] || faltan+=(SERVER_USER)
+          [ -n "$SERVER_PORT" ] || faltan+=(SERVER_PORT)
+          [ -n "$SSH_PRIVATE_KEY" ] || faltan+=(SSH_PRIVATE_KEY)
+          [ -n "$SSH_KNOWN_HOSTS" ] || faltan+=(SSH_KNOWN_HOSTS)
+          if [ "${#faltan[@]}" -gt 0 ]; then
+            echo "::error title=Servidor sin configurar::Faltan los secrets ${faltan[*]} del environment produccion. Ver docs/despliegue.md."
+            exit 1
+          fi
+          # Formatos: evitan que un valor mal copiado llegue a ssh como una opción.
+          [[ "$SERVER_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$ ]] || { echo "::error title=SERVER_HOST inválido::Tiene que ser una IP o un nombre de dominio, sin espacios ni caracteres especiales."; exit 1; }
+          [[ "$SERVER_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "::error title=SERVER_USER inválido::Tiene que ser un nombre de usuario de Linux (por ejemplo deploy)."; exit 1; }
+          [[ "$SERVER_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$SERVER_PORT))" -ge 1 ] && [ "$((10#$SERVER_PORT))" -le 65535 ] || { echo "::error title=SERVER_PORT inválido::Tiene que ser un número de puerto entre 1 y 65535 (por ejemplo 22)."; exit 1; }
+
+      - name: Ejecutar el despliegue en el servidor
+        run: |
+          umask 077
+          directorio="$(mktemp -d "$RUNNER_TEMP/ssh.XXXXXX")"
+          trap 'rm -rf "$directorio"' EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$directorio/clave"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$directorio/known_hosts"
+
+          # Un único argumento: <sha> <digestBackend> <digestFrontend> <modo>. Un digest vacío
+          # (vuelta atrás) viaja como `-`; deploy/ssh-entrada.sh lo traduce a vacío.
+          pedido="$SHA ${DIGEST_BACKEND:--} ${DIGEST_FRONTEND:--} $MODO"
+
+          # El código de salida de ssh es el de desplegar.sh (0 desplegado, 1 falló, 2 pedido
+          # rechazado) o 255 si no se pudo conectar. StrictHostKeyChecking=yes con el
+          # known_hosts del secret: si cambia la clave del servidor, falla en vez de confiar.
+          set +e
+          timeout 30m ssh \
+            -i "$directorio/clave" -p "$SERVER_PORT" \
+            -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$directorio/known_hosts" \
+            -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+            "$SERVER_USER@$SERVER_HOST" "$pedido"
+          estado=$?
+          set -e
+
+          # 3 = versión superada: un commit anterior al que ya está sirviendo. No es un error (el
+          # job termina en verde) pero tampoco se desplegó nada: el resumen lo dice.
+          if [ "$estado" -eq 3 ]; then
+            echo "::notice title=Versión superada::$SHA es anterior a la versión en servicio: no se cambió nada en producción."
+            {
+              echo "### No se desplegó: versión superada"
+              echo
+              echo "- SHA: \`$SHA\`"
+              echo "- Producción conserva la versión más nueva que ya estaba sirviendo."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$estado" -ne 0 ]; then
+            case "$estado" in
+              255) detalle="No se pudo conectar o la clave del servidor no coincide con SSH_KNOWN_HOSTS." ;;
+              124) detalle="Pasaron 30 minutos y el cliente cortó la conexión. El despliegue en el servidor NO se interrumpe (desplegar.sh ignora el corte y termina, o vuelve atrás por su cuenta): ver /var/log/reservas-despliegue.log y no relanzar hasta que termine; un despliegue nuevo espera su turno en el lock." ;;
+              2) detalle="El servidor rechazó el pedido (formato inválido)." ;;
+              *) detalle="desplegar.sh terminó con código $estado. Si dice VUELTA ATRÁS, producción sigue en la versión anterior." ;;
+            esac
+            echo "::error title=Despliegue fallido::$detalle"
+            exit 1
+          fi
+          {
+            echo "### Desplegado en producción"
+            echo
+            echo "- Modo: \`$MODO\`"
+            echo "- SHA: \`$SHA\`"
+            if [ -n "$DIGEST_BACKEND" ]; then
+              echo "- Backend: \`$DIGEST_BACKEND\`"
+              echo "- Frontend: \`$DIGEST_FRONTEND\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
