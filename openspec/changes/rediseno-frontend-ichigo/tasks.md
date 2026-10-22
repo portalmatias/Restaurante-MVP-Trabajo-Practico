@@ -27,7 +27,7 @@ desde cero.
 
 ## 2. Desvíos conocidos entre el prototipo y la spec (prueba primero, después arreglo)
 
-- [ ] 2.1 `identidad-visual-ichigo`, «Tipografías auto-hosteadas»: escribir un test de Jest que
+- [x] 2.1 `identidad-visual-ichigo`, «Tipografías auto-hosteadas»: escribir un test de Jest que
       falle si algún archivo de `frontend/app` o `frontend/src` contiene `next/font/google`
       (hoy falla por `app/global-error.tsx`). Luego migrar `global-error.tsx` a
       `next/font/local` con los mismos archivos de `src/fonts/` y comprobar que el test pasa.
@@ -37,16 +37,16 @@ desde cero.
       `aria-label` tapa). Ajustar el componente: `aria-disabled="true"` en lugar de `disabled`,
       sin `aria-pressed`, nombre accesible «20:00 a 23:30, completo» compuesto por el componente,
       ignorar la activación y seguir en el orden de tabulación.
-- [ ] 2.3 `movimiento-ui`: `globals.css` declara `@keyframes tablilla-dar-vuelta` y
+- [x] 2.3 `movimiento-ui`: `globals.css` declara `@keyframes tablilla-dar-vuelta` y
       `tablilla-fundido` sin usarlos, y su comentario dice que con `prefers-reduced-motion` «se
       cambia de cara con un fundido corto» (la spec exige cambio instantáneo). Eliminarlos (el
       giro es una `transition`), corregir el comentario y comprobar con `git grep` que nada los
       referencia.
-- [ ] 2.4 `identidad-visual-ichigo`, «Contrastes»: corregir el comentario de `globals.css` que
+- [x] 2.4 `identidad-visual-ichigo`, «Contrastes»: corregir el comentario de `globals.css` que
       indica 3,7:1 para `border` sobre `background` (medido 3,66:1) y el que indica 2,5:1 para
       el rojo sobre madera (medido 2,0:1 con `#9A2A19`, el único rojo de la paleta: `#B2321F` no
       es un token de esta spec ni de `globals.css`).
-- [ ] 2.5 `landing-ichigo`: las acciones de la landing se mantienen en infinitivo («Reservar una
+- [x] 2.5 `landing-ichigo`: las acciones de la landing se mantienen en infinitivo («Reservar una
       mesa», «Ya tengo un código», «Elegir fecha y turno») por decisión expresa del equipo. No
       requiere cambios en `app/page.tsx`: agregar un test que fije esos textos y que compruebe
       que los títulos y textos explicativos usan voseo y ninguno usa tuteo.

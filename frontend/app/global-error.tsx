@@ -1,27 +1,34 @@
 "use client";
 
-import { Shippori_Mincho, Zen_Kaku_Gothic_New } from "next/font/google";
+import localFont from "next/font/local";
 import { useEffect } from "react";
 import { PantallaDeEstado } from "../src/components/reservas/pantalla-de-estado";
 import { Button } from "../src/components/ui/button";
 import "./globals.css";
 
 // Reemplaza al layout raíz cuando éste falla: define `<html>` y `<body>` y vuelve a declarar las
-// fuentes (next/font las reutiliza). No lleva la cabecera, que es parte del layout que falló.
-const mincho = Shippori_Mincho({
+// fuentes con los mismos archivos locales de src/fonts (next/font las reutiliza). No lleva la
+// cabecera, que es parte del layout que falló.
+const mincho = localFont({
   variable: "--font-mincho",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "700"],
   display: "swap",
   preload: false,
+  src: [
+    { path: "../src/fonts/mincho-400.woff", weight: "400", style: "normal" },
+    { path: "../src/fonts/mincho-500.woff", weight: "500", style: "normal" },
+    { path: "../src/fonts/mincho-700.woff", weight: "700", style: "normal" },
+  ],
 });
 
-const gothic = Zen_Kaku_Gothic_New({
+const gothic = localFont({
   variable: "--font-gothic",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "700"],
   display: "swap",
   preload: false,
+  src: [
+    { path: "../src/fonts/gothic-400.woff", weight: "400", style: "normal" },
+    { path: "../src/fonts/gothic-500.woff", weight: "500", style: "normal" },
+    { path: "../src/fonts/gothic-700.woff", weight: "700", style: "normal" },
+  ],
 });
 
 export default function GlobalError({

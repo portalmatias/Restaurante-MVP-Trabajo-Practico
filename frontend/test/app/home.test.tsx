@@ -28,4 +28,28 @@ describe("Landing (/)", () => {
 
     expect(screen.getByText("Elegí fecha, turno, zona y cantidad de comensales.")).toBeInTheDocument();
   });
+
+  // Tarea 2.5 (landing-ichigo): las acciones van en infinitivo por decisión del equipo; los
+  // títulos y textos explicativos, en voseo y nunca en tuteo.
+  it.each([
+    ["Reservar una mesa", "/reservas"],
+    ["Ya tengo un código", "/reservas/consultar"],
+    ["Elegir fecha y turno", "/reservas/nueva"],
+  ])("la acción «%s» queda en infinitivo y lleva a %s", (nombre, destino) => {
+    render(<Home />);
+
+    expect(screen.getByRole("link", { name: nombre })).toHaveAttribute("href", destino);
+  });
+
+  it("los textos usan voseo y ninguno usa tuteo", () => {
+    const { container } = render(<Home />);
+    const texto = container.textContent ?? "";
+
+    for (const voseo of ["Dejás", "Reservá", "confiá", "Avisanos", "Elegís", "Elegí", "Dejá", "Guardá", "necesitás"]) {
+      expect(texto).toContain(voseo);
+    }
+    expect(texto).not.toMatch(
+      /\b(tienes|puedes|quieres|necesitas|recibes|eliges|dejas|elige|deja|guarda|confía|avísanos|reserva tu)\b/i,
+    );
+  });
 });

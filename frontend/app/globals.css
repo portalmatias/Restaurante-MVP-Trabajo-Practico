@@ -23,10 +23,10 @@
  *   foreground (#1F1813) sobre background (#E8DCC4)     12,9:1
  *   muted-foreground (#5C4630) sobre background          6,5:1
  *   accent (#9A2A19, texto del sello) sobre background   5,7:1  y sobre card 6,5:1
- *   border (#8A6A43) sobre background                    3,7:1  (mínimo de bordes de controles: 3:1)
+ *   border (#8A6A43) sobre background                    3,66:1 (mínimo de bordes de controles: 3:1)
  *   primary-foreground (#F3EBDA) sobre primary (#1F1813) 14,8:1
- * El rojo del sello NUNCA va como texto sobre madera oscura (2,5:1): solo como relleno con
- * texto hinoki claro (5,3:1).
+ * El rojo del sello (#9A2A19, el único rojo de la paleta) NUNCA va como texto sobre madera
+ * oscura (2,02:1): solo como relleno con texto hinoki claro (6,51:1).
  */
 :root {
   color-scheme: light;
@@ -148,27 +148,10 @@ body::before {
 }
 
 /*
- * Movimiento firma: la tablilla gira al elegirla. Con `prefers-reduced-motion` no hay giro:
- * se cambia de cara con un fundido corto.
+ * Movimiento firma: la tablilla gira al descartarla o completarla (una `transition` de
+ * `transform` en el componente). Con `prefers-reduced-motion` la regla de abajo deja la
+ * transición en 0,01 ms: el cambio de cara es instantáneo, sin giro ni fundido.
  */
-@keyframes tablilla-dar-vuelta {
-  from {
-    transform: rotateY(0deg);
-  }
-  to {
-    transform: rotateY(180deg);
-  }
-}
-
-@keyframes tablilla-fundido {
-  from {
-    opacity: 0.4;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
