@@ -1,0 +1,381 @@
+## Purpose
+
+Define cómo una versión aprobada de `main` llega a producción en un único servidor. Cubre qué
+superficie de red queda expuesta, cómo se protegen los secretos y las credenciales, con qué
+datos arranca producción, cómo se identifica al cliente para los límites de solicitudes y cómo
+se vuelve a una versión anterior.
+
+## ADDED Requirements
+
+### Requirement: Despliegue automático solo desde main con CI en verde
+El sistema SHALL desplegar a producción, sin intervención manual, el commit más reciente de
+`main` cuyo CI haya terminado en verde. Si llegan varios commits seguidos, SHALL desplegar el
+último que tenga el CI en verde y MAY omitir los intermedios. Un commit verde SHALL omitirse
+solo si un commit posterior de `main` también tiene el CI en verde. SHALL NOT desplegar commits
+de otras ramas, de pull requests ni de forks, ni un commit cuyo CI haya fallado o se haya
+cancelado, tampoco a pedido manual. SHALL NOT reemplazar la versión en producción por una más
+vieja, salvo una vuelta atrás pedida explícitamente.
+
+#### Scenario: Merge a main con CI en verde
+- **WHEN** se mergea un pull request a `main` y el CI de ese commit termina en verde
+- **THEN** se inicia el despliegue de ese commit a producción
+- **AND** al terminar, producción sirve la versión de ese commit
+
+#### Scenario: CI en rojo sobre main
+- **WHEN** el CI de un commit de `main` falla o se cancela
+- **THEN** no se inicia ningún despliegue
+- **AND** producción sigue sirviendo la versión anterior
+
+#### Scenario: Pull request o rama que no es main
+- **WHEN** el CI corre sobre un pull request (incluido uno desde un fork) o sobre otra rama
+- **THEN** no se inicia ningún despliegue y el workflow no recibe la clave SSH ni se conecta al
+  servidor
+
+#### Scenario: Dos merges seguidos
+- **WHEN** se mergean dos commits a `main` mientras el primero todavía se está desplegando
+- **THEN** los despliegues corren de a uno, sin superponerse
+- **AND** producción termina sirviendo el commit más reciente
+- **AND** ninguna ejecución se cancela por la llegada de otra: la espera la resuelve el servidor
+
+#### Scenario: Despliegue anterior que llega después de uno más nuevo
+- **WHEN** el despliegue de un commit anterior llega al servidor después de que el de un commit
+  más nuevo ya quedó sirviendo
+- **THEN** el servidor lo saltea como versión superada y producción conserva el más nuevo
+- **AND** el script sale con un código propio (3), que no es un error: el job termina en verde y
+  su resumen dice «No se desplegó: versión superada», sin afirmar que se desplegó
+
+#### Scenario: Redespliegue del mismo commit
+- **WHEN** se despliega el mismo SHA que ya está sirviendo, por ejemplo después de cambiar un
+  valor del `.env`
+- **THEN** el servidor no lo saltea: regenera la configuración y recrea lo que cambió
+
+#### Scenario: CI viejo que termina después de uno nuevo
+- **WHEN** el CI de un commit termina en verde después de que un commit posterior de `main` ya
+  tiene el CI en verde
+- **THEN** no se despliega el commit viejo
+- **AND** el workflow informa que la versión fue superada
+
+#### Scenario: Commit posterior con CI en rojo o todavía corriendo
+- **WHEN** el CI de un commit termina en verde y el único commit posterior de `main` tiene el
+  CI en rojo o todavía no terminó
+- **THEN** se despliega el commit verde
+- **AND** si el posterior termina después en verde, se despliega también
+
+#### Scenario: Despliegue manual de un commit no válido
+- **WHEN** alguien pide a mano un despliegue (no una vuelta atrás) de un commit que no está en
+  `main`, cuyo CI no terminó en verde, o que es más viejo que otro commit verde de `main`
+- **THEN** el pedido se rechaza sin modificar producción
+
+### Requirement: Versiones trazables e inmutables
+Cada despliegue SHALL corresponder a un único commit de `main`, identificado por su SHA
+completo. Los artefactos que se despliegan SHALL identificarse por su contenido (digest), no
+solo por un nombre que se pueda volver a publicar. El servidor SHALL registrar qué artefactos
+exactos corresponden a cada SHA desplegado, de modo que desplegar o volver a la misma versión
+ejecute exactamente lo mismo.
+
+#### Scenario: Identificar qué versión está en producción
+- **WHEN** alguien del equipo necesita saber qué versión corre en producción
+- **THEN** el último despliegue exitoso del workflow de CD informa el SHA desplegado
+- **AND** en el servidor queda registrado el mismo SHA
+
+#### Scenario: Tag vuelto a publicar
+- **WHEN** alguien vuelve a publicar la imagen de un SHA ya desplegado con otro contenido y
+  después se vuelve a esa versión
+- **THEN** el servidor usa los artefactos registrados para ese SHA, no los del tag nuevo
+
+#### Scenario: Tag publicado antes del despliegue con otro origen
+- **WHEN** el tag `:<sha>` ya existe en el registro y la imagen no declara ese SHA como su
+  revisión
+- **THEN** el job de imágenes falla y no se despliega ni se sobrescribe nada
+
+#### Scenario: Despliegue con un identificador inválido
+- **WHEN** el procedimiento de despliegue recibe un valor que no es un SHA completo de commit
+- **THEN** lo rechaza sin modificar nada en el servidor
+
+### Requirement: Verificación posterior y vuelta atrás automática
+Después de levantar una versión nueva, el despliegue SHALL comprobar que la aplicación
+responde a través del proxy de borde, tanto la página pública como una consulta a la API. Si
+la comprobación falla, SHALL volver a levantar la versión anterior y el workflow SHALL
+terminar en error. La vuelta atrás restaura el código, las imágenes y la configuración, pero
+NO el schema de la base de datos: por eso las migraciones SHALL ser compatibles con la versión
+anterior de la aplicación (cambios aditivos; un cambio que quita o renombra algo se hace en dos
+versiones, primero agregando y recién después retirando lo viejo).
+
+#### Scenario: Versión nueva sana
+- **WHEN** la versión nueva responde a la comprobación dentro del tiempo límite
+- **THEN** el despliegue termina en verde y la versión nueva queda registrada como actual
+
+#### Scenario: Versión nueva que no responde
+- **WHEN** la versión nueva no responde a la comprobación dentro del tiempo límite
+- **THEN** el servidor vuelve a levantar la versión anterior
+- **AND** el workflow de CD termina en error, indicando que hubo vuelta atrás
+
+#### Scenario: Vuelta atrás a la versión que estaba sirviendo
+- **WHEN** falla la comprobación de una versión nueva
+- **THEN** el servidor vuelve a la versión que estaba sirviendo justo antes de ese intento, no
+  a una más vieja
+
+#### Scenario: Vuelta atrás después de una migración
+- **WHEN** una versión nueva aplicó una migración y después no responde a la comprobación
+- **THEN** el servidor vuelve a levantar la versión anterior, que tiene que seguir
+  funcionando con el schema ya migrado
+- **AND** la documentación indica que una migración que quita o renombra algo no se publica
+  junto con el código que deja de usarlo, y que antes de una migración riesgosa se exporta la
+  base con `pg_dump`
+
+#### Scenario: Cambio de etapa que no se puede completar
+- **WHEN** se cambia `SITE_ADDRESS` para pasar a HTTPS y el proxy de borde no obtiene el
+  certificado dentro del tiempo límite
+- **THEN** el servidor vuelve a la versión y a la etapa que estaban sirviendo
+- **AND** el workflow termina en error indicando la vuelta atrás
+
+#### Scenario: Vuelta atrás manual
+- **WHEN** el equipo necesita volver a una versión anterior ya desplegada
+- **THEN** la documentación indica cómo pedir esa vuelta atrás, que no reconstruye nada
+- **AND** solo se acepta un SHA que figure entre las versiones desplegadas con éxito
+
+### Requirement: Migraciones antes de servir la versión nueva
+El despliegue SHALL aplicar las migraciones de base de datos versionadas del commit antes de
+que la versión nueva empiece a atender solicitudes. Si una migración falla, el despliegue
+SHALL detenerse sin levantar la versión nueva.
+
+#### Scenario: Commit con una migración nueva
+- **WHEN** se despliega un commit que agrega una migración
+- **THEN** la migración se aplica antes de que el backend nuevo atienda solicitudes
+
+#### Scenario: Migración que falla
+- **WHEN** una migración falla durante el despliegue
+- **THEN** la versión nueva no se levanta, la anterior sigue atendiendo y el workflow termina
+  en error
+
+### Requirement: Superficie de red mínima
+Desde internet, el servidor de producción SHALL aceptar conexiones únicamente en los puertos
+HTTP y HTTPS del proxy de borde y en el puerto SSH que usa el despliegue. Mientras producción
+esté en la etapa HTTP, SHALL aceptar las conexiones HTTP y HTTPS solo desde las direcciones del
+equipo (el puerto SSH queda abierto en las dos etapas, porque los servidores de GitHub Actions
+no tienen una dirección fija). La base de datos, el backend y el frontend SHALL NOT aceptar
+conexiones directas desde fuera del servidor. El acceso por SSH SHALL aceptar solo
+autenticación por clave y SHALL rechazar el ingreso del usuario `root`.
+
+#### Scenario: Conexión directa a la base de datos
+- **WHEN** desde internet se intenta conectar al puerto de PostgreSQL de la IP pública
+- **THEN** la conexión no se establece
+
+#### Scenario: Conexión directa al backend o al frontend
+- **WHEN** desde internet se intenta conectar a los puertos internos del backend o del
+  frontend en la IP pública
+- **THEN** la conexión no se establece
+
+#### Scenario: SSH con contraseña
+- **WHEN** desde internet se intenta abrir una sesión SSH con una contraseña, o como `root`
+- **THEN** el servidor rechaza la autenticación
+
+#### Scenario: Puertos distintos de los previstos
+- **WHEN** desde internet se intenta conectar a cualquier puerto de la IP pública que no sea el
+  de HTTP, el de HTTPS ni el de SSH
+- **THEN** la conexión no se establece
+
+#### Scenario: Acceso de un tercero en la etapa HTTP
+- **WHEN** en la etapa HTTP alguien fuera de las direcciones del equipo intenta conectarse al
+  puerto HTTP
+- **THEN** la conexión no se establece
+
+#### Scenario: Acceso normal
+- **WHEN** un cliente abre la dirección pública de producción (en la etapa HTTPS, cualquier
+  cliente; en la etapa HTTP, un cliente con una dirección del equipo)
+- **THEN** recibe la aplicación servida a través del proxy de borde
+
+### Requirement: Secretos fuera del repositorio, las imágenes y los logs
+Los secretos de producción (secreto del JWT, contraseña de la base de datos y credenciales del
+admin) SHALL guardarse solo en un archivo del servidor de producción, sobre un disco cifrado, y
+SHALL NOT pasar por GitHub. SHALL NOT aparecer en el repositorio, en las imágenes de
+contenedor, en los argumentos del workflow ni en sus logs. En el servidor, el archivo que los
+contiene SHALL ser legible solo por el administrador del sistema, y el despliegue SHALL
+negarse a continuar si no lo es o si falta alguno de los valores requeridos. El procedimiento
+de despliegue SHALL NOT modificar ese archivo.
+
+#### Scenario: Inspeccionar una imagen publicada
+- **WHEN** alguien descarga una imagen publicada y revisa su sistema de archivos, sus capas y
+  su configuración
+- **THEN** no encuentra ningún archivo `.env` ni ningún secreto de producción
+
+#### Scenario: Revisar los logs del workflow de CD
+- **WHEN** alguien con acceso de lectura al repositorio revisa los logs de un despliegue
+- **THEN** no encuentra ningún secreto de producción ni la clave SSH del despliegue
+
+#### Scenario: Archivo de secretos con permisos abiertos o incompleto
+- **WHEN** se pide un despliegue y el archivo de secretos es legible por otros usuarios, o falta
+  alguno de los valores requeridos
+- **THEN** el despliegue termina en error sin modificar nada en el servidor
+- **AND** el mensaje de error no incluye ningún valor del archivo
+
+### Requirement: Sin credenciales de AWS al alcance de los contenedores
+La instancia de producción SHALL NOT tener un rol de AWS asociado, y los contenedores de la
+aplicación SHALL NOT poder obtener credenciales de AWS por el servicio de metadatos de la
+instancia.
+
+#### Scenario: Contenedor que consulta los metadatos de la instancia
+- **WHEN** desde cualquier contenedor se pide un token o credenciales al servicio de metadatos
+  de la instancia
+- **THEN** la solicitud no obtiene respuesta ni credenciales
+
+### Requirement: Credencial de despliegue acotada
+El workflow de CD SHALL conectarse al servidor por SSH con una clave dedicada a ese único uso,
+guardada como secreto de GitHub accesible solo para el workflow de despliegue sobre `main`.
+GitHub SHALL NOT guardar credenciales de AWS. El servidor SHALL aceptar esa clave solo para
+ejecutar el procedimiento de despliegue con un SHA de commit y, en un despliegue, dos digests de
+imagen bien formados; SHALL rechazar cualquier otro pedido, sin abrir una shell, sin ejecutar
+comandos arbitrarios y sin reenvío de puertos. El workflow SHALL verificar la identidad del
+servidor con una huella fijada antes de presentarle la clave.
+
+#### Scenario: Ejecución desde otra rama o desde un fork
+- **WHEN** un workflow que no corre sobre `main` en el entorno de producción intenta usar la
+  clave de despliegue
+- **THEN** GitHub no le entrega el secreto
+
+#### Scenario: Uso de la clave para otra acción
+- **WHEN** con la clave del despliegue se intenta abrir una shell, ejecutar un comando
+  distinto del procedimiento de despliegue, reenviar un puerto o pasar un SHA o un digest mal
+  formado
+- **THEN** el servidor rechaza el pedido sin ejecutar nada
+
+#### Scenario: Servidor distinto del esperado
+- **WHEN** el workflow se conecta a un servidor cuya huella no coincide con la fijada
+- **THEN** la conexión se aborta sin presentar la clave y el workflow termina en error
+
+#### Scenario: Conexión cortada durante un despliegue
+- **WHEN** se corta la conexión entre el workflow y el servidor mientras se despliega
+- **THEN** el servidor termina el despliegue en curso (o su vuelta atrás) igual
+- **AND** el resultado queda registrado en el servidor
+
+### Requirement: Datos iniciales y admin propios de producción
+Producción SHALL arrancar con el catálogo necesario para operar (zonas, mesas, turnos y
+configuración de negocio) y sin reservas de ejemplo. La cuenta de admin de producción SHALL
+crearse con credenciales provistas como secretos de producción y SHALL NOT poder usar las
+credenciales documentadas en el README para el entorno de desarrollo. Cargar los datos
+iniciales SHALL ser idempotente, SHALL NOT sobrescribir la contraseña de un admin existente y
+SHALL NOT revertir cambios que el administrador hizo después sobre el catálogo (reglas de zona,
+aforo, mesas y turnos): un despliegue solo carga lo que falta.
+
+#### Scenario: Login con las credenciales del README
+- **WHEN** alguien intenta loguearse en producción con el email y la contraseña de admin que
+  documenta el README
+- **THEN** el login falla con `401`
+
+#### Scenario: Login con las credenciales de producción
+- **WHEN** el admin se loguea con las credenciales guardadas como secreto de producción
+- **THEN** el login funciona
+
+#### Scenario: Catálogo modificado por el administrador
+- **WHEN** el administrador cambió una regla de zona, la capacidad de una mesa, un turno o el
+  aforo, y se despliega una versión nueva
+- **THEN** esos valores siguen como los dejó el administrador
+
+#### Scenario: Email de admin inválido
+- **WHEN** el email de admin provisto para producción no tiene formato de email válido
+- **THEN** la carga de datos iniciales se detiene con un error y no crea la cuenta
+
+#### Scenario: Contraseña de admin débil
+- **WHEN** la contraseña de admin provista para producción tiene menos de 16 caracteres o
+  coincide con la del entorno de desarrollo
+- **THEN** la carga de datos iniciales se detiene con un error y no crea la cuenta
+
+#### Scenario: Despliegue repetido
+- **WHEN** se despliega una versión nueva sobre una base que ya tiene datos
+- **THEN** no se duplican zonas, mesas ni turnos, y la contraseña del admin existente no
+  cambia
+
+#### Scenario: Sin reservas de ejemplo
+- **WHEN** se consulta la base de producción recién inicializada
+- **THEN** no hay reservas
+
+### Requirement: Datos persistentes entre despliegues
+Los datos de la base de producción SHALL conservarse a través de despliegues, vueltas atrás y
+reinicios del servidor.
+
+#### Scenario: Reserva creada antes de un despliegue
+- **WHEN** un cliente crea una reserva y después se despliega una versión nueva
+- **THEN** la reserva sigue consultable con su código y email
+
+#### Scenario: Reinicio del servidor
+- **WHEN** la instancia se reinicia
+- **THEN** la aplicación vuelve a responder sola, con los mismos datos
+
+### Requirement: Límites de solicitudes por IP real del cliente en producción
+En producción, el proxy de borde SHALL reemplazar cualquier `X-Forwarded-For` que mande el
+cliente por la IP de la conexión, y el backend SHALL confiar únicamente en el salto interno
+del frontend. Así, los límites de solicitudes se cuentan por la IP real de cada cliente y un
+cliente no puede falsificarla.
+
+#### Scenario: Dos clientes distintos
+- **WHEN** un cliente agota el límite de intentos de login en producción (en la etapa HTTP, los
+  dos clientes tienen direcciones del equipo, porque no se admite a nadie más)
+- **THEN** otro cliente, desde otra IP, puede seguir intentando loguearse y recibe `401`, no
+  `429`
+
+#### Scenario: Cliente que falsifica X-Forwarded-For
+- **WHEN** un cliente supera el límite de intentos de login mandando un `X-Forwarded-For`
+  distinto en cada intento
+- **THEN** recibe `429` en el mismo intento que si no hubiera mandado el encabezado
+
+### Requirement: HTTPS con el subdominio de producción
+Cuando el subdominio de producción apunte a la IP pública del servidor, el proxy de borde SHALL
+servir la aplicación por HTTPS con un certificado válido que obtiene y renueva solo. Un control
+automático SHALL avisar al equipo (con un issue) si el certificado está por vencer o deja de ser válido. SHALL
+redirigir a HTTPS toda solicitud HTTP que no sea la validación del certificado, y las
+respuestas por HTTPS SHALL incluir `Strict-Transport-Security`. Activar HTTPS SHALL ser un
+cambio de configuración, sin cambios de código en la aplicación. Los certificados SHALL
+conservarse entre despliegues y reinicios.
+
+#### Scenario: Acceso por el subdominio
+- **WHEN** un cliente abre `https://<subdominio>/`
+- **THEN** la conexión usa un certificado válido para ese nombre y recibe la aplicación
+- **AND** la respuesta incluye `Strict-Transport-Security`
+
+#### Scenario: Acceso por HTTP con el subdominio activo
+- **WHEN** un cliente abre `http://<subdominio>/reservas`
+- **THEN** recibe una redirección permanente a `https://<subdominio>/reservas`
+
+#### Scenario: Orden de activación
+- **WHEN** el equipo activa HTTPS siguiendo el runbook
+- **THEN** primero cambia `SITE_ADDRESS` y redespliega, y recién después abre los puertos 80 y
+  443 a internet
+- **AND** el login del admin no queda en HTTP abierto a internet en ningún momento
+
+#### Scenario: Certificado por vencer
+- **WHEN** al certificado de producción le quedan menos de 21 días de validez o deja de ser
+  válido
+- **THEN** el control automático falla y abre un issue en el repositorio (o comenta el que ya
+  está abierto), sin depender de la notificación de GitHub al creador del workflow
+
+#### Scenario: Control del certificado deshabilitado por inactividad
+- **WHEN** GitHub deshabilita el workflow programado tras 60 días sin actividad del
+  repositorio
+- **THEN** la documentación indica cómo detectarlo y volver a habilitarlo
+
+#### Scenario: Despliegue con el certificado ya emitido
+- **WHEN** se despliega una versión nueva o se reinicia la instancia
+- **THEN** el proxy de borde reutiliza el certificado guardado, sin pedir uno nuevo
+
+### Requirement: Etapa transitoria en HTTP documentada
+Mientras el subdominio no apunte al servidor, producción MAY servirse por HTTP en la IP
+pública. La documentación SHALL indicar el riesgo aceptado para esa etapa (las credenciales del
+admin, el JWT y los datos de contacto de las reservas viajan sin cifrar) y que en ella no se
+cargan datos reales. También SHALL indicar los pasos para activar HTTPS cuando el subdominio
+esté listo.
+
+#### Scenario: Consultar el estado de seguridad del despliegue
+- **WHEN** alguien del equipo o la docente lee la documentación de despliegue
+- **THEN** encuentra si producción está en la etapa HTTP o en HTTPS, qué datos quedan
+  expuestos en la etapa HTTP y cómo se activa HTTPS con el subdominio
+
+### Requirement: Encabezados de seguridad
+Todas las respuestas de producción SHALL incluir encabezados de seguridad básicos y SHALL NOT
+exponer la versión del servidor ni del framework.
+
+#### Scenario: Encabezados de seguridad
+- **WHEN** un cliente pide cualquier página de producción
+- **THEN** la respuesta incluye `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+  `Content-Security-Policy: frame-ancestors 'none'` (que impiden mostrar la app dentro de un
+  frame de otro sitio) y `Referrer-Policy: strict-origin-when-cross-origin`
+- **AND** no expone en los encabezados la versión del servidor ni del framework
