@@ -20,10 +20,19 @@ desde cero.
 - [x] 1.3 Correr `npm run lint` (desde la raíz: `eslint .` ya cubre `frontend/`; el workspace
       `frontend` no tiene script `lint`), `npm run typecheck -w frontend` y `npm test -w frontend`
       sobre la rama rebasada y anotar el resultado real en el PR.
-- [ ] 1.4 Revisar que ningún archivo de `frontend/` incluya `.env`, claves ni datos personales
+- [x] 1.4 Revisar que ningún archivo de `frontend/` incluya `.env`, claves ni datos personales
       (`config.yaml` §14), y que `frontend/.impeccable/` y `PRODUCT.md` (hoy solo en la rama
       `feature/diseno-frontend`) se versionen solo si el equipo lo decide (pregunta 5 de
       `design.md`).
+      Resultado (26/10/2026): sin hallazgos. Ningún archivo de `frontend/` versionado es un `.env`, una
+      clave ni un certificado; no hay patrones de secretos (`AKIA…`, `ghp_`, claves privadas, `JWT_SECRET=`)
+      ni en los archivos ni en el historial de todas las ramas (`git log --all -S…`); `.gitignore` ya
+      excluye `.env*`. Los únicos datos que parecen personales son ficticios: `ana.perez@example.com`,
+      `+54 9 11 5555-1234` y el admin del seed (`admin@restaurante-mvp.local`, documentado en el README).
+      `PRODUCT.md` y `.impeccable/surfaces/app-page-tsx.md` no traen secretos, rutas locales ni nombres
+      personales. Recomendación (la decisión sigue siendo del equipo, pregunta 5): versionarlos, porque
+      `globals.css` y `tablilla.tsx` los citan en sus comentarios y esta spec también; fuera del
+      repositorio esas referencias quedarían rotas.
 
 ## 2. Desvíos conocidos entre el prototipo y la spec (prueba primero, después arreglo)
 
@@ -183,24 +192,50 @@ desde cero.
 
 ## 5. Optimización y documentación
 
-- [ ] 5.1 Documentar en `frontend/src/fonts/` (un `LEEME` breve) cómo se generaron los
+- [x] 5.1 Documentar en `frontend/src/fonts/` (un `LEEME` breve) cómo se generaron los
       subconjuntos: herramienta, lista de caracteres incluidos y cómo regenerarlos. Probar a
       mano nombres con acentos y ñ en el flujo (por ejemplo, «Ñandú Pérez») para detectar
       caracteres que caen a la fuente del sistema.
+      Resultado (26/10/2026): `frontend/src/fonts/LEEME.md` describe cada archivo, su licencia y los
+      caracteres de cada subconjunto (332, 310 y 10), y dice que la herramienta y la lista originales no
+      quedaron registradas; trae una receta de `pyftsubset` marcada como propuesta (reproduce la misma
+      cobertura sobre los `.woff` actuales). En lugar de probar a mano, `tipografias-glifos.test.ts` lee la
+      tabla `cmap` de cada `.woff` y comprueba «Ñandú Pérez», «Güemes», «Córdoba» y demás nombres, la
+      puntuación de la interfaz y todo carácter japonés del código. Límite documentado: `Ł`, `ő` y otras
+      letras fuera de Latín-1 caen a la fuente del sistema. Falta solo la mirada en el flujo (4.x).
 - [ ] 5.2 Verificar las fotografías WebP de `frontend/public/ichigo/`: que son cinco `.webp`, que
       no queda ningún `.png`, que la suma pesa menos de 300 KB (hoy unos 240 KB), que cada una se
       ve aceptable en la landing a 390 y 1440px, y que `PROCEDENCIA.md` documenta la conversión
       (herramienta y calidad) y nombra los archivos `.webp`.
-- [ ] 5.3 `identidad-visual-ichigo`, «Contrastes»: escribir un test que lea los tokens de
+      Resultado parcial (26/10/2026): las comprobaciones automáticas están hechas (cinco `.webp`, ningún
+      `.png`, 242 KB, `PROCEDENCIA.md` nombra los `.webp` y registra herramienta y calidad; ver 5.4).
+      Queda la mirada a 390 y 1440 px en la landing (verificación manual).
+- [x] 5.3 `identidad-visual-ichigo`, «Contrastes»: escribir un test que lea los tokens de
       `globals.css`, calcule las relaciones de contraste (fórmula WCAG 2.1) y falle por debajo
       de 4,5:1 (texto) o 3:1 (bordes), y que verifique que el rojo del sello sobre `madera`
       no se use como texto. Sin dependencias nuevas: la fórmula son diez líneas.
-- [ ] 5.4 `identidad-visual-ichigo`, «Procedencia»: test o script de verificación que compare
+      Resultado (26/10/2026): `globals-contrastes.test.ts` mide con los tokens reales todas las
+      combinaciones de texto (≥ 4,5:1), los bordes (≥ 3:1) y recorre las superficies de madera de la
+      interfaz: ninguna usa `text-accent` ni `text-destructive`, y todo `bg-accent` lleva
+      `text-accent-foreground`. El cálculo se comparte con `globals-foco.test.ts` mediante
+      `test/helpers/contraste.ts`. Falla con un rojo más claro, un borde más claro, un `text-accent` en la
+      tablilla y un `bg-accent` sin texto claro.
+- [x] 5.4 `identidad-visual-ichigo`, «Procedencia»: test o script de verificación que compare
       `frontend/public/ichigo/*.webp` con las filas de `PROCEDENCIA.md`, que falle si hay un
       `.png` y que sume los pesos contra el tope de 300 KB.
-- [ ] 5.5 Test de ausencia de color suelto: buscar literales de color en
+      Resultado (26/10/2026): `procedencia-imagenes.test.ts` compara `public/ichigo/` con
+      `PROCEDENCIA.md`: cinco `.webp`, ningún `.png` ni otro raster, suma < 300 KB (242 KB), una fila por
+      imagen con tamaño (verificado contra el encabezado del WebP), uso y prompt, herramienta, fecha,
+      calidad de la conversión, aclaración de fotos sintéticas y total registrado dentro del 5 % de la
+      suma real. Falla con un `.png`, una fila borrada, un tamaño equivocado, 200 KB de más y un total
+      distinto.
+- [x] 5.5 Test de ausencia de color suelto: buscar literales de color en
       `frontend/src/components` y `frontend/app` fuera de `globals.css` (ver el primer escenario
       de «Tokens semánticos»). Si la búsqueda encuentra alguno, reemplazarlo por un token.
+      Resultado (26/10/2026): `colores-sueltos.test.ts` recorre `src/components` y `app` (sin
+      `globals.css`) y busca hexadecimales de 3, 6 u 8 dígitos, `rgb()`, `hsl()`, `oklch()` y variantes:
+      no hay ninguna coincidencia, así que no hizo falta reemplazar nada por un token. Falla al agregar un
+      `#ff0000`, un `rgb()` o un `oklch()` a un componente.
 
 ## 6. Cierre del change
 
