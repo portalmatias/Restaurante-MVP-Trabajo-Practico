@@ -422,9 +422,11 @@ protegido por `JwtAuthGuard` + `RolesGuard`, con throttle de admin.
   - `429`: mensaje específico "Estamos recibiendo muchas consultas. Probá de nuevo en un
     minuto." sin reintento automático (evita agravar el límite compartido).
   - `404/400` del **plano**: degradan la sección (mensaje "No pudimos cargar el plano. Podés
-    seguir con tu reserva igual."), y el veredicto sale de `/disponibilidad`. Solo un `404/400`
-    de `/disponibilidad` redirige al paso 1 como hoy (selección inválida). Así, un backend sin
-    la ruta (rollback o despliegue en otro orden) no deja a nadie atrapado en el paso 1.
+    seguir con tu reserva igual."), y el veredicto sale de `/disponibilidad`, que se maneja como
+    hoy: un `404` (turno o zona inexistentes) redirige al paso 1, y un `400` muestra que la
+    selección no es válida con un enlace al paso 1, sin redirigir (el paso 1 la da por válida y
+    redirigir dejaría a la persona en un bucle, sin explicación). Así, un backend sin la ruta
+    (rollback o despliegue en otro orden) no deja a nadie atrapado en el paso 1.
 - Copy en voseo rioplatense, como el resto del cliente.
 
 ### D8. Estrategia de tests
