@@ -122,6 +122,19 @@ describe("PlanoMesas - dibujo", () => {
     expect(within(dibujo(container) as unknown as HTMLElement).queryByText(/libre|ocupada|no alcanza/i)).toBeNull();
   });
 
+  it("imprime la capacidad solo en las mesas de al menos 2 celdas de ancho", () => {
+    const { container } = renderizar();
+
+    const textos = (etiqueta: string) =>
+      [...(mesaDibujada(container, etiqueta)?.querySelectorAll("text") ?? [])].map(
+        (texto) => texto.textContent,
+      );
+    expect(textos("S3")).toContain("4 pers.");
+    expect(textos("S4")).toContain("4 pers.");
+    expect(textos("S2")).not.toContain("4 pers.");
+    expect(textos("S1").some((texto) => texto?.includes("pers."))).toBe(false);
+  });
+
   it("dibuja la forma de cada mesa", () => {
     const { container } = renderizar();
 
@@ -204,6 +217,17 @@ describe("PlanoMesas - sin lugar", () => {
         "El plano muestra el estado de las mesas, pero hoy no se puede reservar este turno por: La zona STANDARD no tiene más lugar en ese turno.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("sin lugar y sin motivos informados, el aviso no queda cortado", () => {
+    renderizar({ ...SIN_LUGAR, motivos: [] });
+
+    expect(
+      screen.getByText(
+        "El plano muestra el estado de las mesas, pero hoy no se puede reservar este turno.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/por:/)).toBeNull();
   });
 
   it("sin lugar no dice que la mesa se asigna al confirmar", () => {

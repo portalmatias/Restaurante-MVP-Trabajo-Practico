@@ -117,6 +117,16 @@ function MesaDibujada({ mesa }: { mesa: MesaPlano }) {
 }
 
 /**
+ * Aviso del plano atenuado (design.md D5). El contrato garantiza motivos cuando no hay lugar,
+ * pero si llegaran vacíos el aviso termina en punto en vez de quedar cortado en "por:".
+ */
+function avisoSinLugar(motivos: Plano["motivos"]): string {
+  const aviso = "El plano muestra el estado de las mesas, pero hoy no se puede reservar este turno";
+  if (motivos.length === 0) return `${aviso}.`;
+  return `${aviso} por: ${motivos.map((motivo) => motivo.mensaje).join(" ")}`;
+}
+
+/**
  * Plano informativo de la zona elegida (change `plano-mesas`, design.md D5 y D7): un dibujo
  * decorativo (`aria-hidden`) y una lista textual que es la fuente accesible. No tiene ningún
  * control: la mesa se asigna sola al confirmar la reserva. Cuando el turno no tiene lugar, se
@@ -137,11 +147,7 @@ export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
         Plano de las mesas
       </h2>
       {atenuado ? (
-        <p className="text-base text-foreground">
-          {`El plano muestra el estado de las mesas, pero hoy no se puede reservar este turno por: ${plano.motivos
-            .map((motivo) => motivo.mensaje)
-            .join(" ")}`}
-        </p>
+        <p className="text-base text-foreground">{avisoSinLugar(plano.motivos)}</p>
       ) : (
         <p className="text-base text-muted-foreground">
           El plano es una foto del momento y puede cambiar. La mesa se asigna automáticamente al
