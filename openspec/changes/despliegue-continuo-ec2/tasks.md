@@ -139,7 +139,7 @@
         despliegue termina igual y el log queda completo.
 
       Guardar las salidas para el PR.
-- [ ] 5.3 Escribir primero los tests y después `deploy/ssh-entrada.sh` (D4), el comando
+- [x] 5.3 Escribir primero los tests y después `deploy/ssh-entrada.sh` (D4), el comando
       forzado de la clave SSH. Los tests lo ejecutan con distintos `SSH_ORIGINAL_COMMAND` y un
       `desplegar.sh` de prueba que solo registra sus argumentos:
       - `<sha> <digest> <digest> despliegue` y `<sha> - - vuelta-atras` válidos invocan a
@@ -148,16 +148,21 @@
       - se rechazan (código `2` y sin invocar nada): comando vacío, `bash`, `ls; id`,
         `$(id) ...`, un SHA de 39 o 41 caracteres o con mayúsculas, un digest sin
         `sha256:` o de otra longitud, un `modo` desconocido, argumentos de más, saltos de línea,
-        espacios o tabulaciones extra, y una segunda línea con otro comando;
+        espacios o tabulaciones extra, una segunda línea con otro comando y valores con
+        metacaracteres de shell (`; | & $ \` > < ( ) comillas);
       - ningún valor del pedido se evalúa en una shell (`eval`, `sh -c`, expansión).
-
+ 
       Verificar que fallan sin la implementación (rojo), que pasan, y `shellcheck` sin
       advertencias. Dejar en el runbook (6.1) la línea de `authorized_keys` y la regla de
       `sudoers`.
-      Estado (26/10/2026): `ssh-entrada.sh`, `shellcheck` sin advertencias y el runbook están
-      hechos. Faltan los tests: `deploy/test/desplegar.test.sh` solo comprueba que el archivo es
-      ejecutable, y los casos de arriba se probaron a mano (comentario en #79), sin commitear.
-- [ ] 5.4 Escribir `.github/workflows/cd.yml` según D4:
+      Resultado (27/10/2026): agregados `deploy/test/ssh-entrada.test.sh` con todos los casos
+      solicitados y agregado al script `test:deploy` de `package.json` para correr ambos tests
+      (`bash deploy/test/desplegar.test.sh && bash deploy/test/ssh-entrada.test.sh`). Verificado
+      con sabotaje temporal (regex de `ssh-entrada.sh` modificado) que los tests fallan y con el
+      original que pasan; `git diff` mostró `deploy/ssh-entrada.sh` intacto. `shellcheck` no está
+      instalado en el entorno: no se pudo verificar sin instalarlo globalmente. `ssh-entrada.sh`
+      no fue modificado (sin bug real detectado).
+- [x] 5.4 Escribir `.github/workflows/cd.yml` según D4:
       - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
         y `modo` validados;
       - job `decidir`, que usa la función de 5.6;
@@ -174,12 +179,14 @@
       - si falta alguno de los secrets `SERVER_*` o `SSH_*`, termina en error con un mensaje
         claro, sin afectar al CI;
       - acciones fijadas por SHA y `concurrency` sin cancelar.
-
+ 
       Verificar con `actionlint` sin errores.
-      Estado (26/10/2026): `actionlint` 1.7.7 termina en `1` por un único aviso de nivel info
-      (SC2015) en la validación de `SERVER_PORT` del job `desplegar`. El comportamiento es
-      correcto (el bloque del `||` siempre hace `exit 1`), pero falta reescribir esa línea con un
-      `if` para que `actionlint` quede limpio.
+      Resultado (27/10/2026): reescrita la validación de `SERVER_PORT` en
+      `.github/workflows/cd.yml` con un `if` equivalente sin cambiar el comportamiento (mismos
+      mensajes y mismo exit 1). Comprobado con un script bash que simula los valores (válidos
+      1-65535 y no válidos: 0, 65536, vacío, 22abc, -1, espacios) que el resultado es igual antes
+      y después del cambio. `actionlint` y `shellcheck` no están instalados en el entorno: no se
+      pudo verificar sin instalarlo globalmente (no se instaló nada).
 - [x] 5.5 Agregar `npm run test:frontend` al job de tests de `ci.yml` (D10). Verificar en el
       PR que el job lo ejecuta y queda en verde (el paso «Tests del frontend» corre y pasa en el
       CI del PR #79, junto con «Tests de las utilidades de scripts/» y «Tests de
