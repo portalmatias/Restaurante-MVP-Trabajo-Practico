@@ -22,7 +22,7 @@
  * Contrastes verificados (WCAG 2.1):
  *   foreground (#1F1813) sobre background (#E8DCC4)     12,9:1
  *   muted-foreground (#5C4630) sobre background          6,5:1
- *   accent (#9A2A19, texto del sello) sobre background   5,7:1  y sobre card 6,5:1
+ *   accent (#9A2A19, texto del sello) sobre background   5,69:1 y sobre card 6,51:1
  *   border (#8A6A43) sobre background                    3,66:1 (mínimo de bordes de controles: 3:1)
  *   primary-foreground (#F3EBDA) sobre primary (#1F1813) 14,8:1
  * El rojo del sello (#9A2A19, el único rojo de la paleta) NUNCA va como texto sobre madera
