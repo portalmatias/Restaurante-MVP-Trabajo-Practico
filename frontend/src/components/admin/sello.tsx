@@ -14,10 +14,12 @@ export type TonoSello =
   | "holgado"
   | "casi-lleno"
   | "completo"
+  | "sobrecupo"
+  | "sin-aforo"
   | "activo"
   | "inactivo";
 
-type Forma = "reloj" | "check" | "cruz" | "barra" | "alerta" | "cuadro";
+type Forma = "reloj" | "check" | "cruz" | "barra" | "alerta" | "cuadro" | "exceso";
 
 const TONOS: Record<TonoSello, { clases: string; forma: Forma }> = {
   // Pide acción: contorno rojo grueso.
@@ -31,6 +33,11 @@ const TONOS: Record<TonoSello, { clases: string; forma: Forma }> = {
   "casi-lleno": { clases: "border-2 border-accent text-accent", forma: "alerta" },
   // Sello pleno: la tablilla agotada.
   completo: { clases: "border border-accent bg-accent text-accent-foreground", forma: "cuadro" },
+  // Por encima del aforo: mismo relleno pleno, pero con borde grueso y un triángulo lleno, para que
+  // en escala de grises no se confunda con «Completo» (cuadro) ni con «Casi lleno» (triángulo hueco).
+  sobrecupo: { clases: "border-2 border-accent bg-accent text-accent-foreground", forma: "exceso" },
+  // Sin aforo configurado: contorno punteado y tinta apagada, sin el check de «Con lugar».
+  "sin-aforo": { clases: "border border-dashed border-border text-muted-foreground", forma: "barra" },
   activo: { clases: "border border-border text-foreground", forma: "check" },
   inactivo: { clases: "border border-dashed border-border text-muted-foreground", forma: "barra" },
 };
@@ -58,6 +65,7 @@ function Pictograma({ forma }: { forma: Forma }) {
       {forma === "cruz" ? <path d="M4 4l8 8M12 4l-8 8" /> : null}
       {forma === "barra" ? <path d="M3 8h10" /> : null}
       {forma === "alerta" ? <path d="M8 2.5l6 11H2l6-11zM8 7v3" /> : null}
+      {forma === "exceso" ? <path d="M8 2.5l6 11H2l6-11z" fill="currentColor" /> : null}
       {forma === "cuadro" ? <rect x="3.5" y="3.5" width="9" height="9" fill="currentColor" /> : null}
     </svg>
   );

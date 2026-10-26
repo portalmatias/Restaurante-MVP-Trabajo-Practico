@@ -95,15 +95,16 @@ const RELLENO_BARRA: Record<NivelAforo, string> = {
   "casi-lleno": "bg-foreground",
   completo: "bg-accent",
   sobrecupo: "bg-accent",
-  "sin-aforo": "bg-muted",
+  // Distinto de la pista (`bg-muted`): sobre el mismo color la barra llena de «Sin aforo» no se vería.
+  "sin-aforo": "bg-muted-foreground",
 };
 
-const TONO_NIVEL: Record<NivelAforo, "holgado" | "casi-lleno" | "completo"> = {
+const TONO_NIVEL: Record<NivelAforo, "holgado" | "casi-lleno" | "completo" | "sobrecupo" | "sin-aforo"> = {
   holgado: "holgado",
   "casi-lleno": "casi-lleno",
   completo: "completo",
-  sobrecupo: "completo",
-  "sin-aforo": "holgado",
+  sobrecupo: "sobrecupo",
+  "sin-aforo": "sin-aforo",
 };
 
 function FilaZona({ nombre, ocupado, maximo }: { nombre: string; ocupado: number; maximo: number }) {
@@ -222,7 +223,10 @@ export function DashboardAforo({ hoy }: { hoy?: string }) {
   const errorAforo = resultado?.clave === clave ? resultado.error : undefined;
   const dia = diaSemanaSeguro(fecha);
 
-  const turnoActual = opcionesTurno.find((t) => t.id === turnoId);
+  // El título sale de la fecha y el Turno con los que se pidió el resultado que se muestra, no de lo
+  // elegido ahora: mientras llega la consulta nueva los números siguen siendo los anteriores.
+  const [fechaDelResultado, turnoDelResultado] = (resultado?.clave ?? "").split("|");
+  const turnoDelTitulo = turnos?.find((t) => t.id === turnoDelResultado);
 
   return (
     <div className="flex flex-col gap-6">
@@ -274,8 +278,8 @@ export function DashboardAforo({ hoy }: { hoy?: string }) {
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-border pb-3">
             <div>
               <h2 className="font-display text-xl">
-                {fechaLegible(fecha)}
-                {turnoActual ? `, ${rangoTurno(turnoActual)}` : null}
+                {fechaLegible(fechaDelResultado)}
+                {turnoDelTitulo ? `, ${rangoTurno(turnoDelTitulo)}` : null}
               </h2>
               <p className="text-sm text-muted-foreground">
                 <span className="tabular font-display text-lg text-foreground" data-testid="aforo-global">
