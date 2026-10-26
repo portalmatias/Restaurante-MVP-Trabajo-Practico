@@ -17,6 +17,16 @@ describe('ordenarMesasPorEtiqueta', () => {
     ]);
   });
 
+  it('da el mismo orden para etiquetas que solo difieren en ceros a la izquierda, venga como venga la lista', () => {
+    const ordenar = (lista: string[]) =>
+      etiquetas(
+        ordenarMesasPorEtiqueta(lista.map((etiqueta) => ({ etiqueta }))),
+      );
+    expect(ordenar(['S01', 'S1', 'S2', 'S001'])).toEqual(
+      ordenar(['S2', 'S1', 'S001', 'S01']),
+    );
+  });
+
   it('no modifica la lista que recibe', () => {
     const mesas = [{ etiqueta: 'S2' }, { etiqueta: 'S1' }];
     ordenarMesasPorEtiqueta(mesas);
