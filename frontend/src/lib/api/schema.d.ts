@@ -53,7 +53,7 @@ export interface paths {
         };
         /**
          * Consultar el plano de mesas de una zona
-         * @description Devuelve el plano de una zona con el estado de cada mesa para una fecha, un turno y una cantidad de comensales: libre, ocupada o que no alcanza. Es informativo: no reserva ni bloquea nada y la mesa se asigna automáticamente al confirmar la reserva. Incluye el mismo veredicto que `GET /disponibilidad` (`disponible`, `lugaresRestantes`, `motivos`). No expone datos de las reservas, solo el estado de cada mesa. Es una ruta pública, sin autenticación, con límite de solicitudes.
+         * @description Devuelve el plano de una zona con el estado de cada mesa para una fecha, un turno y una cantidad de comensales: libre, ocupada o que no alcanza. Es informativo: no reserva ni bloquea nada y la mesa se asigna automáticamente al crear la reserva. Incluye el mismo veredicto que `GET /disponibilidad` (`disponible`, `lugaresRestantes`, `motivos`). No expone datos de las reservas, solo el estado de cada mesa. Es una ruta pública, sin autenticación, con límite de solicitudes.
          */
         get: operations["PlanoMesasController_consultar"];
         put?: never;

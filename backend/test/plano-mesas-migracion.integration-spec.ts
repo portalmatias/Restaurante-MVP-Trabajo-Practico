@@ -10,7 +10,8 @@ import { PrismaClient } from '@prisma/client';
  * `modelo-dominio`, escenario "Mesa existente conserva sus datos tras la migración").
  *
  * Crea una base descartable, le aplica todas las migraciones anteriores a `plano_mesas` con
- * `prisma migrate deploy` (desde una copia de la carpeta de migraciones sin la última), carga
+ * `prisma migrate deploy` (desde una copia de la carpeta de migraciones sin la de
+ * `plano_mesas`; si después se agrega otra migración, también se aplica antes), carga
  * datos con el esquema viejo, aplica `plano_mesas` y compara. Al final borra la base y la
  * copia. No toca la base de test compartida más que para crear y borrar la descartable.
  *
