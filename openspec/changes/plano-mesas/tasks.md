@@ -155,18 +155,21 @@
 
 ## 5. Frontend (estética Kakefuda: tokens de `frontend/app/globals.css`)
 
-- [ ] 5.1 Escribir `frontend/test/lib/plano-mesas.test.ts` (rojo) para los helpers puros de
+- [x] 5.1 Escribir `frontend/test/lib/plano-mesas.test.ts` (rojo) para los helpers puros de
       `frontend/src/lib/plano-mesas.ts`: texto por estado, resumen ("3 libres, 1 ocupada, 1
       que no alcanza"), orden de la lista y separación de mesas sin ubicar. Implementarlos hasta
       que pasen.
-- [ ] 5.2 Escribir `frontend/test/components/reservas/plano-mesas.test.tsx` (rojo): lista con
+- [x] 5.2 Escribir `frontend/test/components/reservas/plano-mesas.test.tsx` (rojo): lista con
       etiqueta, capacidad y estado en palabras; leyenda con los tres estados; cada estado con
       patrón, marca y texto (no solo color); mesa sin ubicar solo en la lista; SVG con
       `aria-hidden`; resumen con `role="status"`; sin controles de selección de mesa.
 - [ ] 5.3 Implementar `frontend/src/components/reservas/plano-mesas.tsx`: SVG con `viewBox` en
       celdas, formas redonda/cuadrada/rectangular como tablillas de madera con los tokens
       existentes (sin hex propios), patrones de relleno y marcas por estado, leyenda y lista.
-- [ ] 5.4 Agregar los tests (rojo→verde) del atenuado y el aviso cuando `disponible` es `false`
+      Avance (26/10/2026): el componente ya tiene el SVG con `viewBox` en celdas, las tres formas,
+      los patrones y las marcas por estado, la leyenda y la lista, con los tokens actuales. Falta
+      el estilo de tablillas de madera, que depende de los tokens del rediseño (#78).
+- [x] 5.4 Agregar los tests (rojo→verde) del atenuado y el aviso cuando `disponible` es `false`
       (motivos primero, texto "hoy no se puede reservar este turno") y de la aclaración
       "La mesa se asigna automáticamente al confirmar la reserva" / "foto del momento".
 - [ ] 5.5 Escribir tests y componente del esqueleto `plano-mesas-cargando.tsx`: `aria-busy`,
@@ -174,10 +177,10 @@
       animación en el componente o en `globals.css` usando solo tokens existentes. El test
       comprueba que la regla existe en la hoja de estilos; **no** se simula `matchMedia` porque
       `jsdom` no evalúa media queries (la prueba real es la manual de 6.1).
-- [ ] 5.6 Tests y manejo de errores: fallo `5xx`/red ⇒ mensaje + "Reintentar" reutilizando
+- [x] 5.6 Tests y manejo de errores: fallo `5xx`/red ⇒ mensaje + "Reintentar" reutilizando
       `error-con-reintento.tsx` y la reserva sigue disponible; `429` ⇒ mensaje específico sin
       reintento automático.
-- [ ] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: el plano es la fuente
+- [x] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: el plano es la fuente
       del veredicto (`disponible`, `motivos`) y se pide con `cache: "no-store"` junto al
       catálogo; `/disponibilidad` se pide solo si el plano falla (red, `5xx`, `429`, `404` o `400`), y
       entonces la sección del plano muestra su error (D7). Solo un `404/400` de
@@ -186,6 +189,9 @@
       renderizar el plano atenuado con su aviso, después de los motivos, y se cubre con un test
       propio. Tests: plano `404` o `400` ⇒ sin redirección y veredicto de `/disponibilidad`;
       plano y `/disponibilidad` con `404` o con `400` ⇒ redirección. Verificar que los tests existentes de la página siguen en verde.
+      Nota: con plano y `/disponibilidad` en `400` no se redirige; se muestra la pantalla de
+      selección inválida con el enlace al paso 1, como ya hacía la página (redirigir con un `400`
+      dejaría a la persona en bucle). El `404` doble sí redirige.
 - [ ] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
       la página a 360 px (test del componente con las clases de orden y revisión visual).
 
