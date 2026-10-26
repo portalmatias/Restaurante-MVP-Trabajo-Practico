@@ -23,6 +23,10 @@ export default tseslint.config(
       '**/.next/**',
       '**/coverage/**',
       '**/build/**',
+      // Salida generada por Playwright: el reporte HTML trae bundles que eslint no debe analizar.
+      'frontend/playwright-report/**',
+      'frontend/test-results/**',
+      'frontend/blob-report/**',
       'frontend/next-env.d.ts',
       'eslint.config.mjs',
     ],
