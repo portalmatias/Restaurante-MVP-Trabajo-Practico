@@ -162,7 +162,7 @@
       original que pasan; `git diff` mostró `deploy/ssh-entrada.sh` intacto. `shellcheck` no está
       instalado en el entorno: no se pudo verificar sin instalarlo globalmente. `ssh-entrada.sh`
       no fue modificado (sin bug real detectado).
-- [x] 5.4 Escribir `.github/workflows/cd.yml` según D4:
+- [ ] 5.4 Escribir `.github/workflows/cd.yml` según D4:
       - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
         y `modo` validados;
       - job `decidir`, que usa la función de 5.6;
@@ -185,8 +185,9 @@
       `.github/workflows/cd.yml` con un `if` equivalente sin cambiar el comportamiento (mismos
       mensajes y mismo exit 1). Comprobado con un script bash que simula los valores (válidos
       1-65535 y no válidos: 0, 65536, vacío, 22abc, -1, espacios) que el resultado es igual antes
-      y después del cambio. `actionlint` y `shellcheck` no están instalados en el entorno: no se
-      pudo verificar sin instalarlo globalmente (no se instaló nada).
+      y después del cambio. Falta correr `actionlint` sin errores, que es lo que pide la tarea: no está
+      instalado en el entorno y no se instaló nada global, así que 5.4 queda sin marcar hasta
+      verificarlo (por ejemplo en una máquina con `actionlint` o con la acción oficial en CI).
 - [x] 5.5 Agregar `npm run test:frontend` al job de tests de `ci.yml` (D10). Verificar en el
       PR que el job lo ejecuta y queda en verde (el paso «Tests del frontend» corre y pasa en el
       CI del PR #79, junto con «Tests de las utilidades de scripts/» y «Tests de
