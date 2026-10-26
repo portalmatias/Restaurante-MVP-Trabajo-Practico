@@ -100,7 +100,7 @@ export default function Home() {
 
         <div className="revelar relative pt-6">
           <div aria-hidden="true" className="absolute left-0 right-0 top-0 h-2 rounded-sm bg-madera" />
-          <ol className="flex items-start justify-between gap-2 sm:justify-around sm:gap-4">
+          <ol className="tiempos-landing flex items-start justify-between gap-2 sm:justify-around sm:gap-4">
             {TIEMPOS.map((tiempo) => (
               <li key={tiempo.titulo}>
                 <TablillaPaso titulo={tiempo.titulo} japones={tiempo.japones} detalle={tiempo.detalle} />

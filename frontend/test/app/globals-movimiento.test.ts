@@ -50,4 +50,15 @@ describe("Movimiento en globals.css", () => {
       }
     }
   });
+
+  // Revisión de #78: `ol > li:nth-child(2) .balanceo` alcanzaba a cualquier lista ordenada de la app que
+  // contuviera una tablilla. El desfase de cada tablilla de la landing va acotado a su propia lista.
+  it("el desfase de las tablillas está acotado a la lista de la landing, no a cualquier `ol`", () => {
+    expect(css).not.toMatch(/(^|[\s,}])ol\s*>\s*li/m);
+    expect(css).toMatch(/\.tiempos-landing\s*>\s*li:nth-child\(2\)\s+\.balanceo/);
+    expect(css).toMatch(/\.tiempos-landing\s*>\s*li:nth-child\(3\)\s+\.balanceo/);
+
+    const landing = readFileSync(join(__dirname, "../../app/page.tsx"), "utf8");
+    expect(landing).toMatch(/<ol className="[^"]*\btiempos-landing\b[^"]*">/);
+  });
 });

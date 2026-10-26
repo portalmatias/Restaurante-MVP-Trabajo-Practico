@@ -232,11 +232,12 @@ body::before {
   transform-origin: 50% -1.5rem;
   animation: balanceo 3.6s ease-in-out infinite alternate;
 }
-ol > li:nth-child(2) .balanceo {
+/* Solo la lista de tiempos de la landing (`app/page.tsx`), no cualquier `ol` de la app. */
+.tiempos-landing > li:nth-child(2) .balanceo {
   animation-duration: 4.4s;
   animation-delay: -1.5s;
 }
-ol > li:nth-child(3) .balanceo {
+.tiempos-landing > li:nth-child(3) .balanceo {
   animation-duration: 3.2s;
   animation-delay: -2.4s;
 }
