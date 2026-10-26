@@ -73,8 +73,15 @@ export function FormularioSeleccion({
   const tituloTurnoId = useId();
   const tituloFechaId = useId();
   const opcionesZona = useRef<Array<HTMLButtonElement | null>>([]);
+  // El servidor mide la anticipación máxima por instante, no por día: la cena de hoy + máximo
+  // queda a más de `maximoDias` días y se rechaza. El último día que siempre alcanza es
+  // hoy + máximo - 1. El calendario cierra lo posterior, y la selección también.
+  const maximoDias = Math.max(
+    ...zonas.map((candidata) => candidata.anticipacionMaxDias),
+  );
+  const ultimaFecha = sumarDias(hoy, maximoDias - 1);
   const [inicial] = useState(() =>
-    resolverSeleccionInicial(seleccionInicial, { zonas, turnos, hoy }),
+    resolverSeleccionInicial(seleccionInicial, { zonas, turnos, hoy, hasta: ultimaFecha }),
   );
   const [fecha, setFecha] = useState(inicial.fecha ?? '');
   const [turnoId, setTurnoId] = useState(inicial.turnoId ?? '');
@@ -83,7 +90,7 @@ export function FormularioSeleccion({
     inicial.comensales,
   );
 
-  const fechaElegible = esFechaElegible(fecha, hoy);
+  const fechaElegible = esFechaElegible(fecha, hoy, ultimaFecha);
   const turnosDelDia = fechaElegible
     ? turnos.filter((turno) => turno.diaSemana === diaSemanaDeFechaLocal(fecha))
     : [];
@@ -91,13 +98,6 @@ export function FormularioSeleccion({
   // El calendario cierra los días sin turnos y los que quedan más allá de lo que admite cualquier
   // zona. Es una ayuda: la anticipación de cada zona la valida el servidor.
   const diasConTurnos = new Set(turnos.map((turno) => turno.diaSemana));
-  const maximoDias = Math.max(
-    ...zonas.map((candidata) => candidata.anticipacionMaxDias),
-  );
-  // El servidor mide la anticipación máxima por instante, no por día: la cena de hoy + máximo
-  // queda a más de `maximoDias` días y se rechaza. El último día que siempre alcanza es
-  // hoy + máximo - 1.
-  const ultimaFecha = sumarDias(hoy, maximoDias - 1);
   const zona = zonas.find((candidata) => candidata.id === zonaId);
 
   const faltantes: string[] = [];
@@ -118,7 +118,7 @@ export function FormularioSeleccion({
     const turnoActual = turnos.find((turno) => turno.id === turnoId);
     const sigueCorrespondiendo =
       turnoActual !== undefined &&
-      esFechaElegible(nuevaFecha, hoy) &&
+      esFechaElegible(nuevaFecha, hoy, ultimaFecha) &&
       turnoActual.diaSemana === diaSemanaDeFechaLocal(nuevaFecha);
     if (!sigueCorrespondiendo) setTurnoId('');
   }

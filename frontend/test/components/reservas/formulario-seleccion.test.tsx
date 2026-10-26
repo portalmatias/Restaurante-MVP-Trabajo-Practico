@@ -604,3 +604,32 @@ describe("FormularioSeleccion - último día elegible del calendario", () => {
     expect(screen.getByRole("button", { name: "Mes siguiente" })).toBeDisabled();
   });
 });
+
+// Revisión de #78: `fechaElegible` no miraba el último día que ofrece el calendario (hoy + máximo - 1),
+// así que una fecha de la URL pasada de ese límite se aceptaba aunque el calendario la mostrara como no
+// disponible, y el botón quedaba habilitado.
+describe("fecha de la URL pasada del último día elegible", () => {
+  // Con hoy = martes 15/9, la zona de mayor anticipación (60 días) llega hasta el viernes 13/11
+  // (hoy + 59). El sábado 14/11 es hoy + 60: el servidor lo rechazaría.
+  const HOY_LIMITE = "2026-09-15";
+  const completa = (fecha: string) => ({
+    fecha,
+    turnoId: TURNO_CENA_SABADO.id,
+    zonaId: ZONA_VIP.id,
+    comensales: "2",
+  });
+
+  it("se ignora y pide elegir la fecha de nuevo", () => {
+    renderizar(completa("2026-11-14"), HOY_LIMITE);
+
+    expect(screen.getByText(/Falta elegir: fecha/)).toBeInTheDocument();
+    expect(fechaElegida()).toBe("");
+  });
+
+  it("el último sábado dentro del límite sigue aceptándose", () => {
+    renderizar(completa("2026-11-07"), HOY_LIMITE);
+
+    expect(fechaElegida()).toBe("2026-11-07");
+    expect(screen.queryByText(/Falta elegir/)).not.toBeInTheDocument();
+  });
+});
