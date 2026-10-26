@@ -26,7 +26,9 @@ el nombre «Ichigo» como `h1`, la propuesta «Omakase japonés. Cada bocado, un
 acción principal «Reservar una mesa», que SHALL enlazar a `/reservas`. Las etiquetas de las
 acciones (botones y enlaces de llamada a la acción) SHALL estar en infinitivo («Reservar una
 mesa», «Elegir fecha y turno»), por decisión expresa del equipo y por ser la convención de la
-categoría; los títulos y los textos explicativos SHALL usar voseo rioplatense formal. La acción
+categoría: es una excepción a «Copy en voseo rioplatense» de `frontend-cliente`, que hoy cita
+«Reservar una mesa» como ejemplo incorrecto (ver `design.md`, «Acciones en infinitivo»). Los
+títulos y los textos explicativos SHALL usar voseo rioplatense formal. La acción
 secundaria «Ya tengo un código» SHALL enlazar a `/reservas/consultar`. La acción principal SHALL ser visible sin desplazarse a 390×844px.
 
 #### Scenario: Acción visible en el primer viewport

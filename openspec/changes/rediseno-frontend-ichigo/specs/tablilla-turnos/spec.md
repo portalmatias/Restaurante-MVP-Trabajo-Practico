@@ -29,9 +29,14 @@ objetivo táctil de una tablilla SHALL ser de al menos 44×44px.
 Cuando una persona elige una tablilla, las demás tablillas habilitadas SHALL pasar al estado
 `descartada`: se dan vuelta mostrando la madera oscura con su texto atenuado y SHALL seguir
 siendo tocables para cambiar la elección. Una tablilla `completa` SHALL NOT cambiar de estado
-por la elección de otra: sigue `completa`, deshabilitada y sin `aria-pressed`. Una tablilla en estado `completa` SHALL mostrarse boca abajo con un sello
-de «completo», SHALL estar deshabilitada, SHALL NOT exponer `aria-pressed` y SHALL anunciar
-«Completo» a los lectores de pantalla.
+por la elección de otra: sigue `completa`, con `aria-disabled="true"` y sin `aria-pressed`. Una
+tablilla en estado `completa` SHALL mostrarse boca abajo con un sello de «completo» y SHALL
+declararse con `aria-disabled="true"` y no con el atributo `disabled`: así sigue en el orden de
+tabulación y un lector de pantalla la anuncia, como los días no elegibles de `calendario-fecha`.
+Activarla SHALL NOT cambiar la elección. SHALL NOT exponer `aria-pressed`, y su nombre accesible
+SHALL terminar en «, completo» (por ejemplo, «20:00 a 23:30, completo»). El componente compone ese
+sufijo sobre el `aria-label` recibido, porque un `aria-label` reemplaza cualquier texto `sr-only`
+interno y por eso un «Completo» oculto dentro del botón nunca se anunciaría.
 
 #### Scenario: Las demás se dan vuelta pero siguen tocables
 - **WHEN** hay tres tablillas y la persona toca la segunda
@@ -39,13 +44,20 @@ de «completo», SHALL estar deshabilitada, SHALL NOT exponer `aria-pressed` y S
 - **AND** las otras dos siguen habilitadas y, al tocar una, esa pasa a `elegida`
 
 #### Scenario: Turno completo
-- **WHEN** se renderiza una `Tablilla` en estado `completa`
-- **THEN** el botón está deshabilitado y no tiene atributo `aria-pressed`
-- **AND** el texto «Completo» está disponible para lectores de pantalla
+- **WHEN** se renderiza una `Tablilla` en estado `completa` con `aria-label="20:00 a 23:30"`
+- **THEN** el botón tiene `aria-disabled="true"`, no tiene el atributo `disabled` y no tiene
+  atributo `aria-pressed`
+- **AND** su nombre accesible es «20:00 a 23:30, completo»
+- **AND** se alcanza con la tecla Tab
+
+#### Scenario: Activar un turno completo no elige nada
+- **WHEN** la persona activa una tablilla `completa` con el mouse o el teclado
+- **THEN** no cambia la elección ni se llama a `onClick`
 
 #### Scenario: Un turno completo no se vuelve tocable
 - **WHEN** hay una tablilla `completa` y la persona elige otra
-- **THEN** la `completa` sigue deshabilitada, sin `aria-pressed`, y no pasa a `descartada`
+- **THEN** la `completa` sigue con `aria-disabled="true"`, sin `aria-pressed`, y no pasa a
+  `descartada`
 
 #### Scenario: Exactamente una elegida
 - **WHEN** la persona elige turnos sucesivamente
