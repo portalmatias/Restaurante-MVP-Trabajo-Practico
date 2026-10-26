@@ -304,4 +304,33 @@ describe("ListadoReservas - marcar no show", () => {
     expect(push).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
   });
+
+  // Revisión de #78: la búsqueda distinguía acentos y mayúsculas («perez» no encontraba «Pérez»), y
+  // podía ocultar justo la fila cuya acción acababa de fallar y mostraba un aviso.
+  it("la búsqueda ignora acentos y mayúsculas: «perez» encuentra «Pérez»", async () => {
+    await renderizar();
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "perez" } });
+    expect(screen.getAllByRole("rowheader")).toHaveLength(4);
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "PÉREZ" } });
+    expect(screen.getAllByRole("rowheader")).toHaveLength(4);
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "ana.pérez@EXAMPLE" } });
+    expect(screen.getAllByRole("rowheader")).toHaveLength(4);
+  });
+
+  it("la búsqueda no oculta la fila que muestra un aviso de una acción fallida", async () => {
+    PATCH.mockReturnValue(error(409, "No se pudo confirmar."));
+    await renderizar();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar reserva PEND0001" }));
+    expect(await screen.findByText("No se pudo confirmar.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "CONF0002" } });
+
+    expect(screen.getByRole("rowheader", { name: "CONF0002" })).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "PEND0001" })).toBeInTheDocument();
+    expect(screen.queryByRole("rowheader", { name: "CANC0003" })).not.toBeInTheDocument();
+    expect(screen.getByText("No se pudo confirmar.")).toBeInTheDocument();
+  });
 });

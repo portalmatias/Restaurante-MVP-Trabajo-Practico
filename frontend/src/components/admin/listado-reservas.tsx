@@ -67,6 +67,11 @@ function correoSinRomper(email: string) {
   );
 }
 
+/** Minúsculas y sin acentos, para que «perez» encuentre «Pérez». */
+function sinAcentos(texto: string): string {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function fechaSinRomper(fecha: string): string {
   try {
     return formatearFechaLargaEs(fecha);
@@ -202,12 +207,14 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
   }
 
   const paginas = listado ? totalPaginas(listado.total) : 1;
-  const termino = busqueda.trim().toLowerCase();
+  const termino = sinAcentos(busqueda.trim());
+  // La fila con un aviso de una acción fallida no se oculta: la persona acaba de actuar sobre ella.
   const visibles = (listado?.items ?? []).filter(
     (r) =>
       termino === "" ||
+      r.id === avisoFila?.reservaId ||
       [r.codigoReserva, r.nombreCliente, r.emailCliente].some((dato) =>
-        dato.toLowerCase().includes(termino),
+        sinAcentos(dato).includes(termino),
       ),
   );
   const hayFiltros = Boolean(fecha || estado || zonaId || turnoId);
