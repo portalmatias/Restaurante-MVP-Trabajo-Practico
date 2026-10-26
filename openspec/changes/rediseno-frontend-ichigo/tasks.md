@@ -150,45 +150,119 @@ desde cero.
       `aria-pressed` cuando se elige otra tablilla, de que se alcanza con Tab y de que activarla
       no cambia la elección.
 
-## 4. Verificación manual (nada de esto está hecho)
+## 4. Verificación manual
 
-- [ ] 4.1 Navegador a **390 px** de ancho (Chrome, modo dispositivo): recorrer `/`,
+- [x] 4.1 Navegador a **390 px** de ancho (Chrome, modo dispositivo): recorrer `/`,
       `/reservas`, `/reservas/nueva` (elegir fecha y turno), `datos`, `resultado`, `exito`,
       `/reservas/consultar` y una ruta inexistente. En `/reservas/nueva`, recorrer el calendario con
       el dedo y con el teclado (flechas, Inicio, Fin, RePág y AvPág). Comprobar: sin scroll horizontal, acción
       principal visible sin desplazarse, botón fijo del Paso 1, objetivos táctiles de 44 px o
       más, tablillas legibles. Adjuntar capturas al PR.
-- [ ] 4.2 Navegador a **1440 px**: repetir el recorrido anterior y `/admin/login`, `/admin`,
+      Resultado (26/10/2026): Recorrido a 390 px con Playwright y Chromium (táctil emulado, no un dedo
+      real) por `/`, `/reservas`, `/reservas/nueva`, `resultado`, `datos`, `exito` (con una reserva
+      real en la base de desarrollo), `/reservas/consultar` y una ruta inexistente. Sin scroll
+      horizontal en ninguna pantalla; la acción principal se ve sin desplazarse en todas, y en el Paso
+      1 el botón es `sticky` (arriba en 768 px de 844). Objetivos táctiles: solo fallaban los días del
+      calendario (43,4 × 44 px); corregido en `calendario.tsx` y vuelto a medir: 44,3 px de ancho a
+      360 px de pantalla, 46,4 a 375 y 48 a 390 y a 1440, con 44 px de alto. Calendario con teclado:
+      flechas, Inicio, Fin, RePág y AvPág se mueven bien y los días cerrados se enfocan
+      (`aria-disabled`). Las capturas están en el scratchpad local: falta adjuntarlas a la descripción
+      del PR (6.1).
+
+- [x] 4.2 Navegador a **1440 px**: repetir el recorrido anterior y `/admin/login`, `/admin`,
       `/admin/reservas` y `/admin/salon`. Comprobar la composición de la landing en dos columnas,
       el panel a ancho completo y la tabla de reservas sin desbordes. Comprobar que en `/reservas/nueva`
       el calendario queda a la izquierda y que `/admin/**` no muestra el encabezado ni el pie
       públicos.
+      Resultado (26/10/2026): Mismo recorrido a 1440 px más el panel de admin. Páginas públicas sin
+      desbordes ni controles chicos. Landing en dos columnas (título en x=224 a 789 y primera imagen
+      en x=794 a 1244); en `/reservas/nueva` el calendario queda a la izquierda (x=224 a 640) y el
+      turno a la derecha (x=688 a 1216). `/admin/**` no muestra el encabezado ni el pie públicos, el
+      contenido ocupa el ancho completo y las tablas no desbordan. Los botones del admin miden 36 px a
+      1440 px: es el valor de diseño con puntero fino. Defecto encontrado y corregido: el correo de
+      `/admin/reservas` se partía a mitad de la dirección; vuelto a medir, de 7 correos 4 ocupan dos
+      líneas y ninguno se parte fuera de la arroba.
+
 - [ ] 4.3 Revisión de contraste: medir con una herramienta independiente (extensión de
       contraste del navegador o `webaim.org`) texto, bordes de controles, foco y sellos de las
       pantallas de 4.1 y 4.2, incluidos los estados `elegida`, `descartada` y `completa`.
       Confirmar 4,5:1 en texto y 3:1 en bordes; anotar cualquier incumplimiento como desvío.
-- [ ] 4.4 Estados en escala de grises (DevTools, emulación de visión): comprobar que los cuatro
+      Resultado parcial (26/10/2026): No se usó la herramienta externa que pide la tarea (extensión de
+      contraste o `webaim.org`). Se midió con una fórmula WCAG propia, sobre `getComputedStyle` de
+      cada texto y su fondo efectivo, en 16 pantallas y estados a los dos anchos: ningún texto activo
+      queda por debajo de 4,5:1 (3:1 si es grande; el mínimo medido es 5,52:1) y ningún borde de
+      control medido baja de 3:1. Los días cerrados del calendario (2,37:1) y «Anterior/Siguiente»
+      deshabilitados (3,18:1) son componentes inactivos, exentos por WCAG 1.4.3. No se midieron el
+      anillo de foco en el navegador ni la tablilla `completa` (ninguna pantalla la usa); el contraste
+      del foco y de los tokens lo fijan `globals-foco.test.ts` y `globals-contrastes.test.ts`. Queda
+      para una persona repetir la medición con la extensión o `webaim.org`.
+
+- [x] 4.4 Estados en escala de grises (DevTools, emulación de visión): comprobar que los cuatro
       estados de reserva y los niveles de aforo se distinguen sin color (spec `frontend-admin`).
-- [ ] 4.5 Movimiento: activar `prefers-reduced-motion: reduce` en DevTools y comprobar en `/`
+      Resultado (26/10/2026): Con `Emulation.setEmulatedVisionDeficiency` en `achromatopsia`, los
+      cuatro estados de reserva se distinguen: Ausente (guion), Confirmada (check con relleno),
+      Pendiente (reloj con borde rojo de 2 px) y Cancelada (cruz con borde punteado). Los niveles de
+      aforo se probaron interceptando la API: «Completo» y «Sobrecupo» llevaban el mismo pictograma y
+      relleno, y «Sin aforo» el check de «Con lugar», así que solo los separaba el texto. Corregido:
+      «Completo» lleva un cuadro lleno, «Sobrecupo» un triángulo lleno con borde grueso, «Sin aforo»
+      contorno punteado con un guion, «Casi lleno» un triángulo hueco y «Con lugar» un check. Vuelto a
+      medir con los cinco niveles y revisada la captura en grises: se distinguen por forma y por
+      texto.
+
+- [x] 4.5 Movimiento: activar `prefers-reduced-motion: reduce` en DevTools y comprobar en `/`
       que no hay balanceo, parallax, apertura de fotos ni entrada del nombre, y que el giro de la
       tablilla del Paso 1 es instantáneo. Repetir sin la preferencia para ver que sí hay movimiento.
       Probar además un navegador sin `animation-timeline` (por ejemplo Firefox estable) y
       confirmar que el contenido queda visible.
+      Resultado (26/10/2026): Sin la preferencia, los bloques `.revelar` arrancan transparentes y
+      aparecen al desplazar, y el giro de la tablilla dura 0,45 s con ángulos intermedios. Con
+      `prefers-reduced-motion: reduce` todas las animaciones quedan en `none`, todo en opacidad 1 y el
+      giro es instantáneo (180° a 0 ms). Sin `animation-timeline` se emuló quitando el bloque
+      `@supports (animation-timeline: view())` y el contenido queda visible. No se probó Firefox.
+
 - [ ] 4.6 Teclado y lector de pantalla: recorrer el Paso 1 solo con teclado (Tab, Enter, Espacio)
       y con NVDA o VoiceOver; comprobar el nombre de cada tablilla («20:00 a 23:30»), que el
       japonés no se lee, y que el foco llega al título al abrir el detalle y al volver al
       formulario, y al aviso «Tu reserva fue cancelada.» al cancelar una reserva.
-- [ ] 4.7 Red: con la caché vacía y la pestaña de red abierta en `/`, confirmar que no hay
+      Resultado parcial (26/10/2026): Hecho solo el recorrido por teclado, con Playwright. Tab sigue
+      un orden lógico; Enter y Espacio activan días, tablillas y zonas, y las flechas mueven la zona.
+      Los nombres accesibles de las tablillas son «12:00 a 15:00» y «20:00 a 23:30», y todos los
+      elementos `lang=ja` son `aria-hidden`. El foco llega al título al abrir el detalle y al volver
+      al formulario. Diálogo de cancelación: el foco no sale a la página; Escape y «Volver» lo
+      devuelven a «Cancelar mi reserva» y «Sí, cancelar» lo lleva al aviso «Tu reserva fue
+      cancelada.». No se pudo probar con NVDA ni VoiceOver: queda para una persona.
+
+- [x] 4.7 Red: con la caché vacía y la pestaña de red abierta en `/`, confirmar que no hay
       pedidos a `fonts.googleapis.com` ni `fonts.gstatic.com`, medir el peso transferido de las
       imágenes WebP (la suma de los archivos de `public/ichigo/` debe ser menor que 300 KB) y el desplazamiento acumulado de diseño (Lighthouse), y anotar los valores.
-- [ ] 4.8 Probar con el backend real y la base sembrada: provocar un `429` real en
+      Resultado (26/10/2026): Con un contexto nuevo (caché vacía) no hay ninguna solicitud externa a
+      390 ni a 1440 px, y ninguna a `fonts.googleapis.com` ni a `fonts.gstatic.com`. Las cinco
+      imágenes pesan 242.100 B en disco; transferidas, 70 KB a 390 px y 83 KB a 1440 px. El
+      desplazamiento acumulado de diseño (CLS) fue 0, medido con `PerformanceObserver`: no se usó
+      Lighthouse, que pide la tarea. El LCP fue de unos 208 ms, en modo desarrollo.
+
+- [x] 4.8 Probar con el backend real y la base sembrada: provocar un `429` real en
       `POST /reservas/consultar` y en `POST /reservas/{codigo}/cancelar` (son las rutas con
       límite), y una sesión de admin próxima a vencer (acortar `JWT_EXPIRES_IN` solo en local).
       Los `429` de `POST /reservas` y de `GET /zonas` no se pueden provocar con el backend actual
       (design D7): verificarlos con una respuesta simulada. Anotar qué se vio.
-- [ ] 4.9 Comprobar en `/admin/login?motivo=sesion-vencida` y `?motivo=renovar` que el mensaje
+      Resultado (26/10/2026): `429` reales: en `POST /reservas/consultar` aparece en el intento 11 con
+      el mensaje de demasiados intentos, y en `POST /reservas/{codigo}/cancelar` el diálogo sigue
+      abierto con el mensaje y la reserva sigue activa. `429` simulado en `GET /zonas`: sin
+      «Reintentar» ni «Cancelar mi reserva», con el texto de «no pudimos verificar». Sesión de admin
+      con `JWT_EXPIRES_IN=150s`: el aviso dice «vence en 3 minutos», después 2 y «1 minuto» en
+      singular; al vencer redirige a `?motivo=sesion-vencida` con el texto nuevo. «Renovar sesión»
+      lleva a `?motivo=renovar` y no dispara el mensaje de sesión vencida; un token alterado da `401`
+      y redirige a `sesion-vencida`. Dos pestañas: al cerrar sesión en una, la otra sigue en `/admin`
+      con su propia sesión (`sessionStorage` es por pestaña). No se simuló el `429` de `POST
+      /reservas`: lo cubre el test.
+
+- [x] 4.9 Comprobar en `/admin/login?motivo=sesion-vencida` y `?motivo=renovar` que el mensaje
       aparece (la página de login debe pasar `motivo` al formulario) y que los títulos de las
       pantallas de admin son aceptables; si no lo son, abrir una pregunta al equipo.
+      Resultado (26/10/2026): Los dos `?motivo=` muestran su mensaje, sin «60 minutos»; un motivo
+      desconocido no muestra ninguno. Los títulos «Aforo | Ichigo», «Reservas | Ichigo» y «Salón |
+      Ichigo» son aceptables.
 
 ## 5. Optimización y documentación
 
@@ -203,13 +277,17 @@ desde cero.
       tabla `cmap` de cada `.woff` y comprueba «Ñandú Pérez», «Güemes», «Córdoba» y demás nombres, la
       puntuación de la interfaz y todo carácter japonés del código. Límite documentado: `Ł`, `ő` y otras
       letras fuera de Latín-1 caen a la fuente del sistema. Falta solo la mirada en el flujo (4.x).
-- [ ] 5.2 Verificar las fotografías WebP de `frontend/public/ichigo/`: que son cinco `.webp`, que
+- [x] 5.2 Verificar las fotografías WebP de `frontend/public/ichigo/`: que son cinco `.webp`, que
       no queda ningún `.png`, que la suma pesa menos de 300 KB (hoy unos 240 KB), que cada una se
       ve aceptable en la landing a 390 y 1440px, y que `PROCEDENCIA.md` documenta la conversión
       (herramienta y calidad) y nombra los archivos `.webp`.
-      Resultado parcial (26/10/2026): las comprobaciones automáticas están hechas (cinco `.webp`, ningún
-      `.png`, 242 KB, `PROCEDENCIA.md` nombra los `.webp` y registra herramienta y calidad; ver 5.4).
-      Queda la mirada a 390 y 1440 px en la landing (verificación manual).
+      Resultado (26/10/2026): Cinco `.webp`, ningún `.png`, suma de 242.100 B (236,4 KiB), bajo el
+      tope de 300 KB. Las dimensiones reales de cada archivo coinciden con la tabla de
+      `PROCEDENCIA.md`, que documenta Pillow y calidad 82. A 390 y a 1440 px las fotos se ven
+      aceptables, todas cargan y tienen texto alternativo. Observación: a 390 px con densidad 3x
+      ninguna alcanza la resolución nativa (se sirven a 301 a 390 px), y `sake.webp` se estira 1,34
+      veces a 1440 px; es el costo del tope de 300 KB.
+
 - [x] 5.3 `identidad-visual-ichigo`, «Contrastes»: escribir un test que lea los tokens de
       `globals.css`, calcule las relaciones de contraste (fórmula WCAG 2.1) y falle por debajo
       de 4,5:1 (texto) o 3:1 (bordes), y que verifique que el rojo del sello sobre `madera`
