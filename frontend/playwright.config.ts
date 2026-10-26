@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 // desde la raíz (frontend en 3000, backend en 3001, con la base migrada y el seed). Otra URL:
 // `PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e -w frontend`.
 // Se usa `localhost` y no `127.0.0.1`: así lo trata el navegador en este equipo.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./e2e",
