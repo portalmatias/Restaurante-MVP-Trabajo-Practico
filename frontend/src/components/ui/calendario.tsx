@@ -138,10 +138,12 @@ export function Calendario({
 
   const mesDeHoy = partes(hoy);
   const mesDelLimite = partes(limite);
-  const esMesDeHoy =
-    visible.anio === mesDeHoy.anio && visible.mes0 === mesDeHoy.mes0;
-  const esMesDelLimite =
-    visible.anio === mesDelLimite.anio && visible.mes0 === mesDelLimite.mes0;
+  // Se compara el mes como número y con `<=` / `>=`, no con `===`: si el último día elegible cae en
+  // un mes anterior al visible (todas las zonas con `anticipacionMaxDias = 0` y hoy día 1), el botón
+  // tiene que quedar deshabilitado igual y no dejar avanzar meses sin fin entre días grisados.
+  const mesVisible = visible.anio * 12 + visible.mes0;
+  const esMesDeHoy = mesVisible <= mesDeHoy.anio * 12 + mesDeHoy.mes0;
+  const esMesDelLimite = mesVisible >= mesDelLimite.anio * 12 + mesDelLimite.mes0;
 
   function estado(iso: string): 'elegible' | 'pasado' | 'cerrado' | 'lejano' {
     if (iso < hoy) return 'pasado';

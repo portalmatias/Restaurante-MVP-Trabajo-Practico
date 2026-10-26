@@ -243,3 +243,25 @@ describe("objetivo táctil en pantallas angostas", () => {
     expect(tarjeta.className).toMatch(/\bsm:p-3\b/);
   });
 });
+
+// Revisión de #78: «Mes siguiente» solo se deshabilitaba si el mes visible era IGUAL al del límite.
+// Con todas las zonas en `anticipacionMaxDias = 0` y hoy día 1, el último día elegible (hoy + 0 - 1)
+// cae en el mes anterior al visible y se podía avanzar meses sin fin entre días grisados.
+describe("«Mes siguiente» con el límite en un mes anterior al visible", () => {
+  it("queda deshabilitado desde el principio y no avanza", () => {
+    render(<Asistente hoy="2026-10-01" hasta="2026-09-30" />);
+
+    const siguiente = screen.getByRole("button", { name: "Mes siguiente" });
+    expect(siguiente).toBeDisabled();
+    fireEvent.click(siguiente);
+    expect(screen.getAllByText(/octubre de 2026/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/noviembre de 2026/i)).not.toBeInTheDocument();
+    expect(document.querySelectorAll("button[data-fecha]:not([aria-disabled])")).toHaveLength(0);
+  });
+
+  it("el mes anterior también queda deshabilitado en el mes de hoy", () => {
+    render(<Asistente hoy="2026-10-01" hasta="2026-09-30" />);
+
+    expect(screen.getByRole("button", { name: "Mes anterior" })).toBeDisabled();
+  });
+});
