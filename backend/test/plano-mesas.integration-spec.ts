@@ -31,9 +31,10 @@ import { diaDe, hoyLocal, sumarDias } from './support/fechas-e2e';
  * las mesas que no son del seed.
  *
  * Fechas (design.md D8): las literales de la spec se traducen a fechas relativas a hoy (el
- * próximo sábado y el próximo lunes a 3 días o más), y el reloj del plano se fija al instante
- * en que arranca la suite. Así el veredicto se puede comparar con el de
- * `DisponibilidadService`, que usa el reloj real.
+ * próximo sábado y el próximo lunes a 3 días o más, lejos de los bordes de anticipación). El
+ * reloj del plano se reemplaza por el del sistema leído en cada consulta, el mismo que usa
+ * `DisponibilidadService`: con un reloj congelado, una corrida que cruzara un borde de hora
+ * podía dar veredictos distintos en la comparación entre los dos.
  */
 const SCHEMA = 'plano_mesas_servicio_test';
 
@@ -79,7 +80,6 @@ const CLAVES_MESA = [
 
 describe('PlanoMesasService (integración)', () => {
   const urlCompartida = process.env.DATABASE_URL;
-  const AHORA = new Date();
   const SABADO = proximo(DiaSemana.SABADO, 3);
   const LUNES = proximo(DiaSemana.LUNES, 3);
 
@@ -126,7 +126,7 @@ describe('PlanoMesasService (integración)', () => {
       ],
     })
       .overrideProvider(RELOJ)
-      .useValue(() => AHORA)
+      .useValue(() => new Date())
       .compile();
     process.env.DATABASE_URL = urlCompartida;
 
