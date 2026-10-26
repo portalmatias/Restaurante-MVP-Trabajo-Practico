@@ -146,7 +146,9 @@ jobs:
               exit 1
             fi
             {
-              digest="$(jq -r '.Manifest.Digest // empty' <<< "$consulta")"
+              # `{{json .}}` serializa con las claves en minúscula (`manifest.digest`), no con
+              # los nombres de los campos de Go (`.Manifest.Digest` da vacío).
+              digest="$(jq -r '.manifest.digest // empty' <<< "$consulta")"
               revision="$(jq -r '[.. | objects | select(has("Labels")) | .Labels["org.opencontainers.image.revision"] // empty] | first // ""' <<< "$consulta")"
               [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error title=Respuesta inesperada del registro::$referencia no devolvió un digest válido."; exit 1; }
               if [ "$revision" != "$SHA" ]; then
