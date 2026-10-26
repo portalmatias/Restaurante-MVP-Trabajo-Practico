@@ -118,27 +118,35 @@
 
 ## 4. Backend: controller, límite y contrato
 
-- [ ] 4.1 Escribir `backend/test/plano-mesas.e2e-spec.ts` (rojo): `200` sin token, `400` con
+- [x] 4.1 Escribir `backend/test/plano-mesas.e2e-spec.ts` (rojo): `200` sin token, `400` con
       `comensales=0`, `404` con turno o zona inexistentes, header `Cache-Control: no-store`,
       y `429` en la solicitud 121 tras enviar las 120 permitidas, todas reales (patrón de
       `throttle-rutas-admin.e2e-spec.ts`, que envía las 60 de admin sin bajar el límite: no se
       agrega ninguna variable de entorno); la solicitud rechazada no ejecuta consultas.
-- [ ] 4.2 Implementar `PlanoMesasController` con `@Throttle` (120 por 60 s, constante nombrada),
+      La solicitud 121 no ejecuta consultas: el spy de `PlanoMesasService.consultar` queda en 120.
+- [x] 4.2 Implementar `PlanoMesasController` con `@Throttle` (120 por 60 s, constante nombrada),
       `Cache-Control: no-store` y decoradores `@nestjs/swagger` en español, y
       `PlanoMesasModule` (importa `DisponibilidadModule` y `PrismaModule`); registrarlo en
       `AppModule`. Verificar que 4.1 pasa.
-- [ ] 4.3 Revisar cómo `scripts/openapi-diff.mjs` normaliza los tipos nulables
+- [x] 4.3 Revisar cómo `scripts/openapi-diff.mjs` normaliza los tipos nulables
       (`type: [integer, 'null']` frente a `nullable: true`) leyendo el script y su test
       (`npm run test:scripts`); definir la forma común antes de escribir el YAML: ambos lados deben usar la misma
       representación, porque el script no las equipara.
-- [ ] 4.4 Agregar a `openapi/openapi.yaml` el path `/plano-mesas` y los esquemas
+      Resultado (26/10/2026): `scripts/openapi-diff.mjs` no normaliza nulables y `@nestjs/swagger`
+      11 emite `nullable: true`. Forma común: `type: integer` + `nullable: true` en los dos lados.
+      Spectral lo acepta en 3.1 sin advertencias y `openapi-typescript` genera `number | null`.
+- [x] 4.4 Agregar a `openapi/openapi.yaml` el path `/plano-mesas` y los esquemas
       `PlanoMesasRespuesta`, `MesaPlano`, `EstadoMesaPlano` y `FormaMesa` (D2), con `400`, `404` y
       `429` y ejemplos, **sin** `additionalProperties` (ningún esquema actual lo usa y
       `openapi:check` lo contaría como deriva; la ausencia de claves de más la prueba la tarea
       3.4), y con texto idéntico al de los decoradores.
-- [ ] 4.5 Correr `npm run openapi:check` y `npm run openapi:lint`; resolver cualquier deriva
+      Nota: el ejemplo de `fecha` va entre comillas (`'2026-09-15'`): sin ellas el YAML lo lee como
+      fecha y `openapi:check` lo cuenta como deriva.
+- [x] 4.5 Correr `npm run openapi:check` y `npm run openapi:lint`; resolver cualquier deriva
       corrigiendo el decorador o el YAML, no el script.
-- [ ] 4.6 Regenerar el cliente con `npm run api:types` y verificar `api:types:check` del
+      Resultado: `openapi:check` sin deriva (con `backend/dist` recién compilado) y `openapi:lint`
+      sin errores ni advertencias.
+- [x] 4.6 Regenerar el cliente con `npm run api:types` y verificar `api:types:check` del
       frontend.
 
 ## 5. Frontend (estética Kakefuda: tokens de `frontend/app/globals.css`)

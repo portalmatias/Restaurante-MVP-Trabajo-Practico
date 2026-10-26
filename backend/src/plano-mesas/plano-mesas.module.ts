@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { DisponibilidadModule } from '../disponibilidad/disponibilidad.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PlanoMesasController } from './plano-mesas.controller';
 import { PlanoMesasService } from './plano-mesas.service';
 import { RELOJ, relojDelSistema } from './reloj';
 
@@ -12,6 +13,7 @@ import { RELOJ, relojDelSistema } from './reloj';
  */
 @Module({
   imports: [PrismaModule, DisponibilidadModule],
+  controllers: [PlanoMesasController],
   providers: [PlanoMesasService, { provide: RELOJ, useValue: relojDelSistema }],
 })
 export class PlanoMesasModule {}

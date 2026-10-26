@@ -17,6 +17,8 @@ servers:
 tags:
   - name: disponibilidad
     description: Consulta pública de disponibilidad de mesas (openspec/config.yaml §6).
+  - name: plano-mesas
+    description: Plano público de mesas de una zona con el estado de cada mesa (change plano-mesas).
   - name: Reservas
     description: >-
       Creación, consulta pública y listado de administrador de reservas
@@ -809,6 +811,120 @@ components:
         - diaSemana
         - horaInicio
         - horaFin
+    EstadoMesaPlano:
+      type: string
+      enum:
+        - LIBRE
+        - OCUPADA
+        - NO_ALCANZA
+      description: "Estado de la mesa para la fecha, el turno y los comensales consultados: `LIBRE` (no está ocupada y alcanza), `OCUPADA` (tiene una reserva pendiente o confirmada en ese turno y esa fecha) o `NO_ALCANZA` (no está ocupada, pero su capacidad es menor que los comensales)."
+    FormaMesa:
+      type: string
+      enum:
+        - REDONDA
+        - CUADRADA
+        - RECTANGULAR
+      description: Forma con la que se dibuja la mesa.
+    MesaPlano:
+      type: object
+      properties:
+        etiqueta:
+          type: string
+          description: Identificador legible de la mesa, único en el restaurante.
+          example: S3
+        capacidad:
+          type: integer
+          description: Comensales que entran en la mesa.
+          minimum: 1
+          example: 4
+        forma:
+          description: Forma con la que se dibuja la mesa.
+          allOf:
+            - $ref: "#/components/schemas/FormaMesa"
+        posX:
+          type: integer
+          nullable: true
+          description: Columna de la esquina superior izquierda de la mesa en la grilla, desde 0. Nulo si la mesa no está ubicada en el plano.
+          minimum: 0
+          example: 5
+        posY:
+          type: integer
+          nullable: true
+          description: Fila de la esquina superior izquierda de la mesa en la grilla, desde 0. Nulo si la mesa no está ubicada en el plano.
+          minimum: 0
+          example: 0
+        ancho:
+          type: integer
+          description: Ancho de la mesa en celdas.
+          minimum: 1
+          example: 2
+        alto:
+          type: integer
+          description: Alto de la mesa en celdas.
+          minimum: 1
+          example: 2
+        estado:
+          description: "Estado de la mesa para la fecha, el turno y los comensales consultados: `LIBRE` (no está ocupada y alcanza), `OCUPADA` (tiene una reserva pendiente o confirmada en ese turno y esa fecha) o `NO_ALCANZA` (no está ocupada, pero su capacidad es menor que los comensales)."
+          allOf:
+            - $ref: "#/components/schemas/EstadoMesaPlano"
+      description: Una mesa de la zona con su ubicación en el plano y su estado para la consulta. No incluye datos de las reservas.
+      required:
+        - etiqueta
+        - capacidad
+        - forma
+        - posX
+        - posY
+        - ancho
+        - alto
+        - estado
+    PlanoMesasRespuesta:
+      type: object
+      properties:
+        zona:
+          type: string
+          description: Zona del plano.
+          enum:
+            - STANDARD
+            - VIP
+          example: STANDARD
+        columnas:
+          type: integer
+          description: Columnas de la grilla del plano de la zona.
+          minimum: 1
+          example: 12
+        filas:
+          type: integer
+          description: Filas de la grilla del plano de la zona.
+          minimum: 1
+          example: 8
+        disponible:
+          type: boolean
+          description: "Igual que en `GET /disponibilidad`: `true` si y solo si `motivos` está vacío."
+          example: true
+        lugaresRestantes:
+          type: integer
+          description: "Igual que en `GET /disponibilidad`: comensales que todavía entran en ese turno y esa fecha."
+          minimum: 0
+          example: 36
+        motivos:
+          description: "Igual que en `GET /disponibilidad`: todas las reglas que impiden la reserva. Vacío si hay lugar."
+          type: array
+          items:
+            $ref: "#/components/schemas/MotivoNoDisponible"
+        mesas:
+          description: Todas las mesas de la zona, en orden natural de etiqueta (S2 antes que S10).
+          type: array
+          items:
+            $ref: "#/components/schemas/MesaPlano"
+      description: Plano de una zona con el estado de cada mesa y el mismo veredicto que `GET /disponibilidad`.
+      required:
+        - zona
+        - columnas
+        - filas
+        - disponible
+        - lugaresRestantes
+        - motivos
+        - mesas
 paths:
   /:
     get:
@@ -938,6 +1054,115 @@ paths:
                     statusCode: 404
                     message: No existe una zona con id b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
                     error: Not Found
+  /plano-mesas:
+    get:
+      description: "Devuelve el plano de una zona con el estado de cada mesa para una fecha, un turno y una cantidad de comensales: libre, ocupada o que no alcanza. Es informativo: no reserva ni bloquea nada y la mesa se asigna automáticamente al confirmar la reserva. Incluye el mismo veredicto que `GET /disponibilidad` (`disponible`, `lugaresRestantes`, `motivos`). No expone datos de las reservas, solo el estado de cada mesa. Es una ruta pública, sin autenticación, con límite de solicitudes."
+      operationId: PlanoMesasController_consultar
+      parameters:
+        - name: fecha
+          required: true
+          in: query
+          description: Fecha de calendario local del restaurante, sin hora (`YYYY-MM-DD`). Un instante con hora (por ejemplo `2026-09-15T12:00:00Z`) o una fecha inexistente se rechazan con `400`.
+          schema:
+            format: date
+            pattern: ^\d{4}-\d{2}-\d{2}$
+            example: '2026-09-15'
+            type: string
+        - name: turnoId
+          required: true
+          in: query
+          description: Id del turno a consultar.
+          schema:
+            format: uuid
+            example: 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
+            type: string
+        - name: zonaId
+          required: true
+          in: query
+          description: Id de la zona a consultar.
+          schema:
+            format: uuid
+            example: b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
+            type: string
+        - name: comensales
+          required: true
+          in: query
+          description: Cantidad de comensales de la reserva que se quiere hacer. Entero, mínimo 1.
+          schema:
+            minimum: 1
+            example: 1
+            type: integer
+      responses:
+        "200":
+          description: La consulta es válida. Devuelve la grilla de la zona, el veredicto de disponibilidad y todas las mesas con su estado. Que no haya lugar no es un error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanoMesasRespuesta"
+              examples:
+                conLugar:
+                  summary: STANDARD, 4 comensales, con la mesa S5 ocupada
+                  value:
+                    zona: STANDARD
+                    columnas: 12
+                    filas: 8
+                    disponible: true
+                    lugaresRestantes: 34
+                    motivos: []
+                    mesas:
+                      - etiqueta: S1
+                        capacidad: 2
+                        forma: REDONDA
+                        posX: 0
+                        posY: 0
+                        ancho: 1
+                        alto: 1
+                        estado: NO_ALCANZA
+                      - etiqueta: S3
+                        capacidad: 4
+                        forma: CUADRADA
+                        posX: 5
+                        posY: 0
+                        ancho: 2
+                        alto: 2
+                        estado: LIBRE
+                      - etiqueta: S5
+                        capacidad: 8
+                        forma: RECTANGULAR
+                        posX: 5
+                        posY: 3
+                        ancho: 4
+                        alto: 2
+                        estado: OCUPADA
+                      - etiqueta: S6
+                        capacidad: 4
+                        forma: RECTANGULAR
+                        posX: null
+                        posY: null
+                        ancho: 1
+                        alto: 1
+                        estado: LIBRE
+        "400":
+          description: "La consulta está mal formada: falta un parámetro, la fecha no es `YYYY-MM-DD` o no existe, un id no es UUID, o `comensales` no es un entero mayor o igual a 1."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorRespuesta"
+        "404":
+          description: El turno o la zona indicados no existen.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorRespuesta"
+        "429":
+          description: Se superó el límite de consultas del plano en la ventana configurada. Se rechaza antes de validar la consulta y de leer la base.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorRespuesta"
+      summary: Consultar el plano de mesas de una zona
+      tags:
+        - plano-mesas
   /zonas:
     get:
       summary: Catálogo público de Zonas
