@@ -50,6 +50,23 @@ const ESTADO_TRAS_ACCION: Record<Accion, EstadoReserva> = {
 
 const RUTA_LISTADO = "/admin/reservas";
 
+/**
+ * Un correo largo no debe partirse a mitad de la dirección (a 1440 px llegaba a verse «…@example.c» y
+ * «om» en dos líneas). El único punto de corte permitido es antes de la arroba, con `<wbr>`; si ni
+ * así entra, la tabla se desplaza dentro de su contenedor. El `title` deja el correo completo a mano.
+ */
+function correoSinRomper(email: string) {
+  const arroba = email.indexOf("@");
+  if (arroba <= 0) return <span title={email}>{email}</span>;
+  return (
+    <span title={email}>
+      {email.slice(0, arroba)}
+      <wbr />
+      {email.slice(arroba)}
+    </span>
+  );
+}
+
 function fechaSinRomper(fecha: string): string {
   try {
     return formatearFechaLargaEs(fecha);
@@ -384,7 +401,7 @@ function FilaReserva({
       <td className="whitespace-nowrap px-3 py-2">{reserva.mesa.etiqueta}</td>
       <td className="tabular px-3 py-2 text-right">{reserva.comensales}</td>
       <td className="px-3 py-2">{reserva.nombreCliente}</td>
-      <td className="break-all px-3 py-2">{reserva.emailCliente}</td>
+      <td className="px-3 py-2">{correoSinRomper(reserva.emailCliente)}</td>
       <td className="tabular whitespace-nowrap px-3 py-2">{reserva.telefonoCliente}</td>
       <td className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">

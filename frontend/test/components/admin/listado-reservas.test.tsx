@@ -95,6 +95,18 @@ describe("ListadoReservas - listado, filtros y paginación", () => {
     expect(primera.getByText("ana.perez@example.com")).toBeInTheDocument();
   });
 
+  // Tarea 4.2: a 1440 px el correo se partía a mitad de la dirección («diego.torres@example.c» y «om»).
+  // Ahora solo puede saltar antes de la arroba, y el correo completo queda en el `title`.
+  it("el correo no se parte a mitad de la dirección: solo puede saltar antes de la arroba", async () => {
+    await renderizar();
+
+    const celda = within(fila("PEND0001")).getByText("ana.perez@example.com").closest("td") as HTMLElement;
+    expect(celda.className).not.toMatch(/break-all/);
+    expect(celda.querySelectorAll("wbr")).toHaveLength(1);
+    expect(celda.innerHTML).toContain("ana.perez<wbr>@example.com");
+    expect(celda.querySelector("[title]")?.getAttribute("title")).toBe("ana.perez@example.com");
+  });
+
   it("pasa los filtros de la URL a la API", async () => {
     await renderizar({ estado: "PENDIENTE", fecha: "2026-10-02", zonaId: "z-vip", pagina: 1 });
 
