@@ -193,13 +193,18 @@
       escala de grises y con el lector de pantalla leyendo la lista. Con "reducir movimiento"
       activado en el sistema operativo, comprobar que el esqueleto no se anima. Adjuntar
       capturas al PR.
-- [ ] 6.2 Prueba manual de seguridad: con curl y sin token, consultar el plano de un turno con
+- [x] 6.2 Prueba manual de seguridad: con curl y sin token, consultar el plano de un turno con
       una reserva real del seed y confirmar a ojo que no aparece ningún dato personal ni id;
       comprobar el `429` excediendo el límite.
+      Resultado (26/10/2026), backend compilado contra la base de desarrollo con el seed: el plano de
+      los turnos con las reservas del seed en S3 (CONFIRMADA) y V1 (PENDIENTE) responde `200` con
+      `Cache-Control: no-store`, sin nombres, emails, códigos ni ids, y las dos mesas solo como
+      `OCUPADA`. Tras 120 consultas, la 121 responde `429`; `/disponibilidad` sigue en `200`.
 - [ ] 6.3 Correr `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`,
       `npm run test:e2e`, `npm run test:frontend`, `npm run test:scripts`, `npm run
       openapi:check` y `openspec validate --all --strict`; todo en verde, sin warnings nuevos.
-- [ ] 6.4 Actualizar el README (o la documentación de seed) con el layout del plano y la
+- [x] 6.4 Actualizar el README (o la documentación de seed) con el layout del plano y la
       nota de que el admin todavía no lo edita (D6).
+      README: sección «Plano de mesas del seed», con la nota de D6 y la de producción.
 - [ ] 6.5 Abrir el PR en español enlazado a este change, pedir la aprobación de un compañero y,
       una vez mergeado, archivar con `openspec archive plano-mesas`.
