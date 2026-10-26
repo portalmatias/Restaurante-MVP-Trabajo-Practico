@@ -78,7 +78,11 @@ describe('Salidas de admin de zonas y mesas sin las columnas del plano', () => {
   });
 
   it('PATCH /admin/zonas/:id: la zona actualizada trae solo las claves de ZonaRespuestaDto', async () => {
-    const zona = await zonas.actualizar(zonaStandardId, { aforoMaximo: 40 });
+    // Reescribe el valor que ya tiene: no cambia el estado que usan otras suites.
+    const { aforoMaximo } = await prisma.zona.findUniqueOrThrow({
+      where: { id: zonaStandardId },
+    });
+    const zona = await zonas.actualizar(zonaStandardId, { aforoMaximo });
     expect(claves(zona)).toEqual(CLAVES_ZONA);
   });
 

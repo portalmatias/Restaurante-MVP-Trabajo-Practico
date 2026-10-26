@@ -171,4 +171,26 @@ describe('Layout del plano en el seed (integración)', () => {
     });
     expect([s3.posX, s3.posY]).toEqual([5, 0]);
   });
+
+  it('seedPlano devuelve a su zona una mesa que el admin pasó a la otra', async () => {
+    await correrSeed();
+    const vip = await prisma.zona.findUniqueOrThrow({
+      where: { nombre: 'VIP' },
+    });
+    await prisma.mesa.update({
+      where: { etiqueta: 'S5' },
+      data: { zonaId: vip.id },
+    });
+
+    // Solo el plano, sin el catálogo (que también repone la zona): el layout de S5 es de
+    // STANDARD, así que dejarla en VIP la pondría fuera de la grilla de 10 por 6.
+    await seedPlano(prisma, silencio);
+
+    const s5 = await prisma.mesa.findUniqueOrThrow({
+      where: { etiqueta: 'S5' },
+      include: { zona: true },
+    });
+    expect(s5.zona.nombre).toBe('STANDARD');
+    expect([s5.posX, s5.posY]).toEqual([5, 3]);
+  });
 });

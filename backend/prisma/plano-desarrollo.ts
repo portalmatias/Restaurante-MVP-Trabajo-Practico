@@ -121,9 +121,18 @@ export async function seedPlano(
         },
       });
       for (const { etiqueta, forma, posX, posY, ancho, alto } of plano.mesas) {
+        // También la zona: el layout se validó contra la grilla de esta zona, así que una
+        // mesa que el admin pasó a la otra no puede quedar con estas coordenadas allá.
         await tx.mesa.update({
           where: { etiqueta },
-          data: { forma, posX, posY, ancho, alto },
+          data: {
+            forma,
+            posX,
+            posY,
+            ancho,
+            alto,
+            zona: { connect: { nombre: zona as NombreZona } },
+          },
         });
       }
     }
