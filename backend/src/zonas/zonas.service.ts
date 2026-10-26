@@ -13,6 +13,23 @@ import { ActualizarZonaDto } from './dto/actualizar-zona.dto';
 const SERIALIZACION_MAX_INTENTOS = 3;
 
 /**
+ * Campos que devuelven las rutas de admin de zonas (`ZonaRespuestaDto`). Lista de campos
+ * permitidos: una columna nueva de `Zona` (por ejemplo, las dimensiones del plano de
+ * `plano-mesas`) no sale por estas rutas hasta sumarla acá y al contrato.
+ */
+const SELECT_ZONA_ADMIN = {
+  id: true,
+  nombre: true,
+  minComensales: true,
+  maxComensales: true,
+  anticipacionMinHoras: true,
+  anticipacionMaxDias: true,
+  ventanaCancelacionHoras: true,
+  requiereConfirmacionAdmin: true,
+  aforoMaximo: true,
+} satisfies Prisma.ZonaSelect;
+
+/**
  * Solo lectura y actualización de configuración: `Zona.nombre` es un enum de Prisma con
  * exactamente dos valores (`STANDARD`, `VIP`, definidos en `modelo-dominio`), así que no
  * hay alta ni baja — ver design.md → "Zona: solo lectura y actualización, sin alta ni baja".
@@ -22,7 +39,7 @@ export class ZonasService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar() {
-    return this.prisma.zona.findMany();
+    return this.prisma.zona.findMany({ select: SELECT_ZONA_ADMIN });
   }
 
   /**
@@ -109,7 +126,11 @@ export class ZonasService {
           );
         }
 
-        return tx.zona.update({ where: { id }, data: dto });
+        return tx.zona.update({
+          where: { id },
+          data: dto,
+          select: SELECT_ZONA_ADMIN,
+        });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );

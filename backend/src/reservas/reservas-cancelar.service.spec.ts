@@ -58,6 +58,11 @@ describe('ReservasService.cancelar', () => {
         zonaId: 'zona-standard',
         capacidad: 4,
         etiqueta: 'S2',
+        posX: null,
+        posY: null,
+        ancho: 1,
+        alto: 1,
+        forma: 'RECTANGULAR',
         zona: {
           id: 'zona-standard',
           nombre: 'STANDARD',
@@ -68,6 +73,8 @@ describe('ReservasService.cancelar', () => {
           ventanaCancelacionHoras: overrides.ventanaCancelacionHoras ?? 2,
           requiereConfirmacionAdmin: false,
           aforoMaximo: 40,
+          planoColumnas: 12,
+          planoFilas: 8,
         },
       },
     };

@@ -9,6 +9,17 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MesasService } from './mesas.service';
 
+/**
+ * Campos exactos de `MesaRespuestaDto` (plano-mesas, tarea 2.8): las columnas del plano no
+ * salen por las rutas de admin.
+ */
+const SELECT_MESA_ADMIN = {
+  id: true,
+  zonaId: true,
+  capacidad: true,
+  etiqueta: true,
+};
+
 function errorPrisma(code: string) {
   return new Prisma.PrismaClientKnownRequestError('mock', {
     code,
@@ -82,7 +93,10 @@ describe('MesasService', () => {
 
       const dto = { zonaId: zonaStandard.id, capacidad: 6, etiqueta: 'M1' };
       await expect(service.crear(dto)).resolves.toEqual(mesa);
-      expect(prisma.mesa.create).toHaveBeenCalledWith({ data: dto });
+      expect(prisma.mesa.create).toHaveBeenCalledWith({
+        data: dto,
+        select: SELECT_MESA_ADMIN,
+      });
     });
 
     it('rechaza si la zona no existe', async () => {
@@ -123,7 +137,10 @@ describe('MesasService', () => {
       prisma.mesa.findMany.mockResolvedValue([mesa]);
 
       await expect(service.listar()).resolves.toEqual([mesa]);
-      expect(prisma.mesa.findMany).toHaveBeenCalledWith({ where: undefined });
+      expect(prisma.mesa.findMany).toHaveBeenCalledWith({
+        where: undefined,
+        select: SELECT_MESA_ADMIN,
+      });
     });
 
     it('filtra por zona cuando se especifica', async () => {
@@ -132,6 +149,7 @@ describe('MesasService', () => {
       await service.listar(zonaStandard.id);
       expect(prisma.mesa.findMany).toHaveBeenCalledWith({
         where: { zonaId: zonaStandard.id },
+        select: SELECT_MESA_ADMIN,
       });
     });
   });
@@ -177,6 +195,7 @@ describe('MesasService', () => {
       expect(prisma.mesa.update).toHaveBeenCalledWith({
         where: { id: mesa.id },
         data: { etiqueta: 'M1-nueva' },
+        select: SELECT_MESA_ADMIN,
       });
     });
 
@@ -229,6 +248,7 @@ describe('MesasService', () => {
       expect(prisma.mesa.update).toHaveBeenCalledWith({
         where: { id: mesa.id },
         data: { zonaId: zonaVip.id },
+        select: SELECT_MESA_ADMIN,
       });
     });
 

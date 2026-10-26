@@ -5,7 +5,7 @@
  * openspec/config.yaml §10:
  * - 1 usuario admin con credenciales conocidas (documentadas en el README, no son secreto).
  * - Las 2 zonas (STANDARD, VIP) con los valores de config.yaml §6.
- * - Mesas de capacidades variadas en cada zona.
+ * - Mesas de capacidades variadas en cada zona, ubicadas en el plano de su zona.
  * - Los 2 turnos base (almuerzo, cena), activos de martes a domingo.
  * - Algunas reservas de ejemplo en distintos estados.
  *
@@ -25,6 +25,7 @@ import {
   ADMIN_PASSWORD_DESARROLLO as ADMIN_PASSWORD,
 } from './admin-desarrollo';
 import { seedCatalogo } from './catalogo';
+import { seedPlano } from './plano-desarrollo';
 
 const prisma = new PrismaClient();
 
@@ -180,6 +181,9 @@ async function main() {
   // Catálogo compartido con el seed de producción (prisma/catalogo.ts, D8 de
   // despliegue-continuo-ec2): zonas, configuración global, mesas y turnos.
   const { mesas, turnos } = await seedCatalogo(prisma);
+
+  // Layout del plano de mesas, solo en desarrollo (ver prisma/plano-desarrollo.ts).
+  await seedPlano(prisma);
 
   console.log('Seed: reservas de ejemplo...');
   await seedReservas(mesas, turnos);

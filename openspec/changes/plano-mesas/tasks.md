@@ -1,44 +1,62 @@
 ## 1. Prerrequisitos
 
-- [ ] 1.1 Confirmar que el equipo respondió las preguntas abiertas 1, 3 y 5 de `design.md`
+- [x] 1.1 Confirmar que el equipo respondió las preguntas abiertas 1, 3 y 5 de `design.md`
       (elegir mesa, límite de solicitudes, editor de admin) y anotar la respuesta en el PR. No
       empezar el Grupo 3 sin la 3.
-- [ ] 1.2 Crear `feature/plano-mesas` desde `main` actualizado y verificar con `git log` que
+      Resultado (26/10/2026): el equipo confirmó las propuestas del diseño: 1) elegir mesa queda
+      fuera de alcance, para un change futuro; 3) 120 solicitudes por 60 s; 5) alcanza con el
+      layout del seed, sin editor de admin antes de la entrega.
+- [x] 1.2 Crear `feature/plano-mesas` desde `main` actualizado y verificar con `git log` que
       existen `backend/src/disponibilidad/contexto/cargar-contexto.ts`,
       `backend/src/reservas/elegir-mesa-best-fit.ts` y `frontend/src/lib/api/schema.d.ts`.
-- [ ] 1.3 Anotar en la descripción del PR cualquier diferencia entre lo asumido en `design.md`
+- [x] 1.3 Anotar en la descripción del PR cualquier diferencia entre lo asumido en `design.md`
       (firmas de `cargarContexto`, `evaluarReglas`, `calcularLugaresRestantes`) y el código real.
+      Resultado: las firmas coinciden. Diferencias: `contexto.zona` no trae `planoColumnas` ni
+      `planoFilas` (el service las lee aparte en la misma transacción, paso 4 de D2), y
+      `DisponibilidadService` usa `new Date()` sin reloj inyectado.
 
 ## 2. Modelo de datos y seed (tests primero)
 
-- [ ] 2.1 Escribir `backend/test/plano-mesas-modelo.integration-spec.ts` (rojo): una mesa nueva
+- [x] 2.1 Escribir `backend/test/plano-mesas-modelo.integration-spec.ts` (rojo): una mesa nueva
       tiene `posX/posY` nulos, `ancho/alto` 1 y `forma` `RECTANGULAR`; una zona nueva tiene
       `planoColumnas/planoFilas` 12 y 8; `posX` sin `posY`, `posX` o `posY` negativos, `ancho` o
       `alto` 0 y `planoColumnas` o `planoFilas` 0 son rechazados por la base. Verificar que falla.
-- [ ] 2.2 Agregar a `backend/prisma/schema.prisma` el enum `FormaMesa` y las columnas de `Mesa`
+- [x] 2.2 Agregar a `backend/prisma/schema.prisma` el enum `FormaMesa` y las columnas de `Mesa`
       (`posX`, `posY`, `ancho`, `alto`, `forma`) y de `Zona` (`planoColumnas`, `planoFilas`), con
       comentarios en español.
-- [ ] 2.3 Generar la migración con `prisma migrate dev --create-only --name plano_mesas` (sin
+- [x] 2.3 Generar la migración con `prisma migrate dev --create-only --name plano_mesas` (sin
       aplicarla). **Revisar el SQL**: quitar cualquier intento de reescribir el índice único parcial de `Reserva`, y agregar a
       mano los `CHECK` (`posX >= 0`, `posY >= 0`, ambos nulos o ambos no nulos, `ancho >= 1`,
       `alto >= 1`, `planoColumnas >= 1`, `planoFilas >= 1`). Recién entonces aplicarla con
       `prisma migrate dev`. Nunca `db push`. Verificar que 2.1 pasa y que `indices-partial.integration-spec.ts` sigue en verde.
-- [ ] 2.4 Escribir el test de migración sobre datos previos (rojo→verde): con mesas y reservas
+      Nota: `prisma migrate dev` no corre en una terminal no interactiva; el SQL se generó con
+      `prisma migrate diff` contra la base de desarrollo al día (mismo resultado) y se aplicó con
+      `prisma migrate deploy`. Se quitó el `CREATE UNIQUE INDEX` no parcial de `Reserva`.
+- [x] 2.4 Escribir el test de migración sobre datos previos (rojo→verde): con mesas y reservas
       cargadas antes de aplicar la migración, después conservan `id`, `zonaId`, `capacidad`, `etiqueta`
       y `mesaId`.
-- [ ] 2.5 Escribir `backend/src/plano-mesas/layout-plano.spec.ts` (rojo): la función pura
+      Verificado en rojo quitando la migración (`column "posX" does not exist`) y en verde con
+      ella (`plano-mesas-migracion.integration-spec.ts`).
+- [x] 2.5 Escribir `backend/src/plano-mesas/layout-plano.spec.ts` (rojo): la función pura
       `validarLayout(zona, mesas)` detecta mesa fuera de grilla y solapamiento, y acepta el
       layout de `design.md` D1. Implementarla en `backend/src/plano-mesas/layout-plano.ts` hasta
       que pase (el jest unitario solo recolecta `backend/src/**/*.spec.ts`; el seed la importa
       desde ahí).
-- [ ] 2.6 Actualizar `backend/prisma/seed.ts` con el layout de D1 (STANDARD 12×8, VIP 10×6) en
+- [x] 2.6 Actualizar `backend/prisma/seed.ts` con el layout de D1 (STANDARD 12×8, VIP 10×6) en
       el `create` y el `update` del `upsert` por `etiqueta`, y con las dimensiones de las zonas.
       Llamar a `validarLayout` antes de escribir. Verificar con un test de integración del seed
       que entra en la grilla, no se solapa y es idempotente (dos corridas, mismas posiciones).
-- [ ] 2.7 Confirmar a mano que `POST/PATCH /admin/mesas` siguen funcionando sin enviar las
+      Desvío acordado con el equipo (26/10/2026): el layout vive en `prisma/plano-desarrollo.ts`
+      y lo aplica solo `seed.ts` con `update` por clave natural, después del catálogo, y no en el
+      `upsert` de `prisma/catalogo.ts`. El catálogo también lo usa el seed de producción, que se
+      compila con `tsconfig.seed.json` (solo admite `prisma/`, y `validarLayout` vive en `src/`)
+      y no modifica mesas existentes. Cargar el plano en producción queda para un change propio.
+      Test: `plano-mesas-seed.integration-spec.ts`.
+- [x] 2.7 Confirmar a mano que `POST/PATCH /admin/mesas` siguen funcionando sin enviar las
       columnas nuevas (suite `gestion-salon-admin` y `mesas.integration-spec.ts` en verde).
+      Resultado: `gestion-salon-admin` y `mesas.integration-spec.ts`, 26 de 26.
 
-- [ ] 2.8 Escribir (rojo) un test de integración que fije las claves exactas (`Object.keys`
+- [x] 2.8 Escribir (rojo) un test de integración que fije las claves exactas (`Object.keys`
       iguales a las actuales, sin `posX`, `posY`, `ancho`, `alto`, `forma`, `planoColumnas` ni
       `planoFilas`) de las **cinco salidas** de admin que hoy devuelven la fila de Prisma:
       `GET /admin/zonas`, `PATCH /admin/zonas/:id`, `GET /admin/mesas`, `POST /admin/mesas` y
@@ -49,6 +67,8 @@
       sin `select`). Confirmar con `git grep` que no queda otra salida de `zona` o `mesa`
       que devuelva la fila completa (`eliminar` no devuelve cuerpo y los mappers de reservas ya
       eligen los campos). Verificar que pasa.
+      Test: `plano-mesas-salidas-admin.integration-spec.ts`. El resto de las lecturas de `zona` y
+      `mesa` sin `select` son internas (validaciones) y no se devuelven.
 
 ## 3. Backend: servicio y reglas del plano (tests primero)
 
