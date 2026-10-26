@@ -221,3 +221,25 @@ describe("Calendario - teclado", () => {
     expect(enfocado()).toBe("2026-09-30");
   });
 });
+
+describe("objetivo táctil en pantallas angostas", () => {
+  // jsdom no calcula el ancho: se fija por clases lo que midió el navegador a 390 px (tarea 4.1).
+  // La celda ocupa 1/7 del ancho útil de la tarjeta; con `p-0.5` en la celda y `p-3` en la tarjeta
+  // el botón medía 43,4 px (menos del mínimo de 44). Sin relleno horizontal en la celda y con
+  // tarjeta más ajustada en móvil, el botón llega a 44 px desde 360 px de ancho.
+  it("cada día mide al menos 44 px de alto y la celda no le quita ancho en móvil", () => {
+    render(<Asistente />);
+    const boton = dia("2026-09-15");
+    expect(boton.className).toMatch(/\bh-11\b/);
+    const celda = boton.closest("td");
+    expect(celda?.className).toMatch(/\bpx-0\b/);
+    expect(celda?.className).not.toMatch(/(^|\s)p-0\.5\b/);
+  });
+
+  it("la tarjeta usa un relleno menor en móvil y el normal desde sm", () => {
+    const { container } = render(<Asistente />);
+    const tarjeta = container.firstElementChild as HTMLElement;
+    expect(tarjeta.className).toMatch(/\bp-2\b/);
+    expect(tarjeta.className).toMatch(/\bsm:p-3\b/);
+  });
+});

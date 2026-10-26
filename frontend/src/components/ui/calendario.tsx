@@ -221,7 +221,7 @@ export function Calendario({
     <div
       ref={raiz}
       className={[
-        'w-full max-w-md rounded-sm border border-border bg-card p-3 text-card-foreground',
+        'w-full max-w-md rounded-sm border border-border bg-card p-2 text-card-foreground sm:p-3',
         className,
       ]
         .filter(Boolean)
@@ -230,7 +230,7 @@ export function Calendario({
       {/* Viga de madera de la que cuelga el mes. */}
       <div
         aria-hidden="true"
-        className="-mx-3 -mt-3 mb-3 h-2 rounded-t-sm bg-madera"
+        className="-mx-2 -mt-2 mb-3 h-2 rounded-t-sm bg-madera sm:-mx-3 sm:-mt-3"
       />
 
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -310,7 +310,7 @@ export function Calendario({
                     ? 'bg-background text-foreground hover:bg-muted'
                     : 'text-muted-foreground opacity-50';
                 return (
-                  <td key={iso} className="p-0.5 text-center">
+                  <td key={iso} className="px-0 py-0.5 text-center sm:px-0.5">
                     <button
                       type="button"
                       data-fecha={iso}
