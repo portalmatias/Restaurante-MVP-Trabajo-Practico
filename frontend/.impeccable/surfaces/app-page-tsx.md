@@ -17,7 +17,7 @@ Sin decidir: logotipo definitivo y fotografía.
 
 THESIS: La reserva es una pared de tablillas de madera (kakefuda): cada turno de la noche es una tablilla colgada y elegir es dar vuelta una. Rechaza el arreglo de la categoría: hero con foto, formulario al costado y fila de tarjetas iguales.
 
-OWN-WORLD: Fondo hinoki claro `#E8DCC4` con tinta sumi `#1F1813`; tablillas con borde fino de madera `#8A6A43` (3,66:1), un agujero y un cordón; el único rojo es el sello (`#9A2A19` como texto, `#B2321F` como relleno), nunca sobre madera oscura. Tipografía: Shippori Mincho para nombres, fechas y títulos; Zen Kaku Gothic New para la interfaz; texto horizontal y centrado en las tablillas (decisión del equipo: la legibilidad va antes que la escritura vertical tradicional). Esquinas casi rectas (2px), sin sombras salvo el contacto bajo la tablilla colgada. Sin degradados ni vidrio.
+OWN-WORLD: Fondo hinoki claro `#E8DCC4` con tinta sumi `#1F1813`; tablillas con borde fino de madera `#8A6A43` (3,66:1), un agujero y un cordón; el único rojo es el sello (`#9A2A19`, tanto como texto como relleno: es el único rojo de la paleta), nunca sobre madera oscura. Tipografía: Shippori Mincho para nombres, fechas y títulos; Zen Kaku Gothic New para la interfaz; texto horizontal y centrado en las tablillas (decisión del equipo: la legibilidad va antes que la escritura vertical tradicional). Esquinas casi rectas (2px), sin sombras salvo el contacto bajo la tablilla colgada. Sin degradados ni vidrio.
 
 STORY: El visitante entiende que los lugares de la noche son pocos y están contados; cree que es una experiencia íntima en una barra; reserva eligiendo fecha, dando vuelta una tablilla de turno y dejando sus datos, sin cuenta.
 
