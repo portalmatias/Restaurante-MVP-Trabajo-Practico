@@ -112,7 +112,7 @@ describe("AdminShell", () => {
         jest.advanceTimersByTime(20_000);
       });
 
-      expect(screen.getByRole("alert")).toHaveTextContent(/Tu sesión vence en \d minutos?/);
+      expect(screen.getByRole("group", { name: "Vencimiento de la sesión" })).toHaveTextContent(/Tu sesión vence en \d minutos?/);
       fireEvent.click(screen.getByRole("button", { name: "Renovar sesión" }));
       expect(replace).toHaveBeenCalledWith("/admin/login?motivo=renovar");
     } finally {
@@ -149,7 +149,7 @@ describe("AdminShell", () => {
         jest.advanceTimersByTime(1);
       });
 
-      expect(screen.getByRole("alert")).toHaveTextContent("Tu sesión vence en 1 minuto.");
+      expect(screen.getByRole("group", { name: "Vencimiento de la sesión" })).toHaveTextContent("Tu sesión vence en 1 minuto.");
     } finally {
       jest.useRealTimers();
     }
@@ -224,5 +224,87 @@ describe("AdminShell", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  // Revisión de #78: el aviso era `role="alert"` y su texto cambia cada minuto, así que un lector de
+  // pantalla lo repetía en cada cambio. El aviso visible no es una región viva; una región aparte,
+  // solo para lectores, anuncia nada más la primera aparición y el último minuto.
+  it("el aviso visible no es role=alert: no se vuelve a anunciar cada minuto", () => {
+    jest.useFakeTimers();
+    try {
+      guardarSesion(tokenQueVenceEn(180));
+      render(
+        <AdminShell>
+          <p>Contenido protegido</p>
+        </AdminShell>,
+      );
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Vencimiento de la sesión" })).toHaveTextContent(
+        /Tu sesión vence en 3 minutos/,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("la región viva anuncia al aparecer el aviso y al llegar al último minuto, no entre medio", () => {
+    jest.useFakeTimers();
+    try {
+      guardarSesion(tokenQueVenceEn(270));
+      render(
+        <AdminShell>
+          <p>Contenido protegido</p>
+        </AdminShell>,
+      );
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      const anuncio = screen.getByRole("status");
+      expect(anuncio).toHaveTextContent("Tu sesión vence en 5 minutos.");
+
+      act(() => {
+        jest.advanceTimersByTime(105_000);
+      });
+      expect(screen.getByRole("group", { name: "Vencimiento de la sesión" })).toHaveTextContent(
+        /Tu sesión vence en 3 minutos/,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent("Tu sesión vence en 5 minutos.");
+
+      act(() => {
+        jest.advanceTimersByTime(110_000);
+      });
+      expect(screen.getByRole("group", { name: "Vencimiento de la sesión" })).toHaveTextContent(
+        /Tu sesión vence en 1 minuto/,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent("Tu sesión vence en 1 minuto.");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // Revisión de #78, punto 2: la sesión vive en `sessionStorage`, que es propio de cada pestaña, y
+  // el panel no escucha el evento `storage`. Cerrar sesión en otra pestaña no toca esta: sigue con
+  // la suya hasta que venza, y no hay ningún camino que la mande a `?motivo=sesion-vencida`.
+  it("un evento de storage de otra pestaña no cierra ni redirige esta sesión", () => {
+    guardarSesion(TOKEN);
+    render(
+      <AdminShell>
+        <p>Contenido protegido</p>
+      </AdminShell>,
+    );
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: "admin-session", oldValue: "x", newValue: null }),
+      );
+    });
+
+    expect(replace).not.toHaveBeenCalled();
+    expect(screen.getByText("Contenido protegido")).toBeInTheDocument();
+    expect(leerSesion()).not.toBeNull();
   });
 });

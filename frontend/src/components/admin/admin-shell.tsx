@@ -28,6 +28,10 @@ const ENLACES = [
   { href: "/admin/reservas", etiqueta: "Reservas" },
 ] as const;
 
+function textoVencimiento(minutos: number): string {
+  return `Tu sesión vence en ${minutos} ${minutos === 1 ? "minuto" : "minutos"}.`;
+}
+
 // Suscripción vacía: solo sirve para distinguir el render del servidor del primero del cliente.
 function suscribirseSinCambios(): () => void {
   return () => {};
@@ -61,7 +65,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
   // pulsara «Cerrar sesión» venció (o la rechazó el backend).
   const tuvoSesion = useRef(false);
   const cerroAMano = useRef(false);
-  const [minutosRestantes, setMinutosRestantes] = useState<number>();
+  // `minutos` es lo que se ve; `anunciado` es lo que se lee en voz alta (solo la primera aparición
+  // del aviso y el último minuto: un texto que cambia cada minuto en una región viva se repetiría).
+  const [aviso, setAviso] = useState<{ minutos: number; anunciado: number }>();
 
   function rutaDeSalida(): string {
     return tuvoSesion.current && !cerroAMano.current ? RUTA_LOGIN_SESION_VENCIDA : RUTA_LOGIN;
@@ -98,13 +104,17 @@ export function AdminShell({ children }: { children: ReactNode }) {
     function controlar() {
       const sesion = leerSesion();
       if (!sesion) {
-        setMinutosRestantes(undefined);
+        setAviso(undefined);
         return;
       }
       const restanteMs = sesion.exp * 1000 - Date.now();
-      setMinutosRestantes(
-        restanteMs <= MINUTOS_AVISO_VENCIMIENTO * 60_000 ? Math.max(1, Math.ceil(restanteMs / 60_000)) : undefined,
-      );
+      const minutos =
+        restanteMs <= MINUTOS_AVISO_VENCIMIENTO * 60_000 ? Math.max(1, Math.ceil(restanteMs / 60_000)) : undefined;
+      setAviso((previo) => {
+        if (minutos === undefined) return undefined;
+        const anunciado = previo === undefined || (minutos === 1 && previo.anunciado !== 1) ? minutos : previo.anunciado;
+        return { minutos, anunciado };
+      });
     }
     const inicial = setTimeout(controlar, 0);
     const intervalo = setInterval(controlar, INTERVALO_CONTROL_MS);
@@ -166,15 +176,20 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </BotonCompacto>
         </div>
       </div>
-      {minutosRestantes !== undefined ? (
+      {aviso ? (
         <div className="mx-auto w-full max-w-screen-2xl px-4 pt-4 sm:px-6">
+          {/* Región viva solo para lectores de pantalla: ver `aviso.anunciado`. */}
+          <p role="status" className="sr-only">
+            {textoVencimiento(aviso.anunciado)}
+          </p>
           <Alert
             variant="error"
-            role="alert"
+            role="group"
+            aria-label="Vencimiento de la sesión"
             className="flex flex-wrap items-center justify-between gap-3"
           >
             <span>
-              Tu sesión vence en {minutosRestantes} {minutosRestantes === 1 ? "minuto" : "minutos"}.
+              {textoVencimiento(aviso.minutos)}{" "}
               Guardá lo que estés editando: al vencer, los cambios sin guardar se pierden.
             </span>
             <BotonCompacto variant="primary" onClick={renovarSesion}>
