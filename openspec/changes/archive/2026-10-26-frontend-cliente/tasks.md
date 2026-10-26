@@ -254,9 +254,10 @@
 
 ## 7. Cierre (Definition of Done, `config.yaml` §13)
 
-- [ ] 7.1 `openspec validate frontend-cliente --strict` pasa y todas las tareas de este
+- [x] 7.1 `openspec validate frontend-cliente --strict` pasa y todas las tareas de este
       archivo están marcadas o explícitamente pospuestas con su motivo. Verificar con el
       comando y revisando que no quede ningún `- [ ]` sin justificar.
+      Resultado (26/10/2026): "Change 'frontend-cliente' is valid"; no queda ningún `- [ ]`.
 - [x] 7.2 Verificación manual de accesibilidad visual (mismo criterio que D9 de
       `frontend-base`: sin herramienta automatizada) en 375px, 768px, 1024px y 1440px para las
       nueve pantallas: sin scroll horizontal, contraste de la insignia dorada y del texto sobre
@@ -285,11 +286,19 @@
       `npm test -w frontend`, con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`.
 - [x] 7.6 `npm run lint` y `npm run typecheck` (`tsc --noEmit`) en limpio, sin warnings nuevos,
       desde la raíz.
-- [ ] 7.7 CI en verde en el PR `feature/frontend-cliente`. Verificar en la pestaña Checks.
-- [ ] 7.8 PR con descripción en español, enlazado a `openspec/changes/frontend-cliente/`, con
+- [x] 7.7 CI en verde en el PR `feature/frontend-cliente`. Verificar en la pestaña Checks.
+      Resultado (26/10/2026): el change se entregó en varios PRs encadenados (#52, #53, #54,
+      #57, #61, #67) más el cierre de la verificación (#80); todos mergeados con los checks en
+      verde.
+- [x] 7.8 PR con descripción en español, enlazado a `openspec/changes/frontend-cliente/`, con
       el resultado de 7.2, las Open Questions de `design.md` resueltas o explícitamente
       pospuestas, y aprobado por un compañero distinto del autor. Verificar en GitHub.
-- [ ] 7.9 Después del merge, archivar el change con `openspec archive frontend-cliente` en su
+      Resultado (26/10/2026): los PRs de 7.7 tienen descripción en español, enlazan al change
+      y están aprobados por FedeWerk o lussofacundo-iresm; el resultado de 7.2 está en #80.
+      Open Questions: el campo de fecha se resolvió con `<Field type="date">` sin cambiar
+      `Field` (`formulario-seleccion.tsx`); el contrato estructurado de validación y el email
+      real quedan pospuestos a un change futuro, como indica `design.md`.
+- [x] 7.9 Después del merge, archivar el change con `openspec archive frontend-cliente` en su
       propio PR. Verificar que `openspec/specs/frontend-cliente/spec.md` existe en `main`.
 
 ## Notas de implementación (para la descripción del PR)
