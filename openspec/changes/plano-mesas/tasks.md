@@ -72,39 +72,49 @@
 
 ## 3. Backend: servicio y reglas del plano (tests primero)
 
-- [ ] 3.1 Escribir `backend/src/plano-mesas/estado-mesa.spec.ts` (rojo) para la función pura
+- [x] 3.1 Escribir `backend/src/plano-mesas/estado-mesa.spec.ts` (rojo) para la función pura
       `calcularEstadoMesa(mesa, mesasLibresIds, comensales)`: libre, ocupada, no alcanza,
       ocupada y chica ⇒ ocupada, capacidad exacta ⇒ libre. Incluir en
       `backend/src/plano-mesas/orden-mesas.spec.ts` la función pura `ordenarMesasPorEtiqueta`
       (orden natural: S1, S2, S10 y no S1, S10, S2).
-- [ ] 3.2 Implementar `backend/src/plano-mesas/estado-mesa.ts` y `orden-mesas.ts`. Verificar que
+- [x] 3.2 Implementar `backend/src/plano-mesas/estado-mesa.ts` y `orden-mesas.ts`. Verificar que
       3.1 pasa.
-- [ ] 3.3 Escribir `backend/test/plano-mesas.integration-spec.ts` (rojo) contra PostgreSQL real
+- [x] 3.3 Escribir `backend/test/plano-mesas.integration-spec.ts` (rojo) contra PostgreSQL real
       con los escenarios de la spec `plano-mesas`, **con fechas relativas a hoy o con el reloj
       inyectado** (las fechas literales de la spec son ilustrativas; ver `design.md`, D8): ocupada por `CONFIRMADA` y por `PENDIENTE`,
       liberada por `CANCELADA` y `NO_SHOW`, otra fecha/turno/zona no ocupa, no alcanza, mesa sin
       ubicar, veredicto igual al de `DisponibilidadService.consultar`, e invariante
       `existe mesa LIBRE ⇔ SIN_MESA_DISPONIBLE ∉ motivos` recorriendo una grilla de
       combinaciones.
-- [ ] 3.4 Agregar en el mismo archivo el test de **no fuga de datos**: con una reserva de nombre,
+      Nota: corre en un schema de Postgres propio con el seed de desarrollo cargado, porque los
+      escenarios afirman la lista exacta de mesas; las fechas son el próximo sábado y el próximo
+      lunes a 3 días o más, y el reloj del plano se fija al inicio de la suite.
+- [x] 3.4 Agregar en el mismo archivo el test de **no fuga de datos**: con una reserva de nombre,
       email, teléfono y código reconocibles, el cuerpo serializado no los contiene ni contiene
       el id de la reserva ni de la mesa; cada mesa tiene exactamente las ocho propiedades (`Object.keys` iguales a la lista del
       esquema, no solo "contiene").
-- [ ] 3.5 Crear `backend/src/plano-mesas/dto/` (`PlanoMesasRespuesta`, `MesaPlano`, enums con
+      Verificado que muerde: exponer el `id` de la mesa hace fallar 2 casos.
+- [x] 3.5 Crear `backend/src/plano-mesas/dto/` (`PlanoMesasRespuesta`, `MesaPlano`, enums con
       `enumName` `EstadoMesaPlano` y `FormaMesa`) con `@ApiProperty` y textos en español,
       reutilizando `ConsultarDisponibilidadDto`, `MotivoNoDisponible` y `ErrorRespuesta`.
-- [ ] 3.6 Implementar `PlanoMesasService.consultar` según D2, con el reloj inyectado: una
+      Nota: `zona` usa el enum en línea (como las demás respuestas), sin `enumName`; el contrato no
+      tiene un schema `NombreZona`.
+- [x] 3.6 Implementar `PlanoMesasService.consultar` según D2, con el reloj inyectado: una
       transacción `RepeatableRead` de solo lectura que ejecuta `cargarContexto(tx, …)` y la
       lectura de mesas con `select` explícito, y después `evaluarReglas`,
       `calcularLugaresRestantes`, el estado vía `calcularEstadoMesa` sobre
       `contexto.mesasLibres` y el orden con `ordenarMesasPorEtiqueta`. Verificar que 3.3 y 3.4
       pasan y que el service no toma locks ni escribe.
-- [ ] 3.7 Escribir el test de consistencia con la creación (rojo→verde): plano, creación de
+      Nota: además del aislamiento `RepeatableRead`, la transacción declara `SET TRANSACTION READ
+      ONLY`. El reloj es el provider `RELOJ` del módulo.
+- [x] 3.7 Escribir el test de consistencia con la creación (rojo→verde): plano, creación de
       reserva con los mismos datos, y la mesa asignada estaba `LIBRE`; luego el plano la muestra
       `OCUPADA`. Reutilizar los helpers de `reservas-crear`.
-- [ ] 3.8 Escribir el test de concurrencia (patrón de `reservas-concurrencia.integration-spec.ts`):
+      Nota: el plano ya existía al escribirlo, así que se vio directamente en verde.
+- [x] 3.8 Escribir el test de concurrencia (patrón de `reservas-concurrencia.integration-spec.ts`):
       dos creaciones sobre la última mesa que alcanza, una gana, y el plano posterior la muestra
       `OCUPADA`. Confirmar que el plano no toma locks ni escribe (inspección del service).
+      Inspección: el service no llama a `bloquearTurnoFecha` y su transacción es de solo lectura.
 
 ## 4. Backend: controller, límite y contrato
 
