@@ -48,6 +48,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
       lang="es-AR"
+      data-scroll-behavior="smooth"
       className={`${mincho.variable} ${gothic.variable} ${marca.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">

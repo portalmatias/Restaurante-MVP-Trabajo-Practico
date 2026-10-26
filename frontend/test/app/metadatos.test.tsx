@@ -49,4 +49,12 @@ describe("Metadatos del documento", () => {
 
     expect(html).toMatch(/^<html[^>]* lang="es-AR"/);
   });
+
+  // Next avisa en consola cuando `globals.css` declara `scroll-behavior: smooth` en <html> y el
+  // elemento no trae `data-scroll-behavior="smooth"` (tarea 4.8: apareció como «1 Issue» en /admin).
+  it("el <html> declara data-scroll-behavior=\"smooth\" porque globals.css activa el desplazamiento suave", () => {
+    const html = renderToStaticMarkup(<RootLayout params={Promise.resolve({})}>contenido</RootLayout>);
+
+    expect(html).toMatch(/^<html[^>]* data-scroll-behavior="smooth"/);
+  });
 });
