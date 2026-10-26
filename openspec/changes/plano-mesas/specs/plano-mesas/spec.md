@@ -2,7 +2,7 @@
 Permite que cualquier persona, sin cuenta, vea el plano del salón de una zona del restaurante
 Ichigo con el estado de cada mesa (libre, ocupada o que no alcanza) para una fecha, un turno y
 una cantidad de comensales, y lo presenta en el paso 2 de la reserva de forma accesible. Es
-informativo: la mesa se sigue asignando de forma automática al confirmar la reserva.
+informativo: la mesa se sigue asignando de forma automática al crear la reserva.
 
 Los escenarios usan los datos del seed: zona STANDARD (mesas S1 y S2 de 2 comensales, S3 de 4,
 S4 de 6 y S5 de 8; grilla de 12 por 8), zona VIP (mesas V1 de 2, V2 de 4, V3 de 6 y V4 de 12;

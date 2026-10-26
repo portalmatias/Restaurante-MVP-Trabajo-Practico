@@ -9,6 +9,22 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ZonasService } from './zonas.service';
 
+/**
+ * Campos exactos de `ZonaRespuestaDto` (plano-mesas, tarea 2.8): las columnas del plano no
+ * salen por las rutas de admin.
+ */
+const SELECT_ZONA_ADMIN = {
+  id: true,
+  nombre: true,
+  minComensales: true,
+  maxComensales: true,
+  anticipacionMinHoras: true,
+  anticipacionMaxDias: true,
+  ventanaCancelacionHoras: true,
+  requiereConfirmacionAdmin: true,
+  aforoMaximo: true,
+};
+
 function errorSerializacion() {
   return new Prisma.PrismaClientKnownRequestError('mock', {
     code: 'P2034',
@@ -63,6 +79,9 @@ describe('ZonasService', () => {
       prisma.zona.findMany.mockResolvedValue([zonaVip]);
 
       await expect(service.listar()).resolves.toEqual([zonaVip]);
+      expect(prisma.zona.findMany).toHaveBeenCalledWith({
+        select: SELECT_ZONA_ADMIN,
+      });
     });
   });
 
@@ -123,6 +142,7 @@ describe('ZonasService', () => {
       expect(prisma.zona.update).toHaveBeenCalledWith({
         where: { id: zonaVip.id },
         data: dto,
+        select: SELECT_ZONA_ADMIN,
       });
       expect(resultado.aforoMaximo).toBe(25);
       expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {

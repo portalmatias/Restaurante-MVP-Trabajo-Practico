@@ -16,6 +16,18 @@ const ESTADOS_RESERVA_ACTIVA = ['PENDIENTE', 'CONFIRMADA'] as const;
 /** Reintentos ante conflicto de serialización (mismo patrón que `ReservasService`). */
 const SERIALIZACION_MAX_INTENTOS = 3;
 
+/**
+ * Campos que devuelven las rutas de admin de mesas (`MesaRespuestaDto`). Lista de campos
+ * permitidos: una columna nueva de `Mesa` (por ejemplo, la posición en el plano de
+ * `plano-mesas`) no sale por estas rutas hasta sumarla acá y al contrato.
+ */
+const SELECT_MESA_ADMIN = {
+  id: true,
+  zonaId: true,
+  capacidad: true,
+  etiqueta: true,
+} satisfies Prisma.MesaSelect;
+
 function esCapacidadInvalida(capacidad: number): boolean {
   return !Number.isInteger(capacidad) || capacidad <= 0;
 }
@@ -45,7 +57,10 @@ export class MesasService {
     }
 
     try {
-      return await this.prisma.mesa.create({ data: dto });
+      return await this.prisma.mesa.create({
+        data: dto,
+        select: SELECT_MESA_ADMIN,
+      });
     } catch (error) {
       throw this.traducirErrorDePrisma(error, 'crear');
     }
@@ -54,6 +69,7 @@ export class MesasService {
   async listar(zonaId?: string) {
     return this.prisma.mesa.findMany({
       where: zonaId ? { zonaId } : undefined,
+      select: SELECT_MESA_ADMIN,
     });
   }
 
@@ -144,7 +160,11 @@ export class MesasService {
           }
         }
 
-        return tx.mesa.update({ where: { id }, data: dto });
+        return tx.mesa.update({
+          where: { id },
+          data: dto,
+          select: SELECT_MESA_ADMIN,
+        });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );

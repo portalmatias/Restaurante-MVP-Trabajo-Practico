@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plano-mesas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consultar el plano de mesas de una zona
+         * @description Devuelve el plano de una zona con el estado de cada mesa para una fecha, un turno y una cantidad de comensales: libre, ocupada o que no alcanza. Es informativo: no reserva ni bloquea nada y la mesa se asigna automáticamente al crear la reserva. Incluye el mismo veredicto que `GET /disponibilidad` (`disponible`, `lugaresRestantes`, `motivos`). No expone datos de las reservas, solo el estado de cada mesa. Es una ruta pública, sin autenticación, con límite de solicitudes.
+         */
+        get: operations["PlanoMesasController_consultar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/zonas": {
         parameters: {
             query?: never;
@@ -911,6 +931,86 @@ export interface components {
             /** @example 1970-01-01T23:30:00.000Z */
             horaFin: string;
         };
+        /**
+         * @description Estado de la mesa para la fecha, el turno y los comensales consultados: `LIBRE` (no está ocupada y alcanza), `OCUPADA` (tiene una reserva pendiente o confirmada en ese turno y esa fecha) o `NO_ALCANZA` (no está ocupada, pero su capacidad es menor que los comensales).
+         * @enum {string}
+         */
+        EstadoMesaPlano: "LIBRE" | "OCUPADA" | "NO_ALCANZA";
+        /**
+         * @description Forma con la que se dibuja la mesa.
+         * @enum {string}
+         */
+        FormaMesa: "REDONDA" | "CUADRADA" | "RECTANGULAR";
+        /** @description Una mesa de la zona con su ubicación en el plano y su estado para la consulta. No incluye datos de las reservas. */
+        MesaPlano: {
+            /**
+             * @description Identificador legible de la mesa, único en el restaurante.
+             * @example S3
+             */
+            etiqueta: string;
+            /**
+             * @description Comensales que entran en la mesa.
+             * @example 4
+             */
+            capacidad: number;
+            /** @description Forma con la que se dibuja la mesa. */
+            forma: components["schemas"]["FormaMesa"];
+            /**
+             * @description Columna de la esquina superior izquierda de la mesa en la grilla, desde 0. Nulo si la mesa no está ubicada en el plano.
+             * @example 5
+             */
+            posX: number | null;
+            /**
+             * @description Fila de la esquina superior izquierda de la mesa en la grilla, desde 0. Nulo si la mesa no está ubicada en el plano.
+             * @example 0
+             */
+            posY: number | null;
+            /**
+             * @description Ancho de la mesa en celdas.
+             * @example 2
+             */
+            ancho: number;
+            /**
+             * @description Alto de la mesa en celdas.
+             * @example 2
+             */
+            alto: number;
+            /** @description Estado de la mesa para la fecha, el turno y los comensales consultados: `LIBRE` (no está ocupada y alcanza), `OCUPADA` (tiene una reserva pendiente o confirmada en ese turno y esa fecha) o `NO_ALCANZA` (no está ocupada, pero su capacidad es menor que los comensales). */
+            estado: components["schemas"]["EstadoMesaPlano"];
+        };
+        /** @description Plano de una zona con el estado de cada mesa y el mismo veredicto que `GET /disponibilidad`. */
+        PlanoMesasRespuesta: {
+            /**
+             * @description Zona del plano.
+             * @example STANDARD
+             * @enum {string}
+             */
+            zona: "STANDARD" | "VIP";
+            /**
+             * @description Columnas de la grilla del plano de la zona.
+             * @example 12
+             */
+            columnas: number;
+            /**
+             * @description Filas de la grilla del plano de la zona.
+             * @example 8
+             */
+            filas: number;
+            /**
+             * @description Igual que en `GET /disponibilidad`: `true` si y solo si `motivos` está vacío.
+             * @example true
+             */
+            disponible: boolean;
+            /**
+             * @description Igual que en `GET /disponibilidad`: comensales que todavía entran en ese turno y esa fecha.
+             * @example 36
+             */
+            lugaresRestantes: number;
+            /** @description Igual que en `GET /disponibilidad`: todas las reglas que impiden la reserva. Vacío si hay lugar. */
+            motivos: components["schemas"]["MotivoNoDisponible"][];
+            /** @description Todas las mesas de la zona, en orden natural de etiqueta (S2 antes que S10). */
+            mesas: components["schemas"]["MesaPlano"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -978,6 +1078,62 @@ export interface operations {
             };
             /** @description El turno o la zona indicados no existen. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+        };
+    };
+    PlanoMesasController_consultar: {
+        parameters: {
+            query: {
+                /** @description Fecha de calendario local del restaurante, sin hora (`YYYY-MM-DD`). Un instante con hora (por ejemplo `2026-09-15T12:00:00Z`) o una fecha inexistente se rechazan con `400`. */
+                fecha: string;
+                /** @description Id del turno a consultar. */
+                turnoId: string;
+                /** @description Id de la zona a consultar. */
+                zonaId: string;
+                /** @description Cantidad de comensales de la reserva que se quiere hacer. Entero, mínimo 1. */
+                comensales: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La consulta es válida. Devuelve la grilla de la zona, el veredicto de disponibilidad y todas las mesas con su estado. Que no haya lugar no es un error. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanoMesasRespuesta"];
+                };
+            };
+            /** @description La consulta está mal formada: falta un parámetro, la fecha no es `YYYY-MM-DD` o no existe, un id no es UUID, o `comensales` no es un entero mayor o igual a 1. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description El turno o la zona indicados no existen. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorRespuesta"];
+                };
+            };
+            /** @description Se superó el límite de consultas del plano en la ventana configurada. Se rechaza antes de validar la consulta y de leer la base. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

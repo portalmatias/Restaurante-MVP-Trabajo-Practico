@@ -150,6 +150,34 @@ npm run dev                   # levanta backend y frontend
 > `db:seed`) corre con el working directory en `backend/` y solo mira ahí. Ambos archivos
 > están en `.gitignore` — nunca se commitean.
 
+### Plano de mesas del seed
+
+El seed de desarrollo ubica cada mesa en una grilla lógica de su zona (change `plano-mesas`),
+que es lo que dibuja `GET /plano-mesas`. Coordenadas desde 0, esquina superior izquierda;
+tamaño en celdas (`ancho × alto`):
+
+| Zona (grilla) | Mesa | Capacidad | Forma | Posición | Tamaño |
+|---|---|---|---|---|---|
+| STANDARD (12 × 8) | S1 | 2 | Redonda | 0, 0 | 1 × 1 |
+| | S2 | 2 | Redonda | 2, 0 | 1 × 1 |
+| | S3 | 4 | Cuadrada | 5, 0 | 2 × 2 |
+| | S4 | 6 | Rectangular | 0, 3 | 3 × 2 |
+| | S5 | 8 | Rectangular | 5, 3 | 4 × 2 |
+| VIP (10 × 6) | V1 | 2 | Redonda | 0, 0 | 1 × 1 |
+| | V2 | 4 | Cuadrada | 3, 0 | 2 × 2 |
+| | V3 | 6 | Rectangular | 0, 3 | 3 × 2 |
+| | V4 | 12 | Rectangular | 4, 3 | 6 × 2 |
+
+El layout está en `backend/prisma/plano-desarrollo.ts` y se valida antes de escribirlo (nada
+fuera de la grilla, nada superpuesto). Volver a correr `db:seed` lo restaura.
+
+- **El admin todavía no edita el plano.** Una mesa nueva creada desde `/admin/mesas` queda
+  "sin ubicar": no se dibuja, pero aparece en la lista textual del plano y se asigna igual que
+  las demás. El editor queda para un change siguiente.
+- **Producción no carga este layout.** El seed de producción no modifica mesas existentes, así
+  que allí el plano muestra solo la lista textual hasta que un change propio cargue las
+  posiciones.
+
 ## Puertos y bases
 
 | Qué | Dónde |
@@ -311,6 +339,10 @@ Los dos leen la base de **test**, nunca la de desarrollo:
   `.env`: los `setup` de Jest de e2e e integración cargan el `.env` de la raíz y el de
   `backend/`, y lo que ya esté exportado en tu terminal tiene prioridad. En CI llegan como
   variables del workflow.
+- **Un rol que pueda crear y borrar bases.** `plano-mesas-migracion.integration-spec.ts`
+  crea una base descartable con `CREATE DATABASE` y la borra con `DROP DATABASE` al terminar.
+  El usuario `postgres` del `docker compose` y el de CI ya pueden; con otro rol, dale
+  `CREATEDB`.
 - **`DATABASE_URL_TEST`** (opcional). La base que usan los tests: si no está definida, cae a
   `postgresql://postgres:postgres@localhost:5432/reservas_test`. Se puede definir en el `.env`.
 

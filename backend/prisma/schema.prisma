@@ -53,6 +53,13 @@ enum DiaSemana {
   DOMINGO
 }
 
+/// Forma con la que se dibuja una Mesa en el plano de su Zona (change `plano-mesas`).
+enum FormaMesa {
+  REDONDA
+  CUADRADA
+  RECTANGULAR
+}
+
 /// Administrador del sistema. Único usuario con cuenta — el cliente reserva sin cuenta
 /// (config.yaml §5).
 model Usuario {
@@ -78,6 +85,10 @@ model Zona {
   requiereConfirmacionAdmin Boolean    @default(false)
   /// Aforo máximo de comensales simultáneos para esta Zona (invariante 4).
   aforoMaximo               Int
+  /// Ancho y alto de la grilla lógica del plano de la Zona, en celdas. La migración
+  /// `plano_mesas` agrega un CHECK que exige que ambos sean al menos 1.
+  planoColumnas             Int        @default(12)
+  planoFilas                Int        @default(8)
   mesas                     Mesa[]
 }
 
@@ -92,6 +103,17 @@ model Mesa {
   /// (sin este @@unique, dos corridas concurrentes del seed podían crear la misma mesa
   /// duplicada — ver hallazgo de review del PR #12).
   etiqueta  String    @unique
+  /// Esquina superior izquierda de la Mesa en la grilla del plano de su Zona (base 0, en
+  /// celdas). Ambas nulas = mesa sin ubicar: no se dibuja, pero sigue siendo asignable. La
+  /// migración `plano_mesas` agrega CHECK para que sean ambas nulas o ambas no nulas, y no
+  /// negativas. Que la mesa entre en la grilla cruza dos tablas: lo valida quien escribe la
+  /// posición (hoy, el seed con `validarLayout`).
+  posX      Int?
+  posY      Int?
+  /// Tamaño de la Mesa en el plano, en celdas (CHECK: al menos 1).
+  ancho     Int       @default(1)
+  alto      Int       @default(1)
+  forma     FormaMesa @default(RECTANGULAR)
   reservas  Reserva[]
 
   @@index([zonaId])
@@ -116,14 +138,14 @@ model Turno {
 /// El campo `estado` SOLO se escribe desde el método `transicionarEstado` del service
 /// (design.md, invariante 5) — nunca con un `update` genérico.
 model Reserva {
-  id        String        @id @default(uuid())
-  mesaId    String
-  mesa      Mesa          @relation(fields: [mesaId], references: [id])
-  turnoId   String
-  turno     Turno         @relation(fields: [turnoId], references: [id])
-  fecha     DateTime      @db.Date
+  id         String        @id @default(uuid())
+  mesaId     String
+  mesa       Mesa          @relation(fields: [mesaId], references: [id])
+  turnoId    String
+  turno      Turno         @relation(fields: [turnoId], references: [id])
+  fecha      DateTime      @db.Date
   comensales Int
-  estado    EstadoReserva @default(PENDIENTE)
+  estado     EstadoReserva @default(PENDIENTE)
 
   // Datos de contacto del cliente sin cuenta (config.yaml §5).
   nombreCliente   String

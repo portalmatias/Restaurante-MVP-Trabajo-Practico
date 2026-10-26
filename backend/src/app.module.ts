@@ -11,6 +11,7 @@ import { ReservasModule } from './reservas/reservas.module';
 import { ZonasModule } from './zonas/zonas.module';
 import { MesasModule } from './mesas/mesas.module';
 import { HorariosModule } from './horarios/horarios.module';
+import { PlanoMesasModule } from './plano-mesas/plano-mesas.module';
 
 @Module({
   imports: [
@@ -59,6 +60,9 @@ import { HorariosModule } from './horarios/horarios.module';
     // auth. Reusa las funciones sueltas de `disponibilidad/` (no el `DisponibilidadModule`)
     // e importa `PrismaModule` igual que los de arriba.
     ReservasModule,
+    // `PlanoMesasModule` (change `plano-mesas`) expone `GET /plano-mesas`, público y sin
+    // auth, con su propio límite de solicitudes. Reusa el validador de `DisponibilidadModule`.
+    PlanoMesasModule,
   ],
   controllers: [AppController],
   providers: [

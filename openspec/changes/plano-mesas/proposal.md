@@ -40,7 +40,7 @@ sin filtrar datos de terceros y dibujarlo de forma accesible.
 - **Contrato**: `openapi/openapi.yaml` incorpora `GET /plano-mesas` y sus esquemas; el cliente
   tipado del frontend se regenera (`npm run api:types`).
 - **No** cambia ninguna regla de negocio ni la asignación: sigue siendo automática (*best fit*)
-  al confirmar la reserva. El plano es **informativo**.
+  al crear la reserva. El plano es **informativo**.
 
 ## Capabilities
 
