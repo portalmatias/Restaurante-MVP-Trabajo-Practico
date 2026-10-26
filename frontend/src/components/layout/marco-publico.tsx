@@ -15,6 +15,10 @@ function esRutaDeAdmin(ruta: string | null): boolean {
  * encabezado público ni el pie (no tiene sentido mezclar la navegación del cliente con la del
  * personal). Decide por la ruta en vez de mover las páginas a grupos de rutas, para no cambiar
  * la estructura de `app/`.
+ *
+ * `/admin/login` tampoco lleva el marco público, y es a propósito: la spec `frontend-base`
+ * («El panel de administración no muestra el marco público») lo nombra de forma expresa, y la
+ * pantalla trae su propio título. No exige un encabezado propio para el login.
  */
 export function MarcoPublico({ children }: { children: ReactNode }) {
   const enAdmin = esRutaDeAdmin(usePathname());
