@@ -93,7 +93,7 @@
 
 ## 5. Despliegue en la instancia y workflow de CD (D4, D7, D10)
 
-- [ ] 5.1 Escribir `deploy/desplegar.sh` según D7:
+- [x] 5.1 Escribir `deploy/desplegar.sh` según D7:
       - validación de `sha`, digests y `modo`, y `flock`;
       - validación del `.env` (D6): existe, es de `root` con modo `600` o `400`, tiene
         `JWT_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `SITE_ADDRESS` con
@@ -117,6 +117,9 @@
       Verificar con `shellcheck` sin advertencias. Verificar también que termina en error sin
       tocar nada con un SHA inválido (`abc`, 39 caracteres o mayúsculas), con un digest
       inválido y con un `modo` desconocido.
+      Resultado (26/10/2026): `shellcheck` 0.10.0 sin advertencias (solo un aviso de nivel info,
+      SC2015, en una línea que se comporta bien). Los cinco casos inválidos terminan en `2` sin
+      crear la raíz de despliegue.
 - [ ] 5.2 Probar `desplegar.sh` contra una máquina local o una VM con Docker, apuntando a un
       remoto de prueba:
       - un SHA sano termina en 0, escribe `VERSION_ACTUAL` y lo agrega a `historial`;
@@ -151,6 +154,9 @@
       Verificar que fallan sin la implementación (rojo), que pasan, y `shellcheck` sin
       advertencias. Dejar en el runbook (6.1) la línea de `authorized_keys` y la regla de
       `sudoers`.
+      Estado (26/10/2026): `ssh-entrada.sh`, `shellcheck` sin advertencias y el runbook están
+      hechos. Faltan los tests: `deploy/test/desplegar.test.sh` solo comprueba que el archivo es
+      ejecutable, y los casos de arriba se probaron a mano (comentario en #79), sin commitear.
 - [ ] 5.4 Escribir `.github/workflows/cd.yml` según D4:
       - `workflow_run` con las tres condiciones, más `workflow_dispatch` con los inputs `sha`
         y `modo` validados;
@@ -170,6 +176,10 @@
       - acciones fijadas por SHA y `concurrency` sin cancelar.
 
       Verificar con `actionlint` sin errores.
+      Estado (26/10/2026): `actionlint` 1.7.7 termina en `1` por un único aviso de nivel info
+      (SC2015) en la validación de `SERVER_PORT` del job `desplegar`. El comportamiento es
+      correcto (el bloque del `||` siempre hace `exit 1`), pero falta reescribir esa línea con un
+      `if` para que `actionlint` quede limpio.
 - [x] 5.5 Agregar `npm run test:frontend` al job de tests de `ci.yml` (D10). Verificar en el
       PR que el job lo ejecuta y queda en verde (el paso «Tests del frontend» corre y pasa en el
       CI del PR #79, junto con «Tests de las utilidades de scripts/» y «Tests de
@@ -197,13 +207,18 @@
       etapa previa, redespliegue del mismo SHA con otro `SITE_ADDRESS`, SHA anterior superado,
       reejecución por cambio del script (una sola vez y log sin duplicar). Verificar que las
       pruebas fallan al revertir el atajo «superada» o la vuelta atrás a la etapa.
-- [ ] 5.9 CI (D10): `test:scripts` con la lista explícita de archivos de test, incluido
+- [x] 5.9 CI (D10): `test:scripts` con la lista explícita de archivos de test, incluido
       `scripts/cd/decidir-despliegue.test.mjs` (Node 20 y `cmd.exe` no expanden globs), y un
       paso `npm run test:deploy` en `ci.yml`. Verificar en el PR que ambos corren.
-- [ ] 5.10 En `cd.yml` (D3, D4): sin `concurrency` (cola con `flock` en el servidor) y, si el tag
+      Resultado (26/10/2026): el CI de `main` corre «Tests de las utilidades de scripts/» (42 de
+      42) y «Tests de deploy/desplegar.sh» (35 comprobaciones), los dos en verde.
+- [x] 5.10 En `cd.yml` (D3, D4): sin `concurrency` (cola con `flock` en el servidor) y, si el tag
       `:<sha>` ya existe, exigir que la imagen declare `org.opencontainers.image.revision` igual
       al SHA (si no, el job falla). Verificar con un registro local que la lectura de la etiqueta
       funciona.
+      Resultado (26/10/2026): `cd.yml` no declara `concurrency`. La lectura del digest y de la
+      etiqueta `revision` se verificó contra la salida real de `reservas-backend:de136b6` en
+      GHCR (#83), en lugar de un registro local.
 
 ## 6. Infraestructura y primer despliegue (D9)
 
@@ -295,10 +310,16 @@
         verde.
 
       Actualizar la documentación para indicar que producción ya está en la etapa HTTPS.
+      Estado (26/10/2026): según #83, HTTPS está activo detrás del proxy de Cloudflare: `200`
+      con HSTS, redirección `308` desde `http://`, certificado de Let's Encrypt del servidor
+      válido y runbook actualizado. Falta registrar la reutilización del certificado tras
+      reiniciar, la rotación de la contraseña del admin y la ejecución de `certificado.yml`.
 
-- [ ] 6.7 Hacer públicos los paquetes `reservas-backend` y `reservas-frontend` de GHCR tras la
+- [x] 6.7 Hacer públicos los paquetes `reservas-backend` y `reservas-frontend` de GHCR tras la
       primera publicación y reintentar el primer despliegue (D3, runbook «Paquetes en GHCR»).
       Verificar que los despliegues siguientes descargan sin credenciales.
+      Resultado (26/10/2026): un pedido anónimo a `ghcr.io/v2/portalmatias/reservas-backend` y
+      `reservas-frontend` (`tags/list`) responde `200` sin credenciales.
 
 ## 7. Documentación y cierre
 
