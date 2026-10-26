@@ -339,6 +339,10 @@ Los dos leen la base de **test**, nunca la de desarrollo:
   `.env`: los `setup` de Jest de e2e e integración cargan el `.env` de la raíz y el de
   `backend/`, y lo que ya esté exportado en tu terminal tiene prioridad. En CI llegan como
   variables del workflow.
+- **Un rol que pueda crear y borrar bases.** `plano-mesas-migracion.integration-spec.ts`
+  crea una base descartable con `CREATE DATABASE` y la borra con `DROP DATABASE` al terminar.
+  El usuario `postgres` del `docker compose` y el de CI ya pueden; con otro rol, dale
+  `CREATEDB`.
 - **`DATABASE_URL_TEST`** (opcional). La base que usan los tests: si no está definida, cae a
   `postgresql://postgres:postgres@localhost:5432/reservas_test`. Se puede definir en el `.env`.
 

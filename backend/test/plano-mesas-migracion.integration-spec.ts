@@ -13,6 +13,9 @@ import { PrismaClient } from '@prisma/client';
  * `prisma migrate deploy` (desde una copia de la carpeta de migraciones sin la última), carga
  * datos con el esquema viejo, aplica `plano_mesas` y compara. Al final borra la base y la
  * copia. No toca la base de test compartida más que para crear y borrar la descartable.
+ *
+ * Requisito: el rol de `DATABASE_URL` tiene que poder ejecutar `CREATE DATABASE` y
+ * `DROP DATABASE` (el usuario `postgres` del `docker compose` y el de CI pueden).
  */
 
 const RAIZ_PRISMA = join(__dirname, '..', 'prisma');

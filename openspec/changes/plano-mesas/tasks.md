@@ -32,6 +32,9 @@
       Nota: `prisma migrate dev` no corre en una terminal no interactiva; el SQL se generó con
       `prisma migrate diff` contra la base de desarrollo al día (mismo resultado) y se aplicó con
       `prisma migrate deploy`. Se quitó el `CREATE UNIQUE INDEX` no parcial de `Reserva`.
+      `migrate deploy` no hace el chequeo de drift de `migrate dev`; lo cubren `migrate diff`
+      (que compara contra la base real al día) y el test de 2.4, que aplica todas las
+      migraciones desde cero sobre una base descartable.
 - [x] 2.4 Escribir el test de migración sobre datos previos (rojo→verde): con mesas y reservas
       cargadas antes de aplicar la migración, después conservan `id`, `zonaId`, `capacidad`, `etiqueta`
       y `mesaId`.
@@ -88,7 +91,8 @@
       combinaciones.
       Nota: corre en un schema de Postgres propio con el seed de desarrollo cargado, porque los
       escenarios afirman la lista exacta de mesas; las fechas son el próximo sábado y el próximo
-      lunes a 3 días o más, y el reloj del plano se fija al inicio de la suite.
+      lunes a 3 días o más, y el reloj del plano se reemplaza por `() => new Date()`, leído en
+      cada consulta, el mismo que usa `DisponibilidadService`.
 - [x] 3.4 Agregar en el mismo archivo el test de **no fuga de datos**: con una reserva de nombre,
       email, teléfono y código reconocibles, el cuerpo serializado no los contiene ni contiene
       el id de la reserva ni de la mesa; cada mesa tiene exactamente las ocho propiedades (`Object.keys` iguales a la lista del

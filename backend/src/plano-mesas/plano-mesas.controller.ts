@@ -18,8 +18,10 @@ import { PlanoMesasService } from './plano-mesas.service';
  * Límite propio de `GET /plano-mesas` (design.md D3, confirmado por el equipo el 26/10/2026):
  * 120 solicitudes por ventana de 60 segundos por origen. No es el global de `THROTTLE_LIMIT`
  * (rompería el uso normal: cambiar fecha, turno y comensales son varias consultas) ni
- * `@SkipThrottle()` como `/disponibilidad`, porque el plano hace más consultas a la base. Detrás
- * del proxy `/api` de Next todos los visitantes comparten este cupo.
+ * `@SkipThrottle()` como `/disponibilidad`, porque el plano hace más consultas a la base. El
+ * origen es la IP que resuelve Express: con `TRUST_PROXY` configurado (como en `deploy/`) es la
+ * del cliente y el cupo es por visitante; sin `TRUST_PROXY` (desarrollo local) es la del
+ * servidor de Next detrás del proxy `/api`, y todos los visitantes comparten este cupo.
  */
 export const LIMITE_PLANO_MESAS = { limit: 120, ttl: 60_000 };
 
@@ -40,7 +42,7 @@ export class PlanoMesasController {
   @ApiOperation({
     summary: 'Consultar el plano de mesas de una zona',
     description:
-      'Devuelve el plano de una zona con el estado de cada mesa para una fecha, un turno y una cantidad de comensales: libre, ocupada o que no alcanza. Es informativo: no reserva ni bloquea nada y la mesa se asigna automáticamente al confirmar la reserva. Incluye el mismo veredicto que `GET /disponibilidad` (`disponible`, `lugaresRestantes`, `motivos`). No expone datos de las reservas, solo el estado de cada mesa. Es una ruta pública, sin autenticación, con límite de solicitudes.',
+      'Devuelve el plano de una zona con el estado de cada mesa para una fecha, un turno y una cantidad de comensales: libre, ocupada o que no alcanza. Es informativo: no reserva ni bloquea nada y la mesa se asigna automáticamente al crear la reserva. Incluye el mismo veredicto que `GET /disponibilidad` (`disponible`, `lugaresRestantes`, `motivos`). No expone datos de las reservas, solo el estado de cada mesa. Es una ruta pública, sin autenticación, con límite de solicitudes.',
   })
   @ApiOkResponse({
     description:
