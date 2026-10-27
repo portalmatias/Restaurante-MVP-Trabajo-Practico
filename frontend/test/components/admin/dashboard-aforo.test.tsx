@@ -211,6 +211,20 @@ describe("DashboardAforo", () => {
     expect(conLugar.querySelector("h3 + span svg")?.innerHTML).toContain(check);
   });
 
+  // Spec «Aforo máximo cero»: no se muestra un porcentaje, y el medidor tampoco lo anuncia.
+  it("aforo 0: el medidor no anuncia un porcentaje", async () => {
+    const base = GET.getMockImplementation()!;
+    GET.mockImplementation((path: string, o?: { params: { query: Record<string, string | number> } }) =>
+      path === "/admin/zonas" ? ok([...ZONAS, { id: "z-cero", nombre: "TERRAZA", aforoMaximo: 0 }]) : base(path, o),
+    );
+    render(<DashboardAforo hoy="2026-10-02" />);
+
+    const fila = (await screen.findByTestId("aforo-zona-TERRAZA")).closest("li") as HTMLElement;
+    const medidor = fila.querySelector("[role=meter]") as HTMLElement;
+    expect(medidor).toHaveAttribute("aria-valuetext", "Sin aforo");
+    expect(medidor.getAttribute("aria-valuetext")).not.toMatch(/%/);
+  });
+
   it("«Completo» y «Sobrecupo» no se distinguen solo por el texto: llevan pictogramas distintos", async () => {
     RESERVAS["2026-10-02|t-vie"] = {
       CONFIRMADA: [reserva("z-std", 40), reserva("z-vip", 25)],

@@ -124,7 +124,7 @@ function FilaZona({ nombre, ocupado, maximo }: { nombre: string; ocupado: number
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.min(100, porcentaje)}
-        aria-valuetext={`${porcentaje} % ocupado`}
+        aria-valuetext={nivel === "sin-aforo" ? ETIQUETA_NIVEL[nivel] : `${porcentaje} % ocupado`}
         className="h-3 w-full border border-border bg-muted"
       >
         <div className={`h-full ${RELLENO_BARRA[nivel]}`} style={{ width: `${ancho}%` }} />
