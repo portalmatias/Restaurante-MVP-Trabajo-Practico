@@ -336,5 +336,10 @@ desde cero.
       inicio usa voseo» (que hoy nombra «Reservar una mesa» como impersonal incorrecto) con la
       excepción de los botones y enlaces de acción en infinitivo (`design.md`, «Acciones en
       infinitivo»), y retirar el `Select` de turnos que mencionan su design y sus tareas.
-- [ ] 6.4 Pasar `npx openspec validate --all --strict` y esperar a que CI quede en verde antes de
+- [x] 6.4 Pasar `npx openspec validate --all --strict` y esperar a que CI quede en verde antes de
       pedir la aprobación de un compañero distinto del autor.
+      Resultado (27/10/2026): `npx openspec validate --all --strict` da 17 de 17 válidos. En
+      `0e7b6d9`, los cuatro checks del PR (Especificación, Lint y tipos, Tests del backend y
+      cubic) terminaron en verde; `eslint` limpio y 766 de 766 tests del frontend con `TZ=UTC` y
+      con `TZ=America/Argentina/Buenos_Aires` (corridos en local: el CI de este PR no ejecuta los
+      del frontend).
