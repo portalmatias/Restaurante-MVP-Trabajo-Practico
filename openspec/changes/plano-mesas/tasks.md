@@ -169,6 +169,9 @@
       Avance (26/10/2026): el componente ya tiene el SVG con `viewBox` en celdas, las tres formas,
       los patrones y las marcas por estado, la leyenda y la lista, con los tokens actuales. Falta
       el estilo de tablillas de madera, que depende de los tokens del rediseño (#78).
+      Al hacerlo, resolver un aviso de la revisión de gentle-ai: en las mesas de una celda la marca
+      del estado se superpone con etiquetas largas (por ejemplo "S10") y en las redondas queda
+      fuera del círculo.
 - [x] 5.4 Agregar los tests (rojo→verde) del atenuado y el aviso cuando `disponible` es `false`
       (motivos primero, texto "hoy no se puede reservar este turno") y de la aclaración
       "La mesa se asigna automáticamente al confirmar la reserva" / "foto del momento".

@@ -229,6 +229,14 @@ describe("PlanoMesas - sin lugar", () => {
     ).toBeInTheDocument();
   });
 
+  it("sin lugar atenúa solo el dibujo: la lista y el resumen conservan su contraste", () => {
+    const { container } = renderizar(SIN_LUGAR);
+
+    expect(dibujo(container).closest(".opacity-60")).not.toBeNull();
+    expect(screen.getByRole("list", { name: "Mesas de la zona" }).closest(".opacity-60")).toBeNull();
+    expect(screen.getByRole("status").closest(".opacity-60")).toBeNull();
+  });
+
   it("sin lugar y sin motivos informados, el aviso no queda cortado", () => {
     renderizar({ ...SIN_LUGAR, motivos: [] });
 

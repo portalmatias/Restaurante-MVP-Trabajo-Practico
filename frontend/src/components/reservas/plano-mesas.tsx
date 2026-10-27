@@ -179,9 +179,11 @@ export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
           </li>
         ))}
       </ul>
-      <div className={atenuado ? "flex flex-col gap-4 opacity-60" : "flex flex-col gap-4"}>
+      <div className="flex flex-col gap-4">
         {ubicadas.length > 0 ? (
-          <div className="overflow-x-auto">
+          // Solo se atenúa el dibujo: la lista es la fuente accesible y tiene que conservar el
+          // contraste del texto (WCAG 1.4.3).
+          <div className={atenuado ? "overflow-x-auto opacity-60" : "overflow-x-auto"}>
             <svg
               data-dibujo
               aria-hidden="true"
