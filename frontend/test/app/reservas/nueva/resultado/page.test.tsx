@@ -559,6 +559,35 @@ describe("/reservas/nueva/resultado - plano de mesas", () => {
     expect(screen.queryByRole("region", { name: "Plano de las mesas" })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["500 y la disponibilidad 503", falla(500), falla(503)],
+    ["429 y la disponibilidad 429", falla(429), falla(429)],
+  ])(
+    "si el plano responde %s, muestra solo el error de carga de la página, sin la sección del plano",
+    async (_caso, respuestaPlano, respuestaDisponibilidad) => {
+      responder(respuestaDisponibilidad, { plano: respuestaPlano });
+
+      await renderizar();
+
+      expect(screen.getAllByRole("alert")).toHaveLength(1);
+      expect(screen.queryByRole("region", { name: "Plano de las mesas" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Continuar" })).not.toBeInTheDocument();
+    },
+  );
+
+  it("si el plano y la disponibilidad fallan por la red, muestra solo el error de carga con 'Reintentar'", async () => {
+    GET.mockImplementation(async (ruta: string) => {
+      if (ruta === "/plano-mesas" || ruta === "/disponibilidad") throw new TypeError("fetch failed");
+      return ruta === "/zonas" ? ok(ZONAS) : ok(TURNOS);
+    });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo conectar con el servidor.");
+    expect(screen.getAllByRole("button", { name: "Reintentar" })).toHaveLength(1);
+    expect(screen.queryByRole("region", { name: "Plano de las mesas" })).not.toBeInTheDocument();
+  });
+
   it("sin lugar según la disponibilidad, muestra los motivos y después el error del plano", async () => {
     responder(
       ok({
