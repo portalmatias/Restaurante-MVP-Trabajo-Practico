@@ -46,7 +46,8 @@
         acepta; SHA observado que GitHub no conoce o es anterior: se reintentan;
       - `SUBDOMINIO` ausente o inválido (con `/`, espacios, `@`, `:` o mayúsculas fuera de
         lugar): falla antes de pedir nada;
-      - la URL lleva el parámetro `cb` y el encabezado `Cache-Control: no-cache`.
+      - la URL lleva el parámetro `cb`, con un valor distinto en cada intento, y el encabezado
+        `Cache-Control: no-cache`.
       Verificar que fallan sin la implementación.
 - [ ] 3.2 Escribir `scripts/cd/verificar-version.mjs`: funciones puras de decisión (D5) y el
       ciclo de consulta con plazo total hasta 5 minutos desde el primer intento, con pedidos de

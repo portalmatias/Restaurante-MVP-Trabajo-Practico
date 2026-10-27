@@ -100,9 +100,12 @@ despliegue.
 La lógica está en `scripts/cd/verificar-version.mjs`, con la parte de decisión como funciones
 puras (mismo patrón que `decidir-despliegue.mjs`) y tests en el CI.
 
-- **URL:** `https://<SUBDOMINIO>/version?cb=<run_id>-<run_attempt>`. El parámetro cambia en cada
-  ejecución y evita que una caché intermedia devuelva una respuesta anterior; el pedido lleva
-  además `Cache-Control: no-cache`. `SUBDOMINIO` se valida con un patrón de nombre de dominio
+- **URL:** `https://<SUBDOMINIO>/version?cb=<run_id>-<run_attempt>-<intento>`. El parámetro cambia
+  en **cada intento** (`<intento>` es el contador de reintentos del bucle): si fuera igual en
+  todos, una caché que guarde por URL completa fijaría la respuesta del primer pedido, que puede
+  ser la vieja, y los reintentos siguientes leerían esa misma copia aunque el sitio ya sirviera el
+  SHA correcto. El pedido lleva además `Cache-Control: no-cache`. Una caché que ignore la cadena de
+  consulta no se evita así (ver Risks). `SUBDOMINIO` se valida con un patrón de nombre de dominio
   antes de armar la URL.
 - **Siempre HTTPS, con el certificado verificado.** No hay equivalente de `curl -k`: si el
   certificado no es válido, la comprobación falla. **No sigue redirecciones**: una respuesta
@@ -199,7 +202,8 @@ otra URL.
 ## Risks / Trade-offs
 
 - **Falso rojo si la caché de Cloudflare conserva una copia vieja de `/version`.** El
-  `no-store` y el parámetro `cb` lo evitan; si aun así pasa, el job falla con un mensaje que
+  `no-store` y el parámetro `cb`, distinto en cada intento, lo evitan salvo que una capa ignore la
+  cadena de consulta; si aun así pasa, el job falla con un mensaje que
   nombra el SHA que se ve, y es justamente la situación a investigar (runbook).
 - **Falso rojo por una caída de Cloudflare o del DNS** que no tiene que ver con el despliegue.
   El mensaje dice que el despliegue terminó y que lo que no se pudo confirmar es lo que ve el
