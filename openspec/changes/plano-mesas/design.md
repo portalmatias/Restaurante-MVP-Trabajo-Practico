@@ -347,7 +347,8 @@ eligió esa mesa (ver D9). Queda como pregunta abierta.
   verificado con los tokens reales.
 - **Leyenda** siempre visible con los tres estados (mismo patrón y marca que en el dibujo, con el
   texto del estado).
-- **Mesas sin ubicar** (`posX` nulo): no se dibujan; figuran en la lista con la nota
+- **Mesas sin ubicar** (`posX` nulo, o una posición que no entra entera en la grilla de la zona):
+  no se dibujan; figuran en la lista con la nota
   "sin ubicar en el plano". Si **ninguna** tiene posición, se oculta el dibujo y queda solo la
   lista.
 - **Veredicto primero.** El plano se muestra debajo del mensaje de `disponible`/`motivos` que la
@@ -518,9 +519,11 @@ merece su propio change con su propio análisis; esta versión lo deja explícit
 - **Mesa que cambia de zona conserva su posición** (aviso de la revisión de gentle-ai en #86):
   `PATCH /admin/mesas/:id` con otra `zonaId` guarda la mesa con su `posX`/`posY` anteriores
   (`mesas.service.ts`, el `update` final). En la zona nueva puede quedar fuera de la grilla o
-  encima de otra mesa. Mientras no exista el editor (D6) no hay forma de corregirlo desde la UI;
-  el change `plano-mesas-admin` tendría que dejarla sin ubicar (`posX`/`posY` en `null`) al
-  cambiar de zona, con un test.
+  encima de otra mesa. Mitigación en el cliente: una mesa que no entra en la grilla se trata como
+  sin ubicar (no se dibuja recortada y la lista lo aclara). Mientras no exista el editor (D6) no
+  hay forma de corregir la posición desde la UI; el change `plano-mesas-admin` tendría que dejarla
+  sin ubicar (`posX`/`posY` en `null`) al cambiar de zona, con un test. La superposición con otra
+  mesa sigue sin detectarse.
 - **Estética:** el plano depende de los tokens Kakefuda actuales; si cambian, el componente los
   hereda (usa solo variables CSS, sin hex propios).
 

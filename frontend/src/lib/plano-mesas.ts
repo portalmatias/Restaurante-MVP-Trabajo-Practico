@@ -19,14 +19,29 @@ function comensales(cantidad: number): string {
   return `${cantidad} ${cantidad === 1 ? "comensal" : "comensales"}`;
 }
 
-function estaUbicada(mesa: MesaPlano): boolean {
-  return mesa.posX !== null && mesa.posY !== null;
+/** Columnas y filas de la grilla de la zona. */
+export type Grilla = Pick<PlanoMesas, "columnas" | "filas">;
+
+/**
+ * Una mesa se dibuja si tiene posición y entra entera en la grilla de su zona. Una mesa que
+ * cambió de zona conserva su posición anterior y puede quedar afuera (design.md, riesgos): se
+ * trata como sin ubicar en vez de dibujarla recortada.
+ */
+function estaUbicada(mesa: MesaPlano, { columnas, filas }: Grilla): boolean {
+  return (
+    mesa.posX !== null &&
+    mesa.posY !== null &&
+    mesa.posX >= 0 &&
+    mesa.posY >= 0 &&
+    mesa.posX + mesa.ancho <= columnas &&
+    mesa.posY + mesa.alto <= filas
+  );
 }
 
 /** Fila de la lista textual: "Mesa S3, para 4 comensales: libre" (design.md D7). */
-export function describirMesa(mesa: MesaPlano): string {
+export function describirMesa(mesa: MesaPlano, grilla: Grilla): string {
   const descripcion = `Mesa ${mesa.etiqueta}, para ${comensales(mesa.capacidad)}: ${textoEstado(mesa.estado).toLowerCase()}`;
-  return estaUbicada(mesa) ? descripcion : `${descripcion} (sin ubicar en el plano)`;
+  return estaUbicada(mesa, grilla) ? descripcion : `${descripcion} (sin ubicar en el plano)`;
 }
 
 /**
@@ -66,13 +81,19 @@ export function ordenarMesas(mesas: readonly MesaPlano[]): MesaPlano[] {
   );
 }
 
-/** Mesas que se dibujan y mesas sin posición, que solo van en la lista (design.md D5). */
-export function separarMesas(mesas: readonly MesaPlano[]): {
+/**
+ * Mesas que se dibujan y mesas sin ubicar (sin posición o fuera de la grilla), que solo van en
+ * la lista (design.md D5).
+ */
+export function separarMesas(
+  mesas: readonly MesaPlano[],
+  grilla: Grilla,
+): {
   ubicadas: MesaPlano[];
   sinUbicar: MesaPlano[];
 } {
   return {
-    ubicadas: mesas.filter(estaUbicada),
-    sinUbicar: mesas.filter((mesa) => !estaUbicada(mesa)),
+    ubicadas: mesas.filter((mesa) => estaUbicada(mesa, grilla)),
+    sinUbicar: mesas.filter((mesa) => !estaUbicada(mesa, grilla)),
   };
 }

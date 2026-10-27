@@ -7,6 +7,8 @@ import {
   type MesaPlano,
 } from "../../src/lib/plano-mesas";
 
+const GRILLA = { columnas: 12, filas: 8 };
+
 function mesa(etiqueta: string, cambios: Partial<MesaPlano> = {}): MesaPlano {
   return {
     etiqueta,
@@ -33,18 +35,24 @@ describe("textoEstado", () => {
 
 describe("describirMesa", () => {
   it("dice la etiqueta, la capacidad y el estado en minúscula", () => {
-    expect(describirMesa(mesa("S3", { estado: "OCUPADA" }))).toBe(
+    expect(describirMesa(mesa("S3", { estado: "OCUPADA" }), GRILLA)).toBe(
       "Mesa S3, para 4 comensales: ocupada",
     );
   });
 
   it("usa el singular para una mesa de 1 comensal", () => {
-    expect(describirMesa(mesa("B1", { capacidad: 1 }))).toBe("Mesa B1, para 1 comensal: libre");
+    expect(describirMesa(mesa("B1", { capacidad: 1 }), GRILLA)).toBe("Mesa B1, para 1 comensal: libre");
   });
 
   it("aclara cuando la mesa no está ubicada en el plano", () => {
-    expect(describirMesa(mesa("S6", { posX: null, posY: null, estado: "NO_ALCANZA" }))).toBe(
-      "Mesa S6, para 4 comensales: no alcanza (sin ubicar en el plano)",
+    expect(
+      describirMesa(mesa("S6", { posX: null, posY: null, estado: "NO_ALCANZA" }), GRILLA),
+    ).toBe("Mesa S6, para 4 comensales: no alcanza (sin ubicar en el plano)");
+  });
+
+  it("aclara también cuando la mesa no entra en la grilla de la zona", () => {
+    expect(describirMesa(mesa("S9", { posX: 11, ancho: 2 }), GRILLA)).toBe(
+      "Mesa S9, para 4 comensales: libre (sin ubicar en el plano)",
     );
   });
 });
@@ -116,12 +124,24 @@ describe("separarMesas", () => {
     const s6 = mesa("S6", { posX: null, posY: null });
     const s7 = mesa("S7", { posX: 3, posY: null });
 
-    expect(separarMesas([s1, s6, s7])).toEqual({ ubicadas: [s1], sinUbicar: [s6, s7] });
+    expect(separarMesas([s1, s6, s7], GRILLA)).toEqual({ ubicadas: [s1], sinUbicar: [s6, s7] });
+  });
+
+  it("deja sin ubicar las mesas que se salen de la grilla de la zona", () => {
+    const dentro = mesa("S1", { posX: 10, posY: 6, ancho: 2, alto: 2 });
+    const porDerecha = mesa("S2", { posX: 11, ancho: 2 });
+    const porAbajo = mesa("S3", { posY: 7, alto: 2 });
+    const negativa = mesa("S4", { posX: -1 });
+
+    expect(separarMesas([dentro, porDerecha, porAbajo, negativa], GRILLA)).toEqual({
+      ubicadas: [dentro],
+      sinUbicar: [porDerecha, porAbajo, negativa],
+    });
   });
 
   it("deja la posición 0 como ubicada", () => {
     const esquina = mesa("S1", { posX: 0, posY: 0 });
 
-    expect(separarMesas([esquina]).ubicadas).toEqual([esquina]);
+    expect(separarMesas([esquina], GRILLA).ubicadas).toEqual([esquina]);
   });
 });

@@ -134,7 +134,7 @@ function avisoSinLugar(motivos: Plano["motivos"]): string {
  */
 export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
   const mesas = ordenarMesas(plano.mesas);
-  const { ubicadas } = separarMesas(mesas);
+  const { ubicadas } = separarMesas(mesas, plano);
   const atenuado = !plano.disponible;
 
   return (
@@ -196,7 +196,7 @@ export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
         ) : null}
         <ul aria-label="Mesas de la zona" className="flex flex-col gap-1 text-base text-foreground">
           {mesas.map((mesa) => (
-            <li key={mesa.etiqueta}>{describirMesa(mesa)}</li>
+            <li key={mesa.etiqueta}>{describirMesa(mesa, plano)}</li>
           ))}
         </ul>
       </div>

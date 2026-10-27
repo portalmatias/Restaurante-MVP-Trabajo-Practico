@@ -142,6 +142,16 @@ describe("PlanoMesas - dibujo", () => {
     expect(mesaDibujada(container, "S4")?.querySelector("[data-forma]")?.tagName).toBe("rect");
   });
 
+  it("no dibuja una mesa que se sale de la grilla y la lista la marca sin ubicar", () => {
+    const { container } = renderizar({
+      ...PLANO,
+      mesas: [mesa("S1"), mesa("S9", { posX: 11, ancho: 2 })],
+    });
+
+    expect(mesaDibujada(container, "S9")).toBeNull();
+    expect(screen.getByText("Mesa S9, para 4 comensales: libre (sin ubicar en el plano)")).toBeInTheDocument();
+  });
+
   it("oculta el dibujo si ninguna mesa está ubicada y deja la lista", () => {
     const { container } = renderizar({
       ...PLANO,
