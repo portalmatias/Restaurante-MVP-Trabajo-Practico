@@ -20,16 +20,6 @@ const MESES = [
   'diciembre',
 ] as const;
 
-const DIAS = [
-  'domingo',
-  'lunes',
-  'martes',
-  'miércoles',
-  'jueves',
-  'viernes',
-  'sábado',
-] as const;
-
 // La semana empieza el lunes. El kanji es solo decoración (`aria-hidden`).
 const ENCABEZADOS = [
   { abreviatura: 'lun', nombre: 'lunes', kanji: '月' },

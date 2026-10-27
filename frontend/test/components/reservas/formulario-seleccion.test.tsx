@@ -13,7 +13,7 @@ import {
 const push = jest.fn();
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
-// Hoy en Argentina: lunes 2026-09-14. Lo calcula el servidor y llega por prop: no se falsea `Date`.
+// Hoy en Argentina: lunes, 2026-09-14. Lo calcula el servidor y llega por prop: no se falsea `Date`.
 const HOY = "2026-09-14";
 const SABADO = "2026-09-19";
 const LUNES = "2026-09-21";
@@ -177,7 +177,7 @@ describe("FormularioSeleccion - fecha", () => {
 
     elegirFecha(SABADO);
 
-    expect(screen.getByText("Elegiste el sábado 19 de septiembre de 2026.")).toBeInTheDocument();
+    expect(screen.getByText("Elegiste el sábado, 19 de septiembre de 2026.")).toBeInTheDocument();
     expect(diaDelCalendario(SABADO)).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -609,8 +609,8 @@ describe("FormularioSeleccion - último día elegible del calendario", () => {
 // así que una fecha de la URL pasada de ese límite se aceptaba aunque el calendario la mostrara como no
 // disponible, y el botón quedaba habilitado.
 describe("fecha de la URL pasada del último día elegible", () => {
-  // Con hoy = martes 15/9, la zona de mayor anticipación (60 días) llega hasta el viernes 13/11
-  // (hoy + 59). El sábado 14/11 es hoy + 60: el servidor lo rechazaría.
+  // Con hoy = martes, 15/9, la zona de mayor anticipación (60 días) llega hasta el viernes, 13/11
+  // (hoy + 59). El sábado, 14/11 es hoy + 60: el servidor lo rechazaría.
   const HOY_LIMITE = "2026-09-15";
   const completa = (fecha: string) => ({
     fecha,

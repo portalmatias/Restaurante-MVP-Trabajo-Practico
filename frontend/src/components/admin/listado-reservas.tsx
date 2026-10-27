@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert } from "../ui/alert";
 import { buttonVariants } from "../ui/button";
 import { BotonCompacto } from "./boton-compacto";

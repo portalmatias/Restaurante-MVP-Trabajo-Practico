@@ -4,7 +4,7 @@ import { Calendario, sumarDias } from "../../../src/components/ui/calendario";
 import type { DiaSemana } from "../../../src/lib/fecha-hora";
 
 // Tarea 3.9: cada escenario de la capability calendario-fecha. «Hoy» llega por prop, como en
-// producción: el lunes 14 de septiembre de 2026 salvo que el caso diga otra cosa.
+// producción: el lunes, 14 de septiembre de 2026 salvo que el caso diga otra cosa.
 const HOY = "2026-09-14";
 // Como el seed: martes a domingo con turnos, el lunes cerrado.
 const SIN_LUNES: ReadonlySet<DiaSemana> = new Set(["MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"]);
@@ -90,14 +90,14 @@ describe("Calendario - días no elegibles", () => {
     render(<Asistente />);
 
     expect(dia("2026-09-13")).toHaveAttribute("aria-disabled", "true");
-    expect(dia("2026-09-13")).toHaveAccessibleName("domingo 13 de septiembre de 2026, no disponible");
+    expect(dia("2026-09-13")).toHaveAccessibleName("domingo, 13 de septiembre de 2026, no disponible");
   });
 
   it("un día de la semana sin turnos es aria-disabled, termina en «, cerrado» y va tachado", () => {
     render(<Asistente />);
 
     expect(dia("2026-09-21")).toHaveAttribute("aria-disabled", "true");
-    expect(dia("2026-09-21")).toHaveAccessibleName("lunes 21 de septiembre de 2026, cerrado");
+    expect(dia("2026-09-21")).toHaveAccessibleName("lunes, 21 de septiembre de 2026, cerrado");
     expect(dia("2026-09-21")).toHaveClass("line-through");
     expect(screen.getByText("Los días tachados están cerrados.")).toBeInTheDocument();
   });
@@ -140,7 +140,7 @@ describe("Calendario - nombre accesible y hoy", () => {
   it("el día de hoy elegible se llama «…, hoy» y va en negrita y subrayado", () => {
     render(<Asistente hoy="2026-09-19" />);
 
-    expect(dia("2026-09-19")).toHaveAccessibleName("sábado 19 de septiembre de 2026, hoy");
+    expect(dia("2026-09-19")).toHaveAccessibleName("sábado, 19 de septiembre de 2026, hoy");
     expect(dia("2026-09-19")).toHaveClass("font-bold", "underline");
   });
 });
@@ -171,7 +171,7 @@ describe("Calendario - teclado", () => {
     ["ArrowDown", "2026-09-23"],
     ["Home", "2026-09-14"],
     ["End", "2026-09-20"],
-  ])("desde el miércoles 16, %s lleva el foco a %s", (tecla, destino) => {
+  ])("desde el miércoles, 16, %s lleva el foco a %s", (tecla, destino) => {
     render(<Asistente />);
     dia("2026-09-16").focus();
 
