@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import {
   useId,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -91,13 +92,20 @@ export function FormularioSeleccion({
   );
 
   const fechaElegible = esFechaElegible(fecha, hoy, ultimaFecha);
-  const turnosDelDia = fechaElegible
-    ? turnos.filter((turno) => turno.diaSemana === diaSemanaDeFechaLocal(fecha))
-    : [];
+  const turnosDelDia = useMemo(
+    () =>
+      fechaElegible
+        ? turnos.filter((turno) => turno.diaSemana === diaSemanaDeFechaLocal(fecha))
+        : [],
+    [fecha, fechaElegible, turnos],
+  );
   const turnoElegido = turnosDelDia.find((turno) => turno.id === turnoId);
   // El calendario cierra los días sin turnos y los que quedan más allá de lo que admite cualquier
   // zona. Es una ayuda: la anticipación de cada zona la valida el servidor.
-  const diasConTurnos = new Set(turnos.map((turno) => turno.diaSemana));
+  const diasConTurnos = useMemo(
+    () => new Set(turnos.map((turno) => turno.diaSemana)),
+    [turnos],
+  );
   const zona = zonas.find((candidata) => candidata.id === zonaId);
 
   const faltantes: string[] = [];

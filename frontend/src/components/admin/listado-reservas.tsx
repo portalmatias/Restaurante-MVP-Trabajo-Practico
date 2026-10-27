@@ -207,15 +207,19 @@ export function ListadoReservas({ filtros }: { filtros: FiltrosReservas }) {
   }
 
   const paginas = listado ? totalPaginas(listado.total) : 1;
-  const termino = sinAcentos(busqueda.trim());
+  const termino = useMemo(() => sinAcentos(busqueda.trim()), [busqueda]);
   // La fila con un aviso de una acción fallida no se oculta: la persona acaba de actuar sobre ella.
-  const visibles = (listado?.items ?? []).filter(
-    (r) =>
-      termino === "" ||
-      r.id === avisoFila?.reservaId ||
-      [r.codigoReserva, r.nombreCliente, r.emailCliente].some((dato) =>
-        sinAcentos(dato).includes(termino),
+  const visibles = useMemo(
+    () =>
+      (listado?.items ?? []).filter(
+        (r) =>
+          termino === "" ||
+          r.id === avisoFila?.reservaId ||
+          [r.codigoReserva, r.nombreCliente, r.emailCliente].some((dato) =>
+            sinAcentos(dato).includes(termino),
+          ),
       ),
+    [avisoFila?.reservaId, listado?.items, termino],
   );
   const hayFiltros = Boolean(fecha || estado || zonaId || turnoId);
 

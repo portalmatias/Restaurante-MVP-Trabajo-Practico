@@ -21,7 +21,7 @@ const REGLAS: Record<CampoMesa, ReglaCampo> = {
   // 404 "La zona indicada no existe." (spec "Zona inexistente rechazada") y el 409 de cambiar
   // de Zona una Mesa con Reservas activas.
   zonaId: { coincide: /^zonaId|zona indicada|cambiar de zona/i, textoPorDefecto: "Elegí una zona válida." },
-  capacidad: { coincide: /^capacidad|capacidad/i, textoPorDefecto: "Ingresá un número entero de 1 o más." },
+  capacidad: { coincide: /^capacidad|capacidad de la mesa|nueva capacidad/i, textoPorDefecto: "Ingresá un número entero de 1 o más." },
   // 409 "Ya existe una mesa con esa etiqueta." (spec "Etiqueta duplicada rechazada").
   etiqueta: { coincide: /^etiqueta|etiqueta/i, textoPorDefecto: "Ingresá una etiqueta." },
 };

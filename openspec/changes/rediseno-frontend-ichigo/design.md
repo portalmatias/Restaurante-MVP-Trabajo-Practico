@@ -8,8 +8,7 @@ Este documento fija las decisiones técnicas y sus alternativas.
 
 Estado del que se parte: `frontend-base` define tokens en blanco y negro, Inter y una paleta
 neutra; `frontend-cliente` y `frontend-admin` funcionan sobre ellos. El stack es Next.js 16 (App
-Router) con Tailwind 4, solo modo claro. El rediseño no toca `frontend/src/lib/**`, la API ni
-el contrato OpenAPI.
+Router) con Tailwind 4, solo modo claro. El rediseño no toca la API ni el contrato OpenAPI. Como excepción intencional (pedida por el equipo), se modificó `frontend/src/lib/seleccion-reserva.ts` para agregar el parámetro opcional `hasta` a `esFechaElegible`/`resolverSeleccionInicial` y limitar el rango de fechas desde el calendario; los demás archivos de `frontend/src/lib/**` permanecen sin cambios.
 
 ### Cómo se redactó esta spec (honestidad de proceso)
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { diaSemanaDeFechaLocal, type DiaSemana } from '../../lib/fecha-hora';
+import { diaSemanaDeFechaLocal, formatearFechaLargaEs, type DiaSemana } from '../../lib/fecha-hora';
 
 // Cálculo con Date.UTC y getUTC* (config.yaml §7): el resultado no depende del huso del dispositivo.
 
@@ -80,11 +80,10 @@ function indiceSemana(iso: string): number {
   return (new Date(Date.UTC(anio, mes0, dia)).getUTCDay() + 6) % 7;
 }
 
-/** «sábado 19 de septiembre de 2026»: el nombre accesible de cada día. */
+/** «sábado, 19 de septiembre de 2026»: el nombre accesible de cada día. */
 export function nombreLargoDeFecha(iso: string): string {
-  const { anio, mes0, dia } = partes(iso);
-  const diaSemana = DIAS[new Date(Date.UTC(anio, mes0, dia)).getUTCDay()];
-  return `${diaSemana} ${dia} de ${MESES[mes0]} de ${anio}`;
+  // Reutiliza formatearFechaLargaEs para mantener el mismo formato (incluida la coma tras el día de la semana).
+  return formatearFechaLargaEs(iso);
 }
 
 export type CalendarioProps = {

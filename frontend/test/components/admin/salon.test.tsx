@@ -177,6 +177,28 @@ describe("MesasPanel", () => {
     expect(within(formulario).getByLabelText("Zona")).toHaveAttribute("aria-invalid", "true");
   });
 
+  it("un error sobre la capacidad de la mesa se muestra junto a Capacidad", async () => {
+    await renderizar();
+    POST.mockReturnValue(error(400, "La capacidad de la mesa debe ser un entero positivo."));
+
+    completarAlta();
+
+    expect(await screen.findByText("La capacidad de la mesa debe ser un entero positivo.")).toBeInTheDocument();
+    const formulario = screen.getByRole("form", { name: "Nueva mesa" });
+    expect(within(formulario).getByLabelText("Capacidad")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("un mensaje que solo menciona «capacidad» de otra cosa no se atribuye a Capacidad", async () => {
+    await renderizar();
+    POST.mockReturnValue(error(409, "El aforo de la zona no admite más capacidad en este turno."));
+
+    completarAlta();
+
+    expect(await screen.findByText("El aforo de la zona no admite más capacidad en este turno.")).toBeInTheDocument();
+    const formulario = screen.getByRole("form", { name: "Nueva mesa" });
+    expect(within(formulario).getByLabelText("Capacidad")).not.toHaveAttribute("aria-invalid", "true");
+  });
+
   it("con un formulario abierto no se puede abrir otro", async () => {
     await renderizar();
 
