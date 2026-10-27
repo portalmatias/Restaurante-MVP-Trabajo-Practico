@@ -690,7 +690,9 @@ servidor sigue sirviendo la última versión.
 
 ## 13. Probar `desplegar.sh` y `ssh-entrada.sh` sin AWS (tarea 5.2)
 
-`npm run test:deploy` (también corre en CI) ejecuta `deploy/test/desplegar.test.sh`: arma un
+`npm run test:deploy` (también corre en CI) ejecuta dos pruebas: `deploy/test/desplegar.test.sh`
+(la de `desplegar.sh`, abajo) y `deploy/test/ssh-entrada.test.sh` (la del comando forzado, que está
+en el último párrafo de esta sección). La de `desplegar.sh` arma un
 repositorio Git temporal y simula `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker, red ni
 root. Comprueba el primer despliegue, un cambio de etapa fallido con vuelta atrás a la etapa
 anterior, el redespliegue del mismo SHA con otro `SITE_ADDRESS`, el atajo de «versión superada»,
@@ -708,6 +710,14 @@ superada, vuelta atrás manual y migración rota.
 pedido sin `sudo`: con `SSH_ORIGINAL_COMMAND="<sha> - - vuelta-atras"` ejecuta ese script con los
 cuatro argumentos, y con cualquier pedido mal formado sale con código 2 sin ejecutar nada. En el
 servidor **ninguna de las dos variables se define**.
+
+`deploy/test/ssh-entrada.test.sh` automatiza esa validación con un `desplegar.sh` falso que solo
+registra sus argumentos. Comprueba que los dos pedidos válidos (`<sha> <digest> <digest> despliegue`
+y `<sha> - - vuelta-atras`) invocan a `desplegar.sh` con los cuatro argumentos por separado (el `-`
+llega vacío); que se rechazan, con código 2 y sin invocar nada, el pedido vacío, un SHA de largo o
+formato incorrecto, un digest sin `sha256:` o de otra longitud, un modo desconocido, los argumentos de
+más, los saltos de línea y los espacios o tabulaciones extra, y los metacaracteres de shell; y que
+ningún valor del pedido se evalúa. No hace falta repetir esas verificaciones a mano.
 
 ## Referencia: recursos que usa el sistema
 
