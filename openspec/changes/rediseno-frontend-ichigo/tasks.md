@@ -324,9 +324,17 @@ desde cero.
 
 ## 6. Cierre del change
 
-- [ ] 6.1 Abrir el PR de implementación en español, enlazado a este change, con la tabla de
+- [x] 6.1 Abrir el PR de implementación en español, enlazado a este change, con la tabla de
       verificación (cada escenario de las ocho specs, con su evidencia) y la lista de desvíos
       corregidos de la sección 2.
+      Resultado (27/10/2026): el PR #78 está abierto y enlazado a este change. La tabla de
+      verificación de los 143 escenarios de las ocho specs está publicada en el PR (comentario
+      «Tabla de verificación escenario por escenario» y su actualización): 121 cubiertos por test,
+      14 verificados a mano, 8 parciales y 0 sin cobertura. Los parciales son los que no se
+      pueden probar sin un dispositivo real (puntero táctil, `any-pointer`, orden en columnas),
+      más `fetchpriority`, el último día con la respuesta real del servidor, el guard del login,
+      la tipografía del nombre y la entrada del nombre. Los desvíos de la sección 2 están en los
+      commits de las tareas 2.1 a 2.12 y en la descripción del PR.
 - [ ] 6.2 Resolver las preguntas abiertas de `design.md` con el equipo y reflejar la decisión
       en la spec si cambia un requisito (la spec manda, `config.yaml` §14).
       Resultado parcial (27/10/2026): las preguntas 1, 2, 3, 5, 6, 7 y 8 tienen la respuesta de
