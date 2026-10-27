@@ -75,11 +75,10 @@ mismo valor que ya usa para el tag y para la etiqueta `revision`: no hay dos fue
 **Interacción con la reutilización de tags (D3 de `despliegue-continuo-ec2`).** Un tag
 `reservas-frontend:<sha>` ya publicado se reutiliza solo si su etiqueta `revision` coincide, y
 esa imagen la construyó este mismo workflow con el mismo `BUILD_SHA`. La excepción son imágenes
-publicadas **antes** de este change: no tienen `/version`. `desplegar.sh` permite volver a
-desplegar el **mismo SHA** en modo `despliegue` (redespliegue) y también permite desplegar un
-SHA **anterior** que figure en el historial; en modo `despliegue` se considera «versión superada»
-solo cuando el SHA pedido está **contenido** en la versión en servicio pero es distinto del que
-está en servicio (un ancestro más viejo). En la vuelta atrás se contempla en D5.
+publicadas **antes** de este change: no tienen `/version`. `desplegar.sh` permite volver a desplegar el **mismo SHA** en modo `despliegue` (un redespliegue).
+Un SHA **anterior**, ya contenido en la versión en servicio, no se despliega: se saltea como
+«versión superada» (código 3) y este job no verifica nada. Un SHA anterior solo llega a producción
+por la vuelta atrás, que lo toma del historial (se contempla en D5).
 
 ### D3: La comprobación es un job aparte, sin credenciales
 

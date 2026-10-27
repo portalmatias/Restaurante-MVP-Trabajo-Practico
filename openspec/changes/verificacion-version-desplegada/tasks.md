@@ -67,9 +67,10 @@
         variables de entorno (nunca interpolados en el código de un paso); `GITHUB_TOKEN` se usa
         solo con permisos `contents: read` (`contents: read`);
       - acciones de terceros fijadas por SHA, como el resto del archivo.
-      Verificar con `actionlint` sin errores. **Dependencia:** la tarea 5.4 del change
-      `despliegue-continuo-ec2` (pendiente) define/ajusta el workflow de CD donde se agregan
-      estos cambios; coordinar para evitar conflictos.
+      Verificar con `actionlint` sin errores. **Dependencia:** hoy `actionlint` termina en `1` sobre
+      `cd.yml` por el aviso SC2015 de la validación de `SERVER_PORT`. Corregirlo es la tarea 5.4 del
+      change `despliegue-continuo-ec2` (pendiente; la reescritura está en #88, pero falta correr
+      `actionlint`). Esta tarea no puede darse por cumplida hasta resolver esa.
 - [ ] 3.5 (verificaciones posteriores al despliegue) Probar el ciclo completo de
       `verificar-version.mjs` contra el sitio de producción real con el SHA que sirve hoy (por
       ejemplo `node scripts/cd/verificar-version.mjs` con las variables del job): al desplegar este
