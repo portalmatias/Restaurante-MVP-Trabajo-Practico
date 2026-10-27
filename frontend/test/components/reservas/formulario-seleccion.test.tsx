@@ -235,6 +235,27 @@ describe("FormularioSeleccion - turnos del día", () => {
     expect(tablillaDe(TURNO_ALMUERZO_SABADO.id)).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("las flechas, Inicio y Fin mueven el foco entre las tablillas de turno sin elegir ninguna", () => {
+    renderizar();
+    elegirFecha(SABADO);
+    const almuerzo = tablillaDe(TURNO_ALMUERZO_SABADO.id);
+    const [primera, segunda] = within(grupoTurno()).getAllByRole("button");
+    expect(almuerzo).toBe(primera);
+
+    primera.focus();
+    fireEvent.keyDown(primera, { key: "ArrowRight" });
+    expect(segunda).toHaveFocus();
+    fireEvent.keyDown(segunda, { key: "ArrowRight" });
+    expect(primera).toHaveFocus();
+    fireEvent.keyDown(primera, { key: "ArrowLeft" });
+    expect(segunda).toHaveFocus();
+    fireEvent.keyDown(segunda, { key: "Home" });
+    expect(primera).toHaveFocus();
+    fireEvent.keyDown(primera, { key: "End" });
+    expect(segunda).toHaveFocus();
+    expect(tablillasElegidas()).toHaveLength(0);
+  });
+
   it("una fecha sin turnos que llega por la URL muestra el aviso y oculta el selector de turno", () => {
     // Desde el calendario un día sin turnos no se puede elegir; la URL sí puede traerlo.
     renderizar({ fecha: LUNES });

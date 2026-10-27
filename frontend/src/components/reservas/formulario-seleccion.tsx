@@ -156,6 +156,32 @@ export function FormularioSeleccion({
     opcionesZona.current[destino]?.focus();
   }
 
+  // Tablillas de turno: botones con `aria-pressed`, así que las flechas, Inicio y Fin mueven solo
+  // el foco (con vuelta al extremo, como en la zona); elegir sigue siendo con Enter o Espacio. Todas
+  // siguen en el orden de tabulación.
+  function moverEntreTurnos(evento: KeyboardEvent<HTMLDivElement>) {
+    const salto =
+      evento.key === 'ArrowRight' || evento.key === 'ArrowDown'
+        ? 1
+        : evento.key === 'ArrowLeft' || evento.key === 'ArrowUp'
+          ? -1
+          : 0;
+    if (salto === 0 && evento.key !== 'Home' && evento.key !== 'End') return;
+    const botones = Array.from(
+      evento.currentTarget.querySelectorAll<HTMLButtonElement>('button'),
+    );
+    const actual = botones.findIndex((boton) => boton === evento.target);
+    if (actual === -1) return;
+    evento.preventDefault();
+    const destino =
+      evento.key === 'Home'
+        ? 0
+        : evento.key === 'End'
+          ? botones.length - 1
+          : (actual + salto + botones.length) % botones.length;
+    botones[destino]?.focus();
+  }
+
   function subirComensales() {
     if (!zona) return;
     setComensales((actual) =>
@@ -278,7 +304,10 @@ export function FormularioSeleccion({
                 </p>
               ) : (
                 // Cada tablilla lleva su tramo de viga: si los turnos pasan a otra fila, cuelgan igual.
-                <div className="flex flex-wrap gap-x-2 gap-y-2">
+                <div
+                  className="flex flex-wrap gap-x-2 gap-y-2"
+                  onKeyDown={moverEntreTurnos}
+                >
                   {turnosDelDia.map((turno) => {
                     const horario = `${formatearHoraTurno(turno.horaInicio)} a ${formatearHoraTurno(turno.horaFin)}`;
                     return (
