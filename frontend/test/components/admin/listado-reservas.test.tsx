@@ -305,6 +305,19 @@ describe("ListadoReservas - marcar no show", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  // Spec frontend-admin, «Búsqueda sin coincidencias»: un aviso que lo dice, distinto del estado
+  // vacío de los filtros.
+  it("una búsqueda sin coincidencias avisa que ninguna fila de la página coincide, y no es el estado vacío", async () => {
+    await renderizar();
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "ZZZZ9999" } });
+
+    expect(screen.getByText(/Ninguna reserva de esta página coincide con «ZZZZ9999»/)).toBeInTheDocument();
+    expect(screen.queryByRole("rowheader")).not.toBeInTheDocument();
+    expect(screen.queryByText("No hay reservas para esos filtros.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Todavía no hay reservas.")).not.toBeInTheDocument();
+  });
+
   // Revisión de #78: la búsqueda distinguía acentos y mayúsculas («perez» no encontraba «Pérez»), y
   // podía ocultar justo la fila cuya acción acababa de fallar y mostraba un aviso.
   it("la búsqueda ignora acentos y mayúsculas: «perez» encuentra «Pérez»", async () => {

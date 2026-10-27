@@ -351,6 +351,22 @@ describe("ConsultaReserva - detalle", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(titulo);
   });
 
+  // Spec experiencia-reserva-cliente, «Estado de la reserva consultada»: además del título, el
+  // detalle muestra la palabra del estado dentro de la etiqueta de estado.
+  it.each([
+    ["CONFIRMADA", "Confirmada"],
+    ["PENDIENTE", "Pendiente"],
+    ["CANCELADA", "Cancelada"],
+    ["NO_SHOW", "No se presentó"],
+  ])("el estado %s muestra la etiqueta de estado «%s»", async (estado, palabra) => {
+    await verDetalle({ ...RESERVA, estado });
+
+    const etiqueta = screen.getByText(palabra, { selector: "span" });
+    expect(etiqueta).toBeInTheDocument();
+    expect(etiqueta).toHaveClass("rounded-sm");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).not.toBe(palabra);
+  });
+
   it("una fecha inválida en la respuesta no rompe el detalle y se muestra tal cual", async () => {
     await verDetalle({ ...RESERVA, fecha: "2026-02-30" });
 

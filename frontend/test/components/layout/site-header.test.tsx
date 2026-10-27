@@ -1,8 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { SiteHeader } from "../../../src/components/layout/site-header";
 
 // El encabezado es público: el acceso del personal a `/admin` es por URL directa (design.md D11).
 describe("SiteHeader", () => {
+  // Spec frontend-base, «El encabezado lleva el nombre del restaurante»: «Ichigo» como enlace a `/`,
+  // con «Reservas» y «Consultar reserva» en la navegación.
+  it("el nombre «Ichigo» es un enlace a / y la navegación incluye Reservas y Consultar reserva", () => {
+    render(<SiteHeader />);
+
+    expect(screen.getByRole("link", { name: /^Ichigo/ })).toHaveAttribute("href", "/");
+    const navegacion = within(screen.getByRole("navigation"));
+    expect(navegacion.getByRole("link", { name: "Reservas" })).toBeInTheDocument();
+    expect(navegacion.getByRole("link", { name: "Consultar reserva" })).toBeInTheDocument();
+  });
+
   it("enlaza a /reservas", () => {
     render(<SiteHeader />);
 
