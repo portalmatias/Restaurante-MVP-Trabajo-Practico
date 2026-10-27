@@ -510,7 +510,17 @@ merece su propio change con su propio análisis; esta versión lo deja explícit
 - **Foto del momento:** el plano puede quedar desactualizado entre la vista y la confirmación;
   la UI lo dice y la creación valida de nuevo.
 - **Carga extra en la base:** 7 consultas por plano; el cupo de throttle y `no-store` la acotan;
-  son lecturas por clave indexada sobre decenas de filas.
+  son lecturas por clave indexada sobre decenas de filas. Pendiente (aviso de la revisión de
+  gentle-ai en #86, sin resolver en este change): con `TRUST_PROXY` el cupo es por visitante, así
+  que muchos visitantes a la vez pueden sumar suficientes consultas para agotar el pool de
+  conexiones de Prisma, que también usan las reservas. Si pasa, conviene medirlo y ajustar
+  `connection_limit` o bajar el cupo.
+- **Mesa que cambia de zona conserva su posición** (aviso de la revisión de gentle-ai en #86):
+  `PATCH /admin/mesas/:id` con otra `zonaId` guarda la mesa con su `posX`/`posY` anteriores
+  (`mesas.service.ts`, el `update` final). En la zona nueva puede quedar fuera de la grilla o
+  encima de otra mesa. Mientras no exista el editor (D6) no hay forma de corregirlo desde la UI;
+  el change `plano-mesas-admin` tendría que dejarla sin ubicar (`posX`/`posY` en `null`) al
+  cambiar de zona, con un test.
 - **Estética:** el plano depende de los tokens Kakefuda actuales; si cambian, el componente los
   hereda (usa solo variables CSS, sin hex propios).
 
