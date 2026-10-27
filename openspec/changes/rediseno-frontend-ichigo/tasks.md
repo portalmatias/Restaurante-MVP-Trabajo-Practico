@@ -17,7 +17,13 @@ desde cero.
       19 commits propios: los nueve originales y diez de correcciones de la sección 2.
 - [x] 1.2 Confirmar con `git diff origin/main --stat -- frontend/src/lib openapi backend` que
       el diff está vacío (el rediseño no toca lógica, API ni contrato).  
-      **Resultado:** `git diff origin/main --stat -- frontend/src/lib openapi backend` muestra `backend/...` con muchos cambios (incluso archivos eliminados de plano-mesas y modificaciones a tests/zonas.service) y `frontend/src/lib/seleccion-reserva.ts` modificado (+14/-7 aprox.) además de `frontend/src/lib/api/schema.d.ts`. La diferencia **es intencional**: se hizo una excepción en `frontend/src/lib/seleccion-reserva.ts` (agregado de parámetro opcional `hasta` en `esFechaElegible`/`resolverSeleccionInicial`) para limitar el rango de fechas desde el calendario nuevo; los demás archivos de `frontend/src/lib/**` permanecen sin cambios lógicos fuera de esa excepción, no se toca `openapi/openapi.yaml` en cuanto a contrato funcional intencionalmente (hay diferencias históricas en el diff contra main en este estado del repo) y la excepción está documentada en `proposal.md:49` y `design.md:11`.
+      **Resultado (27/10/2026):** `git diff origin/main --stat -- frontend/src/lib openapi backend` ya no sirve
+      como prueba porque `main` avanzó (por ejemplo, #86 trajo el plano de mesas del backend) y esa
+      comparación incluye cambios ajenos al PR. Contra el punto de partida de la rama,
+      `git diff origin/main...HEAD --stat -- frontend/src/lib openapi backend` da un solo archivo:
+      `frontend/src/lib/seleccion-reserva.ts` (+14/-7), el parámetro opcional `hasta` que pidió la
+      revisión de Mati. Es una excepción intencional a «no se toca `frontend/src/lib/**`»; `openapi/`
+      y `backend/` no cambian.
 - [x] 1.3 Correr `npm run lint` (desde la raíz: `eslint .` ya cubre `frontend/`; el workspace
       `frontend` no tiene script `lint`), `npm run typecheck -w frontend` y `npm test -w frontend`
       sobre la rama rebasada y anotar el resultado real en el PR.
