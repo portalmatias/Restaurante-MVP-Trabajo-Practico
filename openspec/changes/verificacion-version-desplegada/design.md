@@ -75,9 +75,11 @@ mismo valor que ya usa para el tag y para la etiqueta `revision`: no hay dos fue
 **Interacción con la reutilización de tags (D3 de `despliegue-continuo-ec2`).** Un tag
 `reservas-frontend:<sha>` ya publicado se reutiliza solo si su etiqueta `revision` coincide, y
 esa imagen la construyó este mismo workflow con el mismo `BUILD_SHA`. La excepción son imágenes
-publicadas **antes** de este change: no tienen `/version`. Solo se reutilizan si se vuelve a
-desplegar un SHA anterior, que `desplegar.sh` ya rechaza como versión superada en el modo
-`despliegue`; en la vuelta atrás se contempla en D5.
+publicadas **antes** de este change: no tienen `/version`. `desplegar.sh` permite volver a
+desplegar el **mismo SHA** en modo `despliegue` (redespliegue) y también permite desplegar un
+SHA **anterior** que figure en el historial; en modo `despliegue` se considera «versión superada»
+solo cuando el SHA pedido está **contenido** en la versión en servicio pero es distinto del que
+está en servicio (un ancestro más viejo). En la vuelta atrás se contempla en D5.
 
 ### D3: La comprobación es un job aparte, sin credenciales
 
@@ -106,9 +108,11 @@ puras (mismo patrón que `decidir-despliegue.mjs`) y tests en el CI.
 - **Siempre HTTPS, con el certificado verificado.** No hay equivalente de `curl -k`: si el
   certificado no es válido, la comprobación falla. **No sigue redirecciones**: una respuesta
   `3xx` cuenta como observación inválida, para no terminar leyendo otro host.
-- **Reintentos:** hasta 30 intentos, uno cada 10 segundos (5 minutos), con 10 segundos de
-  espera por pedido. Absorben el reinicio del contenedor y un corte breve de Cloudflare. Es el
-  mismo orden de magnitud que la espera de `desplegar.sh` para un cambio de etapa.
+- **Reintentos:** el plazo total es **hasta 5 minutos desde el primer intento**, con pedidos de
+  espera acotada (intervalo entre intentos acotado y tiempo por pedido acotado), no un número
+  fijo de intentos. Así se garantiza que no se supera ese plazo total. Absorben el reinicio del
+  contenedor y un corte breve de Cloudflare. Es el mismo orden de magnitud que la espera de
+  `desplegar.sh` para un cambio de etapa.
 - **Qué se acepta:** `200`, cuerpo JSON y un único campo `sha`. Cualquier otra cosa es una
   observación inválida y se reintenta.
 
@@ -127,12 +131,15 @@ que el despliegue anterior terminó bien y lo que falta es la comprobación.
 | `sha` distinto, un commit anterior o desconocido para GitHub | Se reintenta; a los 5 minutos, falla | igual |
 | `sha` distinto, un commit **posterior** del esperado en `main` | Éxito con aviso: otro despliegue más nuevo ya quedó sirviendo (D6) | Se reintenta; a los 5 minutos, falla |
 | `desconocido` | Falla de inmediato: la imagen se construyó sin `BUILD_SHA`, reintentar no lo arregla | Falla de inmediato |
-| `404` en `/version` | Se reintenta; a los 5 minutos, falla | Se reintenta; a los 5 minutos, **no verificable** (aviso, job en verde) |
-| Error de red, `5xx`, cuerpo inválido, `3xx` | Se reintenta; a los 5 minutos, falla | igual |
+| `404` en `/version` | Se reintenta; al alcanzar el plazo total de hasta 5 minutos desde el primer intento, falla | Se reintenta; al alcanzar el plazo total de hasta 5 minutos desde el primer intento, **no verificable** (aviso, job en verde) — riesgo aceptado (D5 nota) |
+| Error de red, `5xx`, cuerpo inválido, `3xx` | Se reintenta; al alcanzar el plazo total de hasta 5 minutos desde el primer intento, falla | igual |
 
 La fila del `404` en vuelta atrás existe porque se puede volver a una versión construida antes
-de este change, que no tiene la ruta. Es la única situación en la que se acepta no poder
-verificar, y queda escrita en el resumen del job.
+de este change, que no tiene la ruta. Esto se deja como **riesgo aceptado**: no se sabe de
+forma confiable si el SHA destino contiene el commit que agrega la ruta, por lo que no se
+especifica un mecanismo para distinguirlo salvo que se encontrara una forma confiable con
+`git merge-base --is-ancestor` sin ampliar el alcance. Es la única situación en la que se acepta
+no poder verificar, y queda escrita en el resumen del job.
 
 **Casos en los que `verificar` no corre:**
 - *El despliegue falló o volvió atrás solo* (`desplegar.sh` termina en 1, ya con la vuelta
@@ -153,7 +160,7 @@ API de GitHub (`GET /repos/{repo}/compare/{esperado}...{observado}`). Si el obse
 posterior al esperado en la historia (`status: ahead`), concluye que una versión más nueva ya
 quedó sirviendo y termina en verde con un aviso. En la vuelta atrás **no** se acepta, porque una
 versión posterior a la que se pidió volver significa que la vuelta atrás no se aplicó. La
-consulta usa el `GITHUB_TOKEN` del workflow con `contents: read`.
+consulta usa el `GITHUB_TOKEN` del workflow con `contents: read` (permitido explícitamente).
 
 ### D7: Análisis de seguridad de `/version`
 

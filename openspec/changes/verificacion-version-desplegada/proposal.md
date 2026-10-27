@@ -25,9 +25,12 @@ automática en cada despliegue, no con una mirada a mano.
   construir, con el mismo SHA que ya usa para el tag y la etiqueta `revision`.
 - **Verificación post-despliegue en `cd.yml`:** un job nuevo, `verificar`, corre después de
   `desplegar` cuando el despliegue cambió producción. Consulta
-  `https://<subdominio>/version` con un parámetro que evita cachés, reintenta hasta 5 minutos y
-  **falla** si el sitio no sirve el SHA esperado. No usa credenciales ni el environment
-  `produccion`.
+  `https://<subdominio>/version` con un parámetro que evita cachés, reintenta **hasta 5 minutos
+  desde el primer intento** (con pedidos de espera acotada) y **falla** si el sitio no sirve el
+  SHA esperado, **salvo** dos excepciones que terminan en verde: otro despliegue más nuevo ya en
+  servicio (modo `despliegue`) y vuelta atrás a una versión anterior a la ruta (404 en modo
+  `vuelta-atras`, riesgo aceptado). No usa la clave SSH ni los secrets del environment
+  `produccion`; permite `GITHUB_TOKEN` con `contents: read` si es necesario.
 - **Lógica pura con tests:** la decisión (¿coincide, se reintenta, está superada, no se puede
   verificar?) vive en `scripts/cd/verificar-version.mjs`, con tests en el CI.
 - **Runbook:** una sección corta con cómo comprobar a mano que un cambio llegó y qué hacer si el
