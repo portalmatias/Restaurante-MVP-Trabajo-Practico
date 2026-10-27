@@ -329,6 +329,11 @@ desde cero.
       corregidos de la sección 2.
 - [ ] 6.2 Resolver las preguntas abiertas de `design.md` con el equipo y reflejar la decisión
       en la spec si cambia un requisito (la spec manda, `config.yaml` §14).
+      Resultado parcial (27/10/2026): las preguntas 1, 2, 3, 5, 6, 7 y 8 tienen la respuesta de
+      @lussofacundo-iresm (comentario del 20/10/2026 en #77, registrada en `design.md`, «Open
+      Questions»); las 4 y 9 ya estaban resueltas. Falta la respuesta de @portalmatias, y la 5 espera
+      una decisión del equipo. Ninguna respuesta cambia un requisito de la spec, así que no hace falta
+      modificarla. La tarea sigue abierta hasta tener la conformidad de Mati.
 - [ ] 6.3 Definir con el equipo el orden de archivado respecto de `frontend-cliente` (pregunta
       1) y, al archivar, fundir los requisitos de `experiencia-reserva-cliente` que
       contradigan a los de `frontend-cliente`. Incluye, en la spec de `frontend-cliente`,
@@ -336,6 +341,11 @@ desde cero.
       inicio usa voseo» (que hoy nombra «Reservar una mesa» como impersonal incorrecto) con la
       excepción de los botones y enlaces de acción en infinitivo (`design.md`, «Acciones en
       infinitivo»), y retirar el `Select` de turnos que mencionan su design y sus tareas.
+      Estado (27/10/2026): el orden ya está definido, `frontend-cliente` se archivó primero (#84,
+      26/10/2026), con el acuerdo de @lussofacundo-iresm. Falta lo que se hace al archivar este change:
+      fundir los requisitos de `experiencia-reserva-cliente` que contradigan a los de
+      `frontend-cliente`, actualizar «Copy en voseo rioplatense» y retirar el `Select` de turnos en
+      `openspec/specs/frontend-cliente/spec.md`. Queda abierta hasta ese PR.
 - [x] 6.4 Pasar `npx openspec validate --all --strict` y esperar a que CI quede en verde antes de
       pedir la aprobación de un compañero distinto del autor.
       Resultado (27/10/2026): `npx openspec validate --all --strict` da 17 de 17 válidos. En
