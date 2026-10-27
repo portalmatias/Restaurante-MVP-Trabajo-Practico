@@ -421,7 +421,9 @@ protegido por `JwtAuthGuard` + `RolesGuard`, con throttle de admin.
   - Error de red o `5xx`: bloque "No pudimos cargar el plano. Podés seguir con tu reserva igual."
     con botón "Reintentar". La reserva nunca depende del plano.
   - `429`: mensaje específico "Estamos recibiendo muchas consultas. Probá de nuevo en un
-    minuto." sin reintento automático (evita agravar el límite compartido).
+    minuto." sin reintento automático (evita agravar el límite del plano, que comparten los
+    visitantes de un mismo origen). El respaldo a `/disponibilidad` sí se pide: esa ruta tiene
+    `@SkipThrottle()` y no cuenta para este límite.
   - `404/400` del **plano**: degradan la sección (mensaje "No pudimos cargar el plano. Podés
     seguir con tu reserva igual."), y el veredicto sale de `/disponibilidad`, que se maneja como
     hoy: un `404` (turno o zona inexistentes) redirige al paso 1, y un `400` muestra que la

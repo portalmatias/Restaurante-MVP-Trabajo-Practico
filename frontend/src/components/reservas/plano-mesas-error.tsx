@@ -14,7 +14,8 @@ export type PlanoMesasErrorProps = {
 
 /**
  * Sección del plano cuando no se pudo obtener (design.md D7). El `429` solo se informa:
- * reintentar enseguida agrava el límite compartido. Cualquier otro error (red, `5xx`, `404` o
+ * reintentar enseguida agrava el límite del plano, que comparten los visitantes de un mismo
+ * origen (`/disponibilidad`, el respaldo de la página, no tiene límite). Cualquier otro error (red, `5xx`, `404` o
  * `400`) degrada la sección con la opción de reintentar. La reserva nunca depende del plano.
  */
 export function PlanoMesasError({ error }: PlanoMesasErrorProps) {
