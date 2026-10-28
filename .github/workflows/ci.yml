@@ -171,6 +171,6 @@ jobs:
         run: shellcheck --severity=warning deploy/*.sh deploy/test/*.sh
 
       # actionlint revisa la sintaxis y las expresiones de los workflows y pasa shellcheck por
-      # los bloques `run:`. Version fijada (imagen oficial) para que el resultado no cambie solo.
+      # los bloques `run:` (se ignora el aviso info SC2015, igual que en shellcheck). Version fijada (imagen oficial) para que el resultado no cambie solo.
       - name: actionlint (.github/workflows/)
-        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color -ignore 'SC2015:info'
