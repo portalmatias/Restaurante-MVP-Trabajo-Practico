@@ -219,14 +219,14 @@
       `/reservas/nueva/resultado` en escritorio y en 360 px, capturar pantallas de STANDARD y
       VIP con mesas libres, ocupadas y que no alcanzan, y confirmar que se distinguen en
       escala de grises y con el lector de pantalla leyendo la lista. Con "reducir movimiento"
-      activado en el sistema operativo, comprobar que el esqueleto no se anima. Adjuntar
-      capturas al PR.
+      activado en el sistema operativo, comprobar que el esqueleto no se anima. El resultado
+      queda escrito en esta tarea y en la descripción del PR, sin adjuntar capturas.
       Avance (28/10/2026), con Chromium y el seed: STANDARD (sábado 20:00, 4 comensales) y VIP
       (viernes 20:00, 6 comensales) a 1280 y 360 px muestran mesas libres, ocupadas y que no
       alcanzan, y se distinguen en escala de grises. A 360 px no hay scroll horizontal y la lista
       queda antes que el dibujo. Con movimiento reducido el esqueleto tiene `animation-name: none`
       (sin la opción, `brillo-plano`). Falta, y lo tiene que hacer una persona: escuchar la lista
-      con un lector de pantalla real y adjuntar las capturas al PR.
+      con un lector de pantalla real.
 - [x] 6.2 Prueba manual de seguridad: con curl y sin token, consultar el plano de un turno con
       una reserva real del seed y confirmar a ojo que no aparece ningún dato personal ni id;
       comprobar el `429` excediendo el límite.
