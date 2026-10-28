@@ -10,9 +10,13 @@ const TEXTO_ESTADO: Record<EstadoMesa, string> = {
   NO_ALCANZA: "No alcanza",
 };
 
-/** Estado de una mesa en palabras, para la lista y la leyenda (design.md D5 y D7). */
+/**
+ * Estado de una mesa en palabras, para la lista y la leyenda (design.md D5 y D7). Si el backend
+ * agrega un estado antes que este frontend (los despliegues no son simultáneos), el tipo no lo
+ * garantiza en ejecución: se muestra un texto neutro en vez de "undefined".
+ */
 export function textoEstado(estado: EstadoMesa): string {
-  return TEXTO_ESTADO[estado];
+  return TEXTO_ESTADO[estado] ?? "Sin información";
 }
 
 function comensales(cantidad: number): string {

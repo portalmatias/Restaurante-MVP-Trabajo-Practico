@@ -58,10 +58,19 @@ function Patrones() {
   );
 }
 
+/** Un estado que el backend agregó y este frontend aún no conoce se dibuja neutro (puntos, "?"). */
+function patronDe(estado: EstadoMesa): string {
+  return PATRON[estado] ?? PATRON.NO_ALCANZA;
+}
+
+function marcaDe(estado: EstadoMesa): string {
+  return MARCA[estado] ?? "?";
+}
+
 function FormaMesa({ mesa, x, y, ancho, alto }: { mesa: MesaPlano } & Rect) {
   const comun = {
     "data-forma": mesa.forma,
-    fill: `url(#${PATRON[mesa.estado]})`,
+    fill: `url(#${patronDe(mesa.estado)})`,
     strokeWidth: 2,
     className: "stroke-foreground",
   };
@@ -110,7 +119,7 @@ function MesaDibujada({ mesa }: { mesa: MesaPlano }) {
         fontWeight="700"
         className="fill-foreground"
       >
-        {MARCA[mesa.estado]}
+        {marcaDe(mesa.estado)}
       </text>
     </g>
   );

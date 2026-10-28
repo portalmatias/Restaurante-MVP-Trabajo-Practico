@@ -184,6 +184,34 @@ describe("PlanoMesas - leyenda y resumen", () => {
   });
 });
 
+describe("PlanoMesas - estado que el frontend no conoce", () => {
+  // El backend puede agregar un estado antes de que se despliegue este frontend: la mesa se
+  // describe y se dibuja en neutro, sin "undefined" ni un patrón inexistente.
+  const DESCONOCIDO = {
+    ...PLANO,
+    mesas: [mesa("S1", { estado: "BLOQUEADA" as MesaPlano["estado"] })],
+  };
+
+  it("la lista dice 'sin información' en vez de undefined", () => {
+    renderizar(DESCONOCIDO);
+
+    expect(
+      within(screen.getByRole("list", { name: "Mesas de la zona" })).getByRole("listitem"),
+    ).toHaveTextContent("Mesa S1, para 4 comensales: sin información");
+  });
+
+  it("el dibujo usa un patrón que existe y una marca neutra", () => {
+    const { container } = renderizar(DESCONOCIDO);
+
+    const forma = mesaDibujada(container, "S1")?.querySelector("[data-forma]");
+    const patron = forma?.getAttribute("fill")?.match(/^url\(#(.+)\)$/)?.[1];
+    expect(patron).toBeDefined();
+    expect(container.querySelector(`pattern[id="${patron}"]`)).not.toBeNull();
+    expect(mesaDibujada(container, "S1")?.querySelector("[data-marca]")).toHaveTextContent("?");
+    expect(container.innerHTML).not.toContain("undefined");
+  });
+});
+
 describe("PlanoMesas - informativo", () => {
   it("aclara que es una foto del momento y que la mesa se asigna al confirmar", () => {
     renderizar();

@@ -169,6 +169,29 @@ describe("/reservas/nueva/resultado - hay lugar", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/pendiente de confirmación/);
   });
 
+  it("en una zona con confirmación y con plano, el aviso y el resumen del plano conviven", async () => {
+    // Dos regiones `status` en la misma página: ninguna se anuncia al cargar (solo al cambiar) y
+    // las dos se pueden encontrar por su texto.
+    responder(CON_LUGAR, {
+      plano: ok({
+        zona: "VIP",
+        columnas: 12,
+        filas: 8,
+        mesas: [],
+        disponible: true,
+        lugaresRestantes: 10,
+        motivos: [],
+      }),
+    });
+
+    await renderizar({ ...SELECCION, zonaId: ZONA_VIP.id });
+
+    const regiones = screen.getAllByRole("status").map((region) => region.textContent);
+    expect(regiones).toHaveLength(2);
+    expect(regiones[0]).toMatch(/pendiente de confirmación/);
+    expect(regiones[1]).toMatch(/En la zona VIP hay 0 mesas libres/);
+  });
+
   it("ofrece 'Continuar' hacia los datos de contacto con la misma selección", async () => {
     responder(CON_LUGAR);
 
