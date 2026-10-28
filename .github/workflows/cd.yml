@@ -249,7 +249,12 @@ jobs:
           # Formatos: evitan que un valor mal copiado llegue a ssh como una opción.
           [[ "$SERVER_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.:-]*[A-Za-z0-9])?$ ]] || { echo "::error title=SERVER_HOST inválido::Tiene que ser una IP o un nombre de dominio, sin espacios ni caracteres especiales."; exit 1; }
           [[ "$SERVER_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "::error title=SERVER_USER inválido::Tiene que ser un nombre de usuario de Linux (por ejemplo deploy)."; exit 1; }
-          [[ "$SERVER_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$SERVER_PORT))" -ge 1 ] && [ "$((10#$SERVER_PORT))" -le 65535 ] || { echo "::error title=SERVER_PORT inválido::Tiene que ser un número de puerto entre 1 y 65535 (por ejemplo 22)."; exit 1; }
+          if [[ "$SERVER_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$SERVER_PORT))" -ge 1 ] && [ "$((10#$SERVER_PORT))" -le 65535 ]; then
+            :
+          else
+            echo "::error title=SERVER_PORT inválido::Tiene que ser un número de puerto entre 1 y 65535 (por ejemplo 22)."
+            exit 1
+          fi
 
       - name: Ejecutar el despliegue en el servidor
         run: |
