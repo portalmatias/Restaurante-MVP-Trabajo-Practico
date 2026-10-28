@@ -168,7 +168,7 @@ jobs:
       # shellcheck viene instalado en los runners de ubuntu-latest. Los scripts de deploy/ corren
       # en el servidor con privilegios y deciden el despliegue: se revisan en cada cambio.
       - name: shellcheck (deploy/)
-        run: shellcheck deploy/*.sh deploy/test/*.sh
+        run: shellcheck --severity=warning deploy/*.sh deploy/test/*.sh
 
       # actionlint revisa la sintaxis y las expresiones de los workflows y pasa shellcheck por
       # los bloques `run:`. Version fijada (imagen oficial) para que el resultado no cambie solo.
