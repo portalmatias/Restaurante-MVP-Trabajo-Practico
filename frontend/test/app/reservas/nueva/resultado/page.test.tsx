@@ -524,6 +524,32 @@ describe("/reservas/nueva/resultado - plano de mesas", () => {
     expect(screen.getByRole("link", { name: "Continuar" })).toBeInTheDocument();
   });
 
+  // Comentario de cubic en #89: con un catálogo lento, el respaldo no tiene que esperarlo.
+  it("si el plano falla, pide la disponibilidad sin esperar a que termine el catálogo", async () => {
+    let liberarCatalogo: () => void = () => {};
+    const catalogoLento = new Promise<void>((listo) => {
+      liberarCatalogo = listo;
+    });
+    let disponibilidadAntesDelCatalogo = false;
+    let catalogoListo = false;
+    GET.mockImplementation(async (ruta: string) => {
+      if (ruta === "/plano-mesas") return falla(500);
+      if (ruta === "/disponibilidad") {
+        disponibilidadAntesDelCatalogo = !catalogoListo;
+        liberarCatalogo();
+        return CON_LUGAR;
+      }
+      await catalogoLento;
+      catalogoListo = true;
+      return ruta === "/zonas" ? ok(ZONAS) : ok(TURNOS);
+    });
+
+    await renderizar();
+
+    expect(disponibilidadAntesDelCatalogo).toBe(true);
+    expect(screen.getByRole("heading", { level: 1, name: "¡Hay lugar!" })).toBeInTheDocument();
+  });
+
   it("si el plano falla por la red, usa la disponibilidad y la reserva sigue disponible", async () => {
     GET.mockImplementation(async (ruta: string) => {
       if (ruta === "/plano-mesas") throw new TypeError("fetch failed");
@@ -546,6 +572,8 @@ describe("/reservas/nueva/resultado - plano de mesas", () => {
 
       expect(screen.getByRole("heading", { level: 1, name: "¡Hay lugar!" })).toBeInTheDocument();
       expect(within(seccionPlano()).getByRole("alert")).toHaveTextContent(MENSAJE_PLANO);
+      // Misma sección degradada que un 5xx (spec), con su "Reintentar".
+      expect(within(seccionPlano()).getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Continuar" })).toBeInTheDocument();
     },
   );

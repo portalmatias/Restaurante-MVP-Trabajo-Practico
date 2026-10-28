@@ -37,17 +37,22 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     redirect("/reservas/nueva");
   }
 
-  const [plano, catalogo] = await Promise.all([
-    toApiResult(
-      apiClient.GET("/plano-mesas", { params: { query: seleccion }, cache: "no-store" }),
-    ),
+  const pedidoPlano = toApiResult(
+    apiClient.GET("/plano-mesas", { params: { query: seleccion }, cache: "no-store" }),
+  );
+  // El respaldo arranca apenas falla el plano, sin esperar a que termine el catálogo.
+  const pedidoDisponibilidad = pedidoPlano.then((plano) =>
+    plano.data
+      ? { data: plano.data }
+      : toApiResult(
+          apiClient.GET("/disponibilidad", { params: { query: seleccion }, cache: "no-store" }),
+        ),
+  );
+  const [plano, disponibilidad, catalogo] = await Promise.all([
+    pedidoPlano,
+    pedidoDisponibilidad,
     cargarCatalogo(),
   ]);
-  const disponibilidad = plano.data
-    ? { data: plano.data }
-    : await toApiResult(
-        apiClient.GET("/disponibilidad", { params: { query: seleccion }, cache: "no-store" }),
-      );
 
   const seccionPlano = plano.data ? (
     <PlanoMesas plano={plano.data} comensales={seleccion.comensales} />

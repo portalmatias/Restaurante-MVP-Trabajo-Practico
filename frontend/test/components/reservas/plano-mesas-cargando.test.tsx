@@ -32,6 +32,20 @@ describe("PlanoMesasCargando", () => {
 
     expect(container.querySelector(".aspect-\\[3\\/2\\]")).not.toBeNull();
   });
+
+  // Comentario de cubic en #89: sin la lista, el plano real agregaba altura al llegar.
+  it("reserva también el lugar de la lista, en el mismo orden que el plano real", () => {
+    const { container } = render(<PlanoMesasCargando />);
+
+    const lista = container.querySelector("[data-esqueleto-lista]");
+    const dibujo = container.querySelector(".aspect-\\[3\\/2\\]");
+    expect(lista?.querySelectorAll(".plano-mesas-cargando").length).toBeGreaterThan(0);
+    // Como en PlanoMesas: en celular la lista va antes que el dibujo; desde `sm`, después.
+    expect(lista?.className).toMatch(/(^|\s)order-1(\s|$)/);
+    expect(lista?.className).toContain("sm:order-2");
+    expect(dibujo?.className).toMatch(/(^|\s)order-2(\s|$)/);
+    expect(dibujo?.className).toContain("sm:order-1");
+  });
 });
 
 describe("PlanoMesasCargando - movimiento reducido", () => {

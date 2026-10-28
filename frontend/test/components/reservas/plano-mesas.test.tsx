@@ -58,6 +58,18 @@ function mesaDibujada(container: HTMLElement, etiqueta: string): SVGGElement | n
   return dibujo(container).querySelector(`g[data-mesa="${etiqueta}"]`);
 }
 
+/**
+ * Textos de una mesa dibujada. Falla si la mesa no está o no tiene textos: así un bucle sobre el
+ * resultado no puede pasar sin comprobar nada.
+ */
+function textosDeMesa(container: HTMLElement, etiqueta: string): SVGTextElement[] {
+  const g = mesaDibujada(container, etiqueta);
+  expect(g).not.toBeNull();
+  const textos = [...(g?.querySelectorAll("text") ?? [])];
+  expect(textos.length).toBeGreaterThan(0);
+  return textos;
+}
+
 describe("PlanoMesas - lista textual", () => {
   it("lista cada mesa con etiqueta, capacidad y estado en palabras, en orden", () => {
     renderizar();
@@ -314,7 +326,7 @@ describe("PlanoMesas - tablillas de madera (tarea 5.3)", () => {
   it("la mesa ocupada es la tablilla dada vuelta: madera oscura con texto claro", () => {
     const { container } = renderizar();
 
-    const textos = (etiqueta: string) => [...(mesaDibujada(container, etiqueta)?.querySelectorAll("text") ?? [])];
+    const textos = (etiqueta: string) => textosDeMesa(container, etiqueta);
     for (const texto of textos("S2")) {
       expect(texto.getAttribute("class")).toContain("fill-madera-foreground");
     }
@@ -362,7 +374,7 @@ describe("PlanoMesas - tablillas de madera (tarea 5.3)", () => {
     const forma = g?.querySelector("[data-forma]");
     const cy = numero(forma, "cy");
     const ry = numero(forma, "ry");
-    for (const texto of g?.querySelectorAll("text") ?? []) {
+    for (const texto of textosDeMesa(container, "S11")) {
       const base = numero(texto, "y");
       const alto = numero(texto, "font-size");
       expect(base).toBeLessThanOrEqual(cy + ry);
@@ -379,7 +391,7 @@ describe("PlanoMesas - legibilidad sobre el patrón", () => {
 
     const halos: Record<string, string> = { S1: "stroke-muted", S2: "stroke-madera", S3: "stroke-card" };
     for (const [etiqueta, halo] of Object.entries(halos)) {
-      for (const texto of mesaDibujada(container, etiqueta)?.querySelectorAll("text") ?? []) {
+      for (const texto of textosDeMesa(container, etiqueta)) {
         expect(texto.getAttribute("class")).toContain(halo);
         expect(texto.getAttribute("paint-order")).toBe("stroke");
         expect(Number(texto.getAttribute("stroke-width"))).toBeGreaterThan(0);
