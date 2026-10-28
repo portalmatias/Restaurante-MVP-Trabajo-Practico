@@ -145,3 +145,29 @@ describe("separarMesas", () => {
     expect(separarMesas([esquina], GRILLA).ubicadas).toEqual([esquina]);
   });
 });
+
+describe("resumirPlano - estado que el frontend no conoce", () => {
+  // Revisión de gentle-ai (R3-001): la lista muestra esas mesas como "sin información", así que
+  // el resumen también tiene que contarlas para no contradecir a la lista.
+  it("cuenta las mesas con un estado desconocido como sin información", () => {
+    const mesas = [
+      mesa("S1"),
+      mesa("S2", { estado: "OCUPADA" }),
+      mesa("S3", { estado: "NO_ALCANZA" }),
+      mesa("S4", { estado: "BLOQUEADA" as MesaPlano["estado"] }),
+      mesa("S5", { estado: "RESERVADA" as MesaPlano["estado"] }),
+    ];
+
+    expect(resumirPlano({ zona: "STANDARD", comensales: 4, mesas })).toBe(
+      "En la zona STANDARD hay 1 mesa libre para 4 comensales, 1 ocupada, 1 que no alcanza y 2 sin información.",
+    );
+  });
+
+  it("con una sola mesa desconocida usa el mismo texto", () => {
+    const mesas = [mesa("S1"), mesa("S2", { estado: "BLOQUEADA" as MesaPlano["estado"] })];
+
+    expect(resumirPlano({ zona: "STANDARD", comensales: 4, mesas })).toBe(
+      "En la zona STANDARD hay 1 mesa libre para 4 comensales, 0 ocupadas, 0 que no alcanzan y 1 sin información.",
+    );
+  });
+});

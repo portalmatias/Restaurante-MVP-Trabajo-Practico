@@ -50,7 +50,8 @@ export function describirMesa(mesa: MesaPlano, grilla: Grilla): string {
 
 /**
  * Resumen del plano con la cantidad de mesas por estado, para el texto con `role="status"`
- * (design.md D7). Cuenta también las mesas sin ubicar: están en la lista.
+ * (design.md D7). Cuenta también las mesas sin ubicar y las de un estado desconocido: están en
+ * la lista.
  */
 export function resumirPlano({
   zona,
@@ -69,7 +70,12 @@ export function resumirPlano({
   const textoLibres = `${libres} ${libres === 1 ? "mesa libre" : "mesas libres"}`;
   const textoOcupadas = `${ocupadas} ${ocupadas === 1 ? "ocupada" : "ocupadas"}`;
   const textoNoAlcanzan = `${noAlcanzan} ${noAlcanzan === 1 ? "que no alcanza" : "que no alcanzan"}`;
-  return `En la zona ${zona} hay ${textoLibres} para ${comensales(cantidad)}, ${textoOcupadas} y ${textoNoAlcanzan}.`;
+  const inicio = `En la zona ${zona} hay ${textoLibres} para ${comensales(cantidad)}, ${textoOcupadas}`;
+  // Un estado que este frontend no conoce figura en la lista como "sin información": el
+  // resumen también lo cuenta, para no contradecirla.
+  const desconocidas = mesas.length - libres - ocupadas - noAlcanzan;
+  if (desconocidas === 0) return `${inicio} y ${textoNoAlcanzan}.`;
+  return `${inicio}, ${textoNoAlcanzan} y ${desconocidas} sin información.`;
 }
 
 /**
