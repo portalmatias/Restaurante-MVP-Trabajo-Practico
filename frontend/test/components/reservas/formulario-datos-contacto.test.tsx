@@ -502,6 +502,46 @@ describe("FormularioDatosContacto - error de servidor o de red", () => {
     );
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Nombre")).toHaveValue("Ana Pérez");
-    expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeEnabled();
+    // Reintentar enseguida agrava el límite: el botón queda en espera.
+    expect(screen.getByRole("button", { name: "Esperá un momento para reintentar" })).toBeDisabled();
+  });
+
+  // Tarea 3.3: durante la espera, Enter dentro de un campo envía el formulario por el navegador;
+  // el componente tiene que ignorar ese envío igual que el botón deshabilitado.
+  it("durante la espera tras un 429, enviar el formulario con Enter no dispara otra solicitud", async () => {
+    POST.mockResolvedValue(respuestaError(429));
+    renderizar();
+
+    completarFormulario();
+    enviar();
+    await screen.findByRole("alert");
+
+    const formulario = screen.getByLabelText("Nombre").closest("form");
+    if (!formulario) throw new Error("El formulario no está en el documento.");
+    fireEvent.submit(formulario);
+
+    expect(screen.getByRole("button", { name: "Esperá un momento para reintentar" })).toBeDisabled();
+    expect(POST).toHaveBeenCalledTimes(1);
+  });
+
+  it("tras un 429 el botón vuelve a habilitarse cuando termina la espera", async () => {
+    jest.useFakeTimers({ doNotFake: ["queueMicrotask", "nextTick", "setImmediate", "clearImmediate"] });
+    try {
+      POST.mockResolvedValue(respuestaError(429));
+      renderizar();
+
+      completarFormulario();
+      enviar();
+      await screen.findByRole("alert");
+      expect(screen.getByRole("button", { name: "Esperá un momento para reintentar" })).toBeDisabled();
+
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+
+      expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeEnabled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

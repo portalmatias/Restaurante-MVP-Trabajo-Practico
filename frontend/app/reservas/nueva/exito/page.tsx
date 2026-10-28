@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BotonCopiarCodigo } from "../../../../src/components/reservas/boton-copiar-codigo";
@@ -7,6 +8,8 @@ import { Alert } from "../../../../src/components/ui/alert";
 import { buttonVariants } from "../../../../src/components/ui/button";
 import { cargarCatalogo } from "../../../../src/lib/cargar-catalogo";
 import { leerConfirmacionDeQuery } from "../../../../src/lib/seleccion-reserva";
+
+export const metadata: Metadata = { title: "Reserva registrada" };
 
 type ExitoPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -32,12 +35,14 @@ export default async function ExitoPage({ searchParams }: ExitoPageProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-10">
-      <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+      <h1 className="font-display text-3xl font-medium leading-tight sm:text-4xl">
         {`¡Listo! Tu reserva está ${pendiente ? "pendiente de confirmación" : "confirmada"}`}
       </h1>
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-accent bg-muted p-6">
-        <p className="text-sm text-muted-foreground">Tu código de reserva</p>
-        <p className="text-3xl font-bold tracking-widest text-accent">{confirmacion.codigo}</p>
+      <div className="flex flex-col items-center gap-2 rounded-sm border border-border bg-card p-6">
+        <p className="text-base text-muted-foreground">Tu código de reserva</p>
+        <p className="tabular font-display text-4xl font-medium tracking-[0.18em] text-accent sm:text-5xl">
+          {confirmacion.codigo}
+        </p>
         <BotonCopiarCodigo codigo={confirmacion.codigo} />
       </div>
       {pendiente ? (

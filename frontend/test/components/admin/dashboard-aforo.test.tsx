@@ -138,4 +138,104 @@ describe("DashboardAforo", () => {
     expect(await screen.findByText(/No hay turnos configurados para los lunes/)).toBeInTheDocument();
     expect(llamadasA("/admin/reservas")).toHaveLength(0);
   });
+
+  // Tarea 3.7: medidor accesible y hora de la consulta («Dashboard de aforo»).
+  it("cada zona tiene un medidor con su porcentaje y se muestra la hora de los datos", async () => {
+    render(<DashboardAforo hoy="2026-10-02" />);
+    await screen.findByTestId("aforo-zona-STANDARD");
+
+    const medidores = screen.getAllByRole("meter");
+    expect(medidores.length).toBeGreaterThanOrEqual(2);
+    const standard = medidores.find((m) => m.getAttribute("aria-valuetext") === "15 % ocupado");
+    expect(standard).toBeDefined();
+    expect(standard).toHaveAttribute("aria-valuemin", "0");
+    expect(standard).toHaveAttribute("aria-valuemax", "100");
+    expect(standard).toHaveAttribute("aria-valuenow", "15");
+    expect(screen.getAllByText(/^Datos de las \d{2}:\d{2}/).length).toBeGreaterThan(0);
+  });
+
+  // Revisión de #78: el título salía de la selección actual y los números, del resultado anterior.
+  it("mientras llega la consulta nueva, el título sigue siendo el de los números que se ven", async () => {
+    render(<DashboardAforo hoy="2026-10-02" />);
+    await screen.findByTestId("aforo-global");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(/viernes.*12:00 a 15:00/);
+
+    const base = GET.getMockImplementation()!;
+    GET.mockImplementation((path: string, o?: { params: { query: Record<string, string | number> } }) =>
+      path === "/admin/reservas" && o?.params.query.fecha === "2026-10-03" ? new Promise(() => {}) : base(path, o),
+    );
+    fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-10-03" } });
+
+    await waitFor(() => expect(screen.getByText(/se muestra la consulta anterior/)).toBeInTheDocument());
+    const titulo = screen.getByRole("heading", { level: 2 });
+    expect(titulo).toHaveTextContent(/viernes/);
+    expect(titulo).not.toHaveTextContent(/sábado/);
+    expect(screen.getByTestId("aforo-global")).toHaveTextContent(/^12$/);
+  });
+
+  it("si la consulta nueva falla, no queda un título nuevo sobre números viejos", async () => {
+    render(<DashboardAforo hoy="2026-10-02" />);
+    await screen.findByTestId("aforo-global");
+
+    const base = GET.getMockImplementation()!;
+    GET.mockImplementation((path: string, o?: { params: { query: Record<string, string | number> } }) =>
+      path === "/admin/reservas" && o?.params.query.fecha === "2026-10-03"
+        ? Promise.resolve({ error: { statusCode: 500, message: "Falló" }, response: { ok: false, status: 500 } })
+        : base(path, o),
+    );
+    fireEvent.change(screen.getByLabelText("Fecha"), { target: { value: "2026-10-03" } });
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByTestId("aforo-global")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: /sábado/ })).not.toBeInTheDocument();
+  });
+
+  // Tarea 4.4: en escala de grises el nivel se distingue por texto, forma y pictograma.
+  it("aforo 0: la barra se ve sobre su pista y el sello no lleva el check de «Con lugar»", async () => {
+    const base = GET.getMockImplementation()!;
+    GET.mockImplementation((path: string, o?: { params: { query: Record<string, string | number> } }) =>
+      path === "/admin/zonas" ? ok([...ZONAS, { id: "z-cero", nombre: "TERRAZA", aforoMaximo: 0 }]) : base(path, o),
+    );
+    RESERVAS["2026-10-02|t-vie"].CONFIRMADA.push(reserva("z-cero", 5));
+    render(<DashboardAforo hoy="2026-10-02" />);
+
+    const fila = (await screen.findByTestId("aforo-zona-TERRAZA")).closest("li") as HTMLElement;
+    const pista = fila.querySelector("[role=meter]") as HTMLElement;
+    const barra = pista.firstElementChild as HTMLElement;
+    expect(pista.className).toMatch(/(^|\s)bg-muted(\s|$)/);
+    expect(barra.className).not.toMatch(/(^|\s)bg-muted(\s|$)/);
+    expect(fila.textContent).toContain("Sin aforo");
+    const check = "M3 8.5l3.5 3.5L13 4.5";
+    expect(fila.querySelector("h3 + span svg")?.innerHTML ?? "").not.toContain(check);
+    const conLugar = screen.getByTestId("aforo-zona-STANDARD").closest("li") as HTMLElement;
+    expect(conLugar.querySelector("h3 + span svg")?.innerHTML).toContain(check);
+  });
+
+  // Spec «Aforo máximo cero»: no se muestra un porcentaje, y el medidor tampoco lo anuncia.
+  it("aforo 0: el medidor no anuncia un porcentaje", async () => {
+    const base = GET.getMockImplementation()!;
+    GET.mockImplementation((path: string, o?: { params: { query: Record<string, string | number> } }) =>
+      path === "/admin/zonas" ? ok([...ZONAS, { id: "z-cero", nombre: "TERRAZA", aforoMaximo: 0 }]) : base(path, o),
+    );
+    render(<DashboardAforo hoy="2026-10-02" />);
+
+    const fila = (await screen.findByTestId("aforo-zona-TERRAZA")).closest("li") as HTMLElement;
+    const medidor = fila.querySelector("[role=meter]") as HTMLElement;
+    expect(medidor).toHaveAttribute("aria-valuetext", "Sin aforo");
+    expect(medidor.getAttribute("aria-valuetext")).not.toMatch(/%/);
+  });
+
+  it("«Completo» y «Sobrecupo» no se distinguen solo por el texto: llevan pictogramas distintos", async () => {
+    RESERVAS["2026-10-02|t-vie"] = {
+      CONFIRMADA: [reserva("z-std", 40), reserva("z-vip", 25)],
+      PENDIENTE: [],
+    };
+    render(<DashboardAforo hoy="2026-10-02" />);
+
+    const std = (await screen.findByTestId("aforo-zona-STANDARD")).closest("li") as HTMLElement;
+    const vip = screen.getByTestId("aforo-zona-VIP").closest("li") as HTMLElement;
+    expect(std.textContent).toContain("Completo");
+    expect(vip.textContent).toContain("Sobrecupo");
+    expect(std.querySelector("h3 + span svg")?.innerHTML).not.toBe(vip.querySelector("h3 + span svg")?.innerHTML);
+  });
 });

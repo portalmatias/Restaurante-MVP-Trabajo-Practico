@@ -8,8 +8,7 @@ Este documento fija las decisiones técnicas y sus alternativas.
 
 Estado del que se parte: `frontend-base` define tokens en blanco y negro, Inter y una paleta
 neutra; `frontend-cliente` y `frontend-admin` funcionan sobre ellos. El stack es Next.js 16 (App
-Router) con Tailwind 4, solo modo claro. El rediseño no toca `frontend/src/lib/**`, la API ni
-el contrato OpenAPI.
+Router) con Tailwind 4, solo modo claro. El rediseño no toca la API ni el contrato OpenAPI. Como excepción intencional (pedida por el equipo), se modificó `frontend/src/lib/seleccion-reserva.ts` para agregar el parámetro opcional `hasta` a `esFechaElegible`/`resolverSeleccionInicial` y limitar el rango de fechas desde el calendario; los demás archivos de `frontend/src/lib/**` permanecen sin cambios.
 
 ### Cómo se redactó esta spec (honestidad de proceso)
 
@@ -294,21 +293,28 @@ Preguntas para el equipo (ninguna cambia el contrato de la API):
    `experiencia-reserva-cliente`. La regla de precedencia está en «Precedencia sobre
    `frontend-cliente`»; lo que decide el equipo es si se archiva `frontend-cliente` antes
    (recomendado) y quién revisa el texto fundido al archivar (tarea 6.3).
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): de acuerdo con archivar `frontend-cliente` primero. Hecho: se archivó en #84 (26/10/2026); falta fundir los requisitos al archivar este change (tarea 6.3).*
 2. **`radiogroup` o botones con `aria-pressed`** para elegir el turno (D3): ¿el equipo prefiere
    la semántica de radio aun a costa de implementar las flechas?
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a los botones con `aria-pressed`; no hace falta cambiar nada para aprobar la spec. Pendiente la opinión de @portalmatias.*
 3. **¿Se acepta la excepción de 36 px** en el admin cuando no hay ningún puntero grueso (D10), o
    se vuelve a 44 px?
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a la excepción de 36 px. Pendiente la opinión de @portalmatias.*
 4. **Resuelta: WebP** (D6). Las imágenes ya están convertidas en el código; no queda decisión,
    solo verificar peso y calidad (tarea 5.2). Se conserva el número para no renumerar.
 5. **Ubicación de `.impeccable/`** y de `PRODUCT.md` (`frontend/`): ¿se versionan o quedan fuera
    del repositorio evaluable? Hoy están dentro de `frontend/`.
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin opinión fuerte; lo decide quien archive. Propuesta del autor: versionarlos, porque no traen secretos ni datos personales y `globals.css` y `tablilla.tsx` los citan en comentarios. Pendiente de decisión del equipo.*
 6. **Reparto de la revisión:** al ser nueve commits de una sola persona, ¿cómo se reparte la
    autoría y la revisión entre los tres integrantes (`config.yaml` §11)?
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): se aportaron dos commits propios a `feature/diseno-frontend` (`abff7bc`, `ae4086c`) y la revisión independiente de la spec; el resto del balance se ajusta en los changes sin implementación (`plano-mesas`, `despliegue-continuo-ec2`). Pendiente la conformidad de @portalmatias.*
 7. **`role="grid"` o tabla de botones** en el calendario (D11): ¿el equipo prefiere la semántica
    de cuadrícula de fechas aun a costa de un modo de lectura más complejo para lectores de
    pantalla?
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a la tabla de botones. Pendiente la opinión de @portalmatias.*
 8. **Desviación de `config.yaml` §14** (spec posterior al código): ¿el equipo la acepta de forma
    expresa para este change, con la validación del PR de implementación contra `tasks.md`?
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): la desviación se acepta de forma expresa para este change. Pendiente la conformidad de @portalmatias.*
 9. **Resuelta: acciones en infinitivo.** El equipo decidió mantener los botones y enlaces de
    acción en infinitivo y usar voseo solo en títulos y textos explicativos. Se registra como
    excepción a «Copy en voseo» de `frontend-cliente` (ver «Acciones en infinitivo»); falta que
