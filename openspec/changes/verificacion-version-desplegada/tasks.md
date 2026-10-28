@@ -60,9 +60,12 @@
       - la URL lleva el parámetro `cb`, con un valor distinto en cada intento, y el encabezado
         `Cache-Control: no-cache`.
       Verificar que fallan sin la implementación.
-      Resultado (26/10/2026): 57 tests. Comprobé que detectan roturas: seguir redirecciones, aceptar
+      Resultado (28/10/2026): 61 tests. Comprobé que detectan roturas: seguir redirecciones, aceptar
       un SHA posterior en vuelta atrás y no mandar `Cache-Control: no-cache` hacen fallar al menos
-      un test cada una.
+      un test cada una. Tras alinear con el requisito (parámetro distinto en cada intento y plazo
+      total de 5 minutos) se agregaron 5 tests (`cb=<run_id>-<run_attempt>-<consulta>`, distinto
+      por consulta y por reejecución, entero desde 1, un pedido con URL propia por reintento y
+      corte por plazo total); los 5 fallan con la versión anterior del script.
 - [x] 3.2 Escribir `scripts/cd/verificar-version.mjs`: funciones puras de decisión (D5) y el
       ciclo de consulta con plazo total hasta 5 minutos desde el primer intento, con pedidos de
       espera acotada configurables; solo HTTPS cuando se arma la URL desde `SUBDOMINIO`; sin
@@ -72,7 +75,7 @@
 - [x] 3.3 `package.json`: agregar `scripts/cd/verificar-version.test.mjs` a la lista explícita
       de `test:scripts` (Node 20 no expande globs). Verificar que `npm run test:scripts` corre
       el archivo nuevo.
-      Resultado (26/10/2026): `npm run test:scripts`: 99 de 99.
+      Resultado (26/10/2026): `npm run test:scripts`: 103 de 103 (28/10/2026).
 - [ ] 3.4 `cd.yml`:
       - `build-args` del frontend con `BUILD_SHA` (el mismo SHA del tag y de la etiqueta);
       - salida `resultado` del job `desplegar` (`desplegado` o `superada`, según el código de
@@ -115,8 +118,10 @@
 - [x] 4.3 `npx eslint .`, `npm run typecheck -w frontend`, `npm run test:frontend` (con
       `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`), `npm run test:scripts` y
       `npm run test:deploy` en verde, desde la raíz.
-      Resultado (26/10/2026): `eslint` limpio; tipos sin errores; frontend 562 de 562 con las
-      dos zonas horarias; `test:scripts` 99 de 99; `test:deploy` 35 comprobaciones.
+      Resultado (28/10/2026, sobre `main` con el rediseño): `eslint` limpio sobre `scripts/cd`;
+      frontend 799 de 799 con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`; `test:scripts`
+      103 de 103; `test:deploy` 56 comprobaciones. `typecheck` no marca errores en `/version`; en
+      esta copia solo falla por `@playwright/test`, que no estaba instalado (viene de #82).
 - [ ] 4.4 PR con descripción en español, enlazado a este change, con el resultado de 2.3, y
       aprobado por un compañero distinto del autor. Aclarar que el job `verificar` solo se puede
       probar de verdad al desplegar.
