@@ -340,6 +340,44 @@ describe('verificar contra un servidor HTTP local', () => {
     assert.ok(resultado.intentos >= 1);
   });
 
+  test('el plazo total también cubre el tiempo que tarda un pedido', async () => {
+    guion = [sha(OTRO)];
+    let reloj = 0;
+    const resultado = await ejecutar({
+      intentos: 1000,
+      plazoMs: 100,
+      intervaloMs: 10,
+      ahora: () => reloj,
+      // Cada pedido "tarda" 40 ms de reloj mientras está pendiente.
+      fetchImpl: async (...args) => {
+        reloj += 40;
+        return fetch(...args);
+      },
+    });
+    assert.equal(resultado.resultado, 'fallo');
+    assert.ok(resultado.intentos <= 3, `hizo ${resultado.intentos} intentos`);
+  });
+
+  test('la consulta de la relación recibe, como mucho, el tiempo que queda del plazo', async () => {
+    guion = [sha(OTRO)];
+    let reloj = 0;
+    const recibidos = [];
+    await ejecutar({
+      intentos: 1,
+      plazoMs: 100,
+      ahora: () => reloj,
+      fetchImpl: async (...args) => {
+        reloj += 70;
+        return fetch(...args);
+      },
+      relacion: async (_esperado, _observado, { timeoutMs }) => {
+        recibidos.push(timeoutMs);
+        return null;
+      },
+    });
+    assert.deepEqual(recibidos, [30]);
+  });
+
   test('reintenta si primero ve el SHA anterior y luego el esperado', async () => {
     guion = [sha(OTRO), sha(OTRO), sha(ESPERADO)];
     const resultado = await ejecutar();

@@ -214,7 +214,7 @@ async function consultar(url, fetchImpl, timeoutMs) {
  *   timeoutMs?: number,
  *   ahora?: () => number,
  *   fetchImpl?: typeof fetch,
- *   relacion?: (esperado: string, observado: string) => Promise<string | null>,
+ *   relacion?: (esperado: string, observado: string, opciones: { timeoutMs: number }) => Promise<string | null>,
  *   log?: (linea: string) => void,
  * }} opciones
  * @returns {Promise<{
@@ -260,9 +260,11 @@ export async function verificar({
       modo === 'despliegue' &&
       relacion
     ) {
-      if (!relaciones.has(ultima.sha)) {
+      // La consulta a GitHub también cuenta para el plazo total: espera, como mucho, lo que queda.
+      const queda = plazoMs - (ahora() - inicio);
+      if (!relaciones.has(ultima.sha) && queda > 0) {
         try {
-          const dato = await relacion(esperado, ultima.sha);
+          const dato = await relacion(esperado, ultima.sha, { timeoutMs: Math.min(15_000, queda) });
           if (dato) relaciones.set(ultima.sha, dato);
         } catch {
           // Sin la relación se sigue como si no se supiera: se reintenta.
@@ -312,7 +314,7 @@ export async function verificar({
  * observado es posterior. `null` si GitHub no conoce alguno de los dos commits.
  */
 export function relacionConGitHub({ token, repositorio, fetchImpl = fetch }) {
-  return async (esperado, observado) => {
+  return async (esperado, observado, { timeoutMs = 15_000 } = {}) => {
     const respuesta = await fetchImpl(
       `https://api.github.com/repos/${repositorio}/compare/${esperado}...${observado}`,
       {
@@ -321,7 +323,7 @@ export function relacionConGitHub({ token, repositorio, fetchImpl = fetch }) {
           Authorization: `Bearer ${token}`,
           'X-GitHub-Api-Version': '2022-11-28',
         },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(timeoutMs),
       },
     );
     if (respuesta.status === 404) return null;

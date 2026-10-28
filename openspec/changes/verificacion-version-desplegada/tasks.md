@@ -28,7 +28,7 @@
 - [x] 2.2 Escribir `frontend/app/version/route.ts` (`GET`, con `dynamic = "force-dynamic"`).
       Verificar que los tests pasan y que `npm run typecheck -w frontend` y `npx eslint .`
       quedan limpios.
-- [x] 2.3 `frontend/Dockerfile`: `ARG BUILD_SHA=desconocido` y `ENV BUILD_SHA=${BUILD_SHA}` en
+- [ ] 2.3 `frontend/Dockerfile`: `ARG BUILD_SHA=desconocido` y `ENV BUILD_SHA=${BUILD_SHA}` en
       la etapa final, después de los `COPY`. Verificar construyendo la imagen con
       `--build-arg BUILD_SHA=<sha>` y corriendo el contenedor: `GET /version` devuelve el SHA,
       `HEAD` responde `200`, `OPTIONS` responde `204` con `Allow`, `POST` responde `405`, y sin el
@@ -40,6 +40,11 @@
       `Cache-Control: no-store`; `HEAD` → `200`; `POST`, `PUT`, `PATCH` y `DELETE` → `405`; con
       `BUILD_SHA` vacío → `{"sha":"desconocido"}`. Un segundo build con otro SHA reutilizó la
       caché (`npm ci` y `npm run build` en `CACHED`).
+      Falta (28/10/2026): `OPTIONS` → `204` con `Allow` (lo resuelve Next solo, pero no se
+      comprobó; los tests de 2.1 no lo cubren) y construir sin el argumento (se probó con
+      `BUILD_SHA` vacío, no omitido). Se comprueban `OPTIONS` en producción tras el primer
+      despliegue (4.6) y el build sin argumento en la próxima ocasión con Docker; hasta entonces
+      esta tarea queda abierta.
 ## 3. La comprobación (D3 a D6)
 
 - [x] 3.1 Escribir primero `scripts/cd/verificar-version.test.mjs` (`node --test`, sin
@@ -60,12 +65,12 @@
       - la URL lleva el parámetro `cb`, con un valor distinto en cada intento, y el encabezado
         `Cache-Control: no-cache`.
       Verificar que fallan sin la implementación.
-      Resultado (28/10/2026): 61 tests. Comprobé que detectan roturas: seguir redirecciones, aceptar
+      Resultado (28/10/2026): 63 tests. Comprobé que detectan roturas: seguir redirecciones, aceptar
       un SHA posterior en vuelta atrás y no mandar `Cache-Control: no-cache` hacen fallar al menos
       un test cada una. Tras alinear con el requisito (parámetro distinto en cada intento y plazo
-      total de 5 minutos) se agregaron 5 tests (`cb=<run_id>-<run_attempt>-<consulta>`, distinto
+      total de 5 minutos) se agregaron 7 tests (`cb=<run_id>-<run_attempt>-<consulta>`, distinto
       por consulta y por reejecución, entero desde 1, un pedido con URL propia por reintento y
-      corte por plazo total); los 5 fallan con la versión anterior del script.
+      corte por plazo total, también durante un pedido lento y en la consulta a GitHub). Contra la primera versión del script (commit `092cc4f`) fallan los 7.
 - [x] 3.2 Escribir `scripts/cd/verificar-version.mjs`: funciones puras de decisión (D5) y el
       ciclo de consulta con plazo total hasta 5 minutos desde el primer intento, con pedidos de
       espera acotada configurables; solo HTTPS cuando se arma la URL desde `SUBDOMINIO`; sin
@@ -118,10 +123,11 @@
 - [x] 4.3 `npx eslint .`, `npm run typecheck -w frontend`, `npm run test:frontend` (con
       `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`), `npm run test:scripts` y
       `npm run test:deploy` en verde, desde la raíz.
-      Resultado (28/10/2026, sobre `main` con el rediseño): `eslint` limpio sobre `scripts/cd`;
-      frontend 799 de 799 con `TZ=UTC` y con `TZ=America/Argentina/Buenos_Aires`; `test:scripts`
-      103 de 103; `test:deploy` 56 comprobaciones. `typecheck` no marca errores en `/version`; en
-      esta copia solo falla por `@playwright/test`, que no estaba instalado (viene de #82).
+      Resultado (28/10/2026, sobre `main` con el rediseño): frontend 799 de 799 con `TZ=UTC` y
+      con `TZ=America/Argentina/Buenos_Aires`; `test:scripts` 105 de 105; `test:deploy` 56
+      comprobaciones; `eslint` limpio sobre `scripts/cd`. El `eslint .` y el `typecheck` completos
+      los corre el job «Lint y tipos» del CI de este PR, que pasa (en mi copia local `typecheck`
+      solo fallaba por `@playwright/test`, no instalado).
 - [ ] 4.4 PR con descripción en español, enlazado a este change, con el resultado de 2.3, y
       aprobado por un compañero distinto del autor. Aclarar que el job `verificar` solo se puede
       probar de verdad al desplegar.

@@ -467,9 +467,11 @@ hornea en la imagen (`BUILD_SHA`) y responde `{"sha": "<40 hex>"}` sin caché.
 - **A mano:** el `cb` cambia la URL en cada pedido y evita que una caché responda por el sitio.
 
   ```bash
-  curl -s "https://<subdominio>/version?cb=$(date +%s)"   # {"sha":"<40 hex>"}
-  git rev-parse origin/main                               # el SHA que debería estar sirviendo
+  curl -s "https://<subdominio>/version?cb=$RANDOM$RANDOM"   # {"sha":"<40 hex>"}
   ```
+
+  Compará el SHA con el que dice el resumen del job `desplegar` de esa corrida, no con `origin/main`:
+  puede haber sido una vuelta atrás, un commit histórico o una versión superada.
 
 **Si el SHA no coincide**, el job falla pasados 5 minutos y su mensaje dice cuál se vio. En ese
 caso el despliegue en el servidor **terminó bien**; lo que no se confirmó es lo que ve el público.
@@ -479,12 +481,12 @@ Separar de qué lado está el problema:
    sitio (el certificado de Let's Encrypt es válido para ese nombre):
 
    ```bash
-   curl -s --resolve <subdominio>:443:<IP-ELASTICA> "https://<subdominio>/version?cb=$(date +%s)"
+   curl -s --resolve <subdominio>:443:<IP-ELASTICA> "https://<subdominio>/version?cb=$RANDOM$RANDOM"
    ```
 
 2. **Si el servidor sirve el SHA correcto pero el público ve otro**, la copia vieja está en
    Cloudflare. Mirar el encabezado `cf-cache-status` de la respuesta pública
-   (`curl -sI "https://<subdominio>/version?cb=$(date +%s)"`; `HIT` confirma que hay caché), revisar
+   (`curl -sI "https://<subdominio>/version?cb=$RANDOM$RANDOM"`; `HIT` confirma que hay caché), revisar
    si alguna regla de caché de la zona alcanza a `/version` y **purgar** el contenido en el
    panel de Cloudflare (*Caching → Configuration → Purge Cache*). La zona es de la docente: pedirle
    que lo haga o que excluya `/version` y la landing de la caché.
