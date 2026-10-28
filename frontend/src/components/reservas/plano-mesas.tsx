@@ -31,7 +31,16 @@ const PATRON: Record<EstadoMesa, string> = {
   NO_ALCANZA: "plano-mesas-no-alcanza",
 };
 
-/** Patrones compartidos por el dibujo y la leyenda; se definen aunque no haya dibujo. */
+/** Desplazamiento del canto de la tablilla bajo su cara, en unidades del `viewBox`. */
+const CANTO = 3;
+
+/**
+ * Patrones compartidos por el dibujo y la leyenda; se definen aunque no haya dibujo. Son las
+ * tablillas Kakefuda del rediseño: `LIBRE` es hinoki claro liso, `OCUPADA` es la tablilla dada
+ * vuelta (madera oscura) con vetas diagonales y `NO_ALCANZA` es hinoki a la sombra punteado.
+ * Contrastes con los tokens: vetas `border` sobre `madera` 3,13:1, puntos `muted-foreground`
+ * sobre `muted` 5,52:1 (WCAG 1.4.11, mínimo 3:1).
+ */
 function Patrones() {
   return (
     <svg aria-hidden="true" width="0" height="0" className="absolute">
@@ -46,11 +55,11 @@ function Patrones() {
           patternUnits="userSpaceOnUse"
           patternTransform="rotate(45)"
         >
-          <rect width="8" height="8" className="fill-muted" />
-          <line x1="0" y1="0" x2="0" y2="8" strokeWidth="3" className="stroke-muted-foreground" />
+          <rect width="8" height="8" className="fill-madera" />
+          <line x1="0" y1="0" x2="0" y2="8" strokeWidth="3" className="stroke-border" />
         </pattern>
         <pattern id={PATRON.NO_ALCANZA} width="8" height="8" patternUnits="userSpaceOnUse">
-          <rect width="8" height="8" className="fill-card" />
+          <rect width="8" height="8" className="fill-muted" />
           <circle cx="4" cy="4" r="1.5" className="fill-muted-foreground" />
         </pattern>
       </defs>
@@ -67,20 +76,89 @@ function marcaDe(estado: EstadoMesa): string {
   return MARCA[estado] ?? "?";
 }
 
-function FormaMesa({ mesa, x, y, ancho, alto }: { mesa: MesaPlano } & Rect) {
-  const comun = {
-    "data-forma": mesa.forma,
-    fill: `url(#${patronDe(mesa.estado)})`,
-    strokeWidth: 2,
-    className: "stroke-foreground",
-  };
-  if (mesa.forma === "REDONDA") {
-    return <ellipse {...comun} cx={x + ancho / 2} cy={y + alto / 2} rx={ancho / 2} ry={alto / 2} />;
-  }
-  return <rect {...comun} x={x} y={y} width={ancho} height={alto} rx={mesa.forma === "CUADRADA" ? 2 : 6} />;
+/**
+ * Texto sobre la cara de la tablilla: claro sobre la madera oscura (13,14:1), tinta sobre hinoki.
+ * El halo (trazo del color base de la tablilla, pintado debajo del relleno) aparta el texto de los
+ * puntos y las vetas del patrón. Un estado desconocido usa el patrón neutro, con base `muted`.
+ */
+function claseTexto(estado: EstadoMesa): string {
+  if (estado === "OCUPADA") return "fill-madera-foreground stroke-madera";
+  if (estado === "LIBRE") return "fill-foreground stroke-card";
+  return "fill-foreground stroke-muted";
 }
 
+/** Atributos del halo, comunes a todos los textos de la mesa. */
+const HALO = { paintOrder: "stroke", strokeWidth: 3, strokeLinejoin: "round" } as const;
+
 type Rect = { x: number; y: number; ancho: number; alto: number };
+
+/** Silueta de la mesa: la usan la cara y el canto, que es la misma forma corrida hacia abajo. */
+type PropsSilueta = { forma: MesaPlano["forma"] } & Rect & {
+  className: string;
+  fill?: string;
+  strokeWidth?: number;
+  "data-canto"?: string;
+  "data-forma"?: string;
+};
+
+function Silueta({ forma, x, y, ancho, alto, ...resto }: PropsSilueta) {
+  if (forma === "REDONDA") {
+    return <ellipse {...resto} cx={x + ancho / 2} cy={y + alto / 2} rx={ancho / 2} ry={alto / 2} />;
+  }
+  // Esquinas apenas redondeadas, como los radios del tema (`--radius-sm` a `--radius-lg`).
+  return <rect {...resto} x={x} y={y} width={ancho} height={alto} rx={forma === "CUADRADA" ? 2 : 4} />;
+}
+
+/**
+ * Tablilla de la mesa: el canto (madera vista de costado) asoma debajo de la cara, que lleva el
+ * patrón del estado. El borde `border` mide 3,66:1 contra el fondo (WCAG 1.4.11).
+ */
+function FormaMesa({ mesa, ...rect }: { mesa: MesaPlano } & Rect) {
+  return (
+    <>
+      <Silueta data-canto="" forma={mesa.forma} {...rect} y={rect.y + CANTO} className="fill-border" />
+      <Silueta
+        data-forma={mesa.forma}
+        forma={mesa.forma}
+        {...rect}
+        fill={`url(#${patronDe(mesa.estado)})`}
+        strokeWidth={2}
+        className="stroke-border"
+      />
+    </>
+  );
+}
+
+/**
+ * Dónde va cada texto de la mesa. La marca va centrada arriba de la etiqueta, así no se pisa con
+ * etiquetas largas ("S10") y en las redondas queda dentro del círculo (aviso de la revisión de
+ * gentle-ai, tarea 5.3). Una mesa de una fila y varias columnas no tiene alto para tres líneas:
+ * la marca pasa a la izquierda.
+ */
+function posicionesTexto(mesa: MesaPlano, rect: Rect) {
+  const centroX = rect.x + rect.ancho / 2;
+  const centroY = rect.y + rect.alto / 2;
+  const conCapacidad = mesa.ancho >= 2;
+  if (mesa.alto >= 2) {
+    return {
+      marca: { x: centroX, y: centroY - 10, fontSize: 14, textAnchor: "middle" as const },
+      etiqueta: { x: centroX, y: centroY + 8, fontSize: 13 },
+      capacidad: conCapacidad ? { x: centroX, y: centroY + 24, fontSize: 11 } : null,
+    };
+  }
+  if (conCapacidad) {
+    return {
+      marca: { x: rect.x + 12, y: centroY + 5, fontSize: 14, textAnchor: "middle" as const },
+      etiqueta: { x: centroX, y: centroY - 1, fontSize: 13 },
+      capacidad: { x: centroX, y: centroY + 13, fontSize: 11 },
+    };
+  }
+  return {
+    marca: { x: centroX, y: centroY - 3, fontSize: 12, textAnchor: "middle" as const },
+    etiqueta: { x: centroX, y: centroY + 13, fontSize: 12 },
+    capacidad: null,
+  };
+}
 
 function MesaDibujada({ mesa }: { mesa: MesaPlano }) {
   const rect: Rect = {
@@ -89,38 +167,30 @@ function MesaDibujada({ mesa }: { mesa: MesaPlano }) {
     ancho: mesa.ancho * CELDA - 2 * MARGEN,
     alto: mesa.alto * CELDA - 2 * MARGEN,
   };
-  const centroX = rect.x + rect.ancho / 2;
-  const centroY = rect.y + rect.alto / 2;
+  const texto = claseTexto(mesa.estado);
+  const { marca, etiqueta, capacidad } = posicionesTexto(mesa, rect);
   return (
     <g data-mesa={mesa.etiqueta} data-estado={mesa.estado}>
       <FormaMesa mesa={mesa} {...rect} />
+      <text data-marca {...marca} {...HALO} fontWeight="700" className={texto}>
+        {marcaDe(mesa.estado)}
+      </text>
       <text
-        x={centroX}
-        y={centroY - 4}
+        data-etiqueta
+        {...etiqueta}
+        {...HALO}
         textAnchor="middle"
-        fontSize="13"
         fontWeight="600"
-        className="fill-foreground"
+        className={`font-display ${texto}`}
       >
         {mesa.etiqueta}
       </text>
       {/* La capacidad solo entra en mesas de al menos 2 celdas de ancho (design.md D7). */}
-      {mesa.ancho >= 2 ? (
-        <text x={centroX} y={centroY + 12} textAnchor="middle" fontSize="11" className="fill-foreground">
+      {capacidad ? (
+        <text {...capacidad} {...HALO} textAnchor="middle" className={`tabular ${texto}`}>
           {`${mesa.capacidad} pers.`}
         </text>
       ) : null}
-      <text
-        data-marca
-        x={rect.x + rect.ancho - 4}
-        y={rect.y + 14}
-        textAnchor="end"
-        fontSize="14"
-        fontWeight="700"
-        className="fill-foreground"
-      >
-        {marcaDe(mesa.estado)}
-      </text>
     </g>
   );
 }
@@ -139,7 +209,7 @@ function avisoSinLugar(motivos: Plano["motivos"]): string {
  * Plano informativo de la zona elegida (change `plano-mesas`, design.md D5 y D7): un dibujo
  * decorativo (`aria-hidden`) y una lista textual que es la fuente accesible. No tiene ningún
  * control: la mesa se asigna sola al confirmar la reserva. Cuando el turno no tiene lugar, se
- * atenúa y avisa por qué. El estilo de tablillas de madera llega con el rediseño (tarea 5.3).
+ * atenúa y avisa por qué. Cada mesa es una tablilla de madera del rediseño Kakefuda.
  */
 export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
   const mesas = ordenarMesas(plano.mesas);
@@ -176,9 +246,10 @@ export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
                 y="1"
                 width="18"
                 height="18"
+                rx="2"
                 fill={`url(#${PATRON[estado]})`}
                 strokeWidth="2"
-                className="stroke-foreground"
+                className="stroke-border"
               />
             </svg>
             <span aria-hidden="true" className="font-bold">
@@ -192,7 +263,8 @@ export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
         {ubicadas.length > 0 ? (
           // Solo se atenúa el dibujo: la lista es la fuente accesible y tiene que conservar el
           // contraste del texto (WCAG 1.4.3).
-          <div className={atenuado ? "overflow-x-auto opacity-60" : "overflow-x-auto"}>
+          // En celular la lista va primero (es la vía más rápida); desde `sm`, el dibujo (D7).
+          <div className={`order-2 overflow-x-auto sm:order-1${atenuado ? " opacity-60" : ""}`}>
             <svg
               data-dibujo
               aria-hidden="true"
@@ -205,7 +277,7 @@ export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
             </svg>
           </div>
         ) : null}
-        <ul aria-label="Mesas de la zona" className="flex flex-col gap-1 text-base text-foreground">
+        <ul aria-label="Mesas de la zona" className="order-1 flex flex-col gap-1 text-base text-foreground sm:order-2">
           {mesas.map((mesa) => (
             <li key={mesa.etiqueta}>{describirMesa(mesa, plano)}</li>
           ))}

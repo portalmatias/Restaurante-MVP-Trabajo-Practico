@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import { PlanoMesas } from "../../../src/components/reservas/plano-mesas";
 import type { MesaPlano, PlanoMesas as Plano } from "../../../src/lib/plano-mesas";
@@ -280,5 +282,131 @@ describe("PlanoMesas - sin lugar", () => {
     renderizar(SIN_LUGAR);
 
     expect(screen.queryByText(/se asigna automáticamente/)).toBeNull();
+  });
+});
+
+describe("PlanoMesas - tablillas de madera (tarea 5.3)", () => {
+  const numero = (elemento: Element | null | undefined, atributo: string) =>
+    Number(elemento?.getAttribute(atributo));
+
+  it("no usa colores propios: el componente solo usa los tokens del tema", () => {
+    const fuente = readFileSync(
+      join(__dirname, "../../../src/components/reservas/plano-mesas.tsx"),
+      "utf8",
+    );
+
+    expect(fuente).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(/);
+  });
+
+  it("cada mesa tiene el canto de la tablilla debajo de su cara", () => {
+    const { container } = renderizar();
+
+    for (const etiqueta of ["S1", "S2", "S3", "S4"]) {
+      const g = mesaDibujada(container, etiqueta);
+      const canto = g?.querySelector("[data-canto]");
+      expect(canto).not.toBeNull();
+      // El canto va antes que la cara, para quedar detrás.
+      expect(g?.firstElementChild).toBe(canto);
+      expect(canto?.getAttribute("class")).toContain("fill-border");
+    }
+  });
+
+  it("la mesa ocupada es la tablilla dada vuelta: madera oscura con texto claro", () => {
+    const { container } = renderizar();
+
+    const textos = (etiqueta: string) => [...(mesaDibujada(container, etiqueta)?.querySelectorAll("text") ?? [])];
+    for (const texto of textos("S2")) {
+      expect(texto.getAttribute("class")).toContain("fill-madera-foreground");
+    }
+    for (const etiqueta of ["S1", "S3"]) {
+      for (const texto of textos(etiqueta)) {
+        expect(texto.getAttribute("class")).toContain("fill-foreground");
+      }
+    }
+    const patronOcupada = container.querySelector('pattern[id="plano-mesas-ocupada"] rect');
+    expect(patronOcupada?.getAttribute("class")).toContain("fill-madera");
+  });
+
+  // Aviso de la revisión de gentle-ai anotado en la tarea 5.3: en las mesas de una celda la marca
+  // se pisaba con etiquetas largas ("S10") y en las redondas quedaba fuera del círculo.
+  it("en una mesa de una celda la marca va centrada arriba de la etiqueta, sin pisarla", () => {
+    const { container } = renderizar({
+      ...PLANO,
+      mesas: [mesa("S10", { posX: 3, posY: 3 }), mesa("S11", { posX: 5, posY: 3, forma: "REDONDA" })],
+    });
+
+    for (const etiqueta of ["S10", "S11"]) {
+      const g = mesaDibujada(container, etiqueta);
+      const forma = g?.querySelector("[data-forma]");
+      const marca = g?.querySelector("[data-marca]");
+      const texto = g?.querySelector("[data-etiqueta]");
+      const centroX =
+        forma?.tagName === "ellipse"
+          ? numero(forma, "cx")
+          : numero(forma, "x") + numero(forma, "width") / 2;
+
+      expect(numero(marca, "x")).toBe(centroX);
+      expect(marca?.getAttribute("text-anchor")).toBe("middle");
+      // La línea base de la marca queda por encima del alto de la letra de la etiqueta.
+      expect(numero(marca, "y")).toBeLessThanOrEqual(numero(texto, "y") - numero(texto, "font-size"));
+    }
+  });
+
+  it("en una mesa redonda la marca y la etiqueta quedan dentro del círculo", () => {
+    const { container } = renderizar({
+      ...PLANO,
+      mesas: [mesa("S11", { posX: 5, posY: 3, forma: "REDONDA" })],
+    });
+
+    const g = mesaDibujada(container, "S11");
+    const forma = g?.querySelector("[data-forma]");
+    const cy = numero(forma, "cy");
+    const ry = numero(forma, "ry");
+    for (const texto of g?.querySelectorAll("text") ?? []) {
+      const base = numero(texto, "y");
+      const alto = numero(texto, "font-size");
+      expect(base).toBeLessThanOrEqual(cy + ry);
+      expect(base - alto).toBeGreaterThanOrEqual(cy - ry);
+    }
+  });
+});
+
+describe("PlanoMesas - legibilidad sobre el patrón", () => {
+  // Revisión visual (tarea 6.1): los puntos y las vetas del patrón se mezclaban con la marca y la
+  // etiqueta. Cada texto lleva un halo del color base de su tablilla, pintado debajo del relleno.
+  it("cada texto de la mesa lleva un halo del color base de su tablilla", () => {
+    const { container } = renderizar();
+
+    const halos: Record<string, string> = { S1: "stroke-muted", S2: "stroke-madera", S3: "stroke-card" };
+    for (const [etiqueta, halo] of Object.entries(halos)) {
+      for (const texto of mesaDibujada(container, etiqueta)?.querySelectorAll("text") ?? []) {
+        expect(texto.getAttribute("class")).toContain(halo);
+        expect(texto.getAttribute("paint-order")).toBe("stroke");
+        expect(Number(texto.getAttribute("stroke-width"))).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe("PlanoMesas - orden en celular (tarea 5.8)", () => {
+  it("en pantallas angostas la lista va antes que el dibujo; desde sm, el dibujo primero", () => {
+    const { container } = renderizar();
+
+    const lista = screen.getByRole("list", { name: "Mesas de la zona" });
+    const contenedorDibujo = dibujo(container).parentElement;
+    expect(lista.className).toMatch(/(^|\s)order-1(\s|$)/);
+    expect(lista.className).toMatch(/(^|\s)sm:order-2(\s|$)/);
+    expect(contenedorDibujo?.className).toMatch(/(^|\s)order-2(\s|$)/);
+    expect(contenedorDibujo?.className).toMatch(/(^|\s)sm:order-1(\s|$)/);
+    // Los dos comparten el contenedor flex, si no `order` no tiene efecto.
+    expect(lista.parentElement).toBe(contenedorDibujo?.parentElement);
+    expect(lista.parentElement?.className).toMatch(/(^|\s)flex(\s|$)/);
+  });
+
+  it("el dibujo escala al ancho disponible y solo desborda dentro de su caja", () => {
+    const { container } = renderizar();
+
+    expect(dibujo(container).getAttribute("class")).toMatch(/(^|\s)w-full(\s|$)/);
+    expect(dibujo(container).parentElement?.className).toContain("overflow-x-auto");
   });
 });

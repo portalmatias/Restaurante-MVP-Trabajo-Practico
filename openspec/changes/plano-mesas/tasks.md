@@ -163,7 +163,7 @@
       etiqueta, capacidad y estado en palabras; leyenda con los tres estados; cada estado con
       patrón, marca y texto (no solo color); mesa sin ubicar solo en la lista; SVG con
       `aria-hidden`; resumen con `role="status"`; sin controles de selección de mesa.
-- [ ] 5.3 Implementar `frontend/src/components/reservas/plano-mesas.tsx`: SVG con `viewBox` en
+- [x] 5.3 Implementar `frontend/src/components/reservas/plano-mesas.tsx`: SVG con `viewBox` en
       celdas, formas redonda/cuadrada/rectangular como tablillas de madera con los tokens
       existentes (sin hex propios), patrones de relleno y marcas por estado, leyenda y lista.
       Avance (26/10/2026): el componente ya tiene el SVG con `viewBox` en celdas, las tres formas,
@@ -172,14 +172,27 @@
       Al hacerlo, resolver un aviso de la revisión de gentle-ai: en las mesas de una celda la marca
       del estado se superpone con etiquetas largas (por ejemplo "S10") y en las redondas queda
       fuera del círculo.
+      Hecho (28/10/2026), con los tokens de #78 y sin hex propios (un test lo fija): cada mesa es
+      una tablilla con su canto (`border`) debajo de la cara; `LIBRE` es hinoki claro (`card`),
+      `OCUPADA` la tablilla dada vuelta (`madera`, texto `madera-foreground`, 13,14:1) con vetas
+      `border` (3,13:1) y `NO_ALCANZA` hinoki a la sombra (`muted`) con puntos `muted-foreground`
+      (5,52:1). La marca va centrada arriba de la etiqueta (en las de una fila y varias columnas,
+      a la izquierda), y cada texto lleva un halo del color base de su tablilla para separarlo del
+      patrón (lo pidió la revisión visual de 6.1). Tests nuevos: tokens, canto, texto claro sobre
+      madera, marca sin pisar la etiqueta, textos dentro del círculo y halo.
 - [x] 5.4 Agregar los tests (rojo→verde) del atenuado y el aviso cuando `disponible` es `false`
       (motivos primero, texto "hoy no se puede reservar este turno") y de la aclaración
       "La mesa se asigna automáticamente al confirmar la reserva" / "foto del momento".
-- [ ] 5.5 Escribir tests y componente del esqueleto `plano-mesas-cargando.tsx`: `aria-busy`,
+- [x] 5.5 Escribir tests y componente del esqueleto `plano-mesas-cargando.tsx`: `aria-busy`,
       texto accesible, y la regla CSS `@media (prefers-reduced-motion: reduce)` que apaga su
       animación en el componente o en `globals.css` usando solo tokens existentes. El test
       comprueba que la regla existe en la hoja de estilos; **no** se simula `matchMedia` porque
       `jsdom` no evalúa media queries (la prueba real es la manual de 6.1).
+      Hecho (28/10/2026): `plano-mesas-cargando.tsx` (con `aria-busy`, el texto "Cargando el
+      plano de mesas" y la proporción 3:2 de la grilla), la clase `.plano-mesas-cargando` con
+      `brillo-plano` en `globals.css`, apagada en el bloque de `prefers-reduced-motion`. Como el
+      plano se pide en el Server Component, el esqueleto se muestra en el `loading.tsx` del
+      resultado, debajo del de los pasos (test propio).
 - [x] 5.6 Tests y manejo de errores: fallo `5xx`/red ⇒ mensaje + "Reintentar" reutilizando
       `error-con-reintento.tsx` y la reserva sigue disponible; `429` ⇒ mensaje específico sin
       reintento automático.
@@ -193,8 +206,12 @@
       propio. Tests: plano `404` o `400` ⇒ sin redirección y veredicto de `/disponibilidad`;
       plano y `/disponibilidad` con `404` ⇒ redirección; los dos con `400` ⇒ selección inválida sin
       redirección. Verificar que los tests existentes de la página siguen en verde.
-- [ ] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
+- [x] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
       la página a 360 px (test del componente con las clases de orden y revisión visual).
+      Hecho (28/10/2026): la lista lleva `order-1 sm:order-2` y el dibujo `order-2 sm:order-1`
+      (el contenedor de la página mide hasta 672 px, así que en escritorio va el dibujo primero,
+      no lado a lado). En Chromium a 360 px, STANDARD y VIP: `scrollWidth` 360 y la lista arriba
+      del dibujo.
 
 ## 6. Verificación final
 
