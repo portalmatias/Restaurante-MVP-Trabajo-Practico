@@ -56,7 +56,8 @@ SHA desplegado, salvo las dos excepciones que terminan en verde: (1) en modo `de
 cuando el SHA observado es de un commit posterior al esperado en `main` (otro despliegue más
 nuevo ya quedó en servicio) y (2) en modo `vuelta-atras`, cuando el sitio responde `404` en
 `/version` porque la versión a la que se vuelve fue construida antes de que existiera la ruta.
-La consulta SHALL llevar un parámetro distinto en cada ejecución y un pedido
+La consulta SHALL llevar un parámetro distinto en cada intento (no solo en cada ejecución, ni
+en cada reejecución del workflow) y un pedido
 `Cache-Control: no-cache`, para que ninguna caché intermedia responda en su lugar. SHALL
 reintentar hasta 5 minutos desde el primer intento (con pedidos de espera acotada) antes de
 fallar, para absorber el reinicio del servicio. SHALL verificar el certificado, SHALL NOT seguir
@@ -84,6 +85,12 @@ falló, volvió atrás por su cuenta o terminó como versión superada.
 - **THEN** la comprobación termina en error
 - **AND** el mensaje indica el SHA esperado, el que se observó y que el despliegue en el
   servidor terminó bien
+
+#### Scenario: Cada intento lleva un parámetro distinto
+- **WHEN** la comprobación reintenta dentro de una misma ejecución o reejecución del workflow
+- **THEN** cada pedido lleva un parámetro de caché distinto de los demás (por ejemplo
+  `<run_id>-<run_attempt>-<intento>`), de modo que una caché que guarde por URL no pueda fijar
+  la primera respuesta
 
 #### Scenario: Imagen construida sin el dato de la versión
 - **WHEN** el sitio responde `{"sha": "desconocido"}` a una comprobación del modo `despliegue`
