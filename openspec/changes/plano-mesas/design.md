@@ -421,11 +421,11 @@ protegido por `JwtAuthGuard` + `RolesGuard`, con throttle de admin.
   - Error de red o `5xx`: bloque "No pudimos cargar el plano. Podés seguir con tu reserva igual."
     con botón "Reintentar". La reserva nunca depende del plano.
   - `429`: mensaje específico "Estamos recibiendo muchas consultas. Probá de nuevo en un
-    minuto." sin reintento automático (evita agravar el límite del plano, que comparten los
-    visitantes de un mismo origen). El respaldo a `/disponibilidad` sí se pide: esa ruta tiene
+    minuto." sin reintento automático (evita agravar el límite del plano, que comparten todos
+    los visitantes: el pedido sale del servidor de Next, ver D3). El respaldo a `/disponibilidad` sí se pide: esa ruta tiene
     `@SkipThrottle()` y no cuenta para este límite.
-  - `404/400` del **plano**: degradan la sección (mensaje "No pudimos cargar el plano. Podés
-    seguir con tu reserva igual."), y el veredicto sale de `/disponibilidad`, que se maneja como
+  - `404/400` del **plano**: degradan la sección igual que un `5xx` (mensaje "No pudimos cargar
+    el plano. Podés seguir con tu reserva igual." con el botón "Reintentar"), y el veredicto sale de `/disponibilidad`, que se maneja como
     hoy: un `404` (turno o zona inexistentes) redirige al paso 1, y un `400` muestra que la
     selección no es válida con un enlace al paso 1, sin redirigir (el paso 1 la da por válida y
     redirigir dejaría a la persona en un bucle, sin explicación). Así, un backend sin la ruta
@@ -514,10 +514,13 @@ merece su propio change con su propio análisis; esta versión lo deja explícit
   la UI lo dice y la creación valida de nuevo.
 - **Carga extra en la base:** 7 consultas por plano; el cupo de throttle y `no-store` la acotan;
   son lecturas por clave indexada sobre decenas de filas. Pendiente (aviso de la revisión de
-  gentle-ai en #86, sin resolver en este change): con `TRUST_PROXY` el cupo es por visitante, así
-  que muchos visitantes a la vez pueden sumar suficientes consultas para agotar el pool de
-  conexiones de Prisma, que también usan las reservas. Si pasa, conviene medirlo y ajustar
-  `connection_limit` o bajar el cupo.
+  gentle-ai en #86, sin resolver en este change): hoy el cupo es compartido aunque el backend
+  tenga `TRUST_PROXY`, porque `resultado/page.tsx` pide el plano desde el servidor de Next sin
+  reenviar `X-Forwarded-For` (D3); así, el cupo de 120/min también acota la carga total. El
+  riesgo de agotar el pool de conexiones de Prisma, que también usan las reservas, aparece solo
+  si el cupo pasa a ser por visitante (por ejemplo, reenviando la IP del cliente): entonces
+  muchos visitantes a la vez podrían sumar suficientes consultas. Si se hace ese cambio, conviene
+  medirlo y ajustar `connection_limit` o bajar el cupo.
 - **Mesa que cambia de zona conserva su posición** (aviso de la revisión de gentle-ai en #86):
   `PATCH /admin/mesas/:id` con otra `zonaId` guarda la mesa con su `posX`/`posY` anteriores
   (`mesas.service.ts`, el `update` final). En la zona nueva puede quedar fuera de la grilla o
