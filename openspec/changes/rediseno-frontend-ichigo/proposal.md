@@ -46,7 +46,7 @@ hizo para compensar haberlo redactado a posteriori.
 - **Panel de admin:** aforo con porcentaje, lugares libres y nivel por zona; estados de reserva
   distinguibles por texto y forma; aviso de sesión por vencer y motivo en el login; el estado
   `NO_SHOW` se muestra como «Ausente».
-- No se toca la lógica de negocio, la API ni `frontend/src/lib/**`.
+- No se toca la lógica de negocio ni la API. Se hizo una excepción intencional en `frontend/src/lib/seleccion-reserva.ts` (parámetro opcional `hasta` en `esFechaElegible`/`resolverSeleccionInicial`) para que el calendario nuevo pudiera limitar la fecha máxima sin modificar el comportamiento existente; el contrato OpenAPI y los demás archivos de `frontend/src/lib/**` no se modificaron.
 
 ### Fuera de alcance
 

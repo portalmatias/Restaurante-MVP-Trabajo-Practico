@@ -46,12 +46,13 @@ function esFechaDeCalendario(fecha: string): boolean {
 }
 
 /**
- * `true` si `fecha` es una fecha `YYYY-MM-DD` que existe en el calendario y no es anterior a
- * `hoy` (el mínimo que admite el selector). Es una ayuda de navegación: la anticipación de cada
- * zona la valida siempre el servidor.
+ * `true` si `fecha` es una fecha `YYYY-MM-DD` que existe en el calendario, no es anterior a `hoy`
+ * (el mínimo que admite el selector) ni posterior a `hasta` (el último día que ofrece el
+ * calendario, si se conoce). Es una ayuda de navegación: la anticipación de cada zona la valida
+ * siempre el servidor.
  */
-export function esFechaElegible(fecha: string, hoy: string): boolean {
-  return esFechaDeCalendario(fecha) && fecha >= hoy;
+export function esFechaElegible(fecha: string, hoy: string, hasta?: string): boolean {
+  return esFechaDeCalendario(fecha) && fecha >= hoy && (hasta === undefined || fecha <= hasta);
 }
 
 /**
@@ -72,10 +73,16 @@ function leerEnteroPositivo(texto: string | undefined): number | undefined {
  */
 export function resolverSeleccionInicial(
   cruda: SeleccionCruda,
-  catalogo: { zonas: readonly ZonaPublica[]; turnos: readonly TurnoPublico[]; hoy: string },
+  catalogo: {
+    zonas: readonly ZonaPublica[];
+    turnos: readonly TurnoPublico[];
+    hoy: string;
+    /** Último día que ofrece el calendario: una fecha de la URL posterior se ignora. */
+    hasta?: string;
+  },
 ): Partial<SeleccionReserva> {
   const fecha =
-    cruda.fecha !== undefined && esFechaElegible(cruda.fecha, catalogo.hoy) ? cruda.fecha : undefined;
+    cruda.fecha !== undefined && esFechaElegible(cruda.fecha, catalogo.hoy, catalogo.hasta) ? cruda.fecha : undefined;
   const zona = catalogo.zonas.find((candidata) => candidata.id === cruda.zonaId);
   const turno = catalogo.turnos.find(
     (candidato) =>

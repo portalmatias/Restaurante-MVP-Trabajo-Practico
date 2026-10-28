@@ -30,6 +30,12 @@ Thumbs.db
 __pycache__/
 *.pyc
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
+
 # Estado del despliegue en el servidor (deploy/desplegar.sh): historial, versión actual y
 # env de Compose con secretos. Nunca se versiona.
 /.despliegue/

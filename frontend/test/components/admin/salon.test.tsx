@@ -130,7 +130,7 @@ describe("MesasPanel", () => {
     fireEvent.change(within(formulario).getByLabelText("Zona"), { target: { value: "z-vip" } });
     fireEvent.change(within(formulario).getByLabelText("Capacidad"), { target: { value: "6" } });
     fireEvent.change(within(formulario).getByLabelText("Etiqueta"), { target: { value: etiqueta } });
-    fireEvent.click(within(formulario).getByRole("button", { name: "Agregar mesa" }));
+    fireEvent.click(within(formulario).getByRole("button", { name: "Guardar mesa" }));
   }
 
   it("filtrar por Zona pide el listado con zonaId", async () => {
@@ -175,6 +175,28 @@ describe("MesasPanel", () => {
     expect(await screen.findByText("La zona indicada no existe.")).toBeInTheDocument();
     const formulario = screen.getByRole("form", { name: "Nueva mesa" });
     expect(within(formulario).getByLabelText("Zona")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("un error sobre la capacidad de la mesa se muestra junto a Capacidad", async () => {
+    await renderizar();
+    POST.mockReturnValue(error(400, "La capacidad de la mesa debe ser un entero positivo."));
+
+    completarAlta();
+
+    expect(await screen.findByText("La capacidad de la mesa debe ser un entero positivo.")).toBeInTheDocument();
+    const formulario = screen.getByRole("form", { name: "Nueva mesa" });
+    expect(within(formulario).getByLabelText("Capacidad")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("un mensaje que solo menciona «capacidad» de otra cosa no se atribuye a Capacidad", async () => {
+    await renderizar();
+    POST.mockReturnValue(error(409, "El aforo de la zona no admite más capacidad en este turno."));
+
+    completarAlta();
+
+    expect(await screen.findByText("El aforo de la zona no admite más capacidad en este turno.")).toBeInTheDocument();
+    const formulario = screen.getByRole("form", { name: "Nueva mesa" });
+    expect(within(formulario).getByLabelText("Capacidad")).not.toHaveAttribute("aria-invalid", "true");
   });
 
   it("con un formulario abierto no se puede abrir otro", async () => {
@@ -246,7 +268,7 @@ describe("TurnosPanel", () => {
     fireEvent.change(within(formulario).getByLabelText("Día"), { target: { value: "SABADO" } });
     fireEvent.change(within(formulario).getByLabelText("Hora de inicio"), { target: { value: "12:00" } });
     fireEvent.change(within(formulario).getByLabelText("Hora de fin"), { target: { value: "15:30" } });
-    fireEvent.click(within(formulario).getByRole("button", { name: "Agregar turno" }));
+    fireEvent.click(within(formulario).getByRole("button", { name: "Guardar turno" }));
   }
 
   it("muestra las horas en HH:mm, sin conversión de huso horario", async () => {

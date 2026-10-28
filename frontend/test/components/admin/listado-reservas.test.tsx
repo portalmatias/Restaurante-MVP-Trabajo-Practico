@@ -95,6 +95,18 @@ describe("ListadoReservas - listado, filtros y paginación", () => {
     expect(primera.getByText("ana.perez@example.com")).toBeInTheDocument();
   });
 
+  // Tarea 4.2: a 1440 px el correo se partía a mitad de la dirección («diego.torres@example.c» y «om»).
+  // Ahora solo puede saltar antes de la arroba, y el correo completo queda en el `title`.
+  it("el correo no se parte a mitad de la dirección: solo puede saltar antes de la arroba", async () => {
+    await renderizar();
+
+    const celda = within(fila("PEND0001")).getByText("ana.perez@example.com").closest("td") as HTMLElement;
+    expect(celda.className).not.toMatch(/break-all/);
+    expect(celda.querySelectorAll("wbr")).toHaveLength(1);
+    expect(celda.innerHTML).toContain("ana.perez<wbr>@example.com");
+    expect(celda.querySelector("[title]")?.getAttribute("title")).toBe("ana.perez@example.com");
+  });
+
   it("pasa los filtros de la URL a la API", async () => {
     await renderizar({ estado: "PENDIENTE", fecha: "2026-10-02", zonaId: "z-vip", pagina: 1 });
 
@@ -240,20 +252,20 @@ describe("ListadoReservas - marcar no show", () => {
   it("solo las confirmadas ofrecen marcar no show", async () => {
     await renderizar();
 
-    expect(within(fila("CONF0002")).getByRole("button", { name: "Marcar no show" })).toBeInTheDocument();
+    expect(within(fila("CONF0002")).getByRole("button", { name: "Marcar ausente" })).toBeInTheDocument();
     for (const codigo of ["PEND0001", "CANC0003", "NOSH0004"]) {
-      expect(within(fila(codigo)).queryByRole("button", { name: "Marcar no show" })).not.toBeInTheDocument();
+      expect(within(fila(codigo)).queryByRole("button", { name: "Marcar ausente" })).not.toBeInTheDocument();
     }
   });
 
-  it("confirmar el paso de confirmación marca la fila como No se presentó", async () => {
+  it("confirmar el paso de confirmación marca la fila como Ausente", async () => {
     PATCH.mockReturnValue(sinCuerpo());
     await renderizar();
 
-    fireEvent.click(within(fila("CONF0002")).getByRole("button", { name: "Marcar no show" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sí, marcar no show" }));
+    fireEvent.click(within(fila("CONF0002")).getByRole("button", { name: "Marcar ausente" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sí, marcar ausente" }));
 
-    await waitFor(() => expect(within(fila("CONF0002")).getByText("No se presentó")).toBeInTheDocument());
+    await waitFor(() => expect(within(fila("CONF0002")).getByText("Ausente")).toBeInTheDocument());
     expect(PATCH).toHaveBeenCalledWith("/admin/reservas/{id}/no-show", { params: { path: { id: "r-2" } } });
   });
 
@@ -261,11 +273,77 @@ describe("ListadoReservas - marcar no show", () => {
     PATCH.mockReturnValue(error(409, "El turno de la reserva todavía no terminó."));
     await renderizar();
 
-    fireEvent.click(within(fila("CONF0002")).getByRole("button", { name: "Marcar no show" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sí, marcar no show" }));
+    fireEvent.click(within(fila("CONF0002")).getByRole("button", { name: "Marcar ausente" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sí, marcar ausente" }));
 
     expect(await screen.findByText("El turno de la reserva todavía no terminó.")).toBeInTheDocument();
     await waitFor(() => expect(consultasDeReservas()).toHaveLength(2));
     expect(within(fila("CONF0002")).getByText("Confirmada")).toBeInTheDocument();
+  });
+
+  // Tarea 3.7: sellos por texto y búsqueda local (frontend-admin, listado de reservas).
+  it("cada estado se lee en su sello con texto, y NO_SHOW como «Ausente»", async () => {
+    await renderizar();
+
+    expect(within(fila("PEND0001")).getByText("Pendiente")).toBeInTheDocument();
+    expect(within(fila("CONF0002")).getByText("Confirmada")).toBeInTheDocument();
+    expect(within(fila("CANC0003")).getByText("Cancelada")).toBeInTheDocument();
+    expect(within(fila("NOSH0004")).getByText("Ausente")).toBeInTheDocument();
+    expect(screen.queryByText("NO_SHOW")).not.toBeInTheDocument();
+  });
+
+  it("la búsqueda filtra la página cargada sin pedir de nuevo ni tocar la URL", async () => {
+    await renderizar();
+    const pedidos = consultasDeReservas().length;
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "CONF0002" } });
+
+    expect(screen.getByRole("rowheader", { name: "CONF0002" })).toBeInTheDocument();
+    expect(screen.queryByRole("rowheader", { name: "PEND0001" })).not.toBeInTheDocument();
+    expect(consultasDeReservas()).toHaveLength(pedidos);
+    expect(push).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  // Spec frontend-admin, «Búsqueda sin coincidencias»: un aviso que lo dice, distinto del estado
+  // vacío de los filtros.
+  it("una búsqueda sin coincidencias avisa que ninguna fila de la página coincide, y no es el estado vacío", async () => {
+    await renderizar();
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "ZZZZ9999" } });
+
+    expect(screen.getByText(/Ninguna reserva de esta página coincide con «ZZZZ9999»/)).toBeInTheDocument();
+    expect(screen.queryByRole("rowheader")).not.toBeInTheDocument();
+    expect(screen.queryByText("No hay reservas para esos filtros.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Todavía no hay reservas.")).not.toBeInTheDocument();
+  });
+
+  // Revisión de #78: la búsqueda distinguía acentos y mayúsculas («perez» no encontraba «Pérez»), y
+  // podía ocultar justo la fila cuya acción acababa de fallar y mostraba un aviso.
+  it("la búsqueda ignora acentos y mayúsculas: «perez» encuentra «Pérez»", async () => {
+    await renderizar();
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "perez" } });
+    expect(screen.getAllByRole("rowheader")).toHaveLength(4);
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "PÉREZ" } });
+    expect(screen.getAllByRole("rowheader")).toHaveLength(4);
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "ana.pérez@EXAMPLE" } });
+    expect(screen.getAllByRole("rowheader")).toHaveLength(4);
+  });
+
+  it("la búsqueda no oculta la fila que muestra un aviso de una acción fallida", async () => {
+    PATCH.mockReturnValue(error(409, "No se pudo confirmar."));
+    await renderizar();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar reserva PEND0001" }));
+    expect(await screen.findByText("No se pudo confirmar.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), { target: { value: "CONF0002" } });
+
+    expect(screen.getByRole("rowheader", { name: "CONF0002" })).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "PEND0001" })).toBeInTheDocument();
+    expect(screen.queryByRole("rowheader", { name: "CANC0003" })).not.toBeInTheDocument();
+    expect(screen.getByText("No se pudo confirmar.")).toBeInTheDocument();
   });
 });

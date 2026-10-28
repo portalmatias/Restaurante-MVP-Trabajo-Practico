@@ -156,3 +156,25 @@ describe("LoginForm", () => {
     expect(replace).toHaveBeenCalledWith("/admin");
   });
 });
+
+describe("LoginForm - motivo de llegada", () => {
+  it("explica que la sesión terminó o ya no es válida", () => {
+    render(<LoginForm motivo="sesion-vencida" />);
+    expect(screen.getByRole("status")).toHaveTextContent(/Tu sesión terminó o ya no es válida/);
+  });
+
+  it("no fija la duración de la sesión en ningún aviso (es configurable)", () => {
+    const { rerender } = render(<LoginForm motivo="sesion-vencida" />);
+    expect(screen.getByRole("status").textContent).not.toMatch(/\d+\s*minutos?/i);
+    rerender(<LoginForm motivo="renovar" />);
+    expect(screen.getByRole("status")).toHaveTextContent(/renovar tu sesión/);
+    expect(screen.getByRole("status").textContent).not.toMatch(/\d+\s*minutos?/i);
+  });
+
+  it("no muestra ningún aviso sin motivo o con uno desconocido", () => {
+    const { rerender } = render(<LoginForm />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    rerender(<LoginForm motivo="otro" />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});

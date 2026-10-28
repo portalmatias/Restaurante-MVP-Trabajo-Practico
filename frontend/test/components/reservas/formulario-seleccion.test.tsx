@@ -13,7 +13,7 @@ import {
 const push = jest.fn();
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
-// Hoy en Argentina: lunes 2026-09-14. Lo calcula el servidor y llega por prop: no se falsea `Date`.
+// Hoy en Argentina: lunes, 2026-09-14. Lo calcula el servidor y llega por prop: no se falsea `Date`.
 const HOY = "2026-09-14";
 const SABADO = "2026-09-19";
 const LUNES = "2026-09-21";
@@ -31,20 +31,46 @@ function renderizar(seleccionInicial?: Inicial, hoy = HOY) {
   );
 }
 
-const campoFecha = () => screen.getByLabelText("Fecha") as HTMLInputElement;
-const campoTurno = () => screen.getByLabelText("Turno") as HTMLSelectElement;
+// La fecha se elige en un calendario siempre visible: cada día es un botón con su nombre completo.
+const calendario = () => screen.getByRole("group", { name: "Fecha" });
+// La fecha elegida es el día del calendario con aria-pressed (cadena vacía si no hay ninguna).
+const fechaElegida = () =>
+  calendario().querySelector('button[aria-pressed="true"]')?.getAttribute("data-fecha") ?? "";
+const diaDelCalendario = (fecha: string) => {
+  const boton = calendario().querySelector<HTMLButtonElement>(`button[data-fecha="${fecha}"]`);
+  if (!boton) throw new Error(`El calendario no muestra el día ${fecha}.`);
+  return boton;
+};
+// Cada turno es una tablilla (botón con aria-pressed) dentro del grupo «Turno».
+const grupoTurno = () => screen.getByRole("group", { name: "Turno" });
+const tablillaDe = (id: string) => {
+  const turno = TURNOS.find((candidato) => candidato.id === id);
+  if (!turno) throw new Error(`Turno desconocido: ${id}`);
+  const hora = (iso: string) => iso.slice(11, 16);
+  return screen.getByRole("button", { name: `${hora(turno.horaInicio)} a ${hora(turno.horaFin)}` });
+};
+const tablillasElegidas = () => within(grupoTurno()).queryAllByRole("button", { pressed: true });
 const opcionZona = (nombre: string) => screen.getByRole("radio", { name: new RegExp(nombre) });
 const botonVer = () => screen.getByRole("button", { name: "Ver disponibilidad" });
 const cantidad = () => screen.getByRole("status", { name: "Cantidad de comensales" });
 const masComensales = () => screen.getByRole("button", { name: "Más comensales" });
 const menosComensales = () => screen.getByRole("button", { name: "Menos comensales" });
 
+// Avanza de mes hasta que el día aparece y lo toca, como lo haría una persona.
 function elegirFecha(fecha: string) {
-  fireEvent.change(campoFecha(), { target: { value: fecha } });
+  for (let intento = 0; intento < 14; intento += 1) {
+    const boton = calendario().querySelector<HTMLButtonElement>(`button[data-fecha="${fecha}"]`);
+    if (boton) {
+      fireEvent.click(boton);
+      return;
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Mes siguiente" }));
+  }
+  throw new Error(`No se encontró el día ${fecha} en el calendario.`);
 }
 
 function elegirTurno(id: string) {
-  fireEvent.change(campoTurno(), { target: { value: id } });
+  fireEvent.click(tablillaDe(id));
 }
 
 function elegirZona(nombre: string) {
@@ -55,8 +81,9 @@ describe("FormularioSeleccion - campos y obligatoriedad", () => {
   it("muestra la fecha, el turno, la zona, los comensales y el botón de continuar", () => {
     renderizar();
 
-    expect(campoFecha()).toHaveAttribute("type", "date");
-    expect(campoTurno()).toBeInTheDocument();
+    expect(calendario()).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mes anterior" })).toBeInTheDocument();
+    expect(grupoTurno()).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Zona" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Comensales" })).toBeInTheDocument();
     expect(botonVer()).toBeInTheDocument();
@@ -101,45 +128,99 @@ describe("FormularioSeleccion - campos y obligatoriedad", () => {
     expect(screen.queryByText(/Falta elegir/)).not.toBeInTheDocument();
   });
 
-  it("señala la fecha faltante si se borra después de completar todo", () => {
-    renderizar({ fecha: SABADO, turnoId: TURNO_CENA_SABADO.id, zonaId: ZONA_STANDARD.id, comensales: "2" });
-    expect(botonVer()).toBeEnabled();
+  it("tocar un día cerrado no lo elige y la fecha sigue faltando", () => {
+    renderizar();
 
-    elegirFecha("");
+    fireEvent.click(diaDelCalendario(LUNES.replace("21", "14")));
 
     expect(botonVer()).toBeDisabled();
-    expect(screen.getByText("Falta elegir: fecha y turno")).toBeInTheDocument();
+    expect(screen.getByText("Falta elegir: fecha, turno y zona")).toBeInTheDocument();
   });
 });
 
 describe("FormularioSeleccion - fecha", () => {
-  it("usa como mínimo el día de hoy en el calendario del restaurante", () => {
+  it("el calendario arranca en el mes de hoy, marca hoy y no deja ir a un mes anterior", () => {
     renderizar();
 
-    expect(campoFecha()).toHaveAttribute("min", "2026-09-14");
+    expect(diaDelCalendario(HOY)).toHaveAttribute("aria-label", expect.stringContaining("hoy"));
+    expect(screen.getByRole("button", { name: "Mes anterior" })).toBeDisabled();
+    expect(screen.getByText("septiembre de 2026")).toBeInTheDocument();
   });
 
-  it("toma el mínimo de la prop `hoy`, sin leer el reloj del navegador", () => {
+  it("toma 'hoy' de la prop, sin leer el reloj del navegador: lo anterior no se puede elegir", () => {
     renderizar(undefined, "2026-09-20");
 
-    expect(campoFecha()).toHaveAttribute("min", "2026-09-20");
+    expect(diaDelCalendario("2026-09-19")).toHaveAttribute("aria-disabled", "true");
+    expect(diaDelCalendario("2026-09-19")).toHaveAttribute("aria-label", expect.stringContaining("no disponible"));
   });
 
-  it("señala una fecha anterior a hoy escrita a mano y no ofrece turnos", () => {
+  it("un día anterior a hoy no se elige y no ofrece turnos", () => {
     renderizar();
 
-    elegirFecha("2026-09-13");
+    fireEvent.click(diaDelCalendario("2026-09-13"));
 
-    expect(screen.getByText("Elegí una fecha desde hoy.")).toBeInTheDocument();
-    expect(campoTurno()).toBeDisabled();
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("Elegí un día del calendario.")).toBeInTheDocument();
+  });
+
+  it("los días de la semana sin turnos aparecen cerrados y los que tienen turnos se pueden elegir", () => {
+    renderizar();
+
+    expect(diaDelCalendario(MARTES)).not.toHaveAttribute("aria-disabled");
+    expect(diaDelCalendario(SABADO)).not.toHaveAttribute("aria-disabled");
+    expect(diaDelCalendario(LUNES)).toHaveAttribute("aria-disabled", "true");
+    expect(diaDelCalendario(LUNES)).toHaveAttribute("aria-label", expect.stringContaining("cerrado"));
+  });
+
+  it("al elegir un día lo anuncia con su nombre completo y lo marca como elegido", () => {
+    renderizar();
+
+    elegirFecha(SABADO);
+
+    expect(screen.getByText("Elegiste el sábado, 19 de septiembre de 2026.")).toBeInTheDocument();
+    expect(diaDelCalendario(SABADO)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("se puede cambiar de mes y volver", () => {
+    renderizar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mes siguiente" }));
+    expect(screen.getByText("octubre de 2026")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mes anterior" }));
+
+    expect(screen.getByText("septiembre de 2026")).toBeInTheDocument();
+  });
+
+  it("con el teclado las flechas mueven el foco entre los días", () => {
+    renderizar();
+    const hoy = diaDelCalendario(HOY);
+    hoy.focus();
+
+    fireEvent.keyDown(hoy, { key: "ArrowRight" });
+    expect(diaDelCalendario("2026-09-15")).toHaveFocus();
+
+    fireEvent.keyDown(diaDelCalendario("2026-09-15"), { key: "ArrowDown" });
+    expect(diaDelCalendario("2026-09-22")).toHaveFocus();
+  });
+
+  it("solo un día del calendario entra con Tab (tabulación móvil)", () => {
+    renderizar();
+
+    const enTabulacion = Array.from(calendario().querySelectorAll<HTMLButtonElement>("button[data-fecha]")).filter(
+      (boton) => boton.tabIndex === 0,
+    );
+
+    expect(enTabulacion).toHaveLength(1);
+    expect(enTabulacion[0]).toHaveAttribute("data-fecha", HOY);
   });
 });
 
 describe("FormularioSeleccion - turnos del día", () => {
-  it("deshabilita el turno hasta elegir la fecha", () => {
+  it("no ofrece tablillas hasta elegir la fecha y lo explica", () => {
     renderizar();
 
-    expect(campoTurno()).toBeDisabled();
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("Elegí una fecha para ver los turnos de ese día.")).toBeInTheDocument();
   });
 
   it("un sábado ofrece solo los turnos del sábado, con el horario local", () => {
@@ -147,34 +228,81 @@ describe("FormularioSeleccion - turnos del día", () => {
 
     elegirFecha(SABADO);
 
-    const opciones = within(campoTurno())
-      .getAllByRole("option")
-      .filter((opcion) => (opcion as HTMLOptionElement).value !== "")
-      .map((opcion) => [(opcion as HTMLOptionElement).value, opcion.textContent]);
-    expect(opciones).toEqual([
-      [TURNO_ALMUERZO_SABADO.id, "12:00 a 15:00"],
-      [TURNO_CENA_SABADO.id, "20:00 a 23:30"],
-    ]);
+    const nombres = within(grupoTurno())
+      .getAllByRole("button")
+      .map((tablilla) => tablilla.getAttribute("aria-label"));
+    expect(nombres).toEqual(["12:00 a 15:00", "20:00 a 23:30"]);
+    expect(tablillaDe(TURNO_ALMUERZO_SABADO.id)).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("un lunes sin turnos activos muestra el aviso y oculta el selector de turno", () => {
+  it("las flechas, Inicio y Fin mueven el foco entre las tablillas de turno sin elegir ninguna", () => {
     renderizar();
+    elegirFecha(SABADO);
+    const almuerzo = tablillaDe(TURNO_ALMUERZO_SABADO.id);
+    const [primera, segunda] = within(grupoTurno()).getAllByRole("button");
+    expect(almuerzo).toBe(primera);
 
-    elegirFecha(LUNES);
+    primera.focus();
+    fireEvent.keyDown(primera, { key: "ArrowRight" });
+    expect(segunda).toHaveFocus();
+    fireEvent.keyDown(segunda, { key: "ArrowRight" });
+    expect(primera).toHaveFocus();
+    fireEvent.keyDown(primera, { key: "ArrowLeft" });
+    expect(segunda).toHaveFocus();
+    fireEvent.keyDown(segunda, { key: "Home" });
+    expect(primera).toHaveFocus();
+    fireEvent.keyDown(primera, { key: "End" });
+    expect(segunda).toHaveFocus();
+    expect(tablillasElegidas()).toHaveLength(0);
+  });
+
+  it("una fecha sin turnos que llega por la URL muestra el aviso y oculta el selector de turno", () => {
+    // Desde el calendario un día sin turnos no se puede elegir; la URL sí puede traerlo.
+    renderizar({ fecha: LUNES });
 
     expect(screen.getByText("No hay turnos disponibles ese día. Elegí otra fecha.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Turno")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Turno" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Elegí una fecha para ver los turnos de ese día.")).not.toBeInTheDocument();
+    // Tarea 3.12: ese mismo lunes, en el calendario, está cerrado y no se puede elegir.
+    expect(diaDelCalendario(LUNES)).toHaveAttribute("aria-disabled", "true");
+    expect(diaDelCalendario(LUNES).getAttribute("aria-label")).toMatch(/, cerrado$/);
+  });
+
+  // Tarea 3.2: escenarios de «Los turnos del día se eligen como tablillas» que faltaban.
+  it("elegir la cena la deja elegida y el almuerzo queda descartado pero habilitado", () => {
+    renderizar();
+    elegirFecha(SABADO);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "false");
+
+    elegirTurno(TURNO_CENA_SABADO.id);
+
+    const almuerzo = tablillaDe(TURNO_ALMUERZO_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
+    expect(almuerzo).toHaveAttribute("aria-pressed", "false");
+    expect(almuerzo.querySelector(".origin-top")?.className).toContain("rotateY(180deg)");
+    expect(almuerzo).not.toHaveAttribute("aria-disabled");
+    expect(almuerzo).toBeEnabled();
+  });
+
+  it.each([
+    ["mal formada", "19/09/2026"],
+    ["anterior a hoy", "2026-09-13"],
+  ])("una fecha de la URL %s no muestra tablillas y pide elegir una fecha", (_motivo, fecha) => {
+    renderizar({ fecha });
+
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("Elegí una fecha para ver los turnos de ese día.")).toBeInTheDocument();
   });
 
   it("cambiar la fecha a otro día limpia el turno que ya no corresponde", () => {
     renderizar();
     elegirFecha(SABADO);
     elegirTurno(TURNO_CENA_SABADO.id);
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
 
     elegirFecha(MARTES);
 
-    expect(campoTurno()).toHaveValue("");
+    expect(tablillasElegidas()).toHaveLength(0);
     expect(screen.getByText(/Falta elegir: turno/)).toBeInTheDocument();
   });
 
@@ -185,7 +313,7 @@ describe("FormularioSeleccion - turnos del día", () => {
 
     elegirFecha("2026-09-26");
 
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
   });
 });
 
@@ -195,7 +323,7 @@ describe("FormularioSeleccion - zona", () => {
 
     const vip = opcionZona("VIP");
     expect(within(vip).getByText("2 a 12 comensales")).toBeInTheDocument();
-    expect(within(vip).getByText(/24 horas a 60 días/)).toBeInTheDocument();
+    expect(within(vip).getByText(/al menos 24 horas de anticipación y hasta 60 días/)).toBeInTheDocument();
     expect(within(vip).getByText("Queda pendiente de confirmación")).toBeInTheDocument();
   });
 
@@ -204,8 +332,21 @@ describe("FormularioSeleccion - zona", () => {
 
     const standard = opcionZona("STANDARD");
     expect(within(standard).getByText("1 a 8 comensales")).toBeInTheDocument();
-    expect(within(standard).getByText(/2 horas a 30 días/)).toBeInTheDocument();
+    expect(within(standard).getByText(/al menos 2 horas de anticipación y hasta 30 días/)).toBeInTheDocument();
     expect(within(standard).queryByText(/pendiente de confirmación/)).not.toBeInTheDocument();
+  });
+
+  // Tarea 3.12 («Regla de anticipación con valores en singular»).
+  it("con 1 hora mínima y 1 día máximo la regla va en singular", () => {
+    const zonaDeUno = { ...ZONA_STANDARD, anticipacionMinHoras: 1, anticipacionMaxDias: 1 };
+    render(<FormularioSeleccion zonas={[zonaDeUno, ZONA_VIP]} turnos={TURNOS} hoy={HOY} />);
+
+    expect(
+      within(opcionZona("STANDARD")).getByText("Reservá con al menos 1 hora de anticipación y hasta 1 día antes."),
+    ).toBeInTheDocument();
+    expect(
+      within(opcionZona("VIP")).getByText("Reservá con al menos 24 horas de anticipación y hasta 60 días antes."),
+    ).toBeInTheDocument();
   });
 
   it("marca con aria-checked solo la zona elegida", () => {
@@ -341,8 +482,8 @@ describe("FormularioSeleccion - selección inicial", () => {
       comensales: "6",
     });
 
-    expect(campoFecha()).toHaveValue(SABADO);
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(fechaElegida()).toBe(SABADO);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
     expect(opcionZona("VIP")).toHaveAttribute("aria-checked", "true");
     expect(cantidad()).toHaveTextContent("6");
     expect(botonVer()).toBeEnabled();
@@ -351,8 +492,8 @@ describe("FormularioSeleccion - selección inicial", () => {
   it("ignora un turnoId que no está en GET /turnos", () => {
     renderizar({ fecha: SABADO, turnoId: "no-existe", zonaId: ZONA_VIP.id, comensales: "6" });
 
-    expect(campoFecha()).toHaveValue(SABADO);
-    expect(campoTurno()).toHaveValue("");
+    expect(fechaElegida()).toBe(SABADO);
+    expect(tablillasElegidas()).toHaveLength(0);
     expect(opcionZona("VIP")).toHaveAttribute("aria-checked", "true");
     expect(cantidad()).toHaveTextContent("6");
   });
@@ -360,7 +501,7 @@ describe("FormularioSeleccion - selección inicial", () => {
   it("ignora un zonaId que no está en GET /zonas, y con él los comensales", () => {
     renderizar({ fecha: SABADO, turnoId: TURNO_CENA_SABADO.id, zonaId: "no-existe", comensales: "6" });
 
-    expect(campoTurno()).toHaveValue(TURNO_CENA_SABADO.id);
+    expect(tablillaDe(TURNO_CENA_SABADO.id)).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("radio").every((r) => r.getAttribute("aria-checked") === "false")).toBe(true);
     expect(masComensales()).toBeDisabled();
     expect(screen.getByText("Falta elegir: zona")).toBeInTheDocument();
@@ -373,17 +514,16 @@ describe("FormularioSeleccion - selección inicial", () => {
   ])("ignora una fecha %s y, con ella, el turno", (_motivo, fecha) => {
     renderizar({ fecha, turnoId: TURNO_CENA_SABADO.id, zonaId: ZONA_STANDARD.id, comensales: "2" });
 
-    expect(campoFecha()).toHaveValue("");
-    expect(campoTurno()).toHaveValue("");
-    expect(campoTurno()).toBeDisabled();
+    expect(fechaElegida()).toBe("");
+    expect(within(grupoTurno()).queryAllByRole("button")).toHaveLength(0);
     expect(opcionZona("STANDARD")).toHaveAttribute("aria-checked", "true");
   });
 
   it("ignora un turnoId existente pero de otro día de la semana que la fecha", () => {
     renderizar({ fecha: SABADO, turnoId: TURNO_CENA_MARTES.id, zonaId: ZONA_STANDARD.id, comensales: "2" });
 
-    expect(campoFecha()).toHaveValue(SABADO);
-    expect(campoTurno()).toHaveValue("");
+    expect(fechaElegida()).toBe(SABADO);
+    expect(tablillasElegidas()).toHaveLength(0);
   });
 
   it.each([
@@ -435,5 +575,82 @@ describe("FormularioSeleccion - envío", () => {
     fireEvent.submit(botonVer().closest("form") as HTMLFormElement);
 
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("FormularioSeleccion - catálogo vacío", () => {
+  it.each([
+    ["sin zonas", [], TURNOS],
+    ["sin turnos", ZONAS, []],
+  ])("%s explica que no hay lugares y no muestra el formulario", (_motivo, zonas, turnos) => {
+    render(<FormularioSeleccion zonas={zonas} turnos={turnos} hoy={HOY} />);
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Todavía no hay lugares para reservar" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ver disponibilidad" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Volver" })).toHaveAttribute("href", "/reservas");
+  });
+});
+
+describe("FormularioSeleccion - último día elegible del calendario", () => {
+  // Con la zona de mayor anticipación en 60 días (VIP) y hoy 2026-09-14, el último día que el
+  // backend acepta a cualquier hora es hoy + 59: la cena de hoy + 60 queda a más de 60 días
+  // (spec «Días no elegibles distinguidos por texto»).
+  const ULTIMO_ELEGIBLE = "2026-11-12"; // jueves, hoy + 59
+  const PRIMER_LEJANO = "2026-11-13"; // viernes, hoy + 60
+
+  const estaDeshabilitado = (fecha: string) => diaDelCalendario(fecha).getAttribute("aria-disabled") === "true";
+
+  function irAlMes(nombreMes: RegExp) {
+    for (let intento = 0; intento < 14; intento += 1) {
+      if (nombreMes.test(calendario().textContent ?? "")) return;
+      fireEvent.click(screen.getByRole("button", { name: "Mes siguiente" }));
+    }
+    throw new Error("No se llegó al mes pedido.");
+  }
+
+  it("ofrece hoy + 59 y deja deshabilitado hoy + 60", () => {
+    renderizar();
+    irAlMes(/noviembre/i);
+
+    expect(estaDeshabilitado(ULTIMO_ELEGIBLE)).toBe(false);
+    expect(estaDeshabilitado(PRIMER_LEJANO)).toBe(true);
+  });
+
+  it("deshabilita «Mes siguiente» en el mes de ese último día", () => {
+    renderizar();
+    irAlMes(/noviembre/i);
+
+    expect(screen.getByRole("button", { name: "Mes siguiente" })).toBeDisabled();
+  });
+});
+
+// Revisión de #78: `fechaElegible` no miraba el último día que ofrece el calendario (hoy + máximo - 1),
+// así que una fecha de la URL pasada de ese límite se aceptaba aunque el calendario la mostrara como no
+// disponible, y el botón quedaba habilitado.
+describe("fecha de la URL pasada del último día elegible", () => {
+  // Con hoy = martes, 15/9, la zona de mayor anticipación (60 días) llega hasta el viernes, 13/11
+  // (hoy + 59). El sábado, 14/11 es hoy + 60: el servidor lo rechazaría.
+  const HOY_LIMITE = "2026-09-15";
+  const completa = (fecha: string) => ({
+    fecha,
+    turnoId: TURNO_CENA_SABADO.id,
+    zonaId: ZONA_VIP.id,
+    comensales: "2",
+  });
+
+  it("se ignora y pide elegir la fecha de nuevo", () => {
+    renderizar(completa("2026-11-14"), HOY_LIMITE);
+
+    expect(screen.getByText(/Falta elegir: fecha/)).toBeInTheDocument();
+    expect(fechaElegida()).toBe("");
+  });
+
+  it("el último sábado dentro del límite sigue aceptándose", () => {
+    renderizar(completa("2026-11-07"), HOY_LIMITE);
+
+    expect(fechaElegida()).toBe("2026-11-07");
+    expect(screen.queryByText(/Falta elegir/)).not.toBeInTheDocument();
   });
 });

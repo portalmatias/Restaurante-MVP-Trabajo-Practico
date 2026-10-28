@@ -351,6 +351,22 @@ describe("ConsultaReserva - detalle", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(titulo);
   });
 
+  // Spec experiencia-reserva-cliente, «Estado de la reserva consultada»: además del título, el
+  // detalle muestra la palabra del estado dentro de la etiqueta de estado.
+  it.each([
+    ["CONFIRMADA", "Confirmada"],
+    ["PENDIENTE", "Pendiente"],
+    ["CANCELADA", "Cancelada"],
+    ["NO_SHOW", "No se presentó"],
+  ])("el estado %s muestra la etiqueta de estado «%s»", async (estado, palabra) => {
+    await verDetalle({ ...RESERVA, estado });
+
+    const etiqueta = screen.getByText(palabra, { selector: "span" });
+    expect(etiqueta).toBeInTheDocument();
+    expect(etiqueta).toHaveClass("rounded-sm");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).not.toBe(palabra);
+  });
+
   it("una fecha inválida en la respuesta no rompe el detalle y se muestra tal cual", async () => {
     await verDetalle({ ...RESERVA, fecha: "2026-02-30" });
 
@@ -385,6 +401,17 @@ describe("ConsultaReserva - detalle", () => {
     expect(screen.getByRole("button", { name: "Buscar mi reserva" })).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toHaveValue("");
   });
+
+  // Tarea 3.4 («Gestión del foco al cambiar de vista»): el botón tocado desaparece con el detalle.
+  it("al volver al formulario el foco pasa a su título", async () => {
+    await verDetalle();
+
+    fireEvent.click(screen.getByRole("button", { name: "Consultar otra reserva" }));
+
+    const titulo = screen.getByRole("heading", { level: 1 });
+    expect(titulo).toHaveFocus();
+    expect(titulo).toHaveAttribute("tabindex", "-1");
+  });
 });
 
 // La fecha de `RESERVA` ya pasó: "muy por delante" y "turno ya pasado" se arman con fechas
@@ -410,6 +437,22 @@ describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
     expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
     expect(screen.queryByText(NOMBRE_ALERTA)).not.toBeInTheDocument();
     expect(GET).not.toHaveBeenCalled();
+  });
+
+  it("si al verificar la ventana el servidor responde 429, lo explica y no ofrece 'Reintentar'", async () => {
+    GET.mockResolvedValue(respuestaError(429));
+    await verDetalleDe(RESERVA_FUTURA);
+
+    expect(await screen.findByText(/Hiciste demasiados intentos/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar mi reserva" })).not.toBeInTheDocument();
+    expect(GET).toHaveBeenCalledTimes(1);
+  });
+
+  it("al mostrar el detalle el foco pasa al título", async () => {
+    await verDetalleDe(RESERVA_FUTURA);
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
   });
 
   it.each(["CONFIRMADA", "PENDIENTE"])(
