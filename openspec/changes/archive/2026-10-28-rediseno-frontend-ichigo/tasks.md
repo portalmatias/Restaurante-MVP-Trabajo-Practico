@@ -342,18 +342,24 @@ desde cero.
       Questions»); las 4 y 9 ya estaban resueltas. Falta la respuesta de @portalmatias, y la 5 espera
       una decisión del equipo. Ninguna respuesta cambia un requisito de la spec, así que no hace falta
       modificarla. La tarea sigue abierta hasta tener la conformidad de Mati.
-- [ ] 6.3 Definir con el equipo el orden de archivado respecto de `frontend-cliente` (pregunta
+- [x] 6.3 Definir con el equipo el orden de archivado respecto de `frontend-cliente` (pregunta
       1) y, al archivar, fundir los requisitos de `experiencia-reserva-cliente` que
       contradigan a los de `frontend-cliente`. Incluye, en la spec de `frontend-cliente`,
       actualizar el requisito «Copy en voseo rioplatense» y su escenario «La acción principal de
       inicio usa voseo» (que hoy nombra «Reservar una mesa» como impersonal incorrecto) con la
       excepción de los botones y enlaces de acción en infinitivo (`design.md`, «Acciones en
       infinitivo»), y retirar el `Select` de turnos que mencionan su design y sus tareas.
-      Estado (27/10/2026): el orden ya está definido, `frontend-cliente` se archivó primero (#84,
-      26/10/2026), con el acuerdo de @lussofacundo-iresm. Falta lo que se hace al archivar este change:
-      fundir los requisitos de `experiencia-reserva-cliente` que contradigan a los de
-      `frontend-cliente`, actualizar «Copy en voseo rioplatense» y retirar el `Select` de turnos en
-      `openspec/specs/frontend-cliente/spec.md`. Queda abierta hasta ese PR.
+      Resultado (28/10/2026): el orden quedó así: `frontend-cliente` se archivó primero (#84,
+      26/10/2026) y este change después. Al revisar el texto fundido de ambos: los requisitos de
+      `experiencia-reserva-cliente` no contradicen a los de `frontend-cliente`, los refinan (`design.md`,
+      «Precedencia sobre `frontend-cliente`»), y esa capability es nueva, así que se agrega sin
+      reemplazar nada. Lo único que había que cambiar en `frontend-cliente` era «Copy en voseo
+      rioplatense», y va como delta MODIFIED en `specs/frontend-cliente/spec.md`: excepción de las
+      etiquetas de acción en infinitivo y escenario nuevo «Las etiquetas de acción van en
+      infinitivo» (se conserva el escenario «La acción principal de inicio usa voseo», referido al
+      texto que acompaña la acción). El `Select` de turnos no estaba en la spec de
+      `frontend-cliente`, solo en su design y tareas ya archivados (#84), que no se reescriben: la
+      spec principal no tiene nada que retirar.
 - [x] 6.4 Pasar `npx openspec validate --all --strict` y esperar a que CI quede en verde antes de
       pedir la aprobación de un compañero distinto del autor.
       Resultado (27/10/2026): `npx openspec validate --all --strict` da 17 de 17 válidos. En
@@ -361,3 +367,14 @@ desde cero.
       cubic) terminaron en verde; `eslint` limpio y 766 de 766 tests del frontend con `TZ=UTC` y
       con `TZ=America/Argentina/Buenos_Aires` (corridos en local: el CI de este PR no ejecuta los
       del frontend).
+
+## Pendientes al archivar (28/10/2026)
+
+Este change se archiva con tres tareas sin marcar. No se las marca para no afirmar algo que no
+se hizo; siguen abiertas y fuera del repositorio:
+
+- **4.3** Medición de contraste con una herramienta independiente: la necesita una persona (los
+  valores calculados en el repositorio no la reemplazan).
+- **4.6** Recorrido con lector de pantalla: lo necesita una persona con el lector instalado.
+- **6.2** Conformidad de @portalmatias con las respuestas registradas en `design.md`, «Open
+  Questions» (y decisión del equipo sobre la 5). Ninguna respuesta cambió un requisito.

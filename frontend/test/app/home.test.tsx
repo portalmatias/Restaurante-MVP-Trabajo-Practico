@@ -20,7 +20,7 @@ describe("Landing (/)", () => {
     expect(container.textContent).not.toMatch(/administra/i);
   });
 
-  // Tarea 2.6 de openspec/changes/rediseno-frontend-ichigo (spec: "Los pasos de reserva
+  // Tarea 2.6 de openspec/changes/archive/2026-10-28-rediseno-frontend-ichigo (spec: "Los pasos de reserva
   // coinciden con el flujo real"): el primer paso omitía la zona, que el Paso 1 de
   // /reservas/nueva también pide.
   it('el primer paso de "Así se reserva" menciona la zona', () => {
