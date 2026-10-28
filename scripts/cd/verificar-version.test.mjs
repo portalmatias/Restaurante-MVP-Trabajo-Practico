@@ -29,14 +29,34 @@ const respuesta = (estado, cuerpo) => ({
 });
 
 describe('urlDeVersion', () => {
-  const datos = { runId: '123', intento: '2' };
+  const datos = { runId: '123', intento: '2', consulta: 1 };
 
   test('arma una URL HTTPS con el parámetro que evita cachés', () => {
     const url = urlDeVersion('ichigo.alquilerespunilla.com.ar', datos);
     assert.equal(
       url,
-      'https://ichigo.alquilerespunilla.com.ar/version?cb=123-2',
+      'https://ichigo.alquilerespunilla.com.ar/version?cb=123-2-1',
     );
+  });
+
+  test('el parámetro cambia en cada consulta, y también entre reejecuciones del workflow', () => {
+    const cb = (datosDeLaVuelta) =>
+      new URL(urlDeVersion('sitio.example.com', datosDeLaVuelta)).searchParams.get('cb');
+    const valores = [
+      cb({ runId: '123', intento: '1', consulta: 1 }),
+      cb({ runId: '123', intento: '1', consulta: 2 }),
+      cb({ runId: '123', intento: '2', consulta: 1 }),
+    ];
+    assert.equal(new Set(valores).size, 3);
+  });
+
+  test('rechaza un número de consulta que no es un entero desde 1', () => {
+    for (const consulta of [undefined, 0, -1, 1.5, '1']) {
+      assert.throws(
+        () => urlDeVersion('sitio.example.com', { ...datos, consulta }),
+        /consulta/,
+      );
+    }
   });
 
   for (const invalido of [
@@ -63,7 +83,7 @@ describe('urlDeVersion', () => {
 
   test('rechaza identificadores de ejecución que no son números', () => {
     assert.throws(
-      () => urlDeVersion('sitio.example.com', { runId: '1&x=2', intento: '1' }),
+      () => urlDeVersion('sitio.example.com', { runId: '1&x=2', intento: '1', consulta: 1 }),
       /ejecución/,
     );
   });
@@ -294,6 +314,30 @@ describe('verificar contra un servidor HTTP local', () => {
     await ejecutar();
     assert.equal(pedidos[0].url, '/version?cb=1-1');
     assert.match(pedidos[0].cabeceras['cache-control'], /no-cache/);
+  });
+
+  test('cada reintento pide una URL con un parámetro distinto', async () => {
+    guion = [sha(OTRO), sha(OTRO), sha(ESPERADO)];
+    await ejecutar({ url: (consulta) => `${base.replace('cb=1-1', '')}cb=7-1-${consulta}` });
+    assert.deepEqual(
+      pedidos.map((pedido) => pedido.url),
+      ['/version?cb=7-1-1', '/version?cb=7-1-2', '/version?cb=7-1-3'],
+    );
+  });
+
+  test('se rinde al agotar el plazo total, aunque queden intentos', async () => {
+    guion = [sha(OTRO)];
+    let reloj = 0;
+    const resultado = await ejecutar({
+      intentos: 1000,
+      plazoMs: 50,
+      intervaloMs: 10,
+      // Cada lectura del reloj avanza 10 ms: el plazo se agota sin esperar de verdad.
+      ahora: () => (reloj += 10),
+    });
+    assert.equal(resultado.resultado, 'fallo');
+    assert.ok(resultado.intentos < 10, `hizo ${resultado.intentos} intentos`);
+    assert.ok(resultado.intentos >= 1);
   });
 
   test('reintenta si primero ve el SHA anterior y luego el esperado', async () => {

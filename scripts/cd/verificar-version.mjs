@@ -12,7 +12,7 @@
  *   SUBDOMINIO           nombre del sitio (variable de repositorio), solo el nombre de dominio
  *   SHA                  commit que se acaba de desplegar (40 hex en minúscula)
  *   MODO                 despliegue | vuelta-atras
- *   RUN_ID, RUN_ATTEMPT  de la ejecución: arman el parámetro que evita cachés
+ *   RUN_ID, RUN_ATTEMPT  de la ejecución: con el número de consulta arman el parámetro anti-caché
  *   GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_STEP_SUMMARY  los provee Actions
  *
  * No usa credenciales de despliegue. El token del workflow (`contents: read`) solo sirve para
@@ -40,13 +40,15 @@ const MODOS = ['despliegue', 'vuelta-atras'];
  */
 
 /**
- * URL de la comprobación. Siempre HTTPS, y el parámetro cambia en cada ejecución para que
- * ninguna caché intermedia responda con una copia anterior.
+ * URL de la comprobación. Siempre HTTPS, y el parámetro cambia en cada intento
+ * (`<run_id>-<run_attempt>-<consulta>`, requisito del CD de verificacion-version-desplegada):
+ * una caché que guarde por URL no puede fijar la primera respuesta, que podría ser la vieja.
  *
  * @param {string | undefined} subdominio
- * @param {{ runId: string, intento: string }} ejecucion
+ * @param {{ runId: string, intento: string, consulta: number }} ejecucion `intento` es el de la
+ *   ejecución del workflow (RUN_ATTEMPT); `consulta`, el número de pedido dentro de ella (desde 1)
  */
-export function urlDeVersion(subdominio, { runId, intento }) {
+export function urlDeVersion(subdominio, { runId, intento, consulta }) {
   if (typeof subdominio !== 'string' || !FORMATO_DOMINIO.test(subdominio)) {
     throw new Error(
       'La variable SUBDOMINIO no está definida o no es un nombre de dominio válido (en minúscula, sin protocolo, puerto ni ruta).',
@@ -57,7 +59,10 @@ export function urlDeVersion(subdominio, { runId, intento }) {
       'Los identificadores de la ejecución (RUN_ID y RUN_ATTEMPT) tienen que ser números.',
     );
   }
-  return `https://${subdominio}/version?cb=${runId}-${intento}`;
+  if (!Number.isInteger(consulta) || consulta < 1) {
+    throw new Error('El número de consulta tiene que ser un entero desde 1.');
+  }
+  return `https://${subdominio}/version?cb=${runId}-${intento}-${consulta}`;
 }
 
 /**
@@ -196,16 +201,18 @@ async function consultar(url, fetchImpl, timeoutMs) {
 }
 
 /**
- * Ciclo de consulta: pide la versión hasta que coincida, se agoten los intentos o la respuesta
- * sea definitiva.
+ * Ciclo de consulta: pide la versión hasta que coincida, se agote el plazo total (5 minutos desde
+ * el primer intento, con pedidos de espera acotada) o la respuesta sea definitiva.
  *
  * @param {{
- *   url: string,
+ *   url: string | ((consulta: number) => string),
  *   esperado: string,
  *   modo: 'despliegue' | 'vuelta-atras',
  *   intentos?: number,
+ *   plazoMs?: number,
  *   intervaloMs?: number,
  *   timeoutMs?: number,
+ *   ahora?: () => number,
  *   fetchImpl?: typeof fetch,
  *   relacion?: (esperado: string, observado: string) => Promise<string | null>,
  *   log?: (linea: string) => void,
@@ -220,9 +227,11 @@ export async function verificar({
   url,
   esperado,
   modo,
-  intentos = 30,
+  intentos = Infinity,
+  plazoMs = 300_000,
   intervaloMs = 10_000,
   timeoutMs = 10_000,
+  ahora = Date.now,
   fetchImpl = fetch,
   relacion,
   log = () => {},
@@ -230,8 +239,17 @@ export async function verificar({
   const relaciones = new Map();
   let ultima = { tipo: 'invalida', detalle: 'no se hizo ningún intento' };
 
-  for (let intento = 1; intento <= intentos; intento++) {
-    ultima = await consultar(url, fetchImpl, timeoutMs);
+  const inicio = ahora();
+  let intento = 0;
+  while (intento < intentos) {
+    intento++;
+    // El pedido nunca pasa del plazo total: el último espera solo lo que queda.
+    const restante = Math.max(1, plazoMs - (ahora() - inicio));
+    ultima = await consultar(
+      typeof url === 'function' ? url(intento) : url,
+      fetchImpl,
+      Math.min(timeoutMs, restante),
+    );
 
     // Solo en `despliegue` y solo para un SHA distinto del esperado (D6). Un resultado se
     // conserva; un error de la consulta no: se vuelve a intentar en la vuelta siguiente.
@@ -259,7 +277,7 @@ export async function verificar({
       observacion: ultima,
       relacion: rel,
     });
-    log(`Intento ${intento}/${intentos}: ${decision.motivo}`);
+    log(`Intento ${intento}: ${decision.motivo}`);
 
     if (decision.accion === 'exito') {
       return {
@@ -278,12 +296,14 @@ export async function verificar({
         intentos: intento,
       };
     }
+    // Si la próxima espera ya no entra en el plazo total, se termina ahora.
+    if (ahora() - inicio + intervaloMs >= plazoMs) break;
     if (intento < intentos) await esperar(intervaloMs);
   }
 
   return {
     ...decidirAlAgotar({ esperado, modo, ultima }),
-    intentos,
+    intentos: intento,
   };
 }
 
@@ -322,7 +342,7 @@ function resumen(env, lineas) {
 export async function main(env = process.env) {
   const { SHA: esperado, MODO: modo, SUBDOMINIO: subdominio } = env;
 
-  let url;
+  let urlDelIntento;
   try {
     if (!FORMATO_SHA.test(esperado ?? '')) {
       throw new Error('SHA tiene que ser el SHA completo del commit desplegado.');
@@ -330,10 +350,9 @@ export async function main(env = process.env) {
     if (!MODOS.includes(modo)) {
       throw new Error('MODO tiene que ser despliegue o vuelta-atras.');
     }
-    url = urlDeVersion(subdominio, {
-      runId: env.RUN_ID,
-      intento: env.RUN_ATTEMPT,
-    });
+    const ejecucion = { runId: env.RUN_ID, intento: env.RUN_ATTEMPT };
+    urlDeVersion(subdominio, { ...ejecucion, consulta: 1 }); // valida el entorno antes de empezar
+    urlDelIntento = (consulta) => urlDeVersion(subdominio, { ...ejecucion, consulta });
   } catch (error) {
     const mensaje = `${error.message} El despliegue terminó, pero no se pudo comprobar la versión publicada.`;
     console.log(`::error title=No se pudo comprobar la versión publicada::${mensaje}`);
@@ -341,9 +360,10 @@ export async function main(env = process.env) {
     return 1;
   }
 
-  console.log(`Comprobando ${url.replace(/\?.*$/, '')} (esperado ${esperado}, modo ${modo}).`);
+  const sitio = urlDelIntento(1).replace(/\?.*$/, '');
+  console.log(`Comprobando ${sitio} (esperado ${esperado}, modo ${modo}).`);
   const resultado = await verificar({
-    url,
+    url: urlDelIntento,
     esperado,
     modo,
     relacion:
@@ -356,7 +376,6 @@ export async function main(env = process.env) {
     log: (linea) => console.log(linea),
   });
 
-  const sitio = url.replace(/\?.*$/, '');
   if (resultado.resultado === 'ok') {
     resumen(env, [
       '### Versión publicada verificada',
