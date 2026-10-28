@@ -215,7 +215,7 @@
 
 ## 6. Verificación final
 
-- [ ] 6.1 Revisión visual real: levantar backend y frontend con el seed, abrir
+- [x] 6.1 Revisión visual real: levantar backend y frontend con el seed, abrir
       `/reservas/nueva/resultado` en escritorio y en 360 px, capturar pantallas de STANDARD y
       VIP con mesas libres, ocupadas y que no alcanzan, y confirmar que se distinguen en
       escala de grises y con el lector de pantalla leyendo la lista. Con "reducir movimiento"
@@ -225,8 +225,10 @@
       (viernes 20:00, 6 comensales) a 1280 y 360 px muestran mesas libres, ocupadas y que no
       alcanzan, y se distinguen en escala de grises. A 360 px no hay scroll horizontal y la lista
       queda antes que el dibujo. Con movimiento reducido el esqueleto tiene `animation-name: none`
-      (sin la opción, `brillo-plano`). Falta, y lo tiene que hacer una persona: escuchar la lista
-      con un lector de pantalla real.
+      (sin la opción, `brillo-plano`). La escucha con un lector de pantalla real se omite por
+      decisión del equipo (28/10/2026): `config.yaml` y las specs no la exigen, y lo que leería
+      el lector lo cubren los tests (`role="status"` del resumen, lista «Mesas de la zona»,
+      leyenda sin las marcas y dibujo con `aria-hidden`).
 - [x] 6.2 Prueba manual de seguridad: con curl y sin token, consultar el plano de un turno con
       una reserva real del seed y confirmar a ojo que no aparece ningún dato personal ni id;
       comprobar el `429` excediendo el límite.
