@@ -245,6 +245,20 @@ body::before {
   animation-play-state: paused;
 }
 
+/* Esqueleto del plano de mesas (`plano-mesas-cargando.tsx`): un brillo suave mientras carga. */
+@keyframes brillo-plano {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+
+.plano-mesas-cargando {
+  animation: brillo-plano 1.2s ease-in-out infinite alternate;
+}
+
 @supports (animation-timeline: view()) {
   .revelar {
     animation: revelar linear both;
@@ -268,7 +282,8 @@ body::before {
   .balanceo,
   .revelar,
   .marco-organico,
-  .marco-organico .deriva {
+  .marco-organico .deriva,
+  .plano-mesas-cargando {
     animation: none !important;
   }
 }
