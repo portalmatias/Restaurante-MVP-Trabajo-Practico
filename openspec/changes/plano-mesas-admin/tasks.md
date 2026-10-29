@@ -35,7 +35,7 @@ además que la mesa no cambió en la base.
       lo guardado y la validación de design.md D2, dentro de la transacción `Serializable`
       existente. Tests primero (rojo, luego verde): mover, tocarse, superposición `409` con su
       mensaje, cambio de tamaño `409`, fuera de grilla `400` con su mensaje, fuera de grilla gana
-      sobre la superposición, coordenada a medias `400` (también con el valor guardado), tamaño mayor que la grilla en una mesa
+      sobre la superposición, coordenada a medias `400` (también con el valor guardado, y con una `null` junto a otra con valor), tamaño mayor que la grilla en una mesa
       sin ubicar `400`, forma, forma y reenvío de la ubicación de una mesa con un problema previo
       (cargado directo en la base), quitar del plano, y las validaciones existentes antes que las
       de ubicación.
@@ -73,7 +73,8 @@ plano" de `specs/frontend-admin/spec.md`.
       8") y la lista de superposiciones, con los casos del seed. Verificar que pasan.
 - [ ] 4.3 Campos y vista previa. Tests primero (rojo, luego verde): la columna limitada por el
       ancho, el ancho mayor que corrige la columna, la mesa sin ubicar, la vista previa que sigue
-      los valores, el aviso de superposición con el botón habilitado, la alternativa textual, y
+      los valores (sin avisar superposición con la propia posición guardada), la falla al cargar
+      las mesas de la zona, el aviso de superposición con el botón habilitado, la alternativa textual, y
       que el alta no muestra la sección. Implementar la sección "Ubicación en el plano", la vista
       previa y su texto.
 - [ ] 4.4 Pedido y errores. Tests primero (rojo, luego verde): mover, ubicar una mesa sin ubicar,
