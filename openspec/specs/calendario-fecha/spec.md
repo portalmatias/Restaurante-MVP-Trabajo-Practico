@@ -21,9 +21,9 @@ validación real de la fecha y de la anticipación de cada zona sigue siendo la 
 - **AND** el día 1 queda en la tercera columna, precedido por dos celdas vacías
 
 #### Scenario: Elegir un día elegible
-- **WHEN** la persona activa un día elegible, por ejemplo el sábado 19 de septiembre de 2026
+- **WHEN** la persona activa un día elegible, por ejemplo el sábado, 19 de septiembre de 2026
 - **THEN** ese día queda con `aria-pressed="true"` y es el único con ese estado
-- **AND** aparece «Elegiste el sábado 19 de septiembre de 2026.»
+- **AND** aparece «Elegiste el sábado, 19 de septiembre de 2026.»
 
 #### Scenario: Límites de la navegación por meses
 - **WHEN** se muestra el mes de hoy
@@ -73,16 +73,17 @@ tachados están cerrados.».
 
 ### Requirement: Nombre accesible completo y marca del día de hoy
 Cada día del calendario SHALL ser un `<button>` cuyo nombre accesible es la fecha completa en
-español («sábado 19 de septiembre de 2026»), seguida de «, hoy» si es el día de hoy y del sufijo
+español («sábado, 19 de septiembre de 2026», con coma después del día de la semana), seguida de «, hoy» si es el día de hoy y del sufijo
 de no elegibilidad que corresponda. Los encabezados de columna SHALL tener como nombre accesible
 el día de la semana completo («lunes»); la abreviatura y el kanji que los acompañan SHALL ser
-decorativos (`aria-hidden="true"`). El día de hoy SHALL distinguirse además visualmente por
-negrita y subrayado, no solo por color.
+decorativos (`aria-hidden="true"`). El día de hoy, mientras no sea el día elegido, SHALL distinguirse además visualmente por
+negrita y subrayado, no solo por color; el día elegido se distingue por su fondo `madera` y su
+punto (y sigue anunciando «, hoy» en su nombre accesible).
 
 #### Scenario: Nombre accesible de un día
 - **WHEN** se consulta el nombre accesible del botón del 19 de septiembre de 2026 siendo ese día
   hoy y elegible
-- **THEN** es «sábado 19 de septiembre de 2026, hoy»
+- **THEN** es «sábado, 19 de septiembre de 2026, hoy»
 
 #### Scenario: Encabezados de columna
 - **WHEN** se consultan los encabezados de columna con un lector de pantalla

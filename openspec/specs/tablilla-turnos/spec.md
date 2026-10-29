@@ -39,12 +39,14 @@ tablilla en estado `completa` SHALL mostrarse boca abajo con un sello de «compl
 declararse con `aria-disabled="true"` y no con el atributo `disabled`: así sigue en el orden de
 tabulación y un lector de pantalla la anuncia, como los días no elegibles de `calendario-fecha`.
 Activarla SHALL NOT cambiar la elección. SHALL NOT exponer `aria-pressed`, y su nombre accesible
-SHALL terminar en «, completo» (por ejemplo, «20:00 a 23:30, completo»). El componente compone ese
-sufijo sobre el `aria-label` recibido, porque un `aria-label` reemplaza cualquier texto `sr-only`
-interno y por eso un «Completo» oculto dentro del botón nunca se anunciaría.
+terminar en «, completo» cuando recibe un `aria-label` (por ejemplo, «20:00 a 23:30, completo»):
+el componente compone ese sufijo sobre el `aria-label` recibido, porque un `aria-label`
+reemplaza cualquier texto `sr-only` interno y por eso un «Completo» oculto dentro del botón nunca
+se anunciaría. Sin `aria-label`, el nombre sale del contenido y lo completa un «Completo» solo
+para lectores de pantalla, sin la coma.
 
 #### Scenario: Las demás se dan vuelta pero siguen tocables
-- **WHEN** hay tres tablillas y la persona toca la segunda
+- **WHEN** hay tres tablillas habilitadas y la persona toca la segunda
 - **THEN** la segunda queda `aria-pressed="true"` y las otras dos pasan a `descartada`
 - **AND** las otras dos siguen habilitadas y, al tocar una, esa pasa a `elegida`
 
@@ -64,7 +66,7 @@ interno y por eso un «Completo» oculto dentro del botón nunca se anunciaría.
 - **THEN** la `completa` sigue con `aria-disabled="true"`, sin `aria-pressed`, y no pasa a
   `descartada`
 
-#### Scenario: Exactamente una elegida
+#### Scenario: Como máximo una elegida
 - **WHEN** la persona elige turnos sucesivamente
 - **THEN** en todo momento hay como máximo una tablilla con `aria-pressed="true"`
 

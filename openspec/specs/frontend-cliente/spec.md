@@ -414,7 +414,7 @@ minutos.
 #### Scenario: La fecha se muestra en formato largo en español
 - **WHEN** se muestra una fecha de calendario en cualquier pantalla del cliente
 - **THEN** se muestra con el día de la semana, el día, el mes y el año en español (por
-  ejemplo, "sábado 19 de septiembre de 2026")
+  ejemplo, "sábado, 19 de septiembre de 2026")
 
 #### Scenario: El horario de un turno no depende de la zona horaria del dispositivo
 - **WHEN** se muestra el horario de la cena (20:00 a 23:30 hora local del restaurante) en un
@@ -426,7 +426,9 @@ Todo texto de interfaz dirigido a la persona que reserva SHALL usar voseo riopla
 ("reservá", "elegí", "revisá") en vez de tuteo o de un registro impersonal, con una excepción
 acotada: las etiquetas de las acciones (botones y enlaces de llamada a la acción) SHALL estar en
 infinitivo («Reservar una mesa», «Volver», «Reintentar»), que es la convención de la categoría
-(`rediseno-frontend-ichigo`, `design.md`, «Acciones en infinitivo»). Los títulos, los textos
+(`rediseno-frontend-ichigo`, `design.md`, «Acciones en infinitivo»). Hay una única excepción a
+la excepción: «Ya tengo un código», el enlace de la landing para quien ya reservó, que habla en
+primera persona. Los títulos, los textos
 explicativos y los mensajes SHALL seguir en voseo. La excepción es de registro, no de
 accesibilidad: el nombre accesible de cada acción sigue siendo claro y verbal.
 
@@ -444,8 +446,8 @@ accesibilidad: el nombre accesible de cada acción sigue siendo claro y verbal.
 
 #### Scenario: Un mensaje de error de servidor usa voseo
 - **WHEN** se muestra el mensaje genérico de error de servidor o de red
-- **THEN** su texto usa una forma de voseo (por ejemplo, "Intentá de nuevo"), no la forma de
-  tuteo que usa hoy `frontend-base` ("Intente de nuevo")
+- **THEN** su texto usa una forma de voseo (por ejemplo, "Intentá de nuevo"), no el registro
+  formal de usted ("Intente de nuevo") ni el tuteo
 
 ### Requirement: Sin enlaces a la administración
 Ninguna pantalla nueva de este change, ni la navegación compartida, SHALL mostrar un enlace o

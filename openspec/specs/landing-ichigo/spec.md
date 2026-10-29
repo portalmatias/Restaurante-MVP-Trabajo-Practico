@@ -51,8 +51,9 @@ secundaria «Ya tengo un código» SHALL enlazar a `/reservas/consultar`. La acc
 #### Scenario: Acciones en infinitivo y textos en voseo
 - **WHEN** se leen las etiquetas de los enlaces de acción de `/` y sus títulos y textos
   explicativos
-- **THEN** las etiquetas de acción están en infinitivo («Reservar una mesa», «Ya tengo un código»,
-  «Elegir fecha y turno») y los títulos y textos explicativos usan voseo («Dejá tus datos», «Así
+- **THEN** las etiquetas de acción están en infinitivo («Reservar una mesa», «Elegir fecha y
+  turno»), salvo «Ya tengo un código», que habla en primera persona de quien ya reservó, y los
+  títulos y textos explicativos usan voseo («Dejá tus datos», «Así
   se reserva»), sin tuteo
 
 #### Scenario: Sin enlaces a la administración

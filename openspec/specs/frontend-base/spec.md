@@ -9,24 +9,26 @@ pantallas reales; este change no implementa ningún flujo de negocio.
 Salvo que un escenario diga otra cosa: el viewport de referencia mobile es 375px de ancho
 (iPhone SE / gama baja), y los de verificación adicionales son 768px (tablet), 1024px
 (notebook chica) y 1440px (escritorio). Los tokens de color referidos son los definidos en
-este change: `primary` (`#171717` sobre `#FFFFFF`), `secondary` (`#404040` sobre `#FFFFFF`),
-`accent` (`#A16207` sobre `#FFFFFF`), `background`/`card` (`#FFFFFF`),
-`foreground`/`card-foreground` (`#171717`), `muted` (`#E8ECF0`) con `muted-foreground`
-(`#475569`), `border` (`#E5E5E5`), `destructive` (`#DC2626` sobre `#FFFFFF`) y `ring`
-(`#171717`).
+este change y su valor vigente está en `frontend/app/globals.css` (fuente única; la capability
+`identidad-visual-ichigo` fija la paleta y sus contrastes). Los de referencia son `background`
+(`#E8DCC4`), `card` (`#F3EBDA`), `foreground` (`#1F1813`), `muted` (`#D9CBAE`) con
+`muted-foreground` (`#5C4630`), `accent` y `destructive` (`#9A2A19`), `border` (`#8A6A43`,
+3,7:1 sobre `background` y 4,2:1 sobre `card`) y `ring` (`#9A2A19`).
 
 ## Requirements
 
 ### Requirement: Layout compartido y esqueleto de rutas
 El sistema SHALL servir un layout compartido con encabezado y pie de página públicos en todas
-las rutas públicas (`/` y `/reservas/**`), y SHALL exponer `/admin` como página accesible por URL
+las rutas públicas (todas las rutas salvo `/admin` y las que cuelgan de `/admin/`, entre ellas
+`/` y `/reservas/**`), y SHALL exponer `/admin` como página accesible por URL
 directa. Las rutas `/admin` y las que cuelgan de `/admin/` SHALL NOT mostrar el encabezado ni
 el pie públicos: el panel tiene su propio encabezado y su propia navegación. La decisión SHALL
 tomarse por la ruta exacta (`/admin` o prefijo `/admin/`), de modo que una ruta como
 `/administrar` conserve el marco público. El encabezado público SHALL mostrar el nombre «Ichigo» como enlace a `/` y la navegación pública
 («Reservas» y «Consultar reserva»). El idioma del documento SHALL ser español rioplatense
-(`es-AR`), y el título de cada página SHALL seguir la plantilla definida por la capability
-`identidad-visual-ichigo`.
+(`es-AR`), y el título de cada página pública SHALL seguir la plantilla definida por la
+capability `identidad-visual-ichigo` (los títulos del panel de administración quedan fuera de
+ese requisito).
 
 #### Scenario: La landing solo muestra el flujo del cliente
 - **WHEN** una persona visita `/`
@@ -156,8 +158,8 @@ asociado a él mediante `aria-describedby`.
 
 ### Requirement: Objetivos táctiles mínimos
 Todo elemento interactivo SHALL tener un área táctil de al menos 44×44px. Como única
-excepción, las acciones compactas de fila de las tablas del panel de administración
-(`BotonCompacto`) SHALL tener al menos 36px de alto solo cuando ningún dispositivo de entrada
+excepción, las acciones compactas del panel de administración (`BotonCompacto`: las de fila de
+sus tablas y las de la barra de sesión, como «Cerrar sesión» y «Renovar sesión») SHALL tener al menos 36px de alto solo cuando ningún dispositivo de entrada
 disponible es un puntero grueso (no coincide `any-pointer: coarse`), y SHALL conservar los 44px
 cuando lo haya. Así un equipo híbrido (pantalla táctil con mouse) conserva el área táctil
 completa.
