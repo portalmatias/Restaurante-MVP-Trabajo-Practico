@@ -2,7 +2,7 @@ import {
   describirMesa,
   ordenarMesas,
   resumirPlano,
-  separarMesas,
+  mesasUbicadas,
   textoEstado,
   type EstadoMesa,
   type MesaPlano,
@@ -197,12 +197,14 @@ function MesaDibujada({ mesa }: { mesa: MesaPlano }) {
 
 /**
  * Aviso del plano atenuado (design.md D5). El contrato garantiza motivos cuando no hay lugar,
- * pero si llegaran vacíos el aviso termina en punto en vez de quedar cortado en "por:".
+ * pero si llegaran vacíos el aviso termina en punto en vez de quedar cortado en "por:". Si el
+ * último motivo no trae su punto final, se le agrega.
  */
 function avisoSinLugar(motivos: Plano["motivos"]): string {
   const aviso = "El plano muestra el estado de las mesas, pero hoy no se puede reservar este turno";
   if (motivos.length === 0) return `${aviso}.`;
-  return `${aviso} por: ${motivos.map((motivo) => motivo.mensaje).join(" ")}`;
+  const texto = `${aviso} por: ${motivos.map((motivo) => motivo.mensaje.trim()).join(" ")}`;
+  return /[.!?]$/.test(texto) ? texto : `${texto}.`;
 }
 
 /**
@@ -213,7 +215,7 @@ function avisoSinLugar(motivos: Plano["motivos"]): string {
  */
 export function PlanoMesas({ plano, comensales }: PlanoMesasProps) {
   const mesas = ordenarMesas(plano.mesas);
-  const { ubicadas } = separarMesas(mesas, plano);
+  const ubicadas = mesasUbicadas(mesas, plano);
   const atenuado = !plano.disponible;
 
   return (

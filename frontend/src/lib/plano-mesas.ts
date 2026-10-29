@@ -92,18 +92,9 @@ export function ordenarMesas(mesas: readonly MesaPlano[]): MesaPlano[] {
 }
 
 /**
- * Mesas que se dibujan y mesas sin ubicar (sin posición o fuera de la grilla), que solo van en
- * la lista (design.md D5).
+ * Mesas que se dibujan. Las sin ubicar (sin posición o fuera de la grilla) solo van en la lista
+ * (design.md D5), que muestra todas las mesas y las marca con `describirMesa`.
  */
-export function separarMesas(
-  mesas: readonly MesaPlano[],
-  grilla: Grilla,
-): {
-  ubicadas: MesaPlano[];
-  sinUbicar: MesaPlano[];
-} {
-  return {
-    ubicadas: mesas.filter((mesa) => estaUbicada(mesa, grilla)),
-    sinUbicar: mesas.filter((mesa) => !estaUbicada(mesa, grilla)),
-  };
+export function mesasUbicadas(mesas: readonly MesaPlano[], grilla: Grilla): MesaPlano[] {
+  return mesas.filter((mesa) => estaUbicada(mesa, grilla));
 }

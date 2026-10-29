@@ -529,6 +529,9 @@ describe("/reservas/nueva/resultado - plano de mesas", () => {
     let liberarCatalogo: () => void = () => {};
     const catalogoLento = new Promise<void>((listo) => {
       liberarCatalogo = listo;
+      // Si nadie pide la disponibilidad antes, el catálogo termina igual: así un código que la
+      // pide después no se cuelga, y el test falla en la comprobación, no por timeout.
+      setTimeout(listo, 50);
     });
     let disponibilidadAntesDelCatalogo = false;
     let catalogoListo = false;

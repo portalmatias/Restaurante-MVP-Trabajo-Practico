@@ -140,9 +140,7 @@ describe("PlanoMesas - dibujo", () => {
     const { container } = renderizar();
 
     const textos = (etiqueta: string) =>
-      [...(mesaDibujada(container, etiqueta)?.querySelectorAll("text") ?? [])].map(
-        (texto) => texto.textContent,
-      );
+      textosDeMesa(container, etiqueta).map((texto) => texto.textContent);
     expect(textos("S3")).toContain("4 pers.");
     expect(textos("S4")).toContain("4 pers.");
     expect(textos("S2")).not.toContain("4 pers.");
@@ -288,6 +286,20 @@ describe("PlanoMesas - sin lugar", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/por:/)).toBeNull();
+  });
+
+  // Comentario de Facundo en #89: un motivo sin punto final dejaba el aviso sin cerrar.
+  it("sin lugar, si el último motivo no termina en punto, el aviso igual cierra con punto", () => {
+    renderizar({
+      ...SIN_LUGAR,
+      motivos: [{ ...SIN_LUGAR.motivos[0], mensaje: "La zona STANDARD no tiene más lugar en ese turno" }],
+    });
+
+    expect(
+      screen.getByText(
+        "El plano muestra el estado de las mesas, pero hoy no se puede reservar este turno por: La zona STANDARD no tiene más lugar en ese turno.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("sin lugar no dice que la mesa se asigna al confirmar", () => {
