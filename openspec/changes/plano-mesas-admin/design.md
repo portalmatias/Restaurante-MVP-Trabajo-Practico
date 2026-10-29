@@ -141,7 +141,11 @@ tipos desde `openapi.yaml` en el mismo PR.
   abrirse y cada vez que cambia la zona, para dibujar las demás mesas. Solo se usa la respuesta
   del último pedido: si el admin cambia de zona antes de que llegue la anterior, esa se descarta
   (un contador de pedidos o un `AbortController`), para que la vista previa nunca dibuje las mesas
-  de una zona sobre la grilla de otra. La grilla sale de la zona
+  de una zona sobre la grilla de otra. Si el pedido falla, la vista previa dibuja la grilla y la
+  mesa que se edita, y el texto avisa que no puede detectar superposiciones; guardar sigue
+  habilitado porque la API valida igual. La mesa que se edita se saca del listado por `id` antes
+  de calcular superposiciones, para que su posición guardada no cuente como otra mesa. La grilla
+  sale de la zona
   (`planoColumnas`, `planoFilas`) que el panel ya recibe de `GET /admin/zonas`.
 - **Campos.** Columna y Fila son `<select>` numerados desde 1 (la API, desde 0: se convierte al
   armar el pedido y al leer la mesa). Ofrecen de 1 a `columnas - ancho + 1` y de 1 a

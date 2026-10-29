@@ -131,6 +131,10 @@ Zona nueva.
 - **WHEN** el admin envía para S1 `posX` 0, igual al guardado, sin `posY`
 - **THEN** el sistema responde `400` sin modificar la Mesa
 
+#### Scenario: Coordenada null junto a otra con valor rechazada
+- **WHEN** el admin envía para S1 `posX` `null` y `posY` 3
+- **THEN** el sistema responde `400` sin modificar la Mesa
+
 #### Scenario: Valores fuera de rango rechazados
 - **WHEN** el admin envía `posX` -1, `ancho` 0, `ancho` `null` o `forma` `TRIANGULAR`
 - **THEN** el sistema responde `400` sin modificar la Mesa

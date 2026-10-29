@@ -28,8 +28,11 @@ aunque las respuestas de la API lleguen en otro orden) y la Mesa que se edita, d
 el tamaño y la forma de los valores elegidos, actualizada al cambiar cualquiera de ellos. La
 vista previa SHALL ser decorativa para lectores de pantalla y SHALL acompañarse de un texto que
 describe la ubicación elegida ("S3 ocupa las columnas 6 y 7, filas 1 y 2.") y, si la Mesa se
-superpone con otras, las nombra ("Se superpone con S5."). El aviso de superposición SHALL NOT
-impedir guardar: lo decide la API. Los errores `400` y `409` de la API sobre la ubicación SHALL
+superpone con otras, las nombra ("Se superpone con S5."). La Mesa que se edita SHALL NOT contar
+como otra Mesa en ese aviso, aunque su posición guardada venga en el listado de la Zona. Si no se
+pueden cargar las demás Mesas de la Zona, la vista previa SHALL dibujar igual la grilla y la Mesa
+que se edita, y SHALL avisar que no puede detectar superposiciones. El aviso de superposición, o
+su falta, SHALL NOT impedir guardar: lo decide la API. Los errores `400` y `409` de la API sobre la ubicación SHALL
 mostrarse junto a la sección.
 
 El listado de Mesas SHALL mostrar la ubicación de cada una ("Columna 6, fila 1") o "Sin ubicar".
@@ -44,6 +47,13 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **WHEN** el administrador edita S3 y cambia el ancho a 3
 - **THEN** la vista previa dibuja S3 con 3 celdas de ancho y el texto dice "S3 ocupa las columnas
   6 a 8, filas 1 y 2."
+- **AND** el texto no avisa ninguna superposición: la posición guardada de S3 no cuenta como otra
+  Mesa
+
+#### Scenario: Falla la carga de las mesas de la zona
+- **WHEN** el administrador edita S4 y `GET /admin/mesas` de la Zona elegida responde con error
+- **THEN** la vista previa dibuja la grilla y S4, la sección dice "No se pudieron cargar las otras
+  mesas de la zona: no se puede avisar si se superpone." y el botón de guardar sigue habilitado
 
 #### Scenario: Aviso de superposición en la vista previa
 - **WHEN** el administrador edita S4 y elige la columna 5 y la fila 4
