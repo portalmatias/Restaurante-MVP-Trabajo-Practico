@@ -37,7 +37,7 @@ desde cero.
       excluye `.env*`. Los únicos datos que parecen personales son ficticios: `ana.perez@example.com`,
       `+54 9 11 5555-1234` y el admin del seed (`admin@restaurante-mvp.local`, documentado en el README).
       `PRODUCT.md` y `.impeccable/surfaces/app-page-tsx.md` no traen secretos, rutas locales ni nombres
-      personales. Recomendación (la decisión sigue siendo del equipo, pregunta 5): versionarlos, porque
+      personales. Recomendación, adoptada al cerrar la pregunta 5 (ver 6.2): versionarlos, porque
       `globals.css` y `tablilla.tsx` los citan en sus comentarios y esta spec también; fuera del
       repositorio esas referencias quedarían rotas.
 

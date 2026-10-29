@@ -2,8 +2,8 @@
 
 Motivación y alcance: ver `proposal.md`. La dirección visual completa («Kakefuda») está en
 `frontend/.impeccable/surfaces/app-page-tsx.md` y el contexto de producto en
-`frontend/PRODUCT.md`, ambos solo en la rama `feature/diseno-frontend` (no están en `main` ni en
-este PR; versionarlos es la pregunta 5). Esta spec no depende de ellos para ser verificable.
+`frontend/PRODUCT.md`, ambos versionados dentro de `frontend/` (pregunta 5, decidida al
+archivar). Esta spec no depende de ellos para ser verificable.
 Este documento fija las decisiones técnicas y sus alternativas.
 
 Estado del que se parte: `frontend-base` define tokens en blanco y negro, Inter y una paleta
@@ -95,8 +95,8 @@ sobre madera necesita un indicador visible, no una prohibición.
 Un grupo de botones de alternancia en vez de `radio` o `select`: tocar otra tablilla cambia la
 elección sin un paso previo de «deseleccionar», y cada tablilla tiene su nombre accesible
 («20:00 a 23:30»). Se evaluó `role="radiogroup"` (mejor semántica de «una sola opción», pero
-exige manejo de flechas para ser correcto y el equipo no lo implementó); queda como Open
-Question. Una tablilla `completa` usa `aria-disabled` y no `disabled` (como los días no elegibles
+exige manejo de flechas para ser correcto y el equipo no lo implementó); se descartó para este
+change y se mantienen los botones con `aria-pressed` (pregunta 2, conformidad del equipo). Una tablilla `completa` usa `aria-disabled` y no `disabled` (como los días no elegibles
 del calendario, D11): sigue en el orden de tabulación y su nombre accesible compuesto («20:00 a
 23:30, completo») la anuncia; un `aria-label` taparía un «Completo» oculto dentro del botón.
 El giro 3D usa `rotateY` con `backface-visibility`, solo en `transform`, sin reflujo.
@@ -196,7 +196,8 @@ vistazo y, en pantallas anchas, queda a la izquierda de los turnos. Decisiones:
   no solo atenuación.
 - Tabulación móvil (un solo día con `tabindex="0"`) y flechas, Inicio, Fin, RePág y AvPág,
   siguiendo el patrón de cuadrícula de fechas de WAI-ARIA, sin `role="grid"`: se prefirió una
-  tabla de botones simple. Queda como pregunta 7 si el equipo prefiere `grid`.
+  tabla de botones simple. Se mantiene la tabla de botones y no se adopta `role="grid"` en este
+  change (pregunta 7, conformidad del equipo).
 - Cero dependencias: la aritmética de fechas usa `Date.UTC` y `getUTC*` (`config.yaml` §7); el
   día de hoy se calcula en el servidor con el offset de Argentina y llega como propiedad, de modo
   que el huso del dispositivo no cambie qué días son pasados.
