@@ -191,7 +191,7 @@ desde cero.
       `/admin/reservas` se partía a mitad de la dirección; vuelto a medir, de 7 correos 4 ocupan dos
       líneas y ninguno se parte fuera de la arroba.
 
-- [ ] 4.3 Revisión de contraste: medir con una herramienta independiente (extensión de
+- [x] 4.3 Revisión de contraste: medir con una herramienta independiente (extensión de
       contraste del navegador o `webaim.org`) texto, bordes de controles, foco y sellos de las
       pantallas de 4.1 y 4.2, incluidos los estados `elegida`, `descartada` y `completa`.
       Confirmar 4,5:1 en texto y 3:1 en bordes; anotar cualquier incumplimiento como desvío.
@@ -202,8 +202,21 @@ desde cero.
       control medido baja de 3:1. Los días cerrados del calendario (2,37:1) y «Anterior/Siguiente»
       deshabilitados (3,18:1) son componentes inactivos, exentos por WCAG 1.4.3. No se midieron el
       anillo de foco en el navegador ni la tablilla `completa` (ninguna pantalla la usa); el contraste
-      del foco y de los tokens lo fijan `globals-foco.test.ts` y `globals-contrastes.test.ts`. Queda
-      para una persona repetir la medición con la extensión o `webaim.org`.
+      del foco y de los tokens lo fijan `globals-foco.test.ts` y `globals-contrastes.test.ts`.
+      Resultado (29/10/2026): medido con la API de `webaim.org` (Contrast Checker) sobre los
+      colores que usan esas pantallas, tomados de `app/globals.css` y de `tablilla.tsx`. Texto
+      (4,5:1): `foreground` 12,9 / 14,7 / 10,9 sobre `background` / `card` / `muted`;
+      `secondary` y `muted-foreground` 6,51 / 7,45 / 5,52; `accent` y `destructive` 5,68 / 6,51 /
+      4,81; `primary-foreground` sobre `primary` 14,7; `secondary-foreground` sobre `secondary`
+      7,45; `accent-foreground` sobre `accent` (sellos 予 y 満) 6,51; `madera-foreground` sobre
+      `madera` 13,1; título atenuado de `descartada` (`opacity-70`, color resultante `#b7afa1`)
+      sobre `madera` 7,16. Bordes y foco (3:1): `border` 3,66 sobre `background` y 4,19 sobre
+      `card`; borde de `elegida` (`accent` sobre `card`) 6,51; `ring` sobre `background` 5,68;
+      `ring-madera` sobre `madera` 13,1. Todo cumple.
+      Desvío anotado: el recuadro rojo del sello 満 de `completa` (`accent` sobre `madera`) da
+      2,01:1 contra la madera. El estado se reconoce igual por el glifo (6,51:1 contra su relleno)
+      y por la tablilla boca abajo, y el nombre accesible dice «completo»; si el equipo quiere el
+      recuadro en 3:1, alcanza con un borde `ring-madera` alrededor del sello.
 
 - [x] 4.4 Estados en escala de grises (DevTools, emulación de visión): comprobar que los cuatro
       estados de reserva y los niveles de aforo se distinguen sin color (spec `frontend-admin`).
@@ -378,13 +391,11 @@ desde cero.
 
 ## Pendientes al archivar (28/10/2026)
 
-Este change se archiva con una tarea sin marcar. No se la marca para no afirmar algo que no se
-hizo; sigue abierta y fuera del repositorio:
-
-- **4.3** Medición de contraste con una herramienta independiente: la necesita una persona (los
-  valores calculados en el repositorio no la reemplazan).
+Ninguna tarea queda sin marcar: la 4.3, la 4.6 y la 6.2, abiertas al archivar, se cerraron en
+este mismo PR (ver la decisión de abajo).
 
 **Decisión (29/10/2026):** Federico decidió archivar el change igual, con 4.3, 4.6 y 6.2 abiertas,
 aunque `config.yaml` §13 pide completar todas las tareas antes de darlo por terminado. Después,
 en el mismo PR, se cerraron la 4.6 (omitida por decisión del equipo) y la 6.2 (conformidad de
-@portalmatias). Queda abierta solo la 4.3, como seguimiento fuera del repositorio.
+@portalmatias), y por último la 4.3, medida con `webaim.org` (29/10/2026) con un desvío anotado
+en la propia tarea.
