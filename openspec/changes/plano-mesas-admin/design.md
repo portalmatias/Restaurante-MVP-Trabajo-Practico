@@ -47,7 +47,10 @@ la mesa sin ubicar" vive en el mismo lugar que el cambio de zona.
 toca la posición. Las dos se validan con `@ValidateIf((dto) => dto.posX != null)` (y su par para
 `posY`) seguido de `@IsInt()` y `@Min(0)`: con valor se exige un entero no negativo, y `null` pasa
 la validación del DTO sin confundirse con la ausencia, que el service distingue con `undefined`.
-`ancho`, `alto` y `forma` no admiten `null` y usan `@IsOptional()` como los campos actuales. Que
+`ancho`, `alto` y `forma` no admiten `null`: usan `@ValidateIf((_, value) => value !== undefined)`
+como los campos actuales de `ActualizarMesaDto` y `ActualizarZonaDto`, porque `@IsOptional()`
+también saltea la validación cuando llega `null` y el valor terminaría en un error `500` de Prisma.
+Con `@ValidateIf`, un `null` falla en `@IsInt()` o en `@IsEnum()` y responde `400`. Que
 `posX` y `posY` vayan juntas lo valida el service (D2), con el mensaje "posX y posY van juntos: los
 dos con valor o los dos en null."
 
@@ -74,7 +77,10 @@ activas):
    ```
 
    Reutiliza `seSuperponen` y la misma condición de grilla que `validarLayout`, que queda para el
-   seed. `superpuestaCon` sale ordenada con `ordenarMesasPorEtiqueta`.
+   seed. `superpuestaCon` sale ordenada con `ordenarMesasPorEtiqueta`. Antes de eso, aunque la
+   mesa quede sin ubicar, se compara el `ancho` y el `alto` finales con la grilla de la zona final
+   ("La mesa no entra en la grilla de 12 por 8."). Así un tamaño enorme nunca llega a la columna
+   `Int` de la base.
 4. `fueraDeGrilla` → `400` "La mesa queda fuera de la grilla de 12 por 8."; `superpuestaCon` no
    vacía → `409` "La mesa se superpone con S2 y S3." (lista con comas y "y" antes de la última).
    Se informa primero la grilla: una mesa afuera no necesita la lista de superposiciones.

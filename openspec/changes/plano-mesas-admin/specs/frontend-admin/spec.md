@@ -1,5 +1,7 @@
 Los escenarios usan el layout del seed de `plano-mesas` (zona STANDARD de 12 columnas por 8
-filas; S2 en (2,0) 1 por 1, S3 en (5,0) 2 por 2, S4 en (0,3) 3 por 2, S5 en (5,3) 4 por 2).
+filas; S2 en (2,0) 1 por 1, S3 en (5,0) 2 por 2, S4 en (0,3) 3 por 2, S5 en (5,3) 4 por 2; zona
+VIP de 10 por 6, con V4 en (4,3) 6 por 2). V5 es una mesa de VIP de 1 por 1 y sin reservas, en
+(7,5), y S7 una mesa de STANDARD sin ubicar.
 La pantalla numera columnas y filas desde 1; la API, desde 0: la columna 6 de la pantalla es
 `posX` 5.
 
@@ -61,6 +63,15 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **THEN** Columna y Fila están vacíos, la sección dice "La mesa no está en el plano." y la vista
   previa no dibuja esa Mesa
 
+#### Scenario: Ubicar una mesa sin ubicar
+- **WHEN** el administrador edita S7, elige la columna 12 y la fila 1 y guarda
+- **THEN** el sistema envía `posX` 11 y `posY` 0 y, al confirmar la API, el listado muestra S7 en
+  "Columna 12, fila 1"
+
+#### Scenario: Guardar sin ubicación no muestra error
+- **WHEN** el administrador edita S7, cambia solo la etiqueta y guarda con Columna y Fila vacíos
+- **THEN** el sistema guarda la etiqueta sin mostrar error y S7 sigue "Sin ubicar"
+
 #### Scenario: Ubicación a medias no se envía
 - **WHEN** el administrador edita una Mesa sin ubicar, elige solo la columna y guarda
 - **THEN** el sistema muestra un error junto a la sección y no envía el pedido
@@ -74,10 +85,15 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **THEN** la vista previa pasa a mostrar la grilla y las Mesas de la Zona nueva, y Columna y Fila
   quedan vacíos
 
+#### Scenario: Cambio de zona sin elegir ubicación
+- **WHEN** el administrador cambia V5 a STANDARD, deja Columna y Fila vacíos y guarda
+- **THEN** el sistema envía la Zona nueva con `posX` y `posY` en `null`, no muestra error y el
+  listado muestra V5 "Sin ubicar"
+
 #### Scenario: Cambio de zona con la misma columna y fila
-- **WHEN** el administrador cambia la Zona de una Mesa ubicada en la columna 11, fila 8, vuelve a
-  elegir la columna 11 y la fila 8 y guarda
-- **THEN** el sistema envía la Zona nueva junto con `posX` 10 y `posY` 7
+- **WHEN** el administrador cambia V5, ubicada en la columna 8, fila 6 de VIP, a STANDARD, vuelve a
+  elegir la columna 8 y la fila 6 y guarda
+- **THEN** el sistema envía la Zona nueva junto con `posX` 7 y `posY` 5
 
 #### Scenario: Pedido con las coordenadas juntas
 - **WHEN** el administrador edita S4 y cambia solo la columna

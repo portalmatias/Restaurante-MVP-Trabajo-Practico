@@ -2,7 +2,7 @@ Los escenarios usan el layout del seed de `plano-mesas`: zona STANDARD con grill
 por 8 filas, S1 en (0,0) redonda 1 por 1, S2 en (2,0) redonda 1 por 1, S3 en (5,0) cuadrada 2 por
 2, S4 en (0,3) rectangular 3 por 2 y S5 en (5,3) rectangular 4 por 2; zona VIP con grilla de 10
 por 6, V1 en (0,0) 1 por 1, V2 en (3,0) 2 por 2, V3 en (0,3) 3 por 2 y V4 en (4,3) 6 por 2. S6 es
-una mesa que el admin creó en STANDARD, de 1 por 1 y sin reservas, ubicada en (10,7). Las
+una mesa de STANDARD de 1 por 1 y sin reservas, cargada en la base para el test en (10,7). Las
 coordenadas son de la API: base 0, en celdas, `(posX, posY)`.
 
 ## MODIFIED Requirements
@@ -36,8 +36,8 @@ respuestas de alta y de edición de una Mesa SHALL incluir los mismos campos.
 - **THEN** S3 tiene `posX` 5, `posY` 0, `ancho` 2, `alto` 2 y `forma` `CUADRADA`
 
 #### Scenario: Mesa recién creada figura sin ubicar
-- **WHEN** el admin da de alta la Mesa S6 en STANDARD
-- **THEN** la respuesta del alta y el listado muestran S6 con `posX` y `posY` en `null`, `ancho` y
+- **WHEN** el admin da de alta la Mesa S7 en STANDARD
+- **THEN** la respuesta del alta y el listado muestran S7 con `posX` y `posY` en `null`, `ancho` y
   `alto` en 1 y `forma` `RECTANGULAR`
 
 ## ADDED Requirements
@@ -45,8 +45,16 @@ respuestas de alta y de edición de una Mesa SHALL incluir los mismos campos.
 ### Requirement: Ubicación de Mesa en el plano
 `PATCH /admin/mesas/:id` SHALL aceptar, además de los campos que ya acepta, `posX` y `posY`
 (enteros no negativos, o ambos `null` para quitar la Mesa del plano), `ancho` y `alto` (enteros
-mayores o iguales a 1) y `forma` (`REDONDA`, `CUADRADA` o `RECTANGULAR`), todos opcionales. Un
-pedido sin ninguno de esos campos SHALL comportarse igual que antes de este cambio.
+mayores o iguales a 1) y `forma` (`REDONDA`, `CUADRADA` o `RECTANGULAR`), todos opcionales.
+`ancho`, `alto` y `forma` SHALL NOT aceptar `null`. Un valor que no cumple estas reglas SHALL
+rechazarse con `400` sin modificar la Mesa. Un pedido sin ninguno de esos campos y sin cambio de
+Zona SHALL comportarse igual que antes de este cambio; el cambio de Zona sin coordenadas es la
+única excepción y se describe al final de este requisito.
+
+El `ancho` final SHALL ser menor o igual que `planoColumnas` de la Zona final, y el `alto` final
+menor o igual que `planoFilas`, también si la Mesa queda sin ubicar: si no, el sistema SHALL
+responder `400` con el mensaje "La mesa no entra en la grilla de <columnas> por <filas>." sin
+modificar la Mesa.
 
 El sistema SHALL validar el lugar que resulta de aplicar el pedido a la Mesa (la Zona, la
 posición y el tamaño finales) contra la grilla de la Zona final y contra las demás Mesas
@@ -58,8 +66,9 @@ ubicadas de esa Zona, y SHALL rechazar la edición sin modificar la Mesa cuando:
 - la Mesa comparte al menos una celda con otra Mesa ubicada de la misma Zona: `409` con el
   mensaje "La mesa se superpone con <etiquetas>.", que nombra cada Mesa con la que se superpone.
 
-Dos Mesas que solo se tocan por un lado SHALL NOT considerarse superpuestas. Una Mesa sin ubicar
-SHALL NOT validarse contra la grilla ni contra otras Mesas. La validación SHALL correr solo si el
+Dos Mesas que solo se tocan por un lado SHALL NOT considerarse superpuestas. La posición de una Mesa sin
+ubicar SHALL NOT validarse contra la grilla ni contra otras Mesas; su tamaño sí, como se dijo
+arriba. La validación SHALL correr solo si el
 pedido cambia la posición, el tamaño o la Zona: un pedido que solo cambia la `forma` (o los campos
 que no son del plano) SHALL NOT validarse contra la grilla ni contra otras Mesas. Los problemas que ya existieran entre
 otras Mesas de la Zona SHALL NOT impedir la edición. Si dos ediciones simultáneas dejarían dos
@@ -98,8 +107,13 @@ Zona nueva.
 - **THEN** el sistema responde `400` sin modificar la Mesa
 
 #### Scenario: Valores fuera de rango rechazados
-- **WHEN** el admin envía `posX` -1, `ancho` 0 o `forma` `TRIANGULAR`
+- **WHEN** el admin envía `posX` -1, `ancho` 0, `ancho` `null` o `forma` `TRIANGULAR`
 - **THEN** el sistema responde `400` sin modificar la Mesa
+
+#### Scenario: Tamaño mayor que la grilla en una mesa sin ubicar
+- **WHEN** el admin envía para S2, ya quitada del plano, `ancho` 13
+- **THEN** el sistema responde `400` con el mensaje "La mesa no entra en la grilla de 12 por 8." y
+  S2 conserva su ancho
 
 #### Scenario: Cambiar la forma
 - **WHEN** el admin envía para S3 `forma` `REDONDA`
@@ -133,5 +147,5 @@ Zona nueva.
 - **THEN** el sistema guarda la etiqueta y S3 conserva su posición, su tamaño y su forma
 
 #### Scenario: Ediciones simultáneas sobre la misma celda
-- **WHEN** dos pedidos simultáneos intentan mover S1 y S2 a `posX` 10 y `posY` 7
-- **THEN** como mucho uno de los dos se guarda y el otro recibe `409`
+- **WHEN** dos pedidos simultáneos intentan mover S1 y S2 a `posX` 9 y `posY` 6, una celda libre
+- **THEN** exactamente uno de los dos responde `200` y queda en (9,6), y el otro recibe `409`

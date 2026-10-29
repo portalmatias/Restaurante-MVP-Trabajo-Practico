@@ -25,13 +25,14 @@
 - [ ] 3.1 Escribir los tests en `backend/test/gestion-salon-admin.integration-spec.ts` (rojo), uno por escenario de
       "Ubicación de Mesa en el plano" de `specs/gestion-salon/spec.md`: mover, tocarse, superposición
       `409` con su mensaje, cambio de tamaño `409`, fuera de grilla `400` con su mensaje, coordenada
-      a medias `400`, valores fuera de rango `400`, forma, forma de una mesa con un problema previo
+      a medias `400`, valores fuera de rango `400` (incluido `null` en `ancho`, `alto` o `forma`),
+      tamaño mayor que la grilla en una mesa sin ubicar `400`, forma, forma de una mesa con un problema previo
       (cargado directo en la base), quitar del plano, cambio de zona sin ubicación, con ubicación y
-      con ubicación fuera de la grilla nueva (usando la mesa S6 que define el spec), pedido sin
-      campos del plano, y dos `PATCH` simultáneos con `Promise.all` de los que
-      como mucho uno responde `200`. Cada rechazo verifica además que la mesa no cambió en la base.
+      con ubicación fuera de la grilla nueva (usando la mesa S6 que define el spec, cargada directo en la base), pedido sin
+      campos del plano, y dos `PATCH` simultáneos con `Promise.all` hacia una celda libre, de los
+      que exactamente uno responde `200`. Cada rechazo verifica además que la mesa no cambió en la base.
       Sumar los escenarios de los listados (ubicación en `GET /admin/mesas`, grilla en
-      `GET /admin/zonas`, mesa recién creada sin ubicar). Verificar que fallan.
+      `GET /admin/zonas`, mesa recién creada sin ubicar, S7). Verificar que fallan.
 - [ ] 3.2 Agregar `posX`, `posY`, `ancho`, `alto` y `forma` a `ActualizarMesaDto` con las
       validaciones de design.md D1 (`null` distinto de ausente). Verificar con los casos de
       valores fuera de rango de 3.1.

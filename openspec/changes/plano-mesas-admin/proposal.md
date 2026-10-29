@@ -12,8 +12,10 @@ change siguiente; este es ese change.
   del plano (`posX` y `posY` en `null`). Es un cambio aditivo: un pedido sin esos campos se
   comporta igual que hoy.
 - El backend valida la ubicación contra la grilla de la zona y contra las demás mesas de esa zona:
-  rechaza con `400` una mesa que se sale de la grilla o que manda solo una de las dos coordenadas,
-  y con `409` una que se superpone con otra. La validación corre dentro de la transacción
+  rechaza con `400` los valores fuera de rango (coordenadas negativas, tamaño menor que 1 o mayor
+  que la grilla, una forma que no existe, `null` en el tamaño o la forma), una mesa que se sale de
+  la grilla o un pedido con solo una de las dos coordenadas, y con `409` una mesa que se superpone
+  con otra. Así ningún valor inválido llega a los CHECK de la base. La validación corre dentro de la transacción
   `Serializable` que ya usa la edición de mesas, así dos ediciones simultáneas no pueden dejar
   dos mesas en la misma celda.
 - Si el admin cambia una mesa de zona sin mandar una ubicación nueva, la mesa queda sin ubicar en
@@ -31,7 +33,9 @@ change siguiente; este es ese change.
 - Arrastrar mesas sobre la grilla: la ubicación se carga con el formulario (decisión del equipo,
   2026-10-28).
 - Cambiar el tamaño de la grilla de una zona (`planoColumnas`, `planoFilas`): lo sigue fijando el
-  seed. Si se achicara a mano, el plano ya trata la mesa que queda afuera como sin ubicar.
+  seed. Si se achicara a mano, la mesa que queda afuera conserva su posición: el plano del
+  cliente no la dibuja y la lista la muestra como sin ubicar (así lo implementa `plano-mesas` en
+  #89, aunque su spec no lo fija), y el admin la puede volver a ubicar con este editor.
 - Ubicar la mesa en el mismo alta: la mesa nueva se crea sin ubicar, como hoy, y se ubica al
   editarla.
 - Que el cliente elija la mesa (D9 de `plano-mesas`).
