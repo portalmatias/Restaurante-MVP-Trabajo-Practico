@@ -25,10 +25,10 @@ directa. Las rutas `/admin` y las que cuelgan de `/admin/` SHALL NOT mostrar el 
 el pie públicos: el panel tiene su propio encabezado y su propia navegación. La decisión SHALL
 tomarse por la ruta exacta (`/admin` o prefijo `/admin/`), de modo que una ruta como
 `/administrar` conserve el marco público. El encabezado público SHALL mostrar el nombre «Ichigo» como enlace a `/` y la navegación pública
-(«Reservas» y «Consultar reserva»). El idioma del documento SHALL ser español rioplatense
-(`es-AR`), y el título de cada página pública SHALL seguir la plantilla definida por la
-capability `identidad-visual-ichigo` (los títulos del panel de administración quedan fuera de
-ese requisito).
+(«Reservas» y «Consultar reserva»). El idioma del documento y el título de cada página pública
+SHALL seguir el requisito «Metadatos del documento» de la capability `identidad-visual-ichigo`,
+que es la única fuente de ambos (los títulos del panel de administración quedan fuera de ese
+requisito).
 
 #### Scenario: La landing solo muestra el flujo del cliente
 - **WHEN** una persona visita `/`
@@ -53,10 +53,6 @@ ese requisito).
 #### Scenario: Una ruta parecida a /admin conserva el marco público
 - **WHEN** se evalúa una ruta como `/administrar`
 - **THEN** se la trata como pública y muestra el encabezado y el pie
-
-#### Scenario: El idioma del documento es español
-- **WHEN** se carga cualquier página del sitio
-- **THEN** el elemento `<html>` tiene el atributo `lang="es-AR"`
 
 #### Scenario: El encabezado lleva el nombre del restaurante
 - **WHEN** se carga cualquier página pública

@@ -228,7 +228,7 @@ desde cero.
       giro es instantáneo (180° a 0 ms). Sin `animation-timeline` se emuló quitando el bloque
       `@supports (animation-timeline: view())` y el contenido queda visible. No se probó Firefox.
 
-- [ ] 4.6 Teclado y lector de pantalla: recorrer el Paso 1 solo con teclado (Tab, Enter, Espacio)
+- [x] 4.6 Teclado y lector de pantalla: recorrer el Paso 1 solo con teclado (Tab, Enter, Espacio)
       y con NVDA o VoiceOver; comprobar el nombre de cada tablilla («20:00 a 23:30»), que el
       japonés no se lee, y que el foco llega al título al abrir el detalle y al volver al
       formulario, y al aviso «Tu reserva fue cancelada.» al cancelar una reserva.
@@ -238,7 +238,11 @@ desde cero.
       elementos `lang=ja` son `aria-hidden`. El foco llega al título al abrir el detalle y al volver
       al formulario. Diálogo de cancelación: el foco no sale a la página; Escape y «Volver» lo
       devuelven a «Cancelar mi reserva» y «Sí, cancelar» lo lleva al aviso «Tu reserva fue
-      cancelada.». No se pudo probar con NVDA ni VoiceOver: queda para una persona.
+      cancelada.». No se pudo probar con NVDA ni VoiceOver.
+      Resultado (28/10/2026): el equipo decidió omitir la prueba con lector de pantalla real,
+      porque `config.yaml` y las specs no la exigen (@portalmatias en #92). Lo que leería el lector
+      ya lo cubren los tests: nombres accesibles de las tablillas, japonés con `aria-hidden` y foco
+      en el título y en el aviso de cancelación; el recorrido con teclado está hecho.
 
 - [x] 4.7 Red: con la caché vacía y la pestaña de red abierta en `/`, confirmar que no hay
       pedidos a `fonts.googleapis.com` ni `fonts.gstatic.com`, medir el peso transferido de las
@@ -336,13 +340,16 @@ desde cero.
       más `fetchpriority`, el último día con la respuesta real del servidor, el guard del login,
       la tipografía del nombre y la entrada del nombre. Los desvíos de la sección 2 están en los
       commits de las tareas 2.1 a 2.12 y en la descripción del PR.
-- [ ] 6.2 Resolver las preguntas abiertas de `design.md` con el equipo y reflejar la decisión
+- [x] 6.2 Resolver las preguntas abiertas de `design.md` con el equipo y reflejar la decisión
       en la spec si cambia un requisito (la spec manda, `config.yaml` §14).
       Resultado parcial (27/10/2026): las preguntas 1, 2, 3, 5, 6, 7 y 8 tienen la respuesta de
       @lussofacundo-iresm (comentario del 20/10/2026 en #77, registrada en `design.md`, «Open
       Questions»); las 4 y 9 ya estaban resueltas. Falta la respuesta de @portalmatias, y la 5 espera
       una decisión del equipo. Ninguna respuesta cambia un requisito de la spec, así que no hace falta
-      modificarla. La tarea sigue abierta hasta tener la conformidad de Mati.
+      modificarla.
+      Resultado (28/10/2026): @portalmatias dio su conformidad con las respuestas 2, 3, 5, 6, 7 y 8
+      en #92, y la 5 queda decidida (versionar `.impeccable/` y `PRODUCT.md` dentro de
+      `frontend/`). Anotado en `design.md`, «Open Questions».
 - [x] 6.3 Definir con el equipo el orden de archivado respecto de `frontend-cliente` (pregunta
       1) y, al archivar, fundir los requisitos de `experiencia-reserva-cliente` que
       contradigan a los de `frontend-cliente`. Incluye, en la spec de `frontend-cliente`,
@@ -371,16 +378,13 @@ desde cero.
 
 ## Pendientes al archivar (28/10/2026)
 
-Este change se archiva con tres tareas sin marcar. No se las marca para no afirmar algo que no
-se hizo; siguen abiertas y fuera del repositorio:
+Este change se archiva con una tarea sin marcar. No se la marca para no afirmar algo que no se
+hizo; sigue abierta y fuera del repositorio:
 
 - **4.3** Medición de contraste con una herramienta independiente: la necesita una persona (los
   valores calculados en el repositorio no la reemplazan).
-- **4.6** Recorrido con lector de pantalla: lo necesita una persona con el lector instalado.
-- **6.2** Conformidad de @portalmatias con las respuestas registradas en `design.md`, «Open
-  Questions» (y decisión del equipo sobre la 5). Ninguna respuesta cambió un requisito.
 
-**Decisión (29/10/2026):** Federico decidió archivar el change igual, con 4.3, 4.6 y 6.2 abiertas, 
-aunque `config.yaml` §13 pide completar todas las tareas antes de darlo por terminado. Las tres 
-siguen sin marcar y quedan como seguimiento fuera del repositorio. @portalmatias aprobó el PR #78 
-el 28/10/2026, lo que no equivale a la conformidad con las respuestas de «Open Questions» (6.2).
+**Decisión (29/10/2026):** Federico decidió archivar el change igual, con 4.3, 4.6 y 6.2 abiertas,
+aunque `config.yaml` §13 pide completar todas las tareas antes de darlo por terminado. Después,
+en el mismo PR, se cerraron la 4.6 (omitida por decisión del equipo) y la 6.2 (conformidad de
+@portalmatias). Queda abierta solo la 4.3, como seguimiento fuera del repositorio.
