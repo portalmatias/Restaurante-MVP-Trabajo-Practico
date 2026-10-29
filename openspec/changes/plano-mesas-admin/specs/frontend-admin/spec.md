@@ -16,8 +16,9 @@ el alto elegidos; si un cambio de ancho o de alto deja el valor elegido fuera de
 campo SHALL pasar al último valor que entra. Si cambia la Zona elegida y el ancho o el alto
 superan su grilla, Ancho y Alto SHALL pasar al máximo de la grilla nueva antes de calcular las
 opciones de Columna y Fila. Si después se vuelve a elegir la Zona original de la Mesa, Columna,
-Fila, Ancho y Alto SHALL volver a los valores guardados de la Mesa, para que el pedido no la quite
-del plano sin querer. Para una Mesa sin ubicar, Columna y Fila SHALL
+Fila, Ancho y Alto SHALL volver a los valores con los que se abrió el formulario, para que el
+pedido no la quite del plano sin querer: los guardados, o los de una Mesa fuera de la grilla (más
+abajo) si la Mesa guardada no entra en ella. Para una Mesa sin ubicar, Columna y Fila SHALL
 empezar vacíos y la sección SHALL decir "La mesa no está en el plano."; la Mesa queda ubicada al
 guardar con ambos valores elegidos. Guardar con solo uno de los dos SHALL mostrar un error junto
 a la sección sin enviar el pedido.
@@ -127,6 +128,12 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **WHEN** el administrador edita S4, cambia la Zona a VIP, vuelve a elegir STANDARD y guarda
 - **THEN** Columna y Fila vuelven a 1 y 4, Ancho y Alto a 3 y 2, y el pedido no envía `zonaId`,
   `posX`, `posY`, `ancho` ni `alto`
+
+#### Scenario: Volver a la zona original con una mesa fuera de la grilla
+- **WHEN** S4 quedó guardada fuera de la grilla, y el administrador la edita, cambia la Zona a VIP
+  y vuelve a STANDARD
+- **THEN** Columna y Fila quedan vacíos y la sección dice "La mesa quedó fuera de la grilla de la
+  zona: elegí una ubicación nueva.", igual que al abrir el formulario
 
 #### Scenario: Cambio a una zona más chica ajusta el tamaño
 - **WHEN** el administrador cambia a VIP (10 por 6) una Mesa de STANDARD de 12 de

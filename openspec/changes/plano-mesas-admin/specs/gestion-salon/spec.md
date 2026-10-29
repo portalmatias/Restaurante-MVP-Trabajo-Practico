@@ -91,7 +91,8 @@ otras Mesas de la Zona SHALL NOT impedir la edición. Si dos ediciones simultán
 Mesas superpuestas, el sistema SHALL aceptar como mucho una de ellas.
 
 Si el pedido cambia la Zona de la Mesa y no trae `posX` ni `posY`, la Mesa SHALL quedar sin
-ubicar en la Zona nueva. Si los trae, la posición se valida contra la grilla y las Mesas de la
+ubicar en la Zona nueva. Un `zonaId` igual a la Zona guardada SHALL NOT contar como cambio de
+Zona. Si los trae, la posición se valida contra la grilla y las Mesas de la
 Zona nueva.
 
 #### Scenario: Mover una mesa a un lugar libre
@@ -107,6 +108,11 @@ Zona nueva.
 - **WHEN** el admin intenta mover S1 a `posX` 5 y `posY` 1, dentro de S3
 - **THEN** el sistema responde `409` con el mensaje "La mesa se superpone con S3."
 - **AND** S1 sigue en (0,0)
+
+#### Scenario: Superposición con varias mesas
+- **WHEN** el admin envía para S1 solo `ancho` 6, que la extiende de la columna 0 a la 5 de la
+  fila 0
+- **THEN** el sistema responde `409` con el mensaje "La mesa se superpone con S2 y S3."
 
 #### Scenario: Cambio de tamaño que invade otra mesa rechazado
 - **WHEN** el admin envía para S4 solo `ancho` 6, sin coordenadas
@@ -187,6 +193,10 @@ Zona nueva.
 - **WHEN** el admin pasa S8, de 11 por 1, a VIP sin campos del plano
 - **THEN** el sistema responde `400` con el mensaje "La mesa no entra en la grilla de 10 por 6." y
   S8 sigue en STANDARD
+
+#### Scenario: Reenviar la misma zona no es un cambio de zona
+- **WHEN** el admin envía para S3 `zonaId` de STANDARD, su Zona actual, sin `posX` ni `posY`
+- **THEN** el sistema responde `200` y S3 sigue en (5,0)
 
 #### Scenario: Cambio de zona con ubicación nueva
 - **WHEN** el admin pasa S6 a VIP con `posX` 7 y `posY` 0
