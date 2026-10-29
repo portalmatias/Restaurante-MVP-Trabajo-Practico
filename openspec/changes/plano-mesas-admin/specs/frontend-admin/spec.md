@@ -74,6 +74,15 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **THEN** la vista previa pasa a mostrar la grilla y las Mesas de la Zona nueva, y Columna y Fila
   quedan vacíos
 
+#### Scenario: Cambio de zona con la misma columna y fila
+- **WHEN** el administrador cambia la Zona de una Mesa ubicada en la columna 11, fila 8, vuelve a
+  elegir la columna 11 y la fila 8 y guarda
+- **THEN** el sistema envía la Zona nueva junto con `posX` 10 y `posY` 7
+
+#### Scenario: Pedido con las coordenadas juntas
+- **WHEN** el administrador edita S4 y cambia solo la columna
+- **THEN** el sistema envía `posX` y `posY` juntos, y no envía `ancho`, `alto` ni `forma`
+
 #### Scenario: Alternativa textual de la vista previa
 - **WHEN** un lector de pantalla recorre la sección
 - **THEN** el dibujo de la vista previa no se anuncia y el texto de la ubicación sí

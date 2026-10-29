@@ -25,8 +25,10 @@
 - [ ] 3.1 Escribir los tests en `backend/test/gestion-salon-admin.integration-spec.ts` (rojo), uno por escenario de
       "Ubicación de Mesa en el plano" de `specs/gestion-salon/spec.md`: mover, tocarse, superposición
       `409` con su mensaje, cambio de tamaño `409`, fuera de grilla `400` con su mensaje, coordenada
-      a medias `400`, valores fuera de rango `400`, forma, quitar del plano, cambio de zona sin y con
-      ubicación, pedido sin campos del plano, y dos `PATCH` simultáneos con `Promise.all` de los que
+      a medias `400`, valores fuera de rango `400`, forma, forma de una mesa con un problema previo
+      (cargado directo en la base), quitar del plano, cambio de zona sin ubicación, con ubicación y
+      con ubicación fuera de la grilla nueva (usando la mesa S6 que define el spec), pedido sin
+      campos del plano, y dos `PATCH` simultáneos con `Promise.all` de los que
       como mucho uno responde `200`. Cada rechazo verifica además que la mesa no cambió en la base.
       Sumar los escenarios de los listados (ubicación en `GET /admin/mesas`, grilla en
       `GET /admin/zonas`, mesa recién creada sin ubicar). Verificar que fallan.
@@ -54,8 +56,9 @@
       8") y la lista de superposiciones, con los casos del seed. Verificar que pasan.
 - [ ] 4.3 Sumar al bloque `MesasPanel` de `frontend/test/components/admin/salon.test.tsx` un test por escenario
       de "Ubicación de la Mesa en el plano" de `specs/frontend-admin/spec.md` (rojo), incluido que
-      el pedido lleva solo los campos del plano que cambiaron y que el alta no muestra la
-      sección. Verificar que fallan.
+      que el pedido lleva `ancho`, `alto` y `forma` solo si cambiaron, las coordenadas siempre
+      juntas y, tras un cambio de zona, las dos aunque coincidan con las de la zona vieja, y que el
+      alta no muestra la sección. Verificar que fallan.
 - [ ] 4.4 Implementar la sección "Ubicación en el plano", la vista previa y su texto, la regla
       `ubicacion` de `errores-campo.ts` y la columna "Plano" del listado. Verificar que pasa 4.3 y
       que los tests actuales del panel siguen en verde.

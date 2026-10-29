@@ -58,8 +58,10 @@ activas):
 
 1. Se calcula el lugar final: zona final, `posX`/`posY` finales (si cambia la zona y el pedido no
    las trae, `null`), y `ancho`/`alto` finales.
-2. Si el pedido no toca ningún campo del plano ni la zona, no se valida nada más (spec: "Pedido sin
-   campos del plano no cambia la ubicación").
+2. Si el pedido no cambia la posición, el tamaño ni la zona, no se valida nada más: ni un pedido sin
+   campos del plano ni uno que solo cambia la `forma`, que no altera qué celdas ocupa la mesa (spec:
+   "Pedido sin campos del plano no cambia la ubicación" y "Cambiar la forma de una mesa con un
+   problema previo").
 3. Si la mesa queda ubicada, se leen dentro de la transacción la grilla de la zona final y las
    demás mesas ubicadas de esa zona, y se llama a una función pura nueva de `layout-plano.ts`:
 
@@ -112,8 +114,12 @@ tipos desde `openapi.yaml` en el mismo PR.
   armar el pedido y al leer la mesa). Ofrecen de 1 a `columnas - ancho + 1` y de 1 a
   `filas - alto + 1`, y se corrigen al último valor válido cuando crece el ancho o el alto. Ancho y
   Alto son `<select>` de 1 a `columnas` y de 1 a `filas`. Forma es un grupo de radios.
-- **Qué se envía.** Solo los campos del plano que cambiaron respecto de la mesa original. Así,
-  editar la etiqueta de una mesa con un problema previo no dispara la validación (D2).
+- **Qué se envía.** `ancho`, `alto` y `forma` solo si cambiaron respecto de la mesa original. Así,
+  editar la etiqueta de una mesa con un problema previo no dispara la validación (D2). Las
+  coordenadas van siempre juntas: si cambió la zona o cualquiera de las dos, se envían `posX` y
+  `posY` (los dos con valor, o los dos en `null` si quedaron vacías). Comparar contra la mesa
+  original no alcanza después de un cambio de zona: si el admin vuelve a elegir la misma columna y
+  fila que tenía en la zona vieja, no se enviaría nada y el backend dejaría la mesa sin ubicar.
 - **Vista previa.** Se extrae la geometría de `plano-mesas.tsx` (`CELDA`, `MARGEN` y `Silueta`) a
   `frontend/src/components/reservas/plano-geometria.tsx`, que usan el plano del cliente y la vista
   previa. Las demás mesas se dibujan con el relleno neutro (`muted`) y la que se edita con la

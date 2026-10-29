@@ -1,7 +1,9 @@
 Los escenarios usan el layout del seed de `plano-mesas`: zona STANDARD con grilla de 12 columnas
 por 8 filas, S1 en (0,0) redonda 1 por 1, S2 en (2,0) redonda 1 por 1, S3 en (5,0) cuadrada 2 por
 2, S4 en (0,3) rectangular 3 por 2 y S5 en (5,3) rectangular 4 por 2; zona VIP con grilla de 10
-por 6. Las coordenadas son de la API: base 0, en celdas, `(posX, posY)`.
+por 6, V1 en (0,0) 1 por 1, V2 en (3,0) 2 por 2, V3 en (0,3) 3 por 2 y V4 en (4,3) 6 por 2. S6 es
+una mesa que el admin creó en STANDARD, de 1 por 1 y sin reservas, ubicada en (10,7). Las
+coordenadas son de la API: base 0, en celdas, `(posX, posY)`.
 
 ## MODIFIED Requirements
 
@@ -57,7 +59,9 @@ ubicadas de esa Zona, y SHALL rechazar la edición sin modificar la Mesa cuando:
   mensaje "La mesa se superpone con <etiquetas>.", que nombra cada Mesa con la que se superpone.
 
 Dos Mesas que solo se tocan por un lado SHALL NOT considerarse superpuestas. Una Mesa sin ubicar
-SHALL NOT validarse contra la grilla ni contra otras Mesas. Los problemas que ya existieran entre
+SHALL NOT validarse contra la grilla ni contra otras Mesas. La validación SHALL correr solo si el
+pedido cambia la posición, el tamaño o la Zona: un pedido que solo cambia la `forma` (o los campos
+que no son del plano) SHALL NOT validarse contra la grilla ni contra otras Mesas. Los problemas que ya existieran entre
 otras Mesas de la Zona SHALL NOT impedir la edición. Si dos ediciones simultáneas dejarían dos
 Mesas superpuestas, el sistema SHALL aceptar como mucho una de ellas.
 
@@ -101,19 +105,28 @@ Zona nueva.
 - **WHEN** el admin envía para S3 `forma` `REDONDA`
 - **THEN** el sistema guarda la forma y S3 conserva su posición y su tamaño
 
+#### Scenario: Cambiar la forma de una mesa con un problema previo
+- **WHEN** S2 quedó cargada a mano en (5,0), superpuesta con S3, y el admin envía para S2 solo
+  `forma` `CUADRADA`
+- **THEN** el sistema guarda la forma sin validar la superposición
+
 #### Scenario: Quitar una mesa del plano
 - **WHEN** el admin envía para S2 `posX` `null` y `posY` `null`
 - **THEN** S2 queda sin ubicar y el plano de STANDARD la muestra en la lista como sin ubicar
 
 #### Scenario: Cambio de zona sin ubicación nueva deja la mesa sin ubicar
-- **WHEN** una Mesa ubicada de STANDARD sin reservas activas pasa a VIP y el pedido no trae
-  `posX` ni `posY`
-- **THEN** la Mesa queda en VIP con `posX` y `posY` en `null`
+- **WHEN** el admin pasa S6 a VIP y el pedido no trae `posX` ni `posY`
+- **THEN** S6 queda en VIP con `posX` y `posY` en `null`
 
 #### Scenario: Cambio de zona con ubicación nueva
-- **WHEN** una Mesa de STANDARD sin reservas activas pasa a VIP con `posX` 7 y `posY` 0
-- **THEN** el sistema valida la posición contra la grilla de 10 por 6 y las mesas de VIP, y la
-  guarda
+- **WHEN** el admin pasa S6 a VIP con `posX` 7 y `posY` 0
+- **THEN** el sistema valida la posición contra la grilla de 10 por 6 y las mesas de VIP, y guarda
+  S6 en VIP en (7,0)
+
+#### Scenario: Cambio de zona con ubicación fuera de la grilla nueva
+- **WHEN** el admin pasa S6 a VIP con `posX` 10 y `posY` 0
+- **THEN** el sistema responde `400` con el mensaje "La mesa queda fuera de la grilla de 10 por
+  6." y S6 sigue en STANDARD en (10,7)
 
 #### Scenario: Pedido sin campos del plano no cambia la ubicación
 - **WHEN** el admin envía para S3 solo una etiqueta nueva
