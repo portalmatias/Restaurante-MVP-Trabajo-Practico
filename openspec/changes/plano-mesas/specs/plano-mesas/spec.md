@@ -308,9 +308,15 @@ siguiente.
 - **THEN** la pantalla muestra el veredicto de disponibilidad y la sección del plano degradada
 - **AND** no redirige al paso 1 y la acción para continuar sigue disponible
 
-#### Scenario: Selección inválida
-- **WHEN** el plano y la consulta de disponibilidad responden ambos `404`, o ambos `400`
-- **THEN** el sistema trata la selección como inválida y vuelve al paso 1
+#### Scenario: Turno o zona inexistentes
+- **WHEN** el plano y la consulta de disponibilidad responden ambos `404`
+- **THEN** el sistema vuelve al paso 1 con la selección prellenada
+
+#### Scenario: Selección rechazada por el servidor
+- **WHEN** el plano y la consulta de disponibilidad responden ambos `400`
+- **THEN** el sistema muestra que la selección no es válida, con un enlace para cambiarla en el
+  paso 1, y no redirige
+- **AND** no muestra el plano
 
 #### Scenario: Demasiadas consultas
 - **WHEN** el plano responde `429`

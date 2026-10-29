@@ -155,48 +155,80 @@
 
 ## 5. Frontend (estética Kakefuda: tokens de `frontend/app/globals.css`)
 
-- [ ] 5.1 Escribir `frontend/test/lib/plano-mesas.test.ts` (rojo) para los helpers puros de
+- [x] 5.1 Escribir `frontend/test/lib/plano-mesas.test.ts` (rojo) para los helpers puros de
       `frontend/src/lib/plano-mesas.ts`: texto por estado, resumen ("3 libres, 1 ocupada, 1
       que no alcanza"), orden de la lista y separación de mesas sin ubicar. Implementarlos hasta
       que pasen.
-- [ ] 5.2 Escribir `frontend/test/components/reservas/plano-mesas.test.tsx` (rojo): lista con
+- [x] 5.2 Escribir `frontend/test/components/reservas/plano-mesas.test.tsx` (rojo): lista con
       etiqueta, capacidad y estado en palabras; leyenda con los tres estados; cada estado con
       patrón, marca y texto (no solo color); mesa sin ubicar solo en la lista; SVG con
       `aria-hidden`; resumen con `role="status"`; sin controles de selección de mesa.
-- [ ] 5.3 Implementar `frontend/src/components/reservas/plano-mesas.tsx`: SVG con `viewBox` en
+- [x] 5.3 Implementar `frontend/src/components/reservas/plano-mesas.tsx`: SVG con `viewBox` en
       celdas, formas redonda/cuadrada/rectangular como tablillas de madera con los tokens
       existentes (sin hex propios), patrones de relleno y marcas por estado, leyenda y lista.
-- [ ] 5.4 Agregar los tests (rojo→verde) del atenuado y el aviso cuando `disponible` es `false`
+      Avance (26/10/2026): el componente ya tiene el SVG con `viewBox` en celdas, las tres formas,
+      los patrones y las marcas por estado, la leyenda y la lista, con los tokens actuales. Falta
+      el estilo de tablillas de madera, que depende de los tokens del rediseño (#78).
+      Al hacerlo, resolver un aviso de la revisión de gentle-ai: en las mesas de una celda la marca
+      del estado se superpone con etiquetas largas (por ejemplo "S10") y en las redondas queda
+      fuera del círculo.
+      Hecho (28/10/2026), con los tokens de #78 y sin hex propios (un test lo fija): cada mesa es
+      una tablilla con su canto (`border`) debajo de la cara; `LIBRE` es hinoki claro (`card`),
+      `OCUPADA` la tablilla dada vuelta (`madera`, texto `madera-foreground`, 13,14:1) con vetas
+      `border` (3,13:1) y `NO_ALCANZA` hinoki a la sombra (`muted`) con puntos `muted-foreground`
+      (5,52:1). La marca va centrada arriba de la etiqueta (en las de una fila y varias columnas,
+      a la izquierda), y cada texto lleva un halo del color base de su tablilla para separarlo del
+      patrón (lo pidió la revisión visual de 6.1). Tests nuevos: tokens, canto, texto claro sobre
+      madera, marca sin pisar la etiqueta, textos dentro del círculo y halo.
+- [x] 5.4 Agregar los tests (rojo→verde) del atenuado y el aviso cuando `disponible` es `false`
       (motivos primero, texto "hoy no se puede reservar este turno") y de la aclaración
       "La mesa se asigna automáticamente al confirmar la reserva" / "foto del momento".
-- [ ] 5.5 Escribir tests y componente del esqueleto `plano-mesas-cargando.tsx`: `aria-busy`,
+- [x] 5.5 Escribir tests y componente del esqueleto `plano-mesas-cargando.tsx`: `aria-busy`,
       texto accesible, y la regla CSS `@media (prefers-reduced-motion: reduce)` que apaga su
       animación en el componente o en `globals.css` usando solo tokens existentes. El test
       comprueba que la regla existe en la hoja de estilos; **no** se simula `matchMedia` porque
       `jsdom` no evalúa media queries (la prueba real es la manual de 6.1).
-- [ ] 5.6 Tests y manejo de errores: fallo `5xx`/red ⇒ mensaje + "Reintentar" reutilizando
+      Hecho (28/10/2026): `plano-mesas-cargando.tsx` (con `aria-busy`, el texto "Cargando el
+      plano de mesas" y la proporción 3:2 de la grilla), la clase `.plano-mesas-cargando` con
+      `brillo-plano` en `globals.css`, apagada en el bloque de `prefers-reduced-motion`. Como el
+      plano se pide en el Server Component, el esqueleto se muestra en el `loading.tsx` del
+      resultado, debajo del de los pasos (test propio).
+- [x] 5.6 Tests y manejo de errores: fallo `5xx`/red ⇒ mensaje + "Reintentar" reutilizando
       `error-con-reintento.tsx` y la reserva sigue disponible; `429` ⇒ mensaje específico sin
       reintento automático.
-- [ ] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: el plano es la fuente
+- [x] 5.7 Integrar en `frontend/app/reservas/nueva/resultado/page.tsx`: el plano es la fuente
       del veredicto (`disponible`, `motivos`) y se pide con `cache: "no-store"` junto al
       catálogo; `/disponibilidad` se pide solo si el plano falla (red, `5xx`, `429`, `404` o `400`), y
-      entonces la sección del plano muestra su error (D7). Solo un `404/400` de
-      `/disponibilidad` redirige al paso 1. El error del plano no tumba la página. La página hoy
+      entonces la sección del plano muestra su error (D7). Solo un `404` de
+      `/disponibilidad` redirige al paso 1; un `400` muestra la pantalla de selección inválida. El error del plano no tumba la página. La página hoy
       retorna antes cuando `disponible` es `false` (lista los motivos); esa rama también debe
       renderizar el plano atenuado con su aviso, después de los motivos, y se cubre con un test
       propio. Tests: plano `404` o `400` ⇒ sin redirección y veredicto de `/disponibilidad`;
-      plano y `/disponibilidad` con `404` o con `400` ⇒ redirección. Verificar que los tests existentes de la página siguen en verde.
-- [ ] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
+      plano y `/disponibilidad` con `404` ⇒ redirección; los dos con `400` ⇒ selección inválida sin
+      redirección. Verificar que los tests existentes de la página siguen en verde.
+- [x] 5.8 Orden en celular: lista antes que dibujo en pantallas angostas, sin scroll horizontal de
       la página a 360 px (test del componente con las clases de orden y revisión visual).
+      Hecho (28/10/2026): la lista lleva `order-1 sm:order-2` y el dibujo `order-2 sm:order-1`
+      (el contenedor de la página mide hasta 672 px, así que en escritorio va el dibujo primero,
+      no lado a lado). En Chromium a 360 px, STANDARD y VIP: `scrollWidth` 360 y la lista arriba
+      del dibujo.
 
 ## 6. Verificación final
 
-- [ ] 6.1 Revisión visual real: levantar backend y frontend con el seed, abrir
+- [x] 6.1 Revisión visual real: levantar backend y frontend con el seed, abrir
       `/reservas/nueva/resultado` en escritorio y en 360 px, capturar pantallas de STANDARD y
       VIP con mesas libres, ocupadas y que no alcanzan, y confirmar que se distinguen en
       escala de grises y con el lector de pantalla leyendo la lista. Con "reducir movimiento"
-      activado en el sistema operativo, comprobar que el esqueleto no se anima. Adjuntar
-      capturas al PR.
+      activado en el sistema operativo, comprobar que el esqueleto no se anima. El resultado
+      queda escrito en esta tarea y en la descripción del PR, sin adjuntar capturas.
+      Avance (28/10/2026), con Chromium y el seed: STANDARD (sábado 20:00, 4 comensales) y VIP
+      (viernes 20:00, 6 comensales) a 1280 y 360 px muestran mesas libres, ocupadas y que no
+      alcanzan, y se distinguen en escala de grises. A 360 px no hay scroll horizontal y la lista
+      queda antes que el dibujo. Con movimiento reducido el esqueleto tiene `animation-name: none`
+      (sin la opción, `brillo-plano`). La escucha con un lector de pantalla real se omite por
+      decisión del equipo (28/10/2026): `config.yaml` y las specs no la exigen, y lo que leería
+      el lector lo cubren los tests (`role="status"` del resumen, lista «Mesas de la zona»,
+      leyenda sin las marcas y dibujo con `aria-hidden`).
 - [x] 6.2 Prueba manual de seguridad: con curl y sin token, consultar el plano de un turno con
       una reserva real del seed y confirmar a ojo que no aparece ningún dato personal ni id;
       comprobar el `429` excediendo el límite.
@@ -204,9 +236,13 @@
       los turnos con las reservas del seed en S3 (CONFIRMADA) y V1 (PENDIENTE) responde `200` con
       `Cache-Control: no-store`, sin nombres, emails, códigos ni ids, y las dos mesas solo como
       `OCUPADA`. Tras 120 consultas, la 121 responde `429`; `/disponibilidad` sigue en `200`.
-- [ ] 6.3 Correr `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`,
+- [x] 6.3 Correr `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`,
       `npm run test:e2e`, `npm run test:frontend`, `npm run test:scripts`, `npm run
       openapi:check` y `openspec validate --all --strict`; todo en verde, sin warnings nuevos.
+      Resultado (28/10/2026), sobre `552d192` con `main` integrado: lint y tipos limpios; backend
+      240 unitarios, 151 de integración y 168 e2e; frontend 855 con `TZ=UTC` y 855 con
+      `TZ=America/Argentina/Buenos_Aires`; `test:scripts` y `openapi:check` en verde; OpenSpec
+      17 de 17.
 - [x] 6.4 Actualizar el README (o la documentación de seed) con el layout del plano y la
       nota de que el admin todavía no lo edita (D6).
       README: sección «Plano de mesas del seed», con la nota de D6 y la de producción.
