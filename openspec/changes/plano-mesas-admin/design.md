@@ -8,7 +8,8 @@ Ver proposal.md (Why). Estado actual que condiciona el diseño:
   la grilla y que no se superponga cruza filas y tablas: lo valida quien escribe, hoy solo el
   seed con `validarLayout` (`backend/src/plano-mesas/layout-plano.ts`).
 - `MesasService.actualizar` ya corre la edición en una transacción `Serializable` con hasta 3
-  reintentos ante conflicto de serialización (`P2034`), y responde `409` si se agotan.
+  intentos en total (2 reintentos) ante conflicto de serialización (`P2034`), y responde `409` si
+  se agotan (`SERIALIZACION_MAX_INTENTOS`).
 - El `ValidationPipe` global usa `whitelist` y `forbidNonWhitelisted`: hoy un `PATCH` con `posX`
   responde `400`. El cambio de contrato es solo aditivo.
 - En el frontend, `mesas-panel.tsx` tiene el formulario de alta y edición, y reparte los errores
@@ -107,8 +108,13 @@ reintentos). No hace falta `SELECT ... FOR UPDATE` ni un lock de zona.
 ### D4. Respuestas: campos nuevos y requeridos
 
 `MesaRespuestaDto` suma `posX`, `posY` (enteros o `null`), `ancho`, `alto` y `forma`;
-`ZonaRespuestaDto` suma `planoColumnas` y `planoFilas`. Van como requeridos en la respuesta porque
-siempre están: un cliente viejo los ignora. El único consumidor es el frontend, que regenera sus
+`ZonaRespuestaDto` suma `planoColumnas` y `planoFilas`. Hoy esos campos quedan afuera a propósito:
+`SELECT_MESA_ADMIN` (`mesas.service.ts`) y `SELECT_ZONA_ADMIN` (`zonas.service.ts`) eligen columnas
+explícitas, y `plano-mesas-salidas-admin.integration-spec.ts` exige que las respuestas de admin
+traigan solo las claves actuales. Este change suma los campos a los dos `select` (y a la copia de
+`SELECT_ZONA_ADMIN` en `zonas.service.spec.ts`) y cambia ese test para que exija las claves nuevas:
+`GET`, `POST` y `PATCH` de mesas y `GET` y `PATCH` de zonas pasan a devolverlas. Van como
+requeridos en la respuesta porque siempre están: un cliente viejo los ignora. El único consumidor es el frontend, que regenera sus
 tipos desde `openapi.yaml` en el mismo PR.
 
 ### D5. Frontend: formulario con vista previa

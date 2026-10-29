@@ -13,7 +13,9 @@ plano" con los campos Columna, Fila, Ancho, Alto y Forma (Redonda, Cuadrada o Re
 un botón "Quitar del plano" cuando la Mesa está ubicada. Columna y Fila SHALL numerarse desde 1 y
 SHALL ofrecer solo los valores con los que la Mesa entra en la grilla de su Zona con el ancho y
 el alto elegidos; si un cambio de ancho o de alto deja el valor elegido fuera de la grilla, el
-campo SHALL pasar al último valor que entra. Para una Mesa sin ubicar, Columna y Fila SHALL
+campo SHALL pasar al último valor que entra. Si cambia la Zona elegida y el ancho o el alto
+superan su grilla, Ancho y Alto SHALL pasar al máximo de la grilla nueva antes de calcular las
+opciones de Columna y Fila. Para una Mesa sin ubicar, Columna y Fila SHALL
 empezar vacíos y la sección SHALL decir "La mesa no está en el plano."; la Mesa queda ubicada al
 guardar con ambos valores elegidos. Guardar con solo uno de los dos SHALL mostrar un error junto
 a la sección sin enviar el pedido.
@@ -84,6 +86,11 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **WHEN** el administrador cambia la Zona de una Mesa en el formulario
 - **THEN** la vista previa pasa a mostrar la grilla y las Mesas de la Zona nueva, y Columna y Fila
   quedan vacíos
+
+#### Scenario: Cambio a una zona más chica ajusta el tamaño
+- **WHEN** el administrador cambia a VIP (10 por 6) una Mesa de STANDARD de 12 de
+  ancho y 8 de alto
+- **THEN** Ancho pasa a 10 y Alto a 6, y Columna y Fila ofrecen solo el valor 1
 
 #### Scenario: Cambio de zona sin elegir ubicación
 - **WHEN** el administrador cambia V5 a STANDARD, deja Columna y Fila vacíos y guarda

@@ -40,8 +40,12 @@
       design.md D2, dentro de la transacción `Serializable` existente. Verificar que pasan los
       escenarios de edición de 3.1, incluido el de pedidos simultáneos, y que los tests actuales
       de `mesas.service.spec.ts`, `mesas.integration-spec.ts` y `gestion-salon-admin.integration-spec.ts` siguen en verde.
-- [ ] 3.4 Sumar los campos del plano a `MesaRespuestaDto` y `planoColumnas`/`planoFilas` a
-      `ZonaRespuestaDto` (design.md D4). Verificar que pasan los escenarios de listado de 3.1.
+- [ ] 3.4 Sumar los campos del plano a `MesaRespuestaDto`, `planoColumnas`/`planoFilas` a
+      `ZonaRespuestaDto`, y las mismas columnas a `SELECT_MESA_ADMIN` (`mesas.service.ts`) y
+      `SELECT_ZONA_ADMIN` (`zonas.service.ts` y su copia en `zonas.service.spec.ts`), que hoy las
+      excluyen (design.md D4). Cambiar `plano-mesas-salidas-admin.integration-spec.ts` para que
+      exija las claves nuevas en `GET`, `POST` y `PATCH` de mesas y `GET` y `PATCH` de zonas.
+      Verificar que pasan ese test y los escenarios de listado de 3.1.
 - [ ] 3.5 Incorporar el fragmento OpenAPI de design.md a `openapi/openapi.yaml` y regenerar los
       tipos del frontend. Verificar con `npm run openapi:check` y `npm run typecheck -w frontend`.
 

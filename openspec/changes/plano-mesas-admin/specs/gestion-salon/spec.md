@@ -66,6 +66,11 @@ ubicadas de esa Zona, y SHALL rechazar la edición sin modificar la Mesa cuando:
 - la Mesa comparte al menos una celda con otra Mesa ubicada de la misma Zona: `409` con el
   mensaje "La mesa se superpone con <etiquetas>.", que nombra cada Mesa con la que se superpone.
 
+Si un pedido cumple más de una de esas condiciones, el sistema SHALL responder la primera en este
+orden: coordenada a medias, tamaño mayor que la grilla, Mesa fuera de la grilla y superposición.
+Cualquier combinación de `forma`, `ancho` y `alto` SHALL ser válida: una Mesa `REDONDA` o
+`CUADRADA` con lados distintos se acepta y el plano la dibuja estirada.
+
 Dos Mesas que solo se tocan por un lado SHALL NOT considerarse superpuestas. La posición de una Mesa sin
 ubicar SHALL NOT validarse contra la grilla ni contra otras Mesas; su tamaño sí, como se dijo
 arriba. La validación SHALL correr solo si el
@@ -95,6 +100,11 @@ Zona nueva.
 #### Scenario: Cambio de tamaño que invade otra mesa rechazado
 - **WHEN** el admin envía para S4 solo `ancho` 6, sin coordenadas
 - **THEN** el sistema responde `409` con el mensaje "La mesa se superpone con S5."
+
+#### Scenario: Fuera de la grilla gana sobre la superposición
+- **WHEN** el admin intenta mover S4 (3 por 2) a `posX` 10 y `posY` 6: se sale por la derecha y
+  además pisa a S6 en (10,7)
+- **THEN** el sistema responde `400` "La mesa queda fuera de la grilla de 12 por 8." y no `409`
 
 #### Scenario: Mesa fuera de la grilla rechazada
 - **WHEN** el admin intenta mover S5 a `posX` 10 y `posY` 3
