@@ -233,8 +233,10 @@ paths:
       responses:
         '400':
           description: >-
-            Datos inválidos: valores fuera de rango, una sola de las dos coordenadas, o una
-            ubicación que deja la mesa fuera de la grilla de su zona.
+            Datos inválidos: valores fuera de rango; una sola de las dos coordenadas, o una en
+            null junto a otra con valor; un ancho o alto mayor que la grilla de la zona final,
+            aunque la mesa quede sin ubicar o solo cambie de zona; o una ubicación que deja la
+            mesa fuera de la grilla de su zona.
         '409':
           description: >-
             Las causas actuales, o la mesa se superpone con otra mesa ubicada de su zona.
