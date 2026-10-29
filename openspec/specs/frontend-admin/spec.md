@@ -163,7 +163,8 @@ Esta lectura es presentacional: no decide ninguna regla de negocio.
 
 #### Scenario: El nivel no depende del color
 - **WHEN** se captura el dashboard en escala de grises
-- **THEN** cada zona sigue mostrando el nombre de su nivel y su porcentaje en texto
+- **THEN** cada zona sigue mostrando el nombre de su nivel y, salvo en «Sin aforo» (que no
+  informa porcentaje), su porcentaje en texto
 
 ### Requirement: Listado y edición de Zonas
 El sistema SHALL listar las Zonas existentes con su configuración completa en
@@ -285,6 +286,8 @@ dentro de la página ya cargada, que no modifica los filtros ni la consulta a la
   página»
 - **THEN** la tabla muestra solo las filas de la página actual que lo contienen, sin cambiar la
   URL ni repetir el pedido a la API
+- **AND** la fila con el aviso de una acción fallida sigue visible aunque no coincida, porque la
+  persona acaba de actuar sobre ella
 
 #### Scenario: Búsqueda sin coincidencias
 - **WHEN** el texto buscado no coincide con ninguna fila de la página
@@ -342,9 +345,12 @@ SHALL actualizar el estado de esa Reserva en el listado sin recargar toda la pá
 
 ### Requirement: Aviso de sesión por vencer
 El sistema SHALL avisar al administrador, en toda pantalla de `/admin/...` con sesión activa,
-cuando falten cinco minutos o menos para que venza la sesión. El aviso SHALL ser un mensaje con
-`role="alert"` que indique los minutos restantes (con «minuto» o «minutos» según corresponda),
-advierta que los cambios sin guardar se pierden al vencer y ofrezca el botón «Renovar sesión».
+cuando falten cinco minutos o menos para que venza la sesión. El aviso SHALL ser un grupo
+visible (`role="group"`, con nombre accesible «Vencimiento de la sesión») que indique los minutos
+restantes (con «minuto» o «minutos» según corresponda), advierta que los cambios sin guardar se
+pierden al vencer y ofrezca el botón «Renovar sesión». Una región `role="status"` visible solo
+para lectores de pantalla SHALL anunciar los minutos restantes; el aviso SHALL NOT usar
+`role="alert"`, que interrumpiría lo que la persona está editando.
 Como no hay renovación automática, «Renovar sesión» SHALL descartar la sesión y llevar a
 `/admin/login?motivo=renovar`. Es una acción del administrador: manda sobre la regla de sesión
 que desaparece y SHALL NOT dispararla, de modo que nunca lleva a `?motivo=sesion-vencida`. El
@@ -352,8 +358,10 @@ sistema SHALL controlar el vencimiento por tiempo, aunque la pestaña no haga pe
 
 #### Scenario: Aviso con cinco minutos o menos
 - **WHEN** la sesión vence en 4 minutos
-- **THEN** se muestra un mensaje con rol de alerta que dice «Tu sesión vence en 4 minutos»
-- **AND** el mensaje incluye el botón «Renovar sesión»
+- **THEN** se muestra el grupo «Vencimiento de la sesión» con el texto «Tu sesión vence en 4
+  minutos»
+- **AND** una región `status` anuncia «Tu sesión vence en 4 minutos»
+- **AND** el grupo incluye el botón «Renovar sesión»
 
 #### Scenario: Sin aviso con más de cinco minutos
 - **WHEN** la sesión vence en más de 5 minutos

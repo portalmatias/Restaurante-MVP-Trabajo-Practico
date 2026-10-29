@@ -63,7 +63,8 @@ desde cero.
       el rojo sobre madera (medido 2,0:1 con `#9A2A19`, el único rojo de la paleta: `#B2321F` no
       es un token de esta spec ni de `globals.css`).
 - [x] 2.5 `landing-ichigo`: las acciones de la landing se mantienen en infinitivo («Reservar una
-      mesa», «Ya tengo un código», «Elegir fecha y turno») por decisión expresa del equipo. No
+      mesa», «Consultar una reserva», «Elegir fecha y turno») por decisión expresa del equipo
+      (la etiqueta «Ya tengo un código» se cambió el 29/10/2026, ver PR de la etiqueta). No
       requiere cambios en `app/page.tsx`: agregar un test que fije esos textos y que compruebe
       que los títulos y textos explicativos usan voseo y ninguno usa tuteo.
 - [x] 2.6 `landing-ichigo`, «Los pasos de reserva coinciden con el flujo real»: el primer paso de
@@ -378,3 +379,8 @@ se hizo; siguen abiertas y fuera del repositorio:
 - **4.6** Recorrido con lector de pantalla: lo necesita una persona con el lector instalado.
 - **6.2** Conformidad de @portalmatias con las respuestas registradas en `design.md`, «Open
   Questions» (y decisión del equipo sobre la 5). Ninguna respuesta cambió un requisito.
+
+**Decisión (29/10/2026):** Federico decidió archivar el change igual, con 4.3, 4.6 y 6.2 abiertas, 
+aunque `config.yaml` §13 pide completar todas las tareas antes de darlo por terminado. Las tres 
+siguen sin marcar y quedan como seguimiento fuera del repositorio. @portalmatias aprobó el PR #78 
+el 28/10/2026, lo que no equivale a la conformidad con las respuestas de «Open Questions» (6.2).

@@ -33,15 +33,17 @@ claro.
   `color-scheme: light` y no define valores alternativos
 
 ### Requirement: Contrastes mínimos WCAG 2.1 AA de la paleta
-Toda combinación de texto y fondo que los componentes usan SHALL alcanzar al menos 4,5:1; las
+Toda combinación de texto y fondo que los componentes usan SHALL alcanzar al menos 4,5:1 (WCAG
+2.1 AA, criterio 1.4.3); las
 combinaciones permitidas son las que enumera el primer escenario y ninguna otra (por ejemplo,
 `foreground` no se usa como texto sobre `madera`: daría 1,12:1). Los
 bordes de los controles (campos, botones con contorno, tablillas) SHALL alcanzar al menos 3:1
-contra el fondo sobre el que se dibujan. El rojo del sello (`accent`) SHALL usarse como texto
+contra el fondo sobre el que se dibujan (WCAG 2.1 AA, criterio 1.4.11). El rojo del sello (`accent`) SHALL usarse como texto
 solo sobre `background`, `card` o `muted`, y SHALL NOT usarse como texto sobre `madera`;
 sobre `madera` SHALL aparecer solo como relleno, con texto `accent-foreground`.
 
-El indicador de foco SHALL alcanzar al menos 3:1 contra los colores contiguos (WCAG 1.4.11). El
+El indicador de foco SHALL alcanzar al menos 3:1 contra los colores contiguos (WCAG 2.1 AA, criterio
+1.4.11). El
 anillo `ring` mide 5,7:1 sobre `background`, 6,5:1 sobre `card` y 4,8:1 sobre `muted`, pero solo
 2,0:1 sobre `madera`, así que SHALL NOT dibujarse pegado a un fondo `madera`. Un control con fondo
 `madera` (la tablilla descartada o completa) SHALL separar el anillo con un desplazamiento de al

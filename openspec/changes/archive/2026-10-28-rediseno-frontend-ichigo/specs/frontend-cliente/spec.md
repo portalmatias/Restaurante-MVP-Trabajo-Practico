@@ -23,5 +23,5 @@ accesibilidad: el nombre accesible de cada acción sigue siendo claro y verbal.
 
 #### Scenario: Un mensaje de error de servidor usa voseo
 - **WHEN** se muestra el mensaje genérico de error de servidor o de red
-- **THEN** su texto usa una forma de voseo (por ejemplo, "Intentá de nuevo"), no la forma de
-  tuteo que usa hoy `frontend-base` ("Intente de nuevo")
+- **THEN** su texto usa una forma de voseo (por ejemplo, "Intentá de nuevo"), no el registro
+  formal de usted ("Intente de nuevo") ni el tuteo

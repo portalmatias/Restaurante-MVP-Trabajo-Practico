@@ -23,7 +23,9 @@ SHALL declararse dentro de un bloque `@supports (animation-timeline: view())`.
 
 ### Requirement: El contenido es visible por defecto
 Ningún contenido SHALL depender de que una animación corra para ser visible o legible. El
-estado base (sin animación) de todo elemento animado SHALL ser su estado final.
+estado base (sin animación) de todo elemento animado SHALL dejarlo visible y estático, con su
+opacidad y su recorte finales; un efecto puramente decorativo de un `@keyframes` (como el zoom
+y el desplazamiento de `deriva`) puede no aplicarse en ese estado.
 
 #### Scenario: Sin animaciones, todo se ve
 - **WHEN** se desactivan las animaciones CSS del documento
@@ -37,10 +39,12 @@ estado base (sin animación) de todo elemento animado SHALL ser su estado final.
 
 ### Requirement: Toda animación se apaga con prefers-reduced-motion
 Cuando el sistema operativo o el navegador piden `prefers-reduced-motion: reduce`, el sistema
-SHALL apagar todas las animaciones y transiciones decorativas (su duración se reduce a 0,01 ms
-como máximo, de modo que el cambio es instantáneo y los eventos de fin siguen disparándose): el balanceo de tablillas, la
-apertura y el desplazamiento (parallax) de las fotografías, la entrada del nombre, la aparición
-de secciones, el giro de las tablillas y el pulso de los esqueletos de carga. El desplazamiento
+SHALL apagar todas las animaciones y transiciones decorativas. Las transiciones (como el giro de
+las tablillas) reducen su duración a 0,01 ms como máximo, de modo que el cambio es instantáneo y
+sus eventos de fin siguen disparándose. Las animaciones decorativas de la landing (el balanceo de
+tablillas, la apertura y el desplazamiento (parallax) de las fotografías, la entrada del nombre
+y la aparición de secciones) se cancelan (`animation-name: none`) y no emiten eventos de fin; el
+pulso de los esqueletos de carga reduce su duración a 0,01 ms. El desplazamiento
 suave de la página SHALL volver a ser instantáneo. La misma regla global cubre las transiciones
 del panel de admin: no hace falta una variante `motion-reduce` en cada componente.
 
