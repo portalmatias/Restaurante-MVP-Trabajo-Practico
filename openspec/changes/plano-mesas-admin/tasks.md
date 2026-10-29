@@ -45,7 +45,9 @@ además que la mesa no cambió en la base.
       nueva (usando la mesa S6 que define el spec, cargada directo en la base), mesa que no entra
       en la grilla nueva (S8, cargada directo en la base), y dos `PATCH`
       simultáneos con `Promise.all` hacia una celda libre, de los que exactamente uno responde
-      `200`. Verificar que los tests actuales de `mesas.service.spec.ts`,
+      `200`. Sumar en `mesas.service.spec.ts` el reintento (design.md D3): el primer intento
+      falla con `P2034` y el segundo responde el `409` de superposición. Verificar que los tests
+      actuales de `mesas.service.spec.ts`,
       `mesas.integration-spec.ts` y `gestion-salon-admin.integration-spec.ts` siguen en verde.
 - [ ] 3.4 Sumar los campos del plano a `MesaRespuestaDto`, `planoColumnas`/`planoFilas` a
       `ZonaRespuestaDto`, y las mismas columnas a `SELECT_MESA_ADMIN` (`mesas.service.ts` y su
@@ -80,8 +82,9 @@ plano" de `specs/frontend-admin/spec.md`.
       previa y su texto.
 - [ ] 4.4 Pedido y errores. Tests primero (rojo, luego verde): mover, ubicar una mesa sin ubicar,
       guardar sin ubicación sin error, ubicación a medias que no se envía, quitar del plano, el
-      pedido con las coordenadas juntas y `ancho`, `alto` y `forma` solo si cambiaron, y la
-      superposición rechazada por la API. Implementar el armado del pedido, la regla `ubicacion`
+      pedido con las coordenadas juntas y `ancho`, `alto` y `forma` solo si cambiaron, la
+      superposición y el tamaño rechazados por la API junto a la sección, y la mesa guardada fuera
+      de la grilla. Implementar el armado del pedido, la regla `ubicacion`
       de `errores-campo.ts` y la columna "Plano" del listado.
 - [ ] 4.5 Cambio de zona en el formulario. Tests primero (rojo, luego verde): cambio de zona,
       cambio a una zona más chica que ajusta el tamaño, cambio de zona sin elegir ubicación, con

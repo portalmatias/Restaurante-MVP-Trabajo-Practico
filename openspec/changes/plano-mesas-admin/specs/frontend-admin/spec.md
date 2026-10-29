@@ -35,7 +35,13 @@ que se edita, y SHALL avisar que no puede detectar superposiciones. El aviso de 
 su falta, SHALL NOT impedir guardar: lo decide la API. Los errores `400` y `409` de la API sobre la ubicación SHALL
 mostrarse junto a la sección.
 
-El listado de Mesas SHALL mostrar la ubicación de cada una ("Columna 6, fila 1") o "Sin ubicar".
+Una Mesa guardada que no entra en la grilla de su Zona SHALL tratarse en el formulario como sin
+ubicar: Columna y Fila empiezan vacíos, Ancho y Alto pasan al máximo de la grilla si la superan,
+y la sección SHALL decir "La mesa quedó fuera de la grilla de la zona: elegí una ubicación
+nueva.". Guardarla sin elegir ubicación SHALL enviar `posX` y `posY` en `null`.
+
+El listado de Mesas SHALL mostrar la ubicación de cada una ("Columna 6, fila 1"), "Sin ubicar" o,
+si no entra en la grilla de su Zona, "Fuera de la grilla".
 El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin ubicar.
 
 #### Scenario: Mover una mesa
@@ -77,6 +83,17 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **WHEN** el administrador edita una Mesa sin ubicar
 - **THEN** Columna y Fila están vacíos, la sección dice "La mesa no está en el plano." y la vista
   previa no dibuja esa Mesa
+
+#### Scenario: Mesa guardada fuera de la grilla
+- **WHEN** S4, de 3 por 2, quedó guardada en (10,3) de STANDARD, fuera de la grilla de 12 por 8, y
+  el administrador la edita
+- **THEN** el listado muestra S4 "Fuera de la grilla", Columna y Fila están vacíos y la sección
+  dice "La mesa quedó fuera de la grilla de la zona: elegí una ubicación nueva."
+- **AND** al elegir la columna 1 y la fila 1 y guardar, el sistema envía `posX` 0 y `posY` 0
+
+#### Scenario: Mensaje de tamaño de la API junto a la sección
+- **WHEN** la API responde `400` con "La mesa no entra en la grilla de 12 por 8."
+- **THEN** el sistema muestra ese mensaje junto a la sección "Ubicación en el plano"
 
 #### Scenario: Ubicar una mesa sin ubicar
 - **WHEN** el administrador edita S7, elige la columna 12 y la fila 1 y guarda

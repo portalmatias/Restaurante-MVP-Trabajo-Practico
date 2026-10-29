@@ -118,6 +118,11 @@ detecta el aislamiento `Serializable` de PostgreSQL: uno de los dos falla con `P
 reintenta, ve la mesa ya movida y responde `409` por superposición (o `409` por agotar los
 reintentos). No hace falta `SELECT ... FOR UPDATE` ni un lock de zona.
 
+El test de integración con `Promise.all` no alcanza para probarlo: también pasaría si el
+servidor atendiera los pedidos uno detrás del otro. Por eso el camino del reintento se prueba
+aparte en `mesas.service.spec.ts`, como ya se hace con `P2034`: el primer intento falla con
+`P2034`, el segundo lee la otra mesa ya en la celda y la respuesta es el `409` de superposición.
+
 - **Alternativa:** un constraint de exclusión con `gist` sobre rectángulos. Sería la garantía más
   fuerte, pero necesita la extensión `btree_gist`, un tipo geométrico calculado y SQL a mano en la
   migración, para una regla que no es una invariante de negocio (no afecta reservas) sino visual.
@@ -170,8 +175,16 @@ tipos desde `openapi.yaml` en el mismo PR.
   función de `frontend/src/lib/plano-mesas.ts`: duplica la regla del backend, que no se puede
   importar (`config.yaml` §4). Es solo un aviso: la API decide.
 - **Errores.** `errores-campo.ts` suma una regla `ubicacion` que reconoce "fuera de la grilla",
-  "se superpone" y "posX y posY van juntos", y los muestra junto a la sección.
-- **Listado.** La tabla suma la columna "Plano" con "Columna 6, fila 1" o "Sin ubicar".
+  "no entra en la grilla", "se superpone" y "posX y posY van juntos", y los muestra junto a la
+  sección.
+- **Mesa fuera de la grilla.** Si una mesa guardada no entra en la grilla de su zona (la grilla se
+  achicó a mano, proposal), el formulario la trata como sin ubicar: Columna y Fila empiezan
+  vacías, Ancho y Alto se ajustan al máximo de la grilla si la superan, y la sección dice "La mesa
+  quedó fuera de la grilla de la zona: elegí una ubicación nueva.". Guardar sin elegir envía
+  `posX` y `posY` en `null`, que deja en la base lo mismo que ya ve el cliente: una mesa sin
+  ubicar.
+- **Listado.** La tabla suma la columna "Plano" con "Columna 6, fila 1", "Sin ubicar" o "Fuera de
+  la grilla".
 
 ### Contrato OpenAPI
 
