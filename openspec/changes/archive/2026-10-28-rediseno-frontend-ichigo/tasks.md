@@ -64,7 +64,7 @@ desde cero.
       es un token de esta spec ni de `globals.css`).
 - [x] 2.5 `landing-ichigo`: las acciones de la landing se mantienen en infinitivo («Reservar una
       mesa», «Consultar una reserva», «Elegir fecha y turno») por decisión expresa del equipo
-      (la etiqueta «Ya tengo un código» se cambió el 29/10/2026, ver PR de la etiqueta). No
+      (la etiqueta «Ya tengo un código» se cambió el 29/10/2026, ver #98). No
       requiere cambios en `app/page.tsx`: agregar un test que fije esos textos y que compruebe
       que los títulos y textos explicativos usan voseo y ninguno usa tuteo.
 - [x] 2.6 `landing-ichigo`, «Los pasos de reserva coinciden con el flujo real»: el primer paso de

@@ -20,7 +20,7 @@ grupo «Turno» y de la indicación «Elegí una fecha…». Ese caso solo se al
 cargada desde la URL (`?fecha=`): el calendario no deja elegir un día sin turnos
 (`calendario-fecha`, «Días no elegibles distinguidos por texto»). Este requisito refina, y no
 reemplaza, a los del Paso 1 de `frontend-cliente`, que no fijan el tipo de control de los turnos
-(ver `design.md`, «Precedencia sobre `frontend-cliente`»).
+(ver `openspec/changes/archive/2026-10-28-rediseno-frontend-ichigo/design.md`, «Precedencia sobre `frontend-cliente`»).
 
 #### Scenario: Turnos como botones dentro de un grupo
 - **WHEN** la persona elige una fecha con dos turnos activos

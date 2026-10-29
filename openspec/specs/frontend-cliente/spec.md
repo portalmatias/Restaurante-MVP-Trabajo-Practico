@@ -426,7 +426,7 @@ Todo texto de interfaz dirigido a la persona que reserva SHALL usar voseo riopla
 ("reservá", "elegí", "revisá") en vez de tuteo o de un registro impersonal, con una excepción
 acotada: las etiquetas de las acciones (botones y enlaces de llamada a la acción) SHALL estar en
 infinitivo («Reservar una mesa», «Volver», «Reintentar»), que es la convención de la categoría
-(`rediseno-frontend-ichigo`, `design.md`, «Acciones en infinitivo»). Los títulos, los textos
+(`openspec/changes/archive/2026-10-28-rediseno-frontend-ichigo/design.md`, «Acciones en infinitivo»). Los títulos, los textos
 explicativos y los mensajes SHALL seguir en voseo. La excepción es de registro, no de
 accesibilidad: el nombre accesible de cada acción sigue siendo claro y verbal.
 
