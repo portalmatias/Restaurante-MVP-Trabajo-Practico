@@ -16,7 +16,7 @@ de al menos 44×44px que fija `frontend-base`.
 - **THEN** la apertura muestra el texto y la fotografía lado a lado
 
 #### Scenario: Objetivos táctiles
-- **WHEN** se miden los enlaces «Reservar una mesa», «Ya tengo un código» y «Elegir fecha y
+- **WHEN** se miden los enlaces «Reservar una mesa», «Consultar una reserva» y «Elegir fecha y
   turno» a 390px
 - **THEN** cada uno mide al menos 44px de ancho y 44px de alto
 
@@ -29,7 +29,7 @@ mesa», «Elegir fecha y turno»), por decisión expresa del equipo y por ser la
 categoría: es una excepción a «Copy en voseo rioplatense» de `frontend-cliente`, que hoy cita
 «Reservar una mesa» como ejemplo incorrecto (ver `design.md`, «Acciones en infinitivo»). Los
 títulos y los textos explicativos SHALL usar voseo rioplatense formal. La acción
-secundaria «Ya tengo un código» SHALL enlazar a `/reservas/consultar`. La acción principal SHALL ser visible sin desplazarse a 390×844px.
+secundaria «Consultar una reserva» SHALL enlazar a `/reservas/consultar`. La acción principal SHALL ser visible sin desplazarse a 390×844px.
 
 #### Scenario: Acción visible en el primer viewport
 - **WHEN** se abre `/` a 390×844px sin desplazarse
@@ -46,7 +46,7 @@ secundaria «Ya tengo un código» SHALL enlazar a `/reservas/consultar`. La acc
 #### Scenario: Acciones en infinitivo y textos en voseo
 - **WHEN** se leen las etiquetas de los enlaces de acción de `/` y sus títulos y textos
   explicativos
-- **THEN** las etiquetas de acción están en infinitivo («Reservar una mesa», «Ya tengo un código»,
+- **THEN** las etiquetas de acción están en infinitivo («Reservar una mesa», «Consultar una reserva»,
   «Elegir fecha y turno») y los títulos y textos explicativos usan voseo («Dejá tus datos», «Así
   se reserva»), sin tuteo
 
