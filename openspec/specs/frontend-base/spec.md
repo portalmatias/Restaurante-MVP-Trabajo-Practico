@@ -8,9 +8,9 @@ pantallas reales; este change no implementa ningún flujo de negocio.
 
 Salvo que un escenario diga otra cosa: el viewport de referencia mobile es 375px de ancho
 (iPhone SE / gama baja), y los de verificación adicionales son 768px (tablet), 1024px
-(notebook chica) y 1440px (escritorio). Los tokens de color referidos son los definidos en
-este change y su valor vigente está en `frontend/app/globals.css` (fuente única; la capability
-`identidad-visual-ichigo` fija la paleta y sus contrastes). Los de referencia son `background`
+(notebook chica) y 1440px (escritorio). Los tokens de color referidos tienen su valor vigente
+en `frontend/app/globals.css` (fuente única; la capability `identidad-visual-ichigo` fija la
+paleta y sus contrastes). Los de referencia son `background`
 (`#E8DCC4`), `card` (`#F3EBDA`), `foreground` (`#1F1813`), `muted` (`#D9CBAE`) con
 `muted-foreground` (`#5C4630`), `accent` y `destructive` (`#9A2A19`), `border` (`#8A6A43`,
 3,7:1 sobre `background` y 4,2:1 sobre `card`) y `ring` (`#9A2A19`).
@@ -40,8 +40,8 @@ requisito).
 - **WHEN** una persona escribe la dirección `/admin` en el navegador
 - **THEN** la página `/admin` se muestra, aunque ninguna página pública la enlace
 
-#### Scenario: Las rutas placeholder comparten el layout
-- **WHEN** una persona visita `/` o `/reservas` (rutas públicas, entre ellas la página placeholder)
+#### Scenario: Las rutas públicas comparten el layout
+- **WHEN** una persona visita `/` o `/reservas`
 - **THEN** ambas páginas muestran el mismo encabezado y el mismo pie de página
 
 #### Scenario: El panel de administración no muestra el marco público

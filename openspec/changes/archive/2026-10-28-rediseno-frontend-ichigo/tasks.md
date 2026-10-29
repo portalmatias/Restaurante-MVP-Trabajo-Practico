@@ -389,13 +389,16 @@ desde cero.
       con `TZ=America/Argentina/Buenos_Aires` (corridos en local: el CI de este PR no ejecuta los
       del frontend).
 
-## Pendientes al archivar (28/10/2026)
+## Tareas abiertas al archivar y su cierre
 
-Ninguna tarea queda sin marcar: la 4.3, la 4.6 y la 6.2, abiertas al archivar, se cerraron en
-este mismo PR (ver la decisión de abajo).
+1. **Al archivar (28/10/2026, `d686a67`):** la 6.3 se cerró como parte del propio archivado.
+   Quedaron sin marcar la 4.3 (contraste con herramienta independiente), la 4.6 (lector de
+   pantalla) y la 6.2 (conformidad de @portalmatias con «Open Questions»). @FedeWerk decidió
+   archivar igual (`f1af182`), aunque `config.yaml` §13 pide todas las tareas completas, y
+   cerrarlas en el mismo PR (#92) antes de integrarlo.
+2. **29/10/2026, `0f6d7cb`:** 4.6 omitida por decisión del equipo y 6.2 con la conformidad de
+   @portalmatias.
+3. **29/10/2026, `691d0c1`:** 4.3 medida con `webaim.org`, con un desvío anotado en la tarea.
 
-**Decisión (29/10/2026):** Federico decidió archivar el change igual, con 4.3, 4.6 y 6.2 abiertas,
-aunque `config.yaml` §13 pide completar todas las tareas antes de darlo por terminado. Después,
-en el mismo PR, se cerraron la 4.6 (omitida por decisión del equipo) y la 6.2 (conformidad de
-@portalmatias), y por último la 4.3, medida con `webaim.org` (29/10/2026) con un desvío anotado
-en la propia tarea.
+Desde ese último commit no queda ninguna tarea sin marcar, así que el change llega a `main`
+cumpliendo `config.yaml` §13.
