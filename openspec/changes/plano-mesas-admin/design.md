@@ -57,27 +57,35 @@ dos con valor o los dos en null."
 
 ### D2. Validación en el service, dentro de la transacción existente
 
-En `ejecutarActualizacion`, después de las validaciones actuales (etiqueta, zona y reservas
-activas):
+En `ejecutarActualizacion`, después de las validaciones actuales (capacidad frente a las reservas
+activas, zona inexistente y cambio de zona con reservas activas). Ese orden queda fijado en el spec
+("Las validaciones existentes corren antes que las de ubicación"): un pedido que reduce la
+capacidad y además saca la mesa de la grilla recibe el `409` de capacidad.
 
 1. Se calcula el lugar final: zona final, `posX`/`posY` finales (si cambia la zona y el pedido no
    las trae, `null`), y `ancho`/`alto` finales.
-2. Si el pedido no cambia la posición, el tamaño ni la zona, no se valida nada más: ni un pedido sin
-   campos del plano ni uno que solo cambia la `forma`, que no altera qué celdas ocupa la mesa (spec:
-   "Pedido sin campos del plano no cambia la ubicación" y "Cambiar la forma de una mesa con un
-   problema previo").
+2. Si el lugar final es igual al guardado (misma zona, misma posición y mismo tamaño), no se valida
+   nada más. La comparación es contra la mesa leída en la transacción, no contra qué campos trae el
+   pedido: reenviar los mismos valores, no mandar campos del plano o cambiar solo la `forma` no
+   alteran qué celdas ocupa la mesa (spec: "Pedido sin campos del plano no cambia la ubicación",
+   "Cambiar la forma de una mesa con un problema previo" y "Reenviar la ubicación de una mesa con
+   un problema previo").
 3. Si la mesa queda ubicada, se leen dentro de la transacción la grilla de la zona final y las
    demás mesas ubicadas de esa zona, y se llama a una función pura nueva de `layout-plano.ts`:
 
    ```ts
    export function problemasDeUbicacion(
      zona: DimensionesPlano,
-     mesa: MesaEnPlano,
+     mesa: MesaUbicada,
      otras: MesaEnPlano[],
    ): { fueraDeGrilla: boolean; superpuestaCon: string[] };
    ```
 
-   Reutiliza `seSuperponen` y la misma condición de grilla que `validarLayout`, que queda para el
+   `mesa` es `MesaUbicada` (coordenadas no nulas), que hoy es interna de `layout-plano.ts` y pasa a
+   exportarse junto con `estaUbicada`: si alguien la llamara con una mesa sin ubicar, TypeScript lo
+   marca, en vez de que `null + ancho` calcule como si la mesa estuviera en (0,0). El service
+   obtiene ese tipo con `estaUbicada`. `otras` sigue siendo `MesaEnPlano[]`, porque la función
+   ignora las que no están ubicadas. Reutiliza `seSuperponen` y la misma condición de grilla que `validarLayout`, que queda para el
    seed. `superpuestaCon` sale ordenada con `ordenarMesasPorEtiqueta`. Antes de eso, aunque la
    mesa quede sin ubicar, se compara el `ancho` y el `alto` finales con la grilla de la zona final
    ("La mesa no entra en la grilla de 12 por 8."). Así un tamaño enorme nunca llega a la columna
@@ -111,8 +119,9 @@ reintentos). No hace falta `SELECT ... FOR UPDATE` ni un lock de zona.
 `ZonaRespuestaDto` suma `planoColumnas` y `planoFilas`. Hoy esos campos quedan afuera a propósito:
 `SELECT_MESA_ADMIN` (`mesas.service.ts`) y `SELECT_ZONA_ADMIN` (`zonas.service.ts`) eligen columnas
 explícitas, y `plano-mesas-salidas-admin.integration-spec.ts` exige que las respuestas de admin
-traigan solo las claves actuales. Este change suma los campos a los dos `select` (y a la copia de
-`SELECT_ZONA_ADMIN` en `zonas.service.spec.ts`) y cambia ese test para que exija las claves nuevas:
+traigan solo las claves actuales. Este change suma los campos a los dos `select` (y a sus copias en
+`mesas.service.spec.ts` y `zonas.service.spec.ts`, que los tests comparan con
+`toHaveBeenCalledWith`) y cambia ese test para que exija las claves nuevas:
 `GET`, `POST` y `PATCH` de mesas y `GET` y `PATCH` de zonas pasan a devolverlas. Van como
 requeridos en la respuesta porque siempre están: un cliente viejo los ignora. El único consumidor es el frontend, que regenera sus
 tipos desde `openapi.yaml` en el mismo PR.
@@ -132,6 +141,9 @@ tipos desde `openapi.yaml` en el mismo PR.
   `posY` (los dos con valor, o los dos en `null` si quedaron vacías). Comparar contra la mesa
   original no alcanza después de un cambio de zona: si el admin vuelve a elegir la misma columna y
   fila que tenía en la zona vieja, no se enviaría nada y el backend dejaría la mesa sin ubicar.
+  El caso inverso también se cubre: al cambiar de zona, Columna y Fila quedan vacías; si el admin
+  vuelve a la zona original, el formulario restaura Columna, Fila, Ancho y Alto guardados. Sin eso
+  se enviarían `posX` y `posY` en `null` y la mesa quedaría sin ubicar sin que nadie lo pidiera.
 - **Vista previa.** Se extrae la geometría de `plano-mesas.tsx` (`CELDA`, `MARGEN` y `Silueta`) a
   `frontend/src/components/reservas/plano-geometria.tsx`, que usan el plano del cliente y la vista
   previa. Las demás mesas se dibujan con el relleno neutro (`muted`) y la que se edita con la

@@ -68,14 +68,20 @@ ubicadas de esa Zona, y SHALL rechazar la edición sin modificar la Mesa cuando:
 
 Si un pedido cumple más de una de esas condiciones, el sistema SHALL responder la primera en este
 orden: coordenada a medias, tamaño mayor que la grilla, Mesa fuera de la grilla y superposición.
+Las validaciones de "Edición de Mesa preserva las Reservas activas" (capacidad por debajo de una
+Reserva activa y cambio de Zona con Reservas activas) y la de Zona inexistente SHALL correr antes
+que todas las de este requisito: un pedido que falla una de ellas y además una de ubicación SHALL
+recibir la respuesta de la validación existente.
 Cualquier combinación de `forma`, `ancho` y `alto` SHALL ser válida: una Mesa `REDONDA` o
 `CUADRADA` con lados distintos se acepta y el plano la dibuja estirada.
 
 Dos Mesas que solo se tocan por un lado SHALL NOT considerarse superpuestas. La posición de una Mesa sin
 ubicar SHALL NOT validarse contra la grilla ni contra otras Mesas; su tamaño sí, como se dijo
 arriba. La validación SHALL correr solo si el
-pedido cambia la posición, el tamaño o la Zona: un pedido que solo cambia la `forma` (o los campos
-que no son del plano) SHALL NOT validarse contra la grilla ni contra otras Mesas. Los problemas que ya existieran entre
+pedido cambia la posición, el tamaño o la Zona, comparando los valores finales con los guardados
+en la Mesa (no por la sola presencia de los campos en el pedido): un pedido que reenvía los mismos
+valores, o que solo cambia la `forma` (o los campos que no son del plano), SHALL NOT validarse
+contra la grilla ni contra otras Mesas. Los problemas que ya existieran entre
 otras Mesas de la Zona SHALL NOT impedir la edición. Si dos ediciones simultáneas dejarían dos
 Mesas superpuestas, el sistema SHALL aceptar como mucho una de ellas.
 
@@ -133,6 +139,18 @@ Zona nueva.
 - **WHEN** S2 quedó cargada a mano en (5,0), superpuesta con S3, y el admin envía para S2 solo
   `forma` `CUADRADA`
 - **THEN** el sistema guarda la forma sin validar la superposición
+
+#### Scenario: Reenviar la ubicación de una mesa con un problema previo
+- **WHEN** S2 quedó cargada a mano en (5,0), superpuesta con S3, y el admin envía para S2 `posX`
+  5, `posY` 0, `ancho` 1 y `alto` 1, los mismos valores guardados, junto con una etiqueta nueva
+- **THEN** el sistema guarda la etiqueta sin validar la superposición
+
+#### Scenario: Las validaciones existentes corren antes que las de ubicación
+- **WHEN** S4 tiene una Reserva activa de 3 comensales y el admin envía para S4 `capacidad` 2 junto
+  con `posX` 10 y `posY` 6, que la dejarían fuera de la grilla
+- **THEN** el sistema responde `409` con el mensaje "La mesa tiene una reserva activa con más
+  comensales que la nueva capacidad." y no `400`
+- **AND** S4 conserva su capacidad y sigue en (0,3)
 
 #### Scenario: Quitar una mesa del plano
 - **WHEN** el admin envía para S2 `posX` `null` y `posY` `null`
