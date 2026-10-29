@@ -5,7 +5,8 @@
 # Corren sin Docker, sin red y sin root: arman un repositorio Git temporal (un remoto y un clon
 # que hace de /opt/reservas) y ponen delante en el PATH versiones simuladas de `docker`, `curl`,
 # `flock`, `sleep` y `stat`. Lo que se comprueba es la lógica del script (decisiones, estado,
-# etapa HTTP/HTTPS, vuelta atrás, reejecución), no Docker ni Caddy.
+# etapa HTTP/HTTPS, vuelta atrás, reejecución, limpieza de imágenes, migración rota, `.env`
+# inválido y conexión cortada), no Docker ni Caddy.
 #
 # Uso:  bash deploy/test/desplegar.test.sh
 # Sale con 0 si pasó todo y con 1 si falló alguna comprobación.
@@ -48,6 +49,30 @@ case " $* " in
     esac
     ;;
 esac
+# Imágenes en disco: un archivo por repositorio (`imagenes-reservas-backend`, ...), un digest
+# por línea. `image ls` las lista y `image rm` las borra del archivo.
+case "$1 $2" in
+  "image ls")
+    repo="${*: -1}"
+    cat "$FAKE_DIR/imagenes-${repo##*/}" 2> /dev/null
+    exit 0
+    ;;
+  "image rm")
+    ref="$3"
+    archivo="$FAKE_DIR/imagenes-$(basename "${ref%@*}")"
+    [ -f "$archivo" ] && grep -vx -- "${ref#*@}" "$archivo" > "$archivo.tmp"; mv -f "$archivo.tmp" "$archivo" 2> /dev/null
+    exit 0
+    ;;
+esac
+# FAKE_DOCKER_FALLA: un texto; si aparece en los argumentos, la llamada falla (por ejemplo, una
+# migración rota). FAKE_DOCKER_HUP: idem, pero le manda SIGHUP a desplegar.sh, como sshd cuando
+# se corta la conexión del runner.
+if [ -n "${FAKE_DOCKER_HUP:-}" ] && [[ " $* " == *"$FAKE_DOCKER_HUP"* ]]; then
+  kill -HUP "$PPID"
+fi
+if [ -n "${FAKE_DOCKER_FALLA:-}" ] && [[ " $* " == *"$FAKE_DOCKER_FALLA"* ]]; then
+  exit 1
+fi
 exit "${FAKE_DOCKER_SALIDA:-0}"
 EOF
 cat > "$BIN/curl" <<'EOF'
@@ -67,16 +92,22 @@ if [ "${FAKE_CURL_FALLA_HTTPS:-}" = "1" ] && [[ "$url" == https://* ]]; then
   printf '000'; [[ "$formato" == *content_type* ]] && printf ' \n'
   exit 35
 fi
+# FAKE_DIGEST_ROTO: la versión levantada con ese digest del backend no responde.
+if [ -n "${FAKE_DIGEST_ROTO:-}" ] && grep -qx "DIGEST_BACKEND=$FAKE_DIGEST_ROTO" "$FAKE_ENV_COMPOSE" 2> /dev/null; then
+  printf '000'; [[ "$formato" == *content_type* ]] && printf ' \n'
+  exit 7
+fi
 if [[ "$formato" == *content_type* ]]; then printf '200 application/json\n'; else printf '200'; fi
 EOF
 printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/flock"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/sleep"
 cat > "$BIN/stat" <<'EOF'
 #!/usr/bin/env bash
-# El .env de prueba hace de archivo de root con modo 600 (chmod no se refleja en todos los sistemas).
+# El .env de prueba hace de archivo de root con modo 600 (chmod no se refleja en todos los
+# sistemas). FAKE_ENV_MODO simula otro modo.
 for a in "$@"; do
   case "$a" in
-    */.env) case " $* " in *" %u "* | *"'%u'"*) id -u ;; *) echo 600 ;; esac; exit 0 ;;
+    */.env) case " $* " in *" %u "* | *"'%u'"*) id -u ;; *) echo "${FAKE_ENV_MODO:-600}" ;; esac; exit 0 ;;
   esac
 done
 exec "$REAL_STAT" "$@"
@@ -116,6 +147,9 @@ DF="sha256:$(printf 'b%.0s' $(seq 64))"
 DB2="sha256:$(printf 'c%.0s' $(seq 64))"
 DF2="sha256:$(printf 'd%.0s' $(seq 64))"
 ESTADO="$T/raiz/.despliegue"
+export FAKE_ENV_COMPOSE="$ESTADO/compose.env"
+# Digests de prueba: «sha256:» y 64 veces el carácter hexadecimal indicado.
+digest() { printf 'sha256:%s' "$(printf "$1%.0s" $(seq 64))"; }
 
 escribir_env() { # escribir_env <SITE_ADDRESS>
   cat > "$T/raiz/.env" <<EOF
@@ -202,10 +236,130 @@ desplegar "$SHA2" "$DB2" "$DF2" despliegue
 [ "$CODIGO" = 0 ] && ok "termina en 0" || mal "termina en 0 (código $CODIGO)" "$(cat "$T/salida.txt")"
 verificar "no se reejecuta" no_contiene "$T/salida.txt" "desplegar.sh cambió"
 
-# --- 7. Los scripts de despliegue se versionan como ejecutables ---------------------------------
+# Los casos 7 a 12 empiezan sin estado de despliegue, en la etapa :80, con el clon en SHA0. SHA0,
+# SHA1 y SHA2 tienen el mismo desplegar.sh, así que no hay reejecución.
+DA="$(digest 1)"; FA="$(digest 2)"
+DB_="$(digest 3)"; FB="$(digest 4)"
+DC="$(digest 5)"; FC="$(digest 6)"
+reiniciar() {
+  rm -rf "$ESTADO" "$FAKE_DIR"/imagenes-* "$FAKE_DIR"/up-*.env
+  git -C "$T/raiz" checkout -q --detach "$SHA0"
+  escribir_env ":80"
+}
+version_actual() { cat "$ESTADO/VERSION_ACTUAL" 2> /dev/null; }
+head_del_clon() { git -C "$T/raiz" rev-parse HEAD; }
+
+# --- 7. Con dos versiones desplegadas, una tercera rota vuelve a la que estaba sirviendo ---------
+echo "7. A, B y una C que no responde: vuelta atrás a B (no a A)"
+reiniciar
+desplegar "$SHA0" "$DA" "$FA" despliegue
+desplegar "$SHA1" "$DB_" "$FB" despliegue
+rm -f "$FAKE_DIR"/up-*.env
+FAKE_DIGEST_ROTO="$DC" desplegar "$SHA2" "$DC" "$FC" despliegue
+[ "$CODIGO" = 1 ] && ok "termina en 1" || mal "termina en 1 (código $CODIGO)" "$(cat "$T/salida.txt")"
+verificar "avisa la vuelta atrás a B" contiene "$T/salida.txt" "VUELTA ATRÁS a $SHA1 completada"
+[ "$(version_actual)" = "$SHA1 $DB_ $FB" ] && ok "la versión en servicio sigue siendo B" || mal "la versión en servicio sigue siendo B" "$(version_actual)"
+ultimo="$(ls "$FAKE_DIR"/up-*.env | sort -t- -k2 -n | tail -1)"
+verificar "el último env de Compose levanta las imágenes de B" contiene "$ultimo" "^DIGEST_BACKEND=$DB_$"
+[ "$(head_del_clon)" = "$SHA1" ] && ok "el clon queda en el commit de B" || mal "el clon queda en el commit de B"
+verificar "C no entra en el historial" no_contiene "$ESTADO/historial" "^$SHA2 "
+
+# --- 8. Vuelta atrás manual: usa los digests del historial y rechaza lo que no está -------------
+echo "8. Vuelta atrás a una versión del historial (con el tag vuelto a publicar) y a una que no está"
+# El workflow manda los digests vacíos; aunque llegaran otros (el tag de A se volvió a publicar
+# con la imagen de C), se usan los registrados.
+desplegar "$SHA0" "$DC" "$FC" vuelta-atras
+[ "$CODIGO" = 0 ] && ok "termina en 0" || mal "termina en 0 (código $CODIGO)" "$(cat "$T/salida.txt")"
+verificar "usa los digests registrados en el historial" contiene "$ESTADO/compose.env" "^DIGEST_BACKEND=$DA$"
+verificar "también el del frontend" contiene "$ESTADO/compose.env" "^DIGEST_FRONTEND=$FA$"
+[ "$(version_actual)" = "$SHA0 $DA $FA" ] && ok "la versión en servicio pasa a ser A" || mal "la versión en servicio pasa a ser A" "$(version_actual)"
+antes="$(version_actual)"
+desplegar "$SHA2" "" "" vuelta-atras
+[ "$CODIGO" = 1 ] && ok "un SHA fuera del historial termina en 1" || mal "un SHA fuera del historial termina en 1 (código $CODIGO)" "$(cat "$T/salida.txt")"
+verificar "dice que la vuelta atrás se rechaza" contiene "$T/salida.txt" "vuelta atrás rechazada"
+[ ! -s "$FAKE_DIR/docker.log" ] && ok "no toca Docker" || mal "no toca Docker" "$(cat "$FAKE_DIR/docker.log")"
+[ "$(version_actual)" = "$antes" ] && ok "no cambia la versión en servicio" || mal "no cambia la versión en servicio"
+
+# --- 9. Limpieza de imágenes: quedan solo la versión actual y la anterior ----------------------
+echo "9. Después de tres despliegues quedan en disco solo las imágenes de la actual y la anterior"
+reiniciar
+desplegar "$SHA0" "$DA" "$FA" despliegue
+desplegar "$SHA1" "$DB_" "$FB" despliegue
+printf '%s\n' "$DA" "$DB_" "$DC" > "$FAKE_DIR/imagenes-reservas-backend"
+printf '%s\n' "$FA" "$FB" "$FC" > "$FAKE_DIR/imagenes-reservas-frontend"
+desplegar "$SHA2" "$DC" "$FC" despliegue
+[ "$CODIGO" = 0 ] && ok "termina en 0" || mal "termina en 0 (código $CODIGO)" "$(cat "$T/salida.txt")"
+[ "$(sort "$FAKE_DIR/imagenes-reservas-backend" | tr '\n' ' ')" = "$(printf '%s\n' "$DB_" "$DC" | sort | tr '\n' ' ')" ] \
+  && ok "backend: quedan B y C" || mal "backend: quedan B y C" "$(cat "$FAKE_DIR/imagenes-reservas-backend")"
+[ "$(sort "$FAKE_DIR/imagenes-reservas-frontend" | tr '\n' ' ')" = "$(printf '%s\n' "$FB" "$FC" | sort | tr '\n' ' ')" ] \
+  && ok "frontend: quedan B y C" || mal "frontend: quedan B y C" "$(cat "$FAKE_DIR/imagenes-reservas-frontend")"
+
+# --- 10. Una migración rota corta antes de levantar la versión nueva ----------------------------
+echo "10. Migración rota: no se levanta la versión nueva"
+reiniciar
+desplegar "$SHA0" "$DA" "$FA" despliegue
+FAKE_DOCKER_FALLA="prisma migrate deploy" desplegar "$SHA1" "$DB_" "$FB" despliegue
+[ "$CODIGO" = 1 ] && ok "termina en 1" || mal "termina en 1 (código $CODIGO)" "$(cat "$T/salida.txt")"
+verificar "avisa la migración fallida" contiene "$T/salida.txt" "falló una migración"
+verificar "no levanta la aplicación (sin compose up de la versión)" no_contiene "$FAKE_DIR/docker.log" "up -d --remove-orphans"
+verificar "no carga los datos iniciales" no_contiene "$FAKE_DIR/docker.log" "seed-produccion"
+[ "$(version_actual)" = "$SHA0 $DA $FA" ] && ok "la versión en servicio sigue siendo A" || mal "la versión en servicio sigue siendo A" "$(version_actual)"
+[ "$(head_del_clon)" = "$SHA0" ] && ok "el clon vuelve al commit de A" || mal "el clon vuelve al commit de A"
+verificar "el env de Compose vuelve a las imágenes de A" contiene "$ESTADO/compose.env" "^DIGEST_BACKEND=$DA$"
+
+# --- 11. .env ausente, con permisos abiertos o incompleto: error sin tocar nada -----------------
+echo "11. .env inválido: termina en error sin tocar nada y sin imprimir valores"
+reiniciar
+desplegar "$SHA0" "$DA" "$FA" despliegue
+antes="$(version_actual)"
+env_invalido() { # env_invalido <descripción> <texto esperado> [VAR=valor]
+  local desc="$1" esperado="$2"
+  shift 2
+  ( for asignacion in "$@"; do export "${asignacion?}"; done; desplegar "$SHA1" "$DB_" "$FB" despliegue; echo "$CODIGO" > "$T/codigo" )
+  local codigo; codigo="$(cat "$T/codigo")"
+  [ "$codigo" = 1 ] && ok "$desc: termina en 1" || mal "$desc: termina en 1 (código $codigo)" "$(cat "$T/salida.txt")"
+  verificar "$desc: explica el problema" contiene "$T/salida.txt" "$esperado"
+  [ ! -s "$FAKE_DIR/docker.log" ] && ok "$desc: no toca Docker" || mal "$desc: no toca Docker" "$(cat "$FAKE_DIR/docker.log")"
+  [ "$(version_actual)" = "$antes" ] && [ "$(head_del_clon)" = "$SHA0" ] \
+    && ok "$desc: no cambia la versión ni el clon" || mal "$desc: no cambia la versión ni el clon"
+  local secreto
+  for secreto in "$(printf 'j%.0s' $(seq 40))" "$(printf 'p%.0s' $(seq 30))" "ClaveDePrueba-2026"; do
+    if grep -qF -- "$secreto" "$T/salida.txt"; then mal "$desc: no imprime valores del .env"; return; fi
+  done
+  ok "$desc: no imprime valores del .env"
+}
+mv "$T/raiz/.env" "$T/env.guardado"
+env_invalido "sin .env" "no existe $T/raiz/.env"
+mv "$T/env.guardado" "$T/raiz/.env"
+env_invalido ".env con modo 644" "tiene modo 644" FAKE_ENV_MODO=644
+grep -v '^ADMIN_PASSWORD=' "$T/raiz/.env" > "$T/env.sin-clave"
+cp "$T/raiz/.env" "$T/env.guardado" && cp "$T/env.sin-clave" "$T/raiz/.env"
+env_invalido "sin ADMIN_PASSWORD" "faltan variables en $T/raiz/.env (o están vacías): ADMIN_PASSWORD"
+cp "$T/env.guardado" "$T/raiz/.env"
+
+# --- 12. Conexión cortada: SIGHUP y salida cerrada a mitad del despliegue -----------------------
+echo "12. Se corta la conexión durante la migración: el despliegue termina igual y el log queda completo"
+reiniciar
+desplegar "$SHA0" "$DA" "$FA" despliegue
+: > "$FAKE_DIR/docker.log"; : > "$T/despliegue.log"
+# La salida va a una tubería que ya se cerró (`true` no lee nada), y en la migración el simulacro
+# de docker le manda SIGHUP al script, como sshd al caerse el SSH del runner.
+PATH="$BIN:$PATH" RESERVAS_RAIZ="$T/raiz" RESERVAS_REGISTRO="registro.prueba/x" \
+  RESERVAS_LOG="$T/despliegue.log" RESERVAS_SEGUNDOS_COMPROBACION=2 FAKE_DOCKER_HUP="prisma migrate deploy" \
+  bash "$T/raiz/deploy/desplegar.sh" "$SHA1" "$DB_" "$FB" despliegue 2>&1 | true
+CODIGO="${PIPESTATUS[0]}"
+[ "$CODIGO" = 0 ] && ok "termina en 0" || mal "termina en 0 (código $CODIGO)"
+[ "$(version_actual)" = "$SHA1 $DB_ $FB" ] && ok "queda desplegada la versión nueva" || mal "queda desplegada la versión nueva" "$(version_actual)"
+verificar "llegó a levantar la versión (compose up)" contiene "$FAKE_DIR/docker.log" "up -d --remove-orphans"
+# `tee` escribe el log en segundo plano: se le da un momento para terminar.
+for _ in $(seq 50); do grep -q "DESPLEGADO $SHA1" "$T/despliegue.log" && break; command sleep 0.1; done
+verificar "el log propio llega hasta el final" contiene "$T/despliegue.log" "DESPLEGADO $SHA1"
+verificar "el log incluye la migración" contiene "$T/despliegue.log" "aplicando migraciones"
+
+# --- 13. Los scripts de despliegue se versionan como ejecutables --------------------------------
 # El comando forzado de authorized_keys y el sudoers ejecutan estos archivos directamente: con
 # modo 100644 en Git, sshd responde `Permission denied` y todos los despliegues fallan.
-echo "7. Modo ejecutable en Git"
+echo "13. Modo ejecutable en Git"
 RAIZ_REPO="$(cd "$AQUI/../.." && pwd)"
 for f in deploy/desplegar.sh deploy/ssh-entrada.sh deploy/test/desplegar.test.sh scripts/cd/verificar-certificado.sh; do
   modo="$(git -C "$RAIZ_REPO" ls-files -s -- "$f" | cut -d" " -f1)"
