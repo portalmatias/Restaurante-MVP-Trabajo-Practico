@@ -89,7 +89,8 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
   el administrador la edita
 - **THEN** el listado muestra S4 "Fuera de la grilla", Columna y Fila están vacíos y la sección
   dice "La mesa quedó fuera de la grilla de la zona: elegí una ubicación nueva."
-- **AND** al elegir la columna 1 y la fila 1 y guardar, el sistema envía `posX` 0 y `posY` 0
+- **AND** al elegir la columna 9 y la fila 6, un lugar libre, y guardar, el sistema envía `posX` 8 y
+  `posY` 5 y, al confirmar la API, el listado muestra S4 en "Columna 9, fila 6"
 
 #### Scenario: Mensaje de tamaño de la API junto a la sección
 - **WHEN** la API responde `400` con "La mesa no entra en la grilla de 12 por 8."
