@@ -2,8 +2,8 @@
 
 Motivación y alcance: ver `proposal.md`. La dirección visual completa («Kakefuda») está en
 `frontend/.impeccable/surfaces/app-page-tsx.md` y el contexto de producto en
-`frontend/PRODUCT.md`, ambos solo en la rama `feature/diseno-frontend` (no están en `main` ni en
-este PR; versionarlos es la pregunta 5). Esta spec no depende de ellos para ser verificable.
+`frontend/PRODUCT.md`, ambos versionados dentro de `frontend/` (pregunta 5, decidida al
+archivar). Esta spec no depende de ellos para ser verificable.
 Este documento fija las decisiones técnicas y sus alternativas.
 
 Estado del que se parte: `frontend-base` define tokens en blanco y negro, Inter y una paleta
@@ -95,8 +95,8 @@ sobre madera necesita un indicador visible, no una prohibición.
 Un grupo de botones de alternancia en vez de `radio` o `select`: tocar otra tablilla cambia la
 elección sin un paso previo de «deseleccionar», y cada tablilla tiene su nombre accesible
 («20:00 a 23:30»). Se evaluó `role="radiogroup"` (mejor semántica de «una sola opción», pero
-exige manejo de flechas para ser correcto y el equipo no lo implementó); queda como Open
-Question. Una tablilla `completa` usa `aria-disabled` y no `disabled` (como los días no elegibles
+exige manejo de flechas para ser correcto y el equipo no lo implementó); se descartó para este
+change y se mantienen los botones con `aria-pressed` (pregunta 2, conformidad del equipo). Una tablilla `completa` usa `aria-disabled` y no `disabled` (como los días no elegibles
 del calendario, D11): sigue en el orden de tabulación y su nombre accesible compuesto («20:00 a
 23:30, completo») la anuncia; un `aria-label` taparía un «Completo» oculto dentro del botón.
 El giro 3D usa `rotateY` con `backface-visibility`, solo en `transform`, sin reflujo.
@@ -196,7 +196,8 @@ vistazo y, en pantallas anchas, queda a la izquierda de los turnos. Decisiones:
   no solo atenuación.
 - Tabulación móvil (un solo día con `tabindex="0"`) y flechas, Inicio, Fin, RePág y AvPág,
   siguiendo el patrón de cuadrícula de fechas de WAI-ARIA, sin `role="grid"`: se prefirió una
-  tabla de botones simple. Queda como pregunta 7 si el equipo prefiere `grid`.
+  tabla de botones simple. Se mantiene la tabla de botones y no se adopta `role="grid"` en este
+  change (pregunta 7, conformidad del equipo).
 - Cero dependencias: la aritmética de fechas usa `Date.UTC` y `getUTC*` (`config.yaml` §7); el
   día de hoy se calcula en el servidor con el offset de Argentina y llega como propiedad, de modo
   que el huso del dispositivo no cambie qué días son pasados.
@@ -296,25 +297,25 @@ Preguntas para el equipo (ninguna cambia el contrato de la API):
    *Respuesta (20/10/2026, @lussofacundo-iresm en #77): de acuerdo con archivar `frontend-cliente` primero. Hecho: se archivó en #84 (26/10/2026); falta fundir los requisitos al archivar este change (tarea 6.3).*
 2. **`radiogroup` o botones con `aria-pressed`** para elegir el turno (D3): ¿el equipo prefiere
    la semántica de radio aun a costa de implementar las flechas?
-   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a los botones con `aria-pressed`; no hace falta cambiar nada para aprobar la spec. Pendiente la opinión de @portalmatias.*
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a los botones con `aria-pressed`; no hace falta cambiar nada para aprobar la spec. Conformidad de @portalmatias (28/10/2026, en #92).*
 3. **¿Se acepta la excepción de 36 px** en el admin cuando no hay ningún puntero grueso (D10), o
    se vuelve a 44 px?
-   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a la excepción de 36 px. Pendiente la opinión de @portalmatias.*
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a la excepción de 36 px. Conformidad de @portalmatias (28/10/2026, en #92).*
 4. **Resuelta: WebP** (D6). Las imágenes ya están convertidas en el código; no queda decisión,
    solo verificar peso y calidad (tarea 5.2). Se conserva el número para no renumerar.
 5. **Ubicación de `.impeccable/`** y de `PRODUCT.md` (`frontend/`): ¿se versionan o quedan fuera
    del repositorio evaluable? Hoy están dentro de `frontend/`.
-   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin opinión fuerte; lo decide quien archive. Propuesta del autor: versionarlos, porque no traen secretos ni datos personales y `globals.css` y `tablilla.tsx` los citan en comentarios. Pendiente de decisión del equipo.*
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin opinión fuerte; lo decide quien archive. Propuesta del autor: versionarlos, porque no traen secretos ni datos personales y `globals.css` y `tablilla.tsx` los citan en comentarios. Decisión: se versionan dentro de `frontend/`, como quedaron al archivar; conformidad de @portalmatias (28/10/2026, en #92).*
 6. **Reparto de la revisión:** al ser nueve commits de una sola persona, ¿cómo se reparte la
    autoría y la revisión entre los tres integrantes (`config.yaml` §11)?
-   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): se aportaron dos commits propios a `feature/diseno-frontend` (`abff7bc`, `ae4086c`) y la revisión independiente de la spec; el resto del balance se ajusta en los changes sin implementación (`plano-mesas`, `despliegue-continuo-ec2`). Pendiente la conformidad de @portalmatias.*
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): se aportaron dos commits propios a `feature/diseno-frontend` (`abff7bc`, `ae4086c`) y la revisión independiente de la spec; el resto del balance se ajusta en los changes sin implementación (`plano-mesas`, `despliegue-continuo-ec2`). Conformidad de @portalmatias (28/10/2026, en #92).*
 7. **`role="grid"` o tabla de botones** en el calendario (D11): ¿el equipo prefiere la semántica
    de cuadrícula de fechas aun a costa de un modo de lectura más complejo para lectores de
    pantalla?
-   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a la tabla de botones. Pendiente la opinión de @portalmatias.*
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): sin objeción a la tabla de botones. Conformidad de @portalmatias (28/10/2026, en #92).*
 8. **Desviación de `config.yaml` §14** (spec posterior al código): ¿el equipo la acepta de forma
    expresa para este change, con la validación del PR de implementación contra `tasks.md`?
-   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): la desviación se acepta de forma expresa para este change. Pendiente la conformidad de @portalmatias.*
+   *Respuesta (20/10/2026, @lussofacundo-iresm en #77): la desviación se acepta de forma expresa para este change. Conformidad de @portalmatias (28/10/2026, en #92).*
 9. **Resuelta: acciones en infinitivo.** El equipo decidió mantener los botones y enlaces de
    acción en infinitivo y usar voseo solo en títulos y textos explicativos. Se registra como
    excepción a «Copy en voseo» de `frontend-cliente` (ver «Acciones en infinitivo»); falta que

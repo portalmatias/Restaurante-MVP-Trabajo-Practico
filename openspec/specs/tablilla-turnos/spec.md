@@ -1,0 +1,98 @@
+# tablilla-turnos Specification
+
+## Purpose
+Define la tablilla, el control con el que se elige el turno de una reserva, con sus estados (descartada y completa), el texto japonés solo decorativo y la variante informativa `TablillaPaso`.
+
+## Requirements
+
+### Requirement: Tablilla como control de selección de turno
+El sistema SHALL ofrecer el componente `Tablilla`, un `<button type="button">` que representa un
+turno como una tablilla de madera colgada. SHALL exponer su estado con `aria-pressed`
+(`true` solo cuando es la elegida) y SHALL aceptar un nombre accesible en español mediante
+`aria-label`. El texto principal y el detalle SHALL ir siempre en español y en horizontal. El
+objetivo táctil de una tablilla SHALL ser de al menos 44×44px.
+
+#### Scenario: Tablilla libre
+- **WHEN** se renderiza una `Tablilla` en estado `libre`
+- **THEN** es un botón con `aria-pressed="false"`, habilitado
+- **AND** su texto principal se lee en horizontal
+
+#### Scenario: Tablilla elegida
+- **WHEN** se renderiza una `Tablilla` en estado `elegida`
+- **THEN** tiene `aria-pressed="true"` y queda de frente con el borde marcado y el sello
+- **AND** el sello es decorativo (`aria-hidden="true"`)
+
+#### Scenario: Nombre accesible en español
+- **WHEN** se renderiza una `Tablilla` con `aria-label="20:00 a 23:30"`
+- **THEN** su nombre accesible es «20:00 a 23:30» y no incluye el texto japonés
+
+#### Scenario: Objetivo táctil
+- **WHEN** se mide una `Tablilla` renderizada a 390px de ancho
+- **THEN** su ancho y su alto son de al menos 44px
+
+### Requirement: Estados descartada y completa
+Cuando una persona elige una tablilla, las demás tablillas habilitadas SHALL pasar al estado
+`descartada`: se dan vuelta mostrando la madera oscura con su texto atenuado y SHALL seguir
+siendo tocables para cambiar la elección. Una tablilla `completa` SHALL NOT cambiar de estado
+por la elección de otra: sigue `completa`, con `aria-disabled="true"` y sin `aria-pressed`. Una
+tablilla en estado `completa` SHALL mostrarse boca abajo con un sello de «completo» y SHALL
+declararse con `aria-disabled="true"` y no con el atributo `disabled`: así sigue en el orden de
+tabulación y un lector de pantalla la anuncia, como los días no elegibles de `calendario-fecha`.
+Activarla SHALL NOT cambiar la elección. SHALL NOT exponer `aria-pressed`, y su nombre accesible
+terminar en «, completo» cuando recibe un `aria-label` (por ejemplo, «20:00 a 23:30, completo»):
+el componente compone ese sufijo sobre el `aria-label` recibido, porque un `aria-label`
+reemplaza cualquier texto `sr-only` interno y por eso un «Completo» oculto dentro del botón nunca
+se anunciaría. Sin `aria-label`, el nombre sale del contenido y lo completa un «Completo» solo
+para lectores de pantalla, sin la coma.
+
+#### Scenario: Las demás se dan vuelta pero siguen tocables
+- **WHEN** hay tres tablillas habilitadas y la persona toca la segunda
+- **THEN** la segunda queda `aria-pressed="true"` y las otras dos pasan a `descartada`
+- **AND** las otras dos siguen habilitadas y, al tocar una, esa pasa a `elegida`
+
+#### Scenario: Turno completo
+- **WHEN** se renderiza una `Tablilla` en estado `completa` con `aria-label="20:00 a 23:30"`
+- **THEN** el botón tiene `aria-disabled="true"`, no tiene el atributo `disabled` y no tiene
+  atributo `aria-pressed`
+- **AND** su nombre accesible es «20:00 a 23:30, completo»
+- **AND** se alcanza con la tecla Tab
+
+#### Scenario: Activar un turno completo no elige nada
+- **WHEN** la persona activa una tablilla `completa` con el mouse o el teclado
+- **THEN** no cambia la elección ni se llama a `onClick`
+
+#### Scenario: Un turno completo no se vuelve tocable
+- **WHEN** hay una tablilla `completa` y la persona elige otra
+- **THEN** la `completa` sigue con `aria-disabled="true"`, sin `aria-pressed`, y no pasa a
+  `descartada`
+
+#### Scenario: Como máximo una elegida
+- **WHEN** la persona elige turnos sucesivamente
+- **THEN** en todo momento hay como máximo una tablilla con `aria-pressed="true"`
+
+### Requirement: Texto japonés solo decorativo
+Una `Tablilla` o `TablillaPaso` SHALL poder mostrar un equivalente japonés del título en
+vertical al costado. Ese texto SHALL tener `aria-hidden="true"` y `lang="ja"`, SHALL NOT ser el
+único portador de información y SHALL NOT reemplazar al español.
+
+#### Scenario: El japonés queda fuera del árbol de accesibilidad
+- **WHEN** se renderiza una tablilla con `japones="夕食"`
+- **THEN** el elemento que lo contiene tiene `aria-hidden="true"` y `lang="ja"`
+- **AND** el título en español sigue visible en horizontal
+
+#### Scenario: Sin japonés, la tablilla funciona igual
+- **WHEN** se renderiza una tablilla sin la propiedad `japones`
+- **THEN** no se muestra ningún texto vertical y el resto del contenido no cambia de lugar
+
+### Requirement: TablillaPaso informativa
+El sistema SHALL ofrecer el componente `TablillaPaso`, una tablilla que solo informa: SHALL NOT
+ser un control, SHALL NOT recibir foco de teclado y SHALL mostrar el mismo texto bilingüe
+(español horizontal, japonés vertical decorativo).
+
+#### Scenario: No es interactiva
+- **WHEN** se navega con la tecla Tab por una lista de `TablillaPaso`
+- **THEN** el foco no se detiene en ninguna de ellas
+
+#### Scenario: Se usa dentro de una lista
+- **WHEN** la landing muestra los tres tiempos del omakase
+- **THEN** cada `TablillaPaso` está dentro de un elemento `<li>` de una lista ordenada

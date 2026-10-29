@@ -37,7 +37,7 @@ desde cero.
       excluye `.env*`. Los únicos datos que parecen personales son ficticios: `ana.perez@example.com`,
       `+54 9 11 5555-1234` y el admin del seed (`admin@restaurante-mvp.local`, documentado en el README).
       `PRODUCT.md` y `.impeccable/surfaces/app-page-tsx.md` no traen secretos, rutas locales ni nombres
-      personales. Recomendación (la decisión sigue siendo del equipo, pregunta 5): versionarlos, porque
+      personales. Recomendación, adoptada al cerrar la pregunta 5 (ver 6.2): versionarlos, porque
       `globals.css` y `tablilla.tsx` los citan en sus comentarios y esta spec también; fuera del
       repositorio esas referencias quedarían rotas.
 
@@ -63,7 +63,8 @@ desde cero.
       el rojo sobre madera (medido 2,0:1 con `#9A2A19`, el único rojo de la paleta: `#B2321F` no
       es un token de esta spec ni de `globals.css`).
 - [x] 2.5 `landing-ichigo`: las acciones de la landing se mantienen en infinitivo («Reservar una
-      mesa», «Ya tengo un código», «Elegir fecha y turno») por decisión expresa del equipo. No
+      mesa», «Consultar una reserva», «Elegir fecha y turno») por decisión expresa del equipo
+      (la etiqueta «Ya tengo un código» se cambió el 29/10/2026, ver #98). No
       requiere cambios en `app/page.tsx`: agregar un test que fije esos textos y que compruebe
       que los títulos y textos explicativos usan voseo y ninguno usa tuteo.
 - [x] 2.6 `landing-ichigo`, «Los pasos de reserva coinciden con el flujo real»: el primer paso de
@@ -190,7 +191,7 @@ desde cero.
       `/admin/reservas` se partía a mitad de la dirección; vuelto a medir, de 7 correos 4 ocupan dos
       líneas y ninguno se parte fuera de la arroba.
 
-- [ ] 4.3 Revisión de contraste: medir con una herramienta independiente (extensión de
+- [x] 4.3 Revisión de contraste: medir con una herramienta independiente (extensión de
       contraste del navegador o `webaim.org`) texto, bordes de controles, foco y sellos de las
       pantallas de 4.1 y 4.2, incluidos los estados `elegida`, `descartada` y `completa`.
       Confirmar 4,5:1 en texto y 3:1 en bordes; anotar cualquier incumplimiento como desvío.
@@ -201,8 +202,21 @@ desde cero.
       control medido baja de 3:1. Los días cerrados del calendario (2,37:1) y «Anterior/Siguiente»
       deshabilitados (3,18:1) son componentes inactivos, exentos por WCAG 1.4.3. No se midieron el
       anillo de foco en el navegador ni la tablilla `completa` (ninguna pantalla la usa); el contraste
-      del foco y de los tokens lo fijan `globals-foco.test.ts` y `globals-contrastes.test.ts`. Queda
-      para una persona repetir la medición con la extensión o `webaim.org`.
+      del foco y de los tokens lo fijan `globals-foco.test.ts` y `globals-contrastes.test.ts`.
+      Resultado (29/10/2026): medido con la API de `webaim.org` (Contrast Checker) sobre los
+      colores que usan esas pantallas, tomados de `app/globals.css` y de `tablilla.tsx`. Texto
+      (4,5:1): `foreground` 12,9 / 14,7 / 10,9 sobre `background` / `card` / `muted`;
+      `secondary` y `muted-foreground` 6,51 / 7,45 / 5,52; `accent` y `destructive` 5,68 / 6,51 /
+      4,81; `primary-foreground` sobre `primary` 14,7; `secondary-foreground` sobre `secondary`
+      7,45; `accent-foreground` sobre `accent` (sellos 予 y 満) 6,51; `madera-foreground` sobre
+      `madera` 13,1; título atenuado de `descartada` (`opacity-70`, color resultante `#b7afa1`)
+      sobre `madera` 7,16. Bordes y foco (3:1): `border` 3,66 sobre `background` y 4,19 sobre
+      `card`; borde de `elegida` (`accent` sobre `card`) 6,51; `ring` sobre `background` 5,68;
+      `ring-madera` sobre `madera` 13,1. Todo cumple.
+      Desvío anotado: el recuadro rojo del sello 満 de `completa` (`accent` sobre `madera`) da
+      2,01:1 contra la madera. El estado se reconoce igual por el glifo (6,51:1 contra su relleno)
+      y por la tablilla boca abajo, y el nombre accesible dice «completo»; si el equipo quiere el
+      recuadro en 3:1, alcanza con un borde `ring-madera` alrededor del sello.
 
 - [x] 4.4 Estados en escala de grises (DevTools, emulación de visión): comprobar que los cuatro
       estados de reserva y los niveles de aforo se distinguen sin color (spec `frontend-admin`).
@@ -227,7 +241,7 @@ desde cero.
       giro es instantáneo (180° a 0 ms). Sin `animation-timeline` se emuló quitando el bloque
       `@supports (animation-timeline: view())` y el contenido queda visible. No se probó Firefox.
 
-- [ ] 4.6 Teclado y lector de pantalla: recorrer el Paso 1 solo con teclado (Tab, Enter, Espacio)
+- [x] 4.6 Teclado y lector de pantalla: recorrer el Paso 1 solo con teclado (Tab, Enter, Espacio)
       y con NVDA o VoiceOver; comprobar el nombre de cada tablilla («20:00 a 23:30»), que el
       japonés no se lee, y que el foco llega al título al abrir el detalle y al volver al
       formulario, y al aviso «Tu reserva fue cancelada.» al cancelar una reserva.
@@ -237,7 +251,11 @@ desde cero.
       elementos `lang=ja` son `aria-hidden`. El foco llega al título al abrir el detalle y al volver
       al formulario. Diálogo de cancelación: el foco no sale a la página; Escape y «Volver» lo
       devuelven a «Cancelar mi reserva» y «Sí, cancelar» lo lleva al aviso «Tu reserva fue
-      cancelada.». No se pudo probar con NVDA ni VoiceOver: queda para una persona.
+      cancelada.». No se pudo probar con NVDA ni VoiceOver.
+      Resultado (28/10/2026): el equipo decidió omitir la prueba con lector de pantalla real,
+      porque `config.yaml` y las specs no la exigen (@portalmatias en #92). Lo que leería el lector
+      ya lo cubren los tests: nombres accesibles de las tablillas, japonés con `aria-hidden` y foco
+      en el título y en el aviso de cancelación; el recorrido con teclado está hecho.
 
 - [x] 4.7 Red: con la caché vacía y la pestaña de red abierta en `/`, confirmar que no hay
       pedidos a `fonts.googleapis.com` ni `fonts.gstatic.com`, medir el peso transferido de las
@@ -335,25 +353,34 @@ desde cero.
       más `fetchpriority`, el último día con la respuesta real del servidor, el guard del login,
       la tipografía del nombre y la entrada del nombre. Los desvíos de la sección 2 están en los
       commits de las tareas 2.1 a 2.12 y en la descripción del PR.
-- [ ] 6.2 Resolver las preguntas abiertas de `design.md` con el equipo y reflejar la decisión
+- [x] 6.2 Resolver las preguntas abiertas de `design.md` con el equipo y reflejar la decisión
       en la spec si cambia un requisito (la spec manda, `config.yaml` §14).
       Resultado parcial (27/10/2026): las preguntas 1, 2, 3, 5, 6, 7 y 8 tienen la respuesta de
       @lussofacundo-iresm (comentario del 20/10/2026 en #77, registrada en `design.md`, «Open
       Questions»); las 4 y 9 ya estaban resueltas. Falta la respuesta de @portalmatias, y la 5 espera
       una decisión del equipo. Ninguna respuesta cambia un requisito de la spec, así que no hace falta
-      modificarla. La tarea sigue abierta hasta tener la conformidad de Mati.
-- [ ] 6.3 Definir con el equipo el orden de archivado respecto de `frontend-cliente` (pregunta
+      modificarla.
+      Resultado (28/10/2026): @portalmatias dio su conformidad con las respuestas 2, 3, 5, 6, 7 y 8
+      en #92, y la 5 queda decidida (versionar `.impeccable/` y `PRODUCT.md` dentro de
+      `frontend/`). Anotado en `design.md`, «Open Questions».
+- [x] 6.3 Definir con el equipo el orden de archivado respecto de `frontend-cliente` (pregunta
       1) y, al archivar, fundir los requisitos de `experiencia-reserva-cliente` que
       contradigan a los de `frontend-cliente`. Incluye, en la spec de `frontend-cliente`,
       actualizar el requisito «Copy en voseo rioplatense» y su escenario «La acción principal de
       inicio usa voseo» (que hoy nombra «Reservar una mesa» como impersonal incorrecto) con la
       excepción de los botones y enlaces de acción en infinitivo (`design.md`, «Acciones en
       infinitivo»), y retirar el `Select` de turnos que mencionan su design y sus tareas.
-      Estado (27/10/2026): el orden ya está definido, `frontend-cliente` se archivó primero (#84,
-      26/10/2026), con el acuerdo de @lussofacundo-iresm. Falta lo que se hace al archivar este change:
-      fundir los requisitos de `experiencia-reserva-cliente` que contradigan a los de
-      `frontend-cliente`, actualizar «Copy en voseo rioplatense» y retirar el `Select` de turnos en
-      `openspec/specs/frontend-cliente/spec.md`. Queda abierta hasta ese PR.
+      Resultado (28/10/2026): el orden quedó así: `frontend-cliente` se archivó primero (#84,
+      26/10/2026) y este change después. Al revisar el texto fundido de ambos: los requisitos de
+      `experiencia-reserva-cliente` no contradicen a los de `frontend-cliente`, los refinan (`design.md`,
+      «Precedencia sobre `frontend-cliente`»), y esa capability es nueva, así que se agrega sin
+      reemplazar nada. Lo único que había que cambiar en `frontend-cliente` era «Copy en voseo
+      rioplatense», y va como delta MODIFIED en `specs/frontend-cliente/spec.md`: excepción de las
+      etiquetas de acción en infinitivo y escenario nuevo «Las etiquetas de acción van en
+      infinitivo» (se conserva el escenario «La acción principal de inicio usa voseo», referido al
+      texto que acompaña la acción). El `Select` de turnos no estaba en la spec de
+      `frontend-cliente`, solo en su design y tareas ya archivados (#84), que no se reescriben: la
+      spec principal no tiene nada que retirar.
 - [x] 6.4 Pasar `npx openspec validate --all --strict` y esperar a que CI quede en verde antes de
       pedir la aprobación de un compañero distinto del autor.
       Resultado (27/10/2026): `npx openspec validate --all --strict` da 17 de 17 válidos. En
@@ -361,3 +388,17 @@ desde cero.
       cubic) terminaron en verde; `eslint` limpio y 766 de 766 tests del frontend con `TZ=UTC` y
       con `TZ=America/Argentina/Buenos_Aires` (corridos en local: el CI de este PR no ejecuta los
       del frontend).
+
+## Tareas abiertas al archivar y su cierre
+
+1. **Al archivar (28/10/2026, `d686a67`):** la 6.3 se cerró como parte del propio archivado.
+   Quedaron sin marcar la 4.3 (contraste con herramienta independiente), la 4.6 (lector de
+   pantalla) y la 6.2 (conformidad de @portalmatias con «Open Questions»). @FedeWerk decidió
+   archivar igual (`f1af182`), aunque `config.yaml` §13 pide todas las tareas completas, y
+   cerrarlas en el mismo PR (#92) antes de integrarlo.
+2. **29/10/2026, `0f6d7cb`:** 4.6 omitida por decisión del equipo y 6.2 con la conformidad de
+   @portalmatias.
+3. **29/10/2026, `691d0c1`:** 4.3 medida con `webaim.org`, con un desvío anotado en la tarea.
+
+Desde ese último commit no queda ninguna tarea sin marcar, así que el change llega a `main`
+cumpliendo `config.yaml` §13.

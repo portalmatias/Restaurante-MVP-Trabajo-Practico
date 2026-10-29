@@ -414,7 +414,7 @@ minutos.
 #### Scenario: La fecha se muestra en formato largo en español
 - **WHEN** se muestra una fecha de calendario en cualquier pantalla del cliente
 - **THEN** se muestra con el día de la semana, el día, el mes y el año en español (por
-  ejemplo, "sábado 19 de septiembre de 2026")
+  ejemplo, "sábado, 19 de septiembre de 2026")
 
 #### Scenario: El horario de un turno no depende de la zona horaria del dispositivo
 - **WHEN** se muestra el horario de la cena (20:00 a 23:30 hora local del restaurante) en un
@@ -422,19 +422,30 @@ minutos.
 - **THEN** la pantalla sigue mostrando "20:00" y "23:30", sin corrimiento
 
 ### Requirement: Copy en voseo rioplatense
-Todo texto de interfaz dirigido a la persona que reserva, incluidas las etiquetas de las
-acciones principales, SHALL usar voseo rioplatense ("reservá", "elegí", "revisá") en vez de
-tuteo o de un registro impersonal.
+Todo texto de interfaz dirigido a la persona que reserva SHALL usar voseo rioplatense
+("reservá", "elegí", "revisá") en vez de tuteo o de un registro impersonal, con una excepción
+acotada: las etiquetas de las acciones (botones y enlaces de llamada a la acción) SHALL estar en
+infinitivo («Reservar una mesa», «Volver», «Reintentar»), que es la convención de la categoría
+(`openspec/changes/archive/2026-10-28-rediseno-frontend-ichigo/design.md`, «Acciones en infinitivo»). Los títulos, los textos
+explicativos y los mensajes SHALL seguir en voseo. La excepción es de registro, no de
+accesibilidad: el nombre accesible de cada acción sigue siendo claro y verbal.
 
 #### Scenario: La acción principal de inicio usa voseo
-- **WHEN** se muestra la acción principal de la pantalla de inicio
-- **THEN** su texto usa una forma de voseo (por ejemplo, "Reservá tu mesa"), no de tuteo
-  ("Reserva tu mesa") ni impersonal ("Reservar una mesa")
+- **WHEN** se muestra la pantalla de inicio con su acción principal
+- **THEN** el texto explicativo que la acompaña usa voseo (por ejemplo, "Reservá tu lugar en pocos pasos"),
+  no tuteo ni un registro impersonal
+- **AND** la etiqueta de la acción, por ser una acción, queda en infinitivo (ver el escenario
+  siguiente)
+
+#### Scenario: Las etiquetas de acción van en infinitivo
+- **WHEN** se muestra una acción de llamada a la acción, como la principal de inicio
+- **THEN** su etiqueta está en infinitivo (por ejemplo, "Reservar una mesa"), no en tuteo
+  ("Reserva tu mesa") ni en imperativo
 
 #### Scenario: Un mensaje de error de servidor usa voseo
 - **WHEN** se muestra el mensaje genérico de error de servidor o de red
-- **THEN** su texto usa una forma de voseo (por ejemplo, "Intentá de nuevo"), no la forma de
-  tuteo que usa hoy `frontend-base` ("Intente de nuevo")
+- **THEN** su texto usa una forma de voseo (por ejemplo, "Intentá de nuevo"), no el registro
+  formal de usted ("Intente de nuevo") ni el tuteo
 
 ### Requirement: Sin enlaces a la administración
 Ninguna pantalla nueva de este change, ni la navegación compartida, SHALL mostrar un enlace o
