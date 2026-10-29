@@ -25,14 +25,14 @@ commit verde de `main` se despliega solo.
 ```
 push a main ─> CI en verde ─> cd.yml ─┬─ decidir   (¿se despliega este SHA?)
                                       ├─ imagenes  (build y push a GHCR; salen los digests)
-                                      └─ desplegar (ssh deploy@servidor "<sha> <digests> <modo>")
-                                                          │
-                                       servidor Ubuntu   ▼
-                  clave con comando forzado ─> /opt/reservas/deploy/ssh-entrada.sh
-                    (valida el pedido) ─> sudo /opt/reservas/deploy/desplegar.sh
-                                  └─ lee /opt/reservas/.env, migra, carga el seed, levanta
-                                     Compose y comprueba (si falla, vuelve a la versión
-                                     que estaba sirviendo)
+                                      ├─ desplegar (ssh deploy@servidor "<sha> <digests> <modo>")
+                                      │     en el servidor Ubuntu: la clave con comando forzado
+                                      │     ─> /opt/reservas/deploy/ssh-entrada.sh (valida el pedido)
+                                      │     ─> sudo /opt/reservas/deploy/desplegar.sh: lee
+                                      │        /opt/reservas/.env, migra, carga el seed, levanta
+                                      │        Compose y comprueba (si falla, vuelve a la versión
+                                      │        que estaba sirviendo)
+                                      └─ verificar (el sitio PÚBLICO sirve este SHA: GET /version)
 ```
 
 - **Un solo servicio público:** Caddy, en los puertos 80 y 443. PostgreSQL, backend y frontend
@@ -451,6 +451,66 @@ pedido no es el esperado (versión de `cd.yml` distinta de la de `ssh-entrada.sh
 
 Las migraciones se escriben **compatibles hacia atrás** (agregar antes que renombrar o borrar):
 la vuelta atrás levanta imágenes viejas sobre un esquema ya migrado.
+
+### Cómo comprobar que un cambio del frontend llegó
+
+Un despliegue en verde dice que el servidor levantó la versión nueva. No dice que el sitio
+público la sirva: entre el servidor y los usuarios está Cloudflare, que podría conservar una copia
+vieja. Por eso, después de cada despliegue que cambia producción, el job **Verificar versión
+publicada** de `cd.yml` pide `https://<subdominio>/version` y compara el SHA con el desplegado
+(`scripts/cd/verificar-version.mjs`). La ruta la expone el frontend con el SHA que `cd.yml`
+hornea en la imagen (`BUILD_SHA`) y responde `{"sha": "<40 hex>"}` sin caché.
+
+- **En Actions:** la corrida de **CD** termina con el job `verificar`. En verde, el resumen dice
+  qué SHA se verificó. Si el despliegue falló o volvió atrás solo, `verificar` no corre (el job
+  `desplegar` ya está en rojo); si el SHA estaba superado, tampoco (no se desplegó nada).
+- **A mano:** el `cb` cambia la URL en cada pedido y evita que una caché responda por el sitio.
+
+  ```bash
+  curl -s "https://<subdominio>/version?cb=$RANDOM$RANDOM"   # {"sha":"<40 hex>"}
+  ```
+
+  Compará el SHA con el que dice el resumen del job `desplegar` de esa corrida, no con `origin/main`:
+  puede haber sido una vuelta atrás, un commit histórico o una versión superada.
+
+**Si el SHA no coincide**, el job falla pasados 5 minutos y su mensaje dice cuál se vio. En ese
+caso el despliegue en el servidor **terminó bien**; lo que no se confirmó es lo que ve el público.
+Separar de qué lado está el problema:
+
+1. **¿Qué sirve el servidor, salteando Cloudflare?** Se pide a la IP elástica con el nombre del
+   sitio (el certificado de Let's Encrypt es válido para ese nombre):
+
+   ```bash
+   curl -s --resolve <subdominio>:443:<IP-ELASTICA> "https://<subdominio>/version?cb=$RANDOM$RANDOM"
+   ```
+
+2. **Si el servidor sirve el SHA correcto pero el público ve otro**, la copia vieja está en
+   Cloudflare. Mirar el encabezado `cf-cache-status` de la respuesta pública
+   (`curl -sI "https://<subdominio>/version?cb=$RANDOM$RANDOM"`; `HIT` confirma que hay caché), revisar
+   si alguna regla de caché de la zona alcanza a `/version` y **purgar** el contenido en el
+   panel de Cloudflare (*Caching → Configuration → Purge Cache*). La zona es de la docente: pedirle
+   que lo haga o que excluya `/version` y la landing de la caché.
+3. **Si el servidor también sirve el SHA anterior**, mirar `/opt/reservas/.despliegue/VERSION_ACTUAL`
+   y los digests de `historial`, y compararlos con los del resumen del job `desplegar`. Si no
+   coinciden, es un problema del despliegue y no del borde: seguir «Vuelta atrás manual».
+4. **Relanzar solo la comprobación:** en la corrida de **CD**, *Re-run failed jobs*. No vuelve a
+   desplegar; repite `verificar` (los jobs que salieron bien se reutilizan).
+
+Otros mensajes de `verificar`:
+
+- **«la imagen del frontend se construyó sin BUILD_SHA»** (`"sha": "desconocido"`): la imagen no
+  recibió el argumento. Falla de inmediato, sin esperar; revisar `build-args` del frontend en
+  `cd.yml`.
+- **«No se pudo comprobar… SUBDOMINIO»**: falta la variable de repositorio `SUBDOMINIO` o no es un
+  nombre de dominio válido (en minúscula, sin protocolo ni puerto). La comprobación asume HTTPS;
+  no se saltea en silencio.
+- **«no verificable»** (aviso, job en verde): se hizo una vuelta atrás a una versión construida
+  antes de que existiera `/version`.
+- **Un SHA posterior** (aviso, job en verde): otro despliegue más nuevo ya quedó sirviendo mientras
+  se verificaba este; en una vuelta atrás, en cambio, se considera un fallo.
+
+**Alcance:** la comprobación prueba el frontend. El backend lo cubre `desplegar.sh` (digest,
+migraciones y chequeo de salud con vuelta atrás), y la base no se comprueba.
 
 ### Vuelta atrás manual
 

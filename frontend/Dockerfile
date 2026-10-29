@@ -51,6 +51,13 @@ COPY --from=build --chown=root:root /app/frontend/.next/standalone ./
 COPY --from=build --chown=root:root /app/frontend/.next/static ./frontend/.next/static
 COPY --from=build --chown=root:root /app/frontend/public ./frontend/public
 
+# SHA del commit del que se construye la imagen (D2 de verificacion-version-desplegada). Lo pasa
+# cd.yml con el mismo valor del tag y de la etiqueta `revision`; GET /version lo devuelve en cada
+# pedido. Va acá, en la etapa final y después de los COPY, para que cambiarlo invalide solo esta
+# capa y no la caché de `npm ci` ni de `next build`. No es un secreto: el repositorio es público.
+ARG BUILD_SHA=desconocido
+ENV BUILD_SHA=${BUILD_SHA}
+
 USER node
 EXPOSE 3000
 

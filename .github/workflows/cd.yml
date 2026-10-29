@@ -183,7 +183,12 @@ jobs:
           file: frontend/Dockerfile
           platforms: linux/amd64
           push: true
-          build-args: NEXT_PUBLIC_API_URL=http://backend:3001
+          # BUILD_SHA es el mismo SHA del tag y de la etiqueta `revision` (D2 de
+          # verificacion-version-desplegada): GET /version lo devuelve y el job `verificar` lo
+          # compara con lo que sirve el sitio público.
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://backend:3001
+            BUILD_SHA=${{ needs.decidir.outputs.sha }}
           tags: ${{ steps.existentes.outputs.registro }}/reservas-frontend:${{ needs.decidir.outputs.sha }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -222,6 +227,10 @@ jobs:
     environment: produccion
     permissions:
       contents: read
+    outputs:
+      # `desplegado` si desplegar.sh cambió producción; `superada` si terminó en 3 (versión
+      # anterior a la que ya sirve: no se cambió nada). El job `verificar` corre solo con el primero.
+      resultado: ${{ steps.ejecutar.outputs.resultado }}
     env:
       SHA: ${{ needs.decidir.outputs.sha }}
       MODO: ${{ needs.decidir.outputs.modo }}
@@ -257,6 +266,7 @@ jobs:
           fi
 
       - name: Ejecutar el despliegue en el servidor
+        id: ejecutar
         run: |
           umask 077
           directorio="$(mktemp -d "$RUNNER_TEMP/ssh.XXXXXX")"
@@ -291,6 +301,7 @@ jobs:
               echo "- SHA: \`$SHA\`"
               echo "- Producción conserva la versión más nueva que ya estaba sirviendo."
             } >> "$GITHUB_STEP_SUMMARY"
+            echo "resultado=superada" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "$estado" -ne 0 ]; then
@@ -313,3 +324,37 @@ jobs:
               echo "- Frontend: \`$DIGEST_FRONTEND\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "resultado=desplegado" >> "$GITHUB_OUTPUT"
+
+  verificar:
+    name: Verificar versión publicada
+    needs: [decidir, desplegar]
+    # Solo si el despliegue cambió producción: no corre si falló o volvió atrás (el job
+    # `desplegar` queda en rojo) ni si la versión estaba superada (nada que comprobar).
+    if: needs.desplegar.result == 'success' && needs.desplegar.outputs.resultado == 'desplegado'
+    runs-on: ubuntu-latest
+    # Sin `environment`: no recibe la clave SSH ni ningún secret. Solo pide /version al sitio
+    # público y, en modo despliegue, le pregunta a la API de GitHub si un SHA es posterior a otro.
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      # El script sale siempre de main, como la función de decisión del job `decidir`.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Comprobar que el sitio sirve el commit desplegado (scripts/cd/verificar-version.mjs)
+        env:
+          SUBDOMINIO: ${{ vars.SUBDOMINIO }}
+          SHA: ${{ needs.decidir.outputs.sha }}
+          MODO: ${{ needs.decidir.outputs.modo }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/cd/verificar-version.mjs
