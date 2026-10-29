@@ -193,7 +193,7 @@ verificar "pide abrir el security group y espera más al certificado" contiene "
 verificar "prueba HTTPS con el nombre del sitio (--resolve)" contiene "$FAKE_DIR/curl.log" "resolve falla.prueba.test:443:127.0.0.1"
 verificar "la vuelta atrás vuelve a la etapa :80" contiene "$T/salida.txt" "VUELTA ATRÁS a $SHA1 completada, con la etapa :80"
 verificar "la vuelta atrás comprueba por HTTP" contiene "$FAKE_DIR/curl.log" "^url http://127.0.0.1"
-ultimo="$(ls "$FAKE_DIR"/up-*.env | sort -t- -k2 -n | tail -1)"
+ultimo="$FAKE_DIR/up-$(subidas).env" # up-1, up-2, ...: el último es el de número igual a la cantidad
 verificar "el último env de Compose quedó con SITE_ADDRESS=:80" contiene "$ultimo" "^SITE_ADDRESS=:80$"
 verificar "la etapa vigente sigue en :80" grep -qx ":80" "$ESTADO/SITE_ADDRESS_VIGENTE"
 
@@ -259,7 +259,7 @@ FAKE_DIGEST_ROTO="$DC" desplegar "$SHA2" "$DC" "$FC" despliegue
 [ "$CODIGO" = 1 ] && ok "termina en 1" || mal "termina en 1 (código $CODIGO)" "$(cat "$T/salida.txt")"
 verificar "avisa la vuelta atrás a B" contiene "$T/salida.txt" "VUELTA ATRÁS a $SHA1 completada"
 [ "$(version_actual)" = "$SHA1 $DB_ $FB" ] && ok "la versión en servicio sigue siendo B" || mal "la versión en servicio sigue siendo B" "$(version_actual)"
-ultimo="$(ls "$FAKE_DIR"/up-*.env | sort -t- -k2 -n | tail -1)"
+ultimo="$FAKE_DIR/up-$(subidas).env" # up-1, up-2, ...: el último es el de número igual a la cantidad
 verificar "el último env de Compose levanta las imágenes de B" contiene "$ultimo" "^DIGEST_BACKEND=$DB_$"
 [ "$(head_del_clon)" = "$SHA1" ] && ok "el clon queda en el commit de B" || mal "el clon queda en el commit de B"
 verificar "C no entra en el historial" no_contiene "$ESTADO/historial" "^$SHA2 "
