@@ -90,14 +90,10 @@
         variables de entorno (nunca interpolados en el código de un paso); `GITHUB_TOKEN` se usa
         solo con permisos `contents: read` (`contents: read`);
       - acciones de terceros fijadas por SHA, como el resto del archivo.
-      Verificar con `actionlint` sin errores. **Dependencia:** hoy `actionlint` termina en `1` sobre
-      `cd.yml` por el aviso SC2015 de la validación de `SERVER_PORT`. Corregirlo es la tarea 5.4 del
-      change `despliegue-continuo-ec2` (pendiente; la reescritura está en #88, pero falta correr
-      `actionlint`). Esta tarea no puede darse por cumplida hasta resolver esa.
-      Estado (26/10/2026): implementado (`build-args` con `BUILD_SHA`, salida `resultado` y job
-      `verificar`) y el YAML se parseó bien; falta correr `actionlint`, que no está disponible
-      en el equipo donde se hizo.
-      Resultado (29/10/2026): resuelto. La 5.4 de `despliegue-continuo-ec2` quedó hecha (#88) y el
+      Verificar con `actionlint` sin errores. Dependía de la tarea 5.4 del change
+      `despliegue-continuo-ec2` (el aviso SC2015 de la validación de `SERVER_PORT` en `cd.yml`).
+      Resultado (29/10/2026): implementado (`build-args` con `BUILD_SHA`, salida `resultado` y job
+      `verificar`) y verificado. La 5.4 de `despliegue-continuo-ec2` quedó hecha (#88) y el
       job «Lint de scripts y workflows» (#90: `actionlint` 1.7.7 y `shellcheck`) pasó en el CI de
       `main` sobre el `cd.yml` con el job `verificar` (corrida 40797700555, commit `10cd8ae`).
 - [x] 3.5 (verificaciones posteriores al despliegue) Probar el ciclo completo de
@@ -106,13 +102,12 @@
       change por primera vez, producción pasa de no tener `/version` a tenerla, y ese despliegue
       es la prueba de extremo a extremo (ver Migration Plan).
 
-      Estado (26/10/2026): probado contra `https://ichigo.alquilerespunilla.com.ar`, que todavía
-      no tiene `/version`: en modo `despliegue` falla con `HTTP 404` tras los intentos y en
-      `vuelta-atras` queda «no verificable», sin seguir redirecciones y con el certificado
-      verificado. El caso de éxito contra producción falta hasta el primer despliegue con este
-      change.
-      Resultado (29/10/2026): primer despliegue con este change (merge `10cd8ae`, corrida de CD
-      40797889659): las cuatro etapas en verde, incluido «Verificar versión publicada».
+      Primera prueba (26/10/2026), antes de desplegar este change: contra
+      `https://ichigo.alquilerespunilla.com.ar`, que entonces no tenía `/version`, en modo
+      `despliegue` falló con `HTTP 404` tras los intentos y en `vuelta-atras` quedó «no
+      verificable», sin seguir redirecciones y con el certificado verificado.
+      Resultado (29/10/2026): caso de éxito en el primer despliegue con este change (merge
+      `10cd8ae`, corrida de CD 40797889659): las cuatro etapas en verde, incluido «Verificar versión publicada».
       `GET https://ichigo.alquilerespunilla.com.ar/version` → `{"sha":"10cd8aecb6db…"}`, igual al
       SHA de `main`.
 ## 4. Documentación y cierre
