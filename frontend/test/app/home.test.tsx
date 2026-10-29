@@ -33,7 +33,7 @@ describe("Landing (/)", () => {
   // títulos y textos explicativos, en voseo y nunca en tuteo.
   it.each([
     ["Reservar una mesa", "/reservas"],
-    ["Ya tengo un código", "/reservas/consultar"],
+    ["Consultar una reserva", "/reservas/consultar"],
     ["Elegir fecha y turno", "/reservas/nueva"],
   ])("la acción «%s» queda en infinitivo y lleva a %s", (nombre, destino) => {
     render(<Home />);
@@ -94,7 +94,7 @@ describe("Landing (/)", () => {
       for (const seccion of ["Omakase: confiá en el itamae", "Una sala en silencio", "Así se reserva"]) {
         expect(screen.getByRole("heading", { level: 2, name: seccion })).toBeVisible();
       }
-      for (const accion of ["Reservar una mesa", "Ya tengo un código", "Elegir fecha y turno"]) {
+      for (const accion of ["Reservar una mesa", "Consultar una reserva", "Elegir fecha y turno"]) {
         expect(screen.getByRole("link", { name: accion })).toBeVisible();
       }
     });
