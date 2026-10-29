@@ -34,14 +34,14 @@ además que la mesa no cambió en la base.
 - [ ] 3.2 Extender `MesasService.ejecutarActualizacion` con el lugar final, la comparación contra
       lo guardado y la validación de design.md D2, dentro de la transacción `Serializable`
       existente. Tests primero (rojo, luego verde): mover, tocarse, superposición `409` con su
-      mensaje, cambio de tamaño `409`, fuera de grilla `400` con su mensaje, fuera de grilla gana
+      mensaje (con una y con varias mesas), cambio de tamaño `409`, fuera de grilla `400` con su mensaje, fuera de grilla gana
       sobre la superposición, coordenada a medias gana sobre el tamaño mayor que la grilla, tamaño
       mayor que la grilla gana sobre fuera de la grilla, coordenada a medias `400` (también con el valor guardado, y con una `null` junto a otra con valor), tamaño mayor que la grilla en una mesa
       sin ubicar `400`, forma, forma y reenvío de la ubicación de una mesa con un problema previo
       (cargado directo en la base), quitar del plano, y las validaciones existentes antes que las
       de ubicación.
 - [ ] 3.3 Cubrir el cambio de zona y la concurrencia sobre la lógica de 3.2. Tests primero (rojo,
-      luego verde): cambio de zona sin ubicación, con ubicación y con ubicación fuera de la grilla
+      luego verde): reenviar la misma zona, cambio de zona sin ubicación, con ubicación y con ubicación fuera de la grilla
       nueva (usando la mesa S6 que define el spec, cargada directo en la base), mesa que no entra
       en la grilla nueva (S8, cargada directo en la base), y dos `PATCH`
       simultáneos con `Promise.all` hacia una celda libre, de los que exactamente uno responde
@@ -89,7 +89,8 @@ plano" de `specs/frontend-admin/spec.md`.
 - [ ] 4.5 Cambio de zona en el formulario. Tests primero (rojo, luego verde): cambio de zona,
       cambio a una zona más chica que ajusta el tamaño, cambio de zona sin elegir ubicación, con
       la misma columna y fila (envía las dos coordenadas aunque coincidan con las de la zona
-      vieja), volver a la zona original que restaura la ubicación, y cambios de zona rápidos con
+      vieja), volver a la zona original que restaura la ubicación (también con una mesa
+      fuera de la grilla), y cambios de zona rápidos con
       la respuesta vieja llegando última. Verificar que pasan y que los
       tests actuales del panel siguen en verde.
 
