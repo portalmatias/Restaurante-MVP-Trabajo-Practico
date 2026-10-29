@@ -120,13 +120,13 @@
       Resultado (26/10/2026): `shellcheck` 0.10.0 sin advertencias (solo un aviso de nivel info,
       SC2015, en una línea que se comporta bien). Los cinco casos inválidos terminan en `2` sin
       crear la raíz de despliegue.
-- [ ] 5.2 Probar `desplegar.sh` contra una máquina local o una VM con Docker, apuntando a un
+- [x] 5.2 Probar `desplegar.sh` contra una máquina local o una VM con Docker, apuntando a un
       remoto de prueba:
       - un SHA sano termina en 0, escribe `VERSION_ACTUAL` y lo agrega a `historial`;
       - con dos versiones ya desplegadas (A y después B), una versión C que no responde
         vuelve a **B** (la que estaba sirviendo), no a A, y termina en 1;
-      - en modo `despliegue`, un SHA ancestro de la versión actual termina en 0 sin cambiar
-        nada;
+      - en modo `despliegue`, un SHA ancestro de la versión actual termina en 3 («versión
+        superada», que el workflow distingue de un error) sin cambiar nada;
       - en modo `vuelta-atras`, un SHA que está en `historial` vuelve con sus digests
         registrados, aunque el tag se haya vuelto a publicar con otra imagen; uno que no está
         en `historial` se rechaza;
@@ -139,6 +139,15 @@
         despliegue termina igual y el log queda completo.
 
       Guardar las salidas para el PR.
+      Resultado (28/10/2026): cubierto por `deploy/test/desplegar.test.sh` (`npm run
+      test:deploy`), con un repositorio Git temporal como remoto y simulacros de `docker`, `curl`,
+      `flock`, `sleep` y `stat` en lugar de Docker real: prueba la lógica del script, no Docker ni
+      Caddy. Cada punto tiene su caso (1, 4 y 7 a 12; el 4 confirma el código 3 de la versión
+      superada) y el archivo da 79 de 79 comprobaciones. Se comprobó que los casos nuevos
+      detectan el error rompiendo el script a propósito de seis formas, una por punto (sin ignorar
+      SIGHUP, vuelta atrás a la primera versión del historial, vuelta atrás con los digests
+      recibidos, migración rota ignorada, sin control del modo del `.env` y limpieza que conserva
+      solo la versión actual): cada rotura hace fallar su caso.
 - [x] 5.3 Escribir primero los tests y después `deploy/ssh-entrada.sh` (D4), el comando
       forzado de la clave SSH. Los tests lo ejecutan con distintos `SSH_ORIGINAL_COMMAND` y un
       `desplegar.sh` de prueba que solo registra sus argumentos:
