@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Ichigo: a hanging Kakefuda wooden tag with the brush stroke 一 ("ichi"). Colors are the theme tokens. -->
+  <rect x="7" y="7.5" width="18" height="24" rx="2.5" fill="#8a6a43"/>
+  <rect x="7" y="6" width="18" height="24" rx="2.5" fill="#f3ebda" stroke="#8a6a43" stroke-width="1.5"/>
+  <path d="M14.7 10.4C13.6 6 14.4 2.6 16 1.2c1.6 1.4 2.4 4.8 1.3 9.2" fill="none" stroke="#2b221b" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="16" cy="10.4" r="1.4" fill="#2b221b"/>
+  <path d="M9.4 20.4c1-1.9 3.4-2.4 6.2-2.3 2.6.1 4.6-.1 6.2-.5 1.3-.3 1.9.9 1.1 1.9-.8 1.1-2.3 1.7-4.2 1.9-2.6.3-5 .3-7.2.5-1.4.1-2.4-.4-2.1-1.5z" fill="#1f1813"/>
+</svg>
