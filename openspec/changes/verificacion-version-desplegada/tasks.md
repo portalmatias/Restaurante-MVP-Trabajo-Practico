@@ -40,11 +40,10 @@
       `Cache-Control: no-store`; `HEAD` → `200`; `POST`, `PUT`, `PATCH` y `DELETE` → `405`; con
       `BUILD_SHA` vacío → `{"sha":"desconocido"}`. Un segundo build con otro SHA reutilizó la
       caché (`npm ci` y `npm run build` en `CACHED`).
-      Falta (28/10/2026): `OPTIONS` → `204` con `Allow` (lo resuelve Next solo, pero no se
-      comprobó; los tests de 2.1 no lo cubren) y construir sin el argumento (se probó con
-      `BUILD_SHA` vacío, no omitido). Se comprueban `OPTIONS` en producción tras el primer
-      despliegue (4.6) y el build sin argumento en la próxima ocasión con Docker; hasta entonces
-      esta tarea queda abierta.
+      Comprobado en producción (29/10/2026, tras el despliegue de `10cd8ae`): `OPTIONS` → `204`
+      con `allow: GET, HEAD, OPTIONS`; `HEAD` → `200` con `Cache-Control: no-store`; `POST` →
+      `405`. Falta (se mantiene abierta): construir la imagen sin el argumento `BUILD_SHA` (se
+      probó con `BUILD_SHA` vacío, no omitido), a hacer en la próxima ocasión con Docker.
 ## 3. La comprobación (D3 a D6)
 
 - [x] 3.1 Escribir primero `scripts/cd/verificar-version.test.mjs` (`node --test`, sin
@@ -81,7 +80,7 @@
       de `test:scripts` (Node 20 no expande globs). Verificar que `npm run test:scripts` corre
       el archivo nuevo.
       Resultado (26/10/2026): `npm run test:scripts`: 103 de 103 (28/10/2026).
-- [ ] 3.4 `cd.yml`:
+- [x] 3.4 `cd.yml`:
       - `build-args` del frontend con `BUILD_SHA` (el mismo SHA del tag y de la etiqueta);
       - salida `resultado` del job `desplegar` (`desplegado` o `superada`, según el código de
         salida de `desplegar.sh`);
@@ -91,24 +90,26 @@
         variables de entorno (nunca interpolados en el código de un paso); `GITHUB_TOKEN` se usa
         solo con permisos `contents: read` (`contents: read`);
       - acciones de terceros fijadas por SHA, como el resto del archivo.
-      Verificar con `actionlint` sin errores. **Dependencia:** hoy `actionlint` termina en `1` sobre
-      `cd.yml` por el aviso SC2015 de la validación de `SERVER_PORT`. Corregirlo es la tarea 5.4 del
-      change `despliegue-continuo-ec2` (pendiente; la reescritura está en #88, pero falta correr
-      `actionlint`). Esta tarea no puede darse por cumplida hasta resolver esa.
-      Estado (26/10/2026): implementado (`build-args` con `BUILD_SHA`, salida `resultado` y job
-      `verificar`) y el YAML se parseó bien; falta correr `actionlint`, que no está disponible
-      en el equipo donde se hizo.
-- [ ] 3.5 (verificaciones posteriores al despliegue) Probar el ciclo completo de
+      Verificar con `actionlint` sin errores. Dependía de la tarea 5.4 del change
+      `despliegue-continuo-ec2` (el aviso SC2015 de la validación de `SERVER_PORT` en `cd.yml`).
+      Resultado (29/10/2026): implementado (`build-args` con `BUILD_SHA`, salida `resultado` y job
+      `verificar`) y verificado. La 5.4 de `despliegue-continuo-ec2` quedó hecha (#88) y el
+      job «Lint de scripts y workflows» (#90: `actionlint` 1.7.7 y `shellcheck`) pasó en el CI de
+      `main` sobre el `cd.yml` con el job `verificar` (corrida 40797700555, commit `10cd8ae`).
+- [x] 3.5 (verificaciones posteriores al despliegue) Probar el ciclo completo de
       `verificar-version.mjs` contra el sitio de producción real con el SHA que sirve hoy (por
       ejemplo `node scripts/cd/verificar-version.mjs` con las variables del job): al desplegar este
       change por primera vez, producción pasa de no tener `/version` a tenerla, y ese despliegue
       es la prueba de extremo a extremo (ver Migration Plan).
 
-      Estado (26/10/2026): probado contra `https://ichigo.alquilerespunilla.com.ar`, que todavía
-      no tiene `/version`: en modo `despliegue` falla con `HTTP 404` tras los intentos y en
-      `vuelta-atras` queda «no verificable», sin seguir redirecciones y con el certificado
-      verificado. El caso de éxito contra producción falta hasta el primer despliegue con este
-      change.
+      Primera prueba (26/10/2026), antes de desplegar este change: contra
+      `https://ichigo.alquilerespunilla.com.ar`, que entonces no tenía `/version`, en modo
+      `despliegue` falló con `HTTP 404` tras los intentos y en `vuelta-atras` quedó «no
+      verificable», sin seguir redirecciones y con el certificado verificado.
+      Resultado (29/10/2026): caso de éxito en el primer despliegue con este change (merge
+      `10cd8ae`, corrida de CD 40797889659): las cuatro etapas en verde, incluido «Verificar versión publicada».
+      `GET https://ichigo.alquilerespunilla.com.ar/version` → `{"sha":"10cd8aecb6db…"}`, igual al
+      SHA de `main`.
 ## 4. Documentación y cierre
 
 - [x] 4.1 `docs/despliegue.md`: sección «Cómo comprobar que un cambio del frontend llegó», con
@@ -131,9 +132,12 @@
 - [ ] 4.4 PR con descripción en español, enlazado a este change, con el resultado de 2.3, y
       aprobado por un compañero distinto del autor. Aclarar que el job `verificar` solo se puede
       probar de verdad al desplegar.
-- [ ] 4.5 Después del primer despliegue con este change, confirmar en Actions que `verificar`
+- [x] 4.5 Después del primer despliegue con este change, confirmar en Actions que `verificar`
       terminó en verde y que `curl https://<subdominio>/version` devuelve el SHA desplegado.
-- [ ] 4.6 (verificaciones posteriores al despliegue) Completar la tarea 3.5 tras el primer
+      Resultado (29/10/2026): ver 3.5; la corrida 40797889659 pasó `verificar` y el `curl` devolvió
+      el SHA `10cd8aec…` (el de `main`).
+- [x] 4.6 (verificaciones posteriores al despliegue) Completar la tarea 3.5 tras el primer
       despliegue y registrarlo en el PR o en el seguimiento correspondiente.
+      Registrado (29/10/2026) en 3.5 y en este PR.
 - [ ] 4.7 Después del merge y de archivar `despliegue-continuo-ec2`, archivar este change con
       `openspec archive verificacion-version-desplegada` en su propio PR.
