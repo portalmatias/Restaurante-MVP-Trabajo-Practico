@@ -23,7 +23,8 @@ guardar con ambos valores elegidos. Guardar con solo uno de los dos SHALL mostra
 a la sección sin enviar el pedido.
 
 La sección SHALL mostrar una vista previa del plano de la Zona elegida en el formulario: la
-grilla, las demás Mesas ubicadas de esa Zona y la Mesa que se edita, destacada, en el lugar y con
+grilla, las demás Mesas ubicadas de esa Zona (siempre las de la Zona elegida en ese momento,
+aunque las respuestas de la API lleguen en otro orden) y la Mesa que se edita, destacada, en el lugar y con
 el tamaño y la forma de los valores elegidos, actualizada al cambiar cualquiera de ellos. La
 vista previa SHALL ser decorativa para lectores de pantalla y SHALL acompañarse de un texto que
 describe la ubicación elegida ("S3 ocupa las columnas 6 y 7, filas 1 y 2.") y, si la Mesa se
@@ -88,6 +89,11 @@ El formulario de alta SHALL NOT incluir la sección: la Mesa nueva se crea sin u
 - **WHEN** el administrador cambia la Zona de una Mesa en el formulario
 - **THEN** la vista previa pasa a mostrar la grilla y las Mesas de la Zona nueva, y Columna y Fila
   quedan vacíos
+
+#### Scenario: Cambios de zona rápidos
+- **WHEN** el administrador edita S4, cambia la Zona a VIP y vuelve a STANDARD antes de que
+  llegue la respuesta con las Mesas de VIP, y esa respuesta llega después que la de STANDARD
+- **THEN** la vista previa dibuja las Mesas de STANDARD y no las de VIP
 
 #### Scenario: Volver a la zona original restaura la ubicación
 - **WHEN** el administrador edita S4, cambia la Zona a VIP, vuelve a elegir STANDARD y guarda

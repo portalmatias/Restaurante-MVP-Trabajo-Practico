@@ -2,7 +2,8 @@ Los escenarios usan el layout del seed de `plano-mesas`: zona STANDARD con grill
 por 8 filas, S1 en (0,0) redonda 1 por 1, S2 en (2,0) redonda 1 por 1, S3 en (5,0) cuadrada 2 por
 2, S4 en (0,3) rectangular 3 por 2 y S5 en (5,3) rectangular 4 por 2; zona VIP con grilla de 10
 por 6, V1 en (0,0) 1 por 1, V2 en (3,0) 2 por 2, V3 en (0,3) 3 por 2 y V4 en (4,3) 6 por 2. S6 es
-una mesa de STANDARD de 1 por 1 y sin reservas, cargada en la base para el test en (10,7). Las
+una mesa de STANDARD de 1 por 1 y sin reservas, cargada en la base para el test en (10,7). S8 es
+una mesa de STANDARD sin ubicar, de 11 por 1 y sin reservas, cargada en la base para el test. Las
 coordenadas son de la API: base 0, en celdas, `(posX, posY)`.
 
 ## MODIFIED Requirements
@@ -48,8 +49,9 @@ respuestas de alta y de edición de una Mesa SHALL incluir los mismos campos.
 mayores o iguales a 1) y `forma` (`REDONDA`, `CUADRADA` o `RECTANGULAR`), todos opcionales.
 `ancho`, `alto` y `forma` SHALL NOT aceptar `null`. Un valor que no cumple estas reglas SHALL
 rechazarse con `400` sin modificar la Mesa. Un pedido sin ninguno de esos campos y sin cambio de
-Zona SHALL comportarse igual que antes de este cambio; el cambio de Zona sin coordenadas es la
-única excepción y se describe al final de este requisito.
+Zona SHALL comportarse igual que antes de este cambio. Un cambio de Zona sin campos del plano
+tiene dos diferencias con el comportamiento anterior: la Mesa queda sin ubicar (al final de este
+requisito) y su tamaño se valida contra la grilla de la Zona nueva, como se describe abajo.
 
 El `ancho` final SHALL ser menor o igual que `planoColumnas` de la Zona final, y el `alto` final
 menor o igual que `planoFilas`, también si la Mesa queda sin ubicar: si no, el sistema SHALL
@@ -59,7 +61,8 @@ modificar la Mesa.
 El sistema SHALL validar el lugar que resulta de aplicar el pedido a la Mesa (la Zona, la
 posición y el tamaño finales) contra la grilla de la Zona final y contra las demás Mesas
 ubicadas de esa Zona, y SHALL rechazar la edición sin modificar la Mesa cuando:
-- llega solo una de las dos coordenadas, o una coordenada `null` junto a otra no nula: `400`;
+- llega solo una de las dos coordenadas, o una coordenada `null` junto a otra no nula: `400`,
+  aunque el valor que llega coincida con el guardado;
 - la Mesa queda fuera de la grilla (`posX + ancho` mayor que `planoColumnas`, o `posY + alto`
   mayor que `planoFilas`): `400` con el mensaje "La mesa queda fuera de la grilla de
   <columnas> por <filas>.";
@@ -68,10 +71,12 @@ ubicadas de esa Zona, y SHALL rechazar la edición sin modificar la Mesa cuando:
 
 Si un pedido cumple más de una de esas condiciones, el sistema SHALL responder la primera en este
 orden: coordenada a medias, tamaño mayor que la grilla, Mesa fuera de la grilla y superposición.
-Las validaciones de "Edición de Mesa preserva las Reservas activas" (capacidad por debajo de una
-Reserva activa y cambio de Zona con Reservas activas) y la de Zona inexistente SHALL correr antes
-que todas las de este requisito: un pedido que falla una de ellas y además una de ubicación SHALL
-recibir la respuesta de la validación existente.
+Los valores fuera de rango (el primer párrafo de este requisito) se rechazan con `400` antes que
+cualquier otra validación, como hoy los demás datos de entrada inválidos. Las validaciones de
+"Edición de Mesa preserva las Reservas activas" (capacidad por debajo de una Reserva activa y
+cambio de Zona con Reservas activas) y la de Zona inexistente SHALL correr después de esas y antes
+que las cuatro condiciones de ubicación de arriba: un pedido con valores válidos que falla una de
+ellas y además una condición de ubicación SHALL recibir la respuesta de la validación existente.
 Cualquier combinación de `forma`, `ancho` y `alto` SHALL ser válida: una Mesa `REDONDA` o
 `CUADRADA` con lados distintos se acepta y el plano la dibuja estirada.
 
@@ -122,6 +127,10 @@ Zona nueva.
 - **WHEN** el admin envía para S1 `posX` 4 sin `posY`
 - **THEN** el sistema responde `400` sin modificar la Mesa
 
+#### Scenario: Coordenada a medias con el valor guardado rechazada
+- **WHEN** el admin envía para S1 `posX` 0, igual al guardado, sin `posY`
+- **THEN** el sistema responde `400` sin modificar la Mesa
+
 #### Scenario: Valores fuera de rango rechazados
 - **WHEN** el admin envía `posX` -1, `ancho` 0, `ancho` `null` o `forma` `TRIANGULAR`
 - **THEN** el sistema responde `400` sin modificar la Mesa
@@ -159,6 +168,11 @@ Zona nueva.
 #### Scenario: Cambio de zona sin ubicación nueva deja la mesa sin ubicar
 - **WHEN** el admin pasa S6 a VIP y el pedido no trae `posX` ni `posY`
 - **THEN** S6 queda en VIP con `posX` y `posY` en `null`
+
+#### Scenario: Cambio de zona de una mesa que no entra en la grilla nueva
+- **WHEN** el admin pasa S8, de 11 por 1, a VIP sin campos del plano
+- **THEN** el sistema responde `400` con el mensaje "La mesa no entra en la grilla de 10 por 6." y
+  S8 sigue en STANDARD
 
 #### Scenario: Cambio de zona con ubicación nueva
 - **WHEN** el admin pasa S6 a VIP con `posX` 7 y `posY` 0

@@ -62,6 +62,12 @@ activas, zona inexistente y cambio de zona con reservas activas). Ese orden qued
 ("Las validaciones existentes corren antes que las de ubicación"): un pedido que reduce la
 capacidad y además saca la mesa de la grilla recibe el `409` de capacidad.
 
+Los valores fuera de rango ya los rechazó el `ValidationPipe` con `400` antes de llegar al
+service (D1), así que ese orden solo abarca las condiciones de ubicación.
+
+0. Si el pedido trae una sola coordenada, o una `null` junto a otra no nula, `400` "posX y posY van
+   juntos: los dos con valor o los dos en null.". Va antes del paso 2: si no, un `posX` igual al
+   guardado sin `posY` completaría la otra coordenada con la guardada y pasaría por el atajo.
 1. Se calcula el lugar final: zona final, `posX`/`posY` finales (si cambia la zona y el pedido no
    las trae, `null`), y `ancho`/`alto` finales.
 2. Si el lugar final es igual al guardado (misma zona, misma posición y mismo tamaño), no se valida
@@ -89,7 +95,10 @@ capacidad y además saca la mesa de la grilla recibe el `409` de capacidad.
    seed. `superpuestaCon` sale ordenada con `ordenarMesasPorEtiqueta`. Antes de eso, aunque la
    mesa quede sin ubicar, se compara el `ancho` y el `alto` finales con la grilla de la zona final
    ("La mesa no entra en la grilla de 12 por 8."). Así un tamaño enorme nunca llega a la columna
-   `Int` de la base.
+   `Int` de la base. Esto incluye un cambio de zona sin campos del plano: una mesa de 11 de ancho
+   no puede pasar a VIP (10 columnas). Es un cambio de comportamiento reconocido en el spec; el
+   formulario ya achica el tamaño al cambiar de zona (D5), así que solo lo ve quien use la API
+   directo.
 4. `fueraDeGrilla` → `400` "La mesa queda fuera de la grilla de 12 por 8."; `superpuestaCon` no
    vacía → `409` "La mesa se superpone con S2 y S3." (lista con comas y "y" antes de la última).
    Se informa primero la grilla: una mesa afuera no necesita la lista de superposiciones.
@@ -129,7 +138,10 @@ tipos desde `openapi.yaml` en el mismo PR.
 ### D5. Frontend: formulario con vista previa
 
 - **Datos.** El formulario de edición pide `GET /admin/mesas?zonaId=<zona del formulario>` al
-  abrirse y cada vez que cambia la zona, para dibujar las demás mesas. La grilla sale de la zona
+  abrirse y cada vez que cambia la zona, para dibujar las demás mesas. Solo se usa la respuesta
+  del último pedido: si el admin cambia de zona antes de que llegue la anterior, esa se descarta
+  (un contador de pedidos o un `AbortController`), para que la vista previa nunca dibuje las mesas
+  de una zona sobre la grilla de otra. La grilla sale de la zona
   (`planoColumnas`, `planoFilas`) que el panel ya recibe de `GET /admin/zonas`.
 - **Campos.** Columna y Fila son `<select>` numerados desde 1 (la API, desde 0: se convierte al
   armar el pedido y al leer la mesa). Ofrecen de 1 a `columnas - ancho + 1` y de 1 a

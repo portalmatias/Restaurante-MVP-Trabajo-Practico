@@ -35,13 +35,14 @@ además que la mesa no cambió en la base.
       lo guardado y la validación de design.md D2, dentro de la transacción `Serializable`
       existente. Tests primero (rojo, luego verde): mover, tocarse, superposición `409` con su
       mensaje, cambio de tamaño `409`, fuera de grilla `400` con su mensaje, fuera de grilla gana
-      sobre la superposición, coordenada a medias `400`, tamaño mayor que la grilla en una mesa
+      sobre la superposición, coordenada a medias `400` (también con el valor guardado), tamaño mayor que la grilla en una mesa
       sin ubicar `400`, forma, forma y reenvío de la ubicación de una mesa con un problema previo
       (cargado directo en la base), quitar del plano, y las validaciones existentes antes que las
       de ubicación.
 - [ ] 3.3 Cubrir el cambio de zona y la concurrencia sobre la lógica de 3.2. Tests primero (rojo,
       luego verde): cambio de zona sin ubicación, con ubicación y con ubicación fuera de la grilla
-      nueva (usando la mesa S6 que define el spec, cargada directo en la base), y dos `PATCH`
+      nueva (usando la mesa S6 que define el spec, cargada directo en la base), mesa que no entra
+      en la grilla nueva (S8, cargada directo en la base), y dos `PATCH`
       simultáneos con `Promise.all` hacia una celda libre, de los que exactamente uno responde
       `200`. Verificar que los tests actuales de `mesas.service.spec.ts`,
       `mesas.integration-spec.ts` y `gestion-salon-admin.integration-spec.ts` siguen en verde.
@@ -83,7 +84,8 @@ plano" de `specs/frontend-admin/spec.md`.
 - [ ] 4.5 Cambio de zona en el formulario. Tests primero (rojo, luego verde): cambio de zona,
       cambio a una zona más chica que ajusta el tamaño, cambio de zona sin elegir ubicación, con
       la misma columna y fila (envía las dos coordenadas aunque coincidan con las de la zona
-      vieja), y volver a la zona original que restaura la ubicación. Verificar que pasan y que los
+      vieja), volver a la zona original que restaura la ubicación, y cambios de zona rápidos con
+      la respuesta vieja llegando última. Verificar que pasan y que los
       tests actuales del panel siguen en verde.
 
 ## 5. Cierre
