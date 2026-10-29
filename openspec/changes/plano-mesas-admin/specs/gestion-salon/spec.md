@@ -117,6 +117,16 @@ Zona nueva.
   además pisa a S6 en (10,7)
 - **THEN** el sistema responde `400` "La mesa queda fuera de la grilla de 12 por 8." y no `409`
 
+#### Scenario: Coordenada a medias gana sobre el tamaño mayor que la grilla
+- **WHEN** el admin envía para S1 `posX` 4 sin `posY` y `ancho` 13
+- **THEN** el sistema responde `400` con el mensaje "posX y posY van juntos: los dos con valor o
+  los dos en null." y no con el del tamaño
+
+#### Scenario: Tamaño mayor que la grilla gana sobre fuera de la grilla
+- **WHEN** el admin envía para S4 `posX` 10, `posY` 3 y `ancho` 13
+- **THEN** el sistema responde `400` con el mensaje "La mesa no entra en la grilla de 12 por 8." y
+  no "La mesa queda fuera de la grilla de 12 por 8."
+
 #### Scenario: Mesa fuera de la grilla rechazada
 - **WHEN** el admin intenta mover S5 a `posX` 10 y `posY` 3
 - **THEN** el sistema responde `400` con el mensaje "La mesa queda fuera de la grilla de 12 por
