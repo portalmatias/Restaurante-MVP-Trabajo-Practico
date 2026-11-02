@@ -1,0 +1,275 @@
+## Context
+
+Ver proposal.md (Why). Estado actual que condiciona el diseño:
+
+- Las columnas `posX`, `posY`, `ancho`, `alto` y `forma` de `Mesa`, y `planoColumnas` y
+  `planoFilas` de `Zona`, ya existen (change `plano-mesas`). La base garantiza con CHECK que las
+  coordenadas van juntas y no son negativas, y que el tamaño es al menos 1. Que la mesa entre en
+  la grilla y que no se superponga cruza filas y tablas: lo valida quien escribe, hoy solo el
+  seed con `validarLayout` (`backend/src/plano-mesas/layout-plano.ts`).
+- `MesasService.actualizar` ya corre la edición en una transacción `Serializable` con hasta 3
+  intentos en total (2 reintentos) ante conflicto de serialización (`P2034`), y responde `409` si
+  se agotan (`SERIALIZACION_MAX_INTENTOS`).
+- El `ValidationPipe` global usa `whitelist` y `forbidNonWhitelisted`: hoy un `PATCH` con `posX`
+  responde `400`. El cambio de contrato es solo aditivo.
+- En el frontend, `mesas-panel.tsx` tiene el formulario de alta y edición, y reparte los errores
+  de la API entre campos por el texto del mensaje (`errores-campo.ts`). El dibujo del plano del
+  cliente (`plano-mesas.tsx`, PR #89) define la geometría: celdas de 48 unidades del `viewBox`,
+  margen de 4 y la silueta de cada forma.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Una sola fuente de verdad para la regla de grilla y superposición en el backend, compartida
+  con el seed.
+- Que dos ediciones simultáneas no puedan dejar dos mesas en la misma celda.
+- Que editar la etiqueta o la capacidad de una mesa nunca falle por su ubicación.
+- Reutilizar la geometría del dibujo del cliente, para que la vista previa del admin se vea igual
+  que el plano que ve el cliente.
+
+**Non-Goals:**
+- Validar en la base que las mesas no se superpongan (constraint de exclusión): ver D3.
+- Un endpoint nuevo para la ubicación: ver D1.
+
+## Decisions
+
+### D1. Se extiende `PATCH /admin/mesas/:id` en vez de sumar `/posicion`
+
+Los cinco campos del plano entran como opcionales en `ActualizarMesaDto`. Así el formulario guarda
+todo en un solo pedido y una sola transacción, y la regla "cambio de zona sin ubicación nueva deja
+la mesa sin ubicar" vive en el mismo lugar que el cambio de zona.
+
+- **Alternativa:** `PATCH /admin/mesas/:id/posicion`, como sugería D6 de `plano-mesas`. Separa la
+  ubicación, pero un cambio de zona más una ubicación nueva pasaría a ser dos pedidos, con un
+  estado intermedio donde la mesa ya está en la zona nueva con coordenadas de la vieja. Además
+  sumaría una ruta a la lista de `throttle-rutas-admin` y a los guards.
+
+`null` y ausente significan cosas distintas: `posX: null` quita la mesa del plano y la ausencia no
+toca la posición. Las dos se validan con `@ValidateIf((dto) => dto.posX != null)` (y su par para
+`posY`) seguido de `@IsInt()` y `@Min(0)`: con valor se exige un entero no negativo, y `null` pasa
+la validación del DTO sin confundirse con la ausencia, que el service distingue con `undefined`.
+`ancho`, `alto` y `forma` no admiten `null`: usan `@ValidateIf((_, value) => value !== undefined)`
+como los campos actuales de `ActualizarMesaDto` y `ActualizarZonaDto`, porque `@IsOptional()`
+también saltea la validación cuando llega `null` y el valor terminaría en un error `500` de Prisma.
+Con `@ValidateIf`, un `null` falla en `@IsInt()` o en `@IsEnum()` y responde `400`. Que
+`posX` y `posY` vayan juntas lo valida el service (D2), con el mensaje "posX y posY van juntos: los
+dos con valor o los dos en null."
+
+### D2. Validación en el service, dentro de la transacción existente
+
+En `ejecutarActualizacion`, después de las validaciones actuales (capacidad frente a las reservas
+activas, zona inexistente y cambio de zona con reservas activas). Ese orden queda fijado en el spec
+("Las validaciones existentes corren antes que las de ubicación"): un pedido que reduce la
+capacidad y además saca la mesa de la grilla recibe el `409` de capacidad.
+
+Los valores fuera de rango ya los rechazó el `ValidationPipe` con `400` antes de llegar al
+service (D1), así que ese orden solo abarca las condiciones de ubicación.
+
+0. Si el pedido trae una sola coordenada, o una `null` junto a otra no nula, `400` "posX y posY van
+   juntos: los dos con valor o los dos en null.". Va antes del paso 2: si no, un `posX` igual al
+   guardado sin `posY` completaría la otra coordenada con la guardada y pasaría por el atajo.
+1. Se calcula el lugar final: zona final, `posX`/`posY` finales (si cambia la zona y el pedido no
+   las trae, `null`), y `ancho`/`alto` finales.
+2. Si el lugar final es igual al guardado (misma zona, misma posición y mismo tamaño), no se valida
+   nada más. La comparación es contra la mesa leída en la transacción, no contra qué campos trae el
+   pedido: reenviar los mismos valores, no mandar campos del plano o cambiar solo la `forma` no
+   alteran qué celdas ocupa la mesa (spec: "Pedido sin campos del plano no cambia la ubicación",
+   "Cambiar la forma de una mesa con un problema previo" y "Reenviar la ubicación de una mesa con
+   un problema previo").
+3. Si la mesa queda ubicada, se leen dentro de la transacción la grilla de la zona final y las
+   demás mesas ubicadas de esa zona, y se llama a una función pura nueva de `layout-plano.ts`:
+
+   ```ts
+   export function problemasDeUbicacion(
+     zona: DimensionesPlano,
+     mesa: MesaUbicada,
+     otras: MesaEnPlano[],
+   ): { fueraDeGrilla: boolean; superpuestaCon: string[] };
+   ```
+
+   `mesa` es `MesaUbicada` (coordenadas no nulas), que hoy es interna de `layout-plano.ts` y pasa a
+   exportarse junto con `estaUbicada`: si alguien la llamara con una mesa sin ubicar, TypeScript lo
+   marca, en vez de que `null + ancho` calcule como si la mesa estuviera en (0,0). El service
+   obtiene ese tipo con `estaUbicada`. `otras` sigue siendo `MesaEnPlano[]`, porque la función
+   ignora las que no están ubicadas. Reutiliza `seSuperponen` y la misma condición de grilla que `validarLayout`, que queda para el
+   seed. `superpuestaCon` sale ordenada con `ordenarMesasPorEtiqueta`. Antes de eso, aunque la
+   mesa quede sin ubicar, se compara el `ancho` y el `alto` finales con la grilla de la zona final
+   ("La mesa no entra en la grilla de 12 por 8."). Así un tamaño enorme nunca llega a la columna
+   `Int` de la base. Esto incluye un cambio de zona sin campos del plano: una mesa de 11 de ancho
+   no puede pasar a VIP (10 columnas). Es un cambio de comportamiento reconocido en el spec; el
+   formulario ya achica el tamaño al cambiar de zona (D5), así que solo lo ve quien use la API
+   directo.
+4. `fueraDeGrilla` → `400` "La mesa queda fuera de la grilla de 12 por 8."; `superpuestaCon` no
+   vacía → `409` "La mesa se superpone con S2 y S3." (lista con comas y "y" antes de la última).
+   Se informa primero la grilla: una mesa afuera no necesita la lista de superposiciones.
+
+Solo se valida la mesa editada contra las demás. Un problema previo entre otras dos mesas (un
+layout cargado a mano) no bloquea al admin, que justamente puede estar arreglándolo.
+
+- **Alternativa:** correr `validarLayout` sobre la zona completa con la mesa ya movida. Es más
+  corto, pero bloquearía la edición por problemas que no causó este pedido, y sus mensajes nombran
+  pares de mesas en vez de decir qué hacer.
+
+### D3. Concurrencia: alcanza con `Serializable`
+
+Dos pedidos que mueven S1 y S2 a la misma celda leen las mesas de la zona (cada uno lee la fila
+que el otro escribe) y escriben una cada uno. Esa dependencia cruzada es exactamente lo que
+detecta el aislamiento `Serializable` de PostgreSQL: uno de los dos falla con `P2034`, se
+reintenta, ve la mesa ya movida y responde `409` por superposición (o `409` por agotar los
+reintentos). No hace falta `SELECT ... FOR UPDATE` ni un lock de zona.
+
+El test de integración con `Promise.all` no alcanza para probarlo: también pasaría si el
+servidor atendiera los pedidos uno detrás del otro. Por eso el camino del reintento se prueba
+aparte en `mesas.service.spec.ts`, como ya se hace con `P2034`: el primer intento falla con
+`P2034`, el segundo lee la otra mesa ya en la celda y la respuesta es el `409` de superposición.
+
+- **Alternativa:** un constraint de exclusión con `gist` sobre rectángulos. Sería la garantía más
+  fuerte, pero necesita la extensión `btree_gist`, un tipo geométrico calculado y SQL a mano en la
+  migración, para una regla que no es una invariante de negocio (no afecta reservas) sino visual.
+
+### D4. Respuestas: campos nuevos y requeridos
+
+`MesaRespuestaDto` suma `posX`, `posY` (enteros o `null`), `ancho`, `alto` y `forma`;
+`ZonaRespuestaDto` suma `planoColumnas` y `planoFilas`. Hoy esos campos quedan afuera a propósito:
+`SELECT_MESA_ADMIN` (`mesas.service.ts`) y `SELECT_ZONA_ADMIN` (`zonas.service.ts`) eligen columnas
+explícitas, y `plano-mesas-salidas-admin.integration-spec.ts` exige que las respuestas de admin
+traigan solo las claves actuales. Este change suma los campos a los dos `select` (y a sus copias en
+`mesas.service.spec.ts` y `zonas.service.spec.ts`, que los tests comparan con
+`toHaveBeenCalledWith`) y cambia ese test para que exija las claves nuevas:
+`GET`, `POST` y `PATCH` de mesas y `GET` y `PATCH` de zonas pasan a devolverlas. Van como
+requeridos en la respuesta porque siempre están: un cliente viejo los ignora. El único consumidor es el frontend, que regenera sus
+tipos desde `openapi.yaml` en el mismo PR.
+
+### D5. Frontend: formulario con vista previa
+
+- **Datos.** El formulario de edición pide `GET /admin/mesas?zonaId=<zona del formulario>` al
+  abrirse y cada vez que cambia la zona, para dibujar las demás mesas. Solo se usa la respuesta
+  del último pedido: si el admin cambia de zona antes de que llegue la anterior, esa se descarta
+  (un contador de pedidos o un `AbortController`), para que la vista previa nunca dibuje las mesas
+  de una zona sobre la grilla de otra. Si el pedido falla, la vista previa dibuja la grilla y la
+  mesa que se edita, y el texto avisa que no puede detectar superposiciones; guardar sigue
+  habilitado porque la API valida igual. La mesa que se edita se saca del listado por `id` antes
+  de calcular superposiciones, para que su posición guardada no cuente como otra mesa. La grilla
+  sale de la zona
+  (`planoColumnas`, `planoFilas`) que el panel ya recibe de `GET /admin/zonas`.
+- **Campos.** Columna y Fila son `<select>` numerados desde 1 (la API, desde 0: se convierte al
+  armar el pedido y al leer la mesa). Ofrecen de 1 a `columnas - ancho + 1` y de 1 a
+  `filas - alto + 1`, y se corrigen al último valor válido cuando crece el ancho o el alto. Ancho y
+  Alto son `<select>` de 1 a `columnas` y de 1 a `filas`. Forma es un grupo de radios.
+- **Qué se envía.** `ancho`, `alto` y `forma` solo si cambiaron respecto de la mesa original. Así,
+  editar la etiqueta de una mesa con un problema previo no dispara la validación (D2). Las
+  coordenadas van siempre juntas: si cambió la zona o cualquiera de las dos, se envían `posX` y
+  `posY` (los dos con valor, o los dos en `null` si quedaron vacías). Comparar contra la mesa
+  original no alcanza después de un cambio de zona: si el admin vuelve a elegir la misma columna y
+  fila que tenía en la zona vieja, no se enviaría nada y el backend dejaría la mesa sin ubicar.
+  El caso inverso también se cubre: al cambiar de zona, Columna y Fila quedan vacías; si el admin
+  vuelve a la zona original, el formulario restaura Columna, Fila, Ancho y Alto guardados. Sin eso
+  se enviarían `posX` y `posY` en `null` y la mesa quedaría sin ubicar sin que nadie lo pidiera.
+- **Vista previa.** Se extrae la geometría de `plano-mesas.tsx` (`CELDA`, `MARGEN` y `Silueta`) a
+  `frontend/src/components/reservas/plano-geometria.tsx`, que usan el plano del cliente y la vista
+  previa. Las demás mesas se dibujan con el relleno neutro (`muted`) y la que se edita con la
+  madera oscura (`madera`), con su etiqueta. El SVG es `aria-hidden`.
+- **Texto.** Un párrafo con `aria-live="polite"` describe la ubicación ("S3 ocupa las columnas 6 y
+  7, filas 1 y 2."; una celda: "la columna 6"; tres o más: "las columnas 6 a 8") y agrega "Se
+  superpone con S5." cuando corresponde. La superposición se calcula en el cliente con una
+  función de `frontend/src/lib/plano-mesas.ts`: duplica la regla del backend, que no se puede
+  importar (`config.yaml` §4). Es solo un aviso: la API decide.
+- **Errores.** `errores-campo.ts` suma una regla `ubicacion` que reconoce "fuera de la grilla",
+  "no entra en la grilla", "se superpone" y "posX y posY van juntos", y los muestra junto a la
+  sección.
+- **Mesa fuera de la grilla.** Si una mesa guardada no entra en la grilla de su zona (la grilla se
+  achicó a mano, proposal), el formulario la trata como sin ubicar: Columna y Fila empiezan
+  vacías, Ancho y Alto se ajustan al máximo de la grilla si la superan, y la sección dice "La mesa
+  quedó fuera de la grilla de la zona: elegí una ubicación nueva.". Guardar sin elegir envía
+  `posX` y `posY` en `null`, que deja en la base lo mismo que ya ve el cliente: una mesa sin
+  ubicar.
+- **Listado.** La tabla suma la columna "Plano" con "Columna 6, fila 1", "Sin ubicar" o "Fuera de
+  la grilla".
+
+### Contrato OpenAPI
+
+Fragmento que el PR de implementación incorpora a `openapi/openapi.yaml`:
+
+```yaml
+components:
+  schemas:
+    ActualizarMesaDto:
+      type: object
+      properties:
+        # zonaId, capacidad y etiqueta: sin cambios
+        posX:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: >-
+            Columna de la esquina superior izquierda en la grilla de la zona, desde 0. Va
+            junto con posY; los dos en null quitan la mesa del plano. Si se cambia la zona
+            sin indicarla, la mesa queda sin ubicar.
+          example: 8
+        posY:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Fila de la esquina superior izquierda, desde 0. Va junto con posX.
+          example: 5
+        ancho:
+          type: integer
+          minimum: 1
+          description: Columnas que ocupa la mesa en el plano.
+          example: 3
+        alto:
+          type: integer
+          minimum: 1
+          description: Filas que ocupa la mesa en el plano.
+          example: 2
+        forma:
+          $ref: '#/components/schemas/FormaMesa'
+    MesaRespuestaDto:
+      type: object
+      properties:
+        # id, zonaId, capacidad y etiqueta: sin cambios
+        posX: { type: integer, nullable: true, minimum: 0, example: 5 }
+        posY: { type: integer, nullable: true, minimum: 0, example: 0 }
+        ancho: { type: integer, minimum: 1, example: 2 }
+        alto: { type: integer, minimum: 1, example: 2 }
+        forma: { $ref: '#/components/schemas/FormaMesa' }
+      required: [id, zonaId, capacidad, etiqueta, posX, posY, ancho, alto, forma]
+    ZonaRespuestaDto:
+      properties:
+        # campos actuales: sin cambios
+        planoColumnas: { type: integer, minimum: 1, example: 12 }
+        planoFilas: { type: integer, minimum: 1, example: 8 }
+      # required: los actuales más planoColumnas y planoFilas
+paths:
+  /admin/mesas/{id}:
+    patch:
+      responses:
+        '400':
+          description: >-
+            Datos inválidos: valores fuera de rango; una sola de las dos coordenadas, o una en
+            null junto a otra con valor; un ancho o alto mayor que la grilla de la zona final,
+            aunque la mesa quede sin ubicar o solo cambie de zona; o una ubicación que deja la
+            mesa fuera de la grilla de su zona.
+        '409':
+          description: >-
+            Las causas actuales, o la mesa se superpone con otra mesa ubicada de su zona.
+```
+
+## Risks / Trade-offs
+
+- [La regla de superposición está escrita dos veces: backend y frontend] → La del frontend solo
+  arma un aviso; un desfasaje se nota como un aviso que no coincide con la respuesta de la API, no
+  como datos inválidos. Los tests de ambos lados usan los mismos casos del seed.
+- [`null` frente a ausente en class-validator (D1)] → Un test por caso: ausente no toca la
+  posición, `null` en los dos quita la mesa, `null` en uno solo responde `400`.
+- [Un reintento por serialización podría devolver un `409` genérico en vez del de superposición]
+  → Es aceptable: el formulario muestra el mensaje que llegue y la mesa no queda superpuesta.
+- [El dibujo del plano vive en PR #89] → La implementación espera a que se integre y se archive
+  `plano-mesas` (proposal, Impact), y entonces extrae la geometría sin cambiar cómo se ve el
+  plano del cliente: sus tests actuales tienen que seguir pasando.
+
+## Migration Plan
+
+Sin migración de base: las columnas ya existen. El despliegue es el habitual. La vuelta atrás es
+revertir el PR: el contrato nuevo es aditivo y las posiciones que haya cargado el admin siguen
+siendo válidas para el plano del cliente.
