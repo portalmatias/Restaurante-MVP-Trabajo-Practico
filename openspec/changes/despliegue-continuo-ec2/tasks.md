@@ -308,8 +308,15 @@
       no se repite: detrás de Cloudflare los límites se cuentan por borde y no por cliente (lo
       resuelve el change `ip-real-detras-de-cloudflare`, #100), y una ráfaga de logins fallidos
       podría devolver `429` a otros usuarios del mismo borde. Como el subdominio resuelve a
-      Cloudflare, los puertos y SSH se tienen que probar contra la IP elástica. Falta: puertos,
-      SSH, metadatos de la instancia y login con las credenciales de producción.
+      Cloudflare, los puertos y SSH se tienen que probar contra la IP elástica.
+      Contra la IP elástica (02/11/2026, conexión TCP desde fuera de AWS): `5432`, `3000` y
+      `3001` no conectan; `22`, `80` y `443` sí (80 y 443 abiertos a todos, como pide la etapa
+      HTTPS; restringirlos a Cloudflare es parte de #100). SSH sin clave ni agente: con
+      `PreferredAuthentications=password` el servidor solo ofrece `publickey` y rechaza
+      (`Permission denied (publickey)`), tanto para `deploy` como para `root`. Que `root` quede
+      rechazado aun con una clave válida (`PermitRootLogin no`) no se puede ver desde afuera sin
+      una clave autorizada. Falta: metadatos de la instancia (`aws ec2 describe-instances` y el
+      `PUT` desde un contenedor) y login con las credenciales de producción.
 - [ ] 6.4 Verificar los límites de la clave de despliegue (con la clave real, desde un equipo
       del equipo, y guardar las salidas sin datos sensibles):
       - `ssh deploy@<IP>` sin comando (shell interactiva) → rechazado;
