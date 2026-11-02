@@ -49,7 +49,7 @@ export default function Home() {
               href="/reservas/consultar"
               className={buttonVariants({ variant: "ghost", size: "lg", className: "border border-border" })}
             >
-              Ya tengo un código
+              Consultar una reserva
             </Link>
           </div>
         </div>
