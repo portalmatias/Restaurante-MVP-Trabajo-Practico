@@ -212,7 +212,7 @@ desde cero.
       `madera` 13,1; título atenuado de `descartada` (`opacity-70`, color resultante `#b7afa1`)
       sobre `madera` 7,16. Bordes y foco (3:1): `border` 3,66 sobre `background` y 4,19 sobre
       `card`; borde de `elegida` (`accent` sobre `card`) 6,51; `ring` sobre `background` 5,68;
-      `ring-madera` sobre `madera` 13,1. Todo cumple.
+      `ring-madera` sobre `madera` 13,1. Todo cumple salvo el desvío que sigue.
       Desvío anotado: el recuadro rojo del sello 満 de `completa` (`accent` sobre `madera`) da
       2,01:1 contra la madera. El estado se reconoce igual por el glifo (6,51:1 contra su relleno)
       y por la tablilla boca abajo, y el nombre accesible dice «completo»; si el equipo quiere el
