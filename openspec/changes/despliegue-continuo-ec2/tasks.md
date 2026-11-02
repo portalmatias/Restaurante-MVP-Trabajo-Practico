@@ -281,6 +281,12 @@
       `docker stats` y `free -m` el consumo de memoria, ajustar los `mem_limit` si hace falta y
       anotar las mediciones en el PR. Confirmar en la consola que la instancia está en
       `standard` y que la alerta de Budgets existe.
+      Avance (02/11/2026), comprobado desde afuera del servidor: el primer despliegue con
+      `workflow_dispatch` terminó en verde (corrida 39702358427, 22/10/2026, tras un primer
+      intento fallido) y la app responde en `https://<subdominio>/`; la variable `SUBDOMINIO`
+      existe, así que la docente asignó el subdominio. Falta registrar, con acceso al servidor y
+      a la consola: `docker stats` y `free -m` con uso, los `mem_limit`, los créditos de CPU en
+      `standard` y la alerta de Budgets.
 - [ ] 6.3 Verificar desde afuera de AWS la superficie y las credenciales, y guardar las salidas
       (sin IPs ni ARNs que no hagan falta) en el PR:
       - `nc -zv <IP> 5432`, `3000` y `3001` no conectan, y el `22` sí;
@@ -312,6 +318,12 @@
 - [ ] 6.5 Mergear un cambio trivial a `main` y verificar que se despliega solo y que una reserva
       creada antes del despliegue sigue consultable. Reiniciar la instancia y verificar que la
       app vuelve sola con los mismos datos.
+      Avance (02/11/2026): el despliegue automático funciona. El merge de #98 (cambio de una
+      etiqueta de la landing) entró en `a2e079c`, la corrida de CD 41547000496 (`workflow_run`)
+      pasó las cuatro etapas, incluida «Verificar versión publicada», y producción muestra
+      «Consultar una reserva» y `GET /version` → `a2e079c…`. Hay 17 despliegues automáticos en
+      verde desde el 22/10/2026. Falta comprobar que una reserva creada antes de un despliegue
+      sigue consultable y que la app vuelve sola tras reiniciar la instancia.
 - [ ] 6.6 Activar HTTPS cuando la docente confirme el subdominio: pasarle la IP elástica,
       verificar con `dig +short <subdominio>` que resuelve a esa IP, **cambiar `SITE_ADDRESS` en
       `/opt/reservas/.env` y redesplegar primero, y abrir 80 y 443 a `0.0.0.0/0` después**, cuando
@@ -332,6 +344,12 @@
       con HSTS, redirección `308` desde `http://`, certificado de Let's Encrypt del servidor
       válido y runbook actualizado. Falta registrar la reutilización del certificado tras
       reiniciar, la rotación de la contraseña del admin y la ejecución de `certificado.yml`.
+      Avance (02/11/2026): `curl -I https://<subdominio>/` → `200` con
+      `strict-transport-security: max-age=31536000`, y `curl -I http://<subdominio>/reservas` →
+      `308` a `https://`. La variable `SUBDOMINIO` existe y la ejecución manual de
+      `certificado.yml` terminó en verde (corrida 39702530473, 22/10/2026); desde entonces corre
+      a diario por `schedule`, también en verde. Falta registrar la reutilización del
+      certificado tras redesplegar y reiniciar, y la rotación de la contraseña del admin.
 
 - [x] 6.7 Hacer públicos los paquetes `reservas-backend` y `reservas-frontend` de GHCR tras la
       primera publicación y reintentar el primer despliegue (D3, runbook «Paquetes en GHCR»).
