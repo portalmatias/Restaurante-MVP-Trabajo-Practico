@@ -302,6 +302,14 @@
       - login con las de producción → `200`;
       - `GET /api/reservas/...` de una reserva de ejemplo → no existe;
       - repetir la prueba de 4.3 contra producción.
+      Avance (02/11/2026), desde fuera de AWS y a través de `https://<subdominio>`: login con
+      las credenciales del README → `401` («Credenciales inválidas»); `POST
+      /api/reservas/consultar` con `SEEDCNF2` del seed de desarrollo → `404`. La prueba de 4.3
+      no se repite: detrás de Cloudflare los límites se cuentan por borde y no por cliente (lo
+      resuelve el change `ip-real-detras-de-cloudflare`, #100), y una ráfaga de logins fallidos
+      podría devolver `429` a otros usuarios del mismo borde. Como el subdominio resuelve a
+      Cloudflare, los puertos y SSH se tienen que probar contra la IP elástica. Falta: puertos,
+      SSH, metadatos de la instancia y login con las credenciales de producción.
 - [ ] 6.4 Verificar los límites de la clave de despliegue (con la clave real, desde un equipo
       del equipo, y guardar las salidas sin datos sensibles):
       - `ssh deploy@<IP>` sin comando (shell interactiva) → rechazado;
