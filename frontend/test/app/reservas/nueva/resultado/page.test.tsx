@@ -36,14 +36,27 @@ const falla = (status: number, error?: unknown): Respuesta => ({
 
 const CON_LUGAR = ok({ disponible: true, lugaresRestantes: 20, motivos: [] });
 
+// Por defecto el plano responde 404 (un backend sin la ruta): el veredicto sale de
+// `/disponibilidad`, como antes del plano. Los tests del plano lo pasan explícito.
+const SIN_PLANO = falla(404, { statusCode: 404, message: "Cannot GET /plano-mesas" });
+
 function responder(
   disponibilidad: Respuesta,
-  { zonas = ok(ZONAS), turnos = ok(TURNOS) }: { zonas?: Respuesta; turnos?: Respuesta } = {},
+  {
+    zonas = ok(ZONAS),
+    turnos = ok(TURNOS),
+    plano = SIN_PLANO,
+  }: { zonas?: Respuesta; turnos?: Respuesta; plano?: Respuesta } = {},
 ) {
   GET.mockImplementation(async (ruta: string) => {
+    if (ruta === "/plano-mesas") return plano;
     if (ruta === "/disponibilidad") return disponibilidad;
     return ruta === "/zonas" ? zonas : turnos;
   });
+}
+
+function motivos() {
+  return within(screen.getByRole("list", { name: "Motivos" })).getAllByRole("alert");
 }
 
 const SELECCION = {
@@ -98,7 +111,7 @@ describe("/reservas/nueva/resultado - sin selección", () => {
 });
 
 describe("/reservas/nueva/resultado - hay lugar", () => {
-  it("consulta la disponibilidad de la selección sin reutilizar respuestas anteriores", async () => {
+  it("sin plano consulta la disponibilidad de la selección sin reutilizar respuestas anteriores", async () => {
     responder(CON_LUGAR);
 
     await renderizar();
@@ -156,6 +169,29 @@ describe("/reservas/nueva/resultado - hay lugar", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/pendiente de confirmación/);
   });
 
+  it("en una zona con confirmación y con plano, el aviso y el resumen del plano conviven", async () => {
+    // Dos regiones `status` en la misma página: ninguna se anuncia al cargar (solo al cambiar) y
+    // las dos se pueden encontrar por su texto.
+    responder(CON_LUGAR, {
+      plano: ok({
+        zona: "VIP",
+        columnas: 12,
+        filas: 8,
+        mesas: [],
+        disponible: true,
+        lugaresRestantes: 10,
+        motivos: [],
+      }),
+    });
+
+    await renderizar({ ...SELECCION, zonaId: ZONA_VIP.id });
+
+    const regiones = screen.getAllByRole("status").map((region) => region.textContent);
+    expect(regiones).toHaveLength(2);
+    expect(regiones[0]).toMatch(/pendiente de confirmación/);
+    expect(regiones[1]).toMatch(/En la zona VIP hay 0 mesas libres/);
+  });
+
   it("ofrece 'Continuar' hacia los datos de contacto con la misma selección", async () => {
     responder(CON_LUGAR);
 
@@ -190,7 +226,7 @@ describe("/reservas/nueva/resultado - no hay lugar", () => {
 
     await renderizar();
 
-    const alertas = screen.getAllByRole("alert");
+    const alertas = motivos();
     expect(alertas.map((alerta) => alerta.textContent)).toEqual([
       "La zona STANDARD está completa para ese turno y esa fecha.",
       "La zona STANDARD admite de 1 a 8 comensales.",
@@ -212,7 +248,7 @@ describe("/reservas/nueva/resultado - no hay lugar", () => {
 
     await renderizar();
 
-    expect(screen.getAllByRole("alert").map((alerta) => alerta.textContent)).toEqual([
+    expect(motivos().map((alerta) => alerta.textContent)).toEqual([
       "Primer motivo.",
       "Segundo motivo.",
     ]);
@@ -263,7 +299,7 @@ describe("/reservas/nueva/resultado - no hay lugar", () => {
 
     await renderizar();
 
-    expect(screen.getAllByRole("alert").map((alerta) => alerta.textContent)).toEqual([
+    expect(motivos().map((alerta) => alerta.textContent)).toEqual([
       "El turno no está activo.",
       "La zona STANDARD admite de 1 a 8 comensales.",
     ]);
@@ -382,5 +418,243 @@ describe("/reservas/nueva/resultado - errores", () => {
     await renderizar();
 
     expect(document.querySelector('a[href^="/admin"]')).toBeNull();
+  });
+});
+
+describe("/reservas/nueva/resultado - plano de mesas", () => {
+  const MESAS = [
+    {
+      etiqueta: "S1",
+      capacidad: 2,
+      forma: "REDONDA",
+      posX: 0,
+      posY: 0,
+      ancho: 1,
+      alto: 1,
+      estado: "NO_ALCANZA",
+    },
+    {
+      etiqueta: "S5",
+      capacidad: 8,
+      forma: "RECTANGULAR",
+      posX: 5,
+      posY: 3,
+      ancho: 4,
+      alto: 2,
+      estado: "OCUPADA",
+    },
+  ];
+  const plano = (veredicto: object) =>
+    ok({ zona: "STANDARD", columnas: 12, filas: 8, mesas: MESAS, ...veredicto });
+  const PLANO_CON_LUGAR = plano({ disponible: true, lugaresRestantes: 34, motivos: [] });
+  const PLANO_SIN_LUGAR = plano({
+    disponible: false,
+    lugaresRestantes: 0,
+    motivos: [{ codigo: "AFORO_ZONA", mensaje: "La zona STANDARD está completa." }],
+  });
+  const MENSAJE_PLANO = "No pudimos cargar el plano. Podés seguir con tu reserva igual.";
+
+  function seccionPlano() {
+    return screen.getByRole("region", { name: "Plano de las mesas" });
+  }
+
+  it("pide el plano de la selección sin caché junto al catálogo, y no pide la disponibilidad", async () => {
+    responder(CON_LUGAR, { plano: PLANO_CON_LUGAR });
+
+    await renderizar();
+
+    expect(GET).toHaveBeenCalledWith("/plano-mesas", {
+      params: {
+        query: {
+          fecha: "2026-09-19",
+          turnoId: TURNO_CENA_SABADO.id,
+          zonaId: ZONA_STANDARD.id,
+          comensales: 4,
+        },
+      },
+      cache: "no-store",
+    });
+    expect(GET).toHaveBeenCalledWith("/zonas", { cache: "no-store" });
+    expect(GET).not.toHaveBeenCalledWith("/disponibilidad", expect.anything());
+  });
+
+  it("toma el veredicto del plano y muestra el plano debajo, con 'Continuar'", async () => {
+    // La disponibilidad diría otra cosa: no se consulta, el plano es la única fuente.
+    responder(ok({ disponible: false, lugaresRestantes: 0, motivos: [] }), {
+      plano: PLANO_CON_LUGAR,
+    });
+
+    await renderizar();
+
+    expect(screen.getByRole("heading", { level: 1, name: "¡Hay lugar!" })).toBeInTheDocument();
+    expect(valorDe("Lugares restantes")).toBe("34");
+    expect(within(seccionPlano()).getByRole("list", { name: "Mesas de la zona" })).toBeInTheDocument();
+    expect(screen.getByText(/La mesa se asigna automáticamente al confirmar la reserva/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuar" })).toBeInTheDocument();
+  });
+
+  it("sin lugar muestra primero los motivos del plano y después el plano atenuado con su aviso", async () => {
+    responder(CON_LUGAR, { plano: PLANO_SIN_LUGAR });
+
+    await renderizar();
+
+    const lista = screen.getByRole("list", { name: "Motivos" });
+    expect(motivos().map((alerta) => alerta.textContent)).toEqual([
+      "La zona STANDARD está completa.",
+    ]);
+    expect(seccionPlano()).toHaveAttribute("data-atenuado", "true");
+    expect(within(seccionPlano()).getByText(/hoy no se puede reservar este turno/)).toBeInTheDocument();
+    expect(
+      lista.compareDocumentPosition(seccionPlano()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Continuar" })).not.toBeInTheDocument();
+    expect(GET).not.toHaveBeenCalledWith("/disponibilidad", expect.anything());
+  });
+
+  it("si el plano responde 500, usa la disponibilidad y muestra el error del plano con 'Reintentar'", async () => {
+    responder(CON_LUGAR, { plano: falla(500, { message: "detalle interno" }) });
+
+    await renderizar();
+
+    expect(screen.getByRole("heading", { level: 1, name: "¡Hay lugar!" })).toBeInTheDocument();
+    expect(valorDe("Lugares restantes")).toBe("20");
+    expect(within(seccionPlano()).getByRole("alert")).toHaveTextContent(MENSAJE_PLANO);
+    expect(within(seccionPlano()).getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+    expect(screen.queryByText(/detalle interno/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuar" })).toBeInTheDocument();
+  });
+
+  // Comentario de cubic en #89: con un catálogo lento, el respaldo no tiene que esperarlo.
+  it("si el plano falla, pide la disponibilidad sin esperar a que termine el catálogo", async () => {
+    let liberarCatalogo: () => void = () => {};
+    const catalogoLento = new Promise<void>((listo) => {
+      liberarCatalogo = listo;
+      // Si nadie pide la disponibilidad antes, el catálogo termina igual: así un código que la
+      // pide después no se cuelga, y el test falla en la comprobación, no por timeout.
+      setTimeout(listo, 50);
+    });
+    let disponibilidadAntesDelCatalogo = false;
+    let catalogoListo = false;
+    GET.mockImplementation(async (ruta: string) => {
+      if (ruta === "/plano-mesas") return falla(500);
+      if (ruta === "/disponibilidad") {
+        disponibilidadAntesDelCatalogo = !catalogoListo;
+        liberarCatalogo();
+        return CON_LUGAR;
+      }
+      await catalogoLento;
+      catalogoListo = true;
+      return ruta === "/zonas" ? ok(ZONAS) : ok(TURNOS);
+    });
+
+    await renderizar();
+
+    expect(disponibilidadAntesDelCatalogo).toBe(true);
+    expect(screen.getByRole("heading", { level: 1, name: "¡Hay lugar!" })).toBeInTheDocument();
+  });
+
+  it("si el plano falla por la red, usa la disponibilidad y la reserva sigue disponible", async () => {
+    GET.mockImplementation(async (ruta: string) => {
+      if (ruta === "/plano-mesas") throw new TypeError("fetch failed");
+      if (ruta === "/disponibilidad") return CON_LUGAR;
+      return ruta === "/zonas" ? ok(ZONAS) : ok(TURNOS);
+    });
+
+    await renderizar();
+
+    expect(within(seccionPlano()).getByRole("alert")).toHaveTextContent(MENSAJE_PLANO);
+    expect(screen.getByRole("link", { name: "Continuar" })).toBeInTheDocument();
+  });
+
+  it.each([404, 400])(
+    "si solo el plano responde %i, no redirige: veredicto de la disponibilidad y plano degradado",
+    async (status) => {
+      responder(CON_LUGAR, { plano: falla(status) });
+
+      await renderizar();
+
+      expect(screen.getByRole("heading", { level: 1, name: "¡Hay lugar!" })).toBeInTheDocument();
+      expect(within(seccionPlano()).getByRole("alert")).toHaveTextContent(MENSAJE_PLANO);
+      // Misma sección degradada que un 5xx (spec), con su "Reintentar".
+      expect(within(seccionPlano()).getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Continuar" })).toBeInTheDocument();
+    },
+  );
+
+  it("si el plano responde 429, avisa que pruebe en un minuto y no ofrece reintentar", async () => {
+    responder(CON_LUGAR, { plano: falla(429) });
+
+    await renderizar();
+
+    expect(within(seccionPlano()).getByRole("alert")).toHaveTextContent(
+      "Estamos recibiendo muchas consultas. Probá de nuevo en un minuto.",
+    );
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuar" })).toBeInTheDocument();
+  });
+
+  it("si el plano y la disponibilidad responden 404, redirige al Paso 1", async () => {
+    responder(falla(404), { plano: falla(404) });
+
+    expect(await destinoDeRedireccion(SELECCION)).toBe(
+      `/reservas/nueva?${new URLSearchParams(SELECCION).toString()}`,
+    );
+  });
+
+  it("si el plano y la disponibilidad responden 400, trata la selección como inválida", async () => {
+    responder(falla(400), { plano: falla(400) });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Alguno de los datos de la selección no es válido.",
+    );
+    expect(screen.getByRole("link", { name: "Cambiar fecha, turno o zona" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Plano de las mesas" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["500 y la disponibilidad 503", falla(500), falla(503)],
+    ["429 y la disponibilidad 429", falla(429), falla(429)],
+  ])(
+    "si el plano responde %s, muestra solo el error de carga de la página, sin la sección del plano",
+    async (_caso, respuestaPlano, respuestaDisponibilidad) => {
+      responder(respuestaDisponibilidad, { plano: respuestaPlano });
+
+      await renderizar();
+
+      expect(screen.getAllByRole("alert")).toHaveLength(1);
+      expect(screen.queryByRole("region", { name: "Plano de las mesas" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Continuar" })).not.toBeInTheDocument();
+    },
+  );
+
+  it("si el plano y la disponibilidad fallan por la red, muestra solo el error de carga con 'Reintentar'", async () => {
+    GET.mockImplementation(async (ruta: string) => {
+      if (ruta === "/plano-mesas" || ruta === "/disponibilidad") throw new TypeError("fetch failed");
+      return ruta === "/zonas" ? ok(ZONAS) : ok(TURNOS);
+    });
+
+    await renderizar();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo conectar con el servidor.");
+    expect(screen.getAllByRole("button", { name: "Reintentar" })).toHaveLength(1);
+    expect(screen.queryByRole("region", { name: "Plano de las mesas" })).not.toBeInTheDocument();
+  });
+
+  it("sin lugar según la disponibilidad, muestra los motivos y después el error del plano", async () => {
+    responder(
+      ok({
+        disponible: false,
+        lugaresRestantes: 0,
+        motivos: [{ codigo: "AFORO_ZONA", mensaje: "Completo." }],
+      }),
+      { plano: falla(503) },
+    );
+
+    await renderizar();
+
+    expect(motivos().map((alerta) => alerta.textContent)).toEqual(["Completo."]);
+    expect(within(seccionPlano()).getByRole("alert")).toHaveTextContent(MENSAJE_PLANO);
   });
 });

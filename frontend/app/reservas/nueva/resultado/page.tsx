@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga";
 import { PasosReserva } from "../../../../src/components/reservas/pasos-reserva";
+import { PlanoMesas } from "../../../../src/components/reservas/plano-mesas";
+import { PlanoMesasError } from "../../../../src/components/reservas/plano-mesas-error";
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
 import { Alert } from "../../../../src/components/ui/alert";
 import { buttonVariants } from "../../../../src/components/ui/button";
@@ -23,6 +25,11 @@ const contenedor = "mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-
  * Resultado de disponibilidad (design.md D3 Pantalla 3). Consulta el servidor en cada visita
  * (sin caché: es "una foto del momento", config.yaml §6) y resuelve en paralelo el catálogo
  * para traducir `turnoId`/`zonaId` a horario y nombre, y para saber si la zona queda pendiente.
+ *
+ * El veredicto sale del plano de mesas (change `plano-mesas`, design.md D5): una sola respuesta
+ * gobierna el mensaje, el plano y "Continuar". `/disponibilidad` se pide solo si el plano falla
+ * (red, `5xx`, `429`, `404` o `400`); entonces decide ella y la sección del plano muestra su
+ * error (D7). El error del plano nunca impide reservar.
  */
 export default async function ResultadoPage({ searchParams }: ResultadoPageProps) {
   const seleccion = leerSeleccionDeQuery(await searchParams);
@@ -30,17 +37,34 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
     redirect("/reservas/nueva");
   }
 
-  const [disponibilidad, catalogo] = await Promise.all([
-    toApiResult(
-      apiClient.GET("/disponibilidad", { params: { query: seleccion }, cache: "no-store" }),
-    ),
+  const pedidoPlano = toApiResult(
+    apiClient.GET("/plano-mesas", { params: { query: seleccion }, cache: "no-store" }),
+  );
+  // El respaldo arranca apenas falla el plano, sin esperar a que termine el catálogo.
+  const pedidoDisponibilidad = pedidoPlano.then((plano) =>
+    plano.data
+      ? { data: plano.data }
+      : toApiResult(
+          apiClient.GET("/disponibilidad", { params: { query: seleccion }, cache: "no-store" }),
+        ),
+  );
+  const [plano, disponibilidad, catalogo] = await Promise.all([
+    pedidoPlano,
+    pedidoDisponibilidad,
     cargarCatalogo(),
   ]);
+
+  const seccionPlano = plano.data ? (
+    <PlanoMesas plano={plano.data} comensales={seleccion.comensales} />
+  ) : (
+    <PlanoMesasError error={plano.error} />
+  );
 
   const paso1ConSeleccion = urlConSeleccion("/reservas/nueva", seleccion);
 
   // Turno o zona que ya no existen (por ejemplo, un enlace viejo): reintentar no lo arregla y el
-  // Paso 1 ignora lo inválido.
+  // Paso 1 ignora lo inválido. Solo decide `/disponibilidad`: un 404 del plano solo (backend sin
+  // la ruta) no llega acá, porque entonces la disponibilidad responde 200.
   if (disponibilidad.error?.tipo === "no-encontrado") {
     redirect(paso1ConSeleccion);
   }
@@ -71,7 +95,7 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
         <h1 className="font-display text-3xl font-medium leading-tight sm:text-4xl">
           No hay lugar para esa combinación
         </h1>
-        <ul className="flex flex-col gap-3">
+        <ul aria-label="Motivos" className="flex flex-col gap-3">
           {disponibilidad.data.motivos.map((motivo, indice) => (
             // El índice desambigua dos motivos con el mismo código; la lista no se reordena.
             <li key={`${motivo.codigo}-${indice}`}>
@@ -88,6 +112,8 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
         >
           Cambiar fecha, turno o zona
         </Link>
+        {/* Después de los motivos y atenuado: no sugiere que se pueda reservar (D5). */}
+        {seccionPlano}
       </div>
     );
   }
@@ -130,6 +156,7 @@ export default async function ResultadoPage({ searchParams }: ResultadoPageProps
       >
         Continuar
       </Link>
+      {seccionPlano}
     </div>
   );
 }
