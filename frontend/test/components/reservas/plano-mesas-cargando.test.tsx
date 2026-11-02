@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { PlanoMesasCargando } from "../../../src/components/reservas/plano-mesas-cargando";
 
@@ -11,20 +9,21 @@ describe("PlanoMesasCargando", () => {
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
 
-  it("tiene un texto accesible que dice qué se está cargando", () => {
+  // Comentario de Facundo en #89: como `EsqueletoCarga`, el texto se anuncia con un rol de estado.
+  it("anuncia qué se está cargando con un rol de estado", () => {
     render(<PlanoMesasCargando />);
 
-    expect(screen.getByText("Cargando el plano de mesas")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Cargando el plano de mesas");
   });
 
-  it("los bloques del esqueleto son decorativos y usan la clase animada", () => {
+  // Comentario de Facundo en #89: el pulso es el mismo de `EsqueletoCarga`, sin CSS propio, y
+  // `motion-safe:` lo apaga con `prefers-reduced-motion` (la prueba real es la manual de 6.1).
+  it("los bloques del esqueleto son decorativos y pulsan solo sin movimiento reducido", () => {
     const { container } = render(<PlanoMesasCargando />);
 
-    const bloques = container.querySelectorAll(".plano-mesas-cargando");
-    expect(bloques.length).toBeGreaterThan(0);
-    for (const bloque of bloques) {
-      expect(bloque.closest('[aria-hidden="true"]')).not.toBeNull();
-    }
+    const bloques = container.querySelector('[aria-hidden="true"]');
+    expect(bloques?.className).toMatch(/(^|\s)motion-safe:animate-pulse(\s|$)/);
+    expect(bloques?.children.length).toBeGreaterThan(0);
   });
 
   it("reserva el lugar del dibujo con la proporción de la grilla, sin saltos de layout", () => {
@@ -39,33 +38,11 @@ describe("PlanoMesasCargando", () => {
 
     const lista = container.querySelector("[data-esqueleto-lista]");
     const dibujo = container.querySelector(".aspect-\\[3\\/2\\]");
-    expect(lista?.querySelectorAll(".plano-mesas-cargando").length).toBeGreaterThan(0);
+    expect(lista?.children.length).toBeGreaterThan(0);
     // Como en PlanoMesas: en celular la lista va antes que el dibujo; desde `sm`, después.
     expect(lista?.className).toMatch(/(^|\s)order-1(\s|$)/);
     expect(lista?.className).toContain("sm:order-2");
     expect(dibujo?.className).toMatch(/(^|\s)order-2(\s|$)/);
     expect(dibujo?.className).toContain("sm:order-1");
-  });
-});
-
-describe("PlanoMesasCargando - movimiento reducido", () => {
-  // `jsdom` no evalúa media queries: se comprueba que la regla existe en la hoja de estilos y la
-  // prueba real es la manual de la tarea 6.1.
-  const css = readFileSync(join(__dirname, "../../../app/globals.css"), "utf8");
-
-  it("la clase del esqueleto tiene una animación declarada", () => {
-    expect(css).toMatch(/\.plano-mesas-cargando\s*\{[^}]*animation:[^;]*\bbrillo-plano\b/);
-  });
-
-  it("prefers-reduced-motion apaga la animación del esqueleto", () => {
-    const bloques = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\r?\n\}/g)].map(
-      (m) => m[1],
-    );
-
-    expect(
-      bloques.some(
-        (bloque) => /\.plano-mesas-cargando(?![\w-])[^{]*\{[^}]*animation:\s*none/.test(bloque),
-      ),
-    ).toBe(true);
   });
 });

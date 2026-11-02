@@ -10,4 +10,15 @@ describe("Carga del resultado de la reserva", () => {
     expect(screen.getByText("Cargando el plano de mesas")).toBeInTheDocument();
     expect(screen.getByText("Cargando…")).toBeInTheDocument();
   });
+
+  // Comentario de Facundo en #89: en la página, el plano es un hijo más del contenedor con
+  // `gap-6`; si el esqueleto lo ponía en otro contenedor, el espacio cambiaba al llegar.
+  it("pone el esqueleto del plano en el mismo contenedor que el resto, como la página", () => {
+    render(<Loading />);
+
+    const plano = screen.getByText("Cargando el plano de mesas").closest("section");
+    const contenedor = screen.getByText("Cargando…").parentElement;
+    expect(plano?.parentElement).toBe(contenedor);
+    expect(contenedor?.className).toMatch(/(^|\s)gap-6(\s|$)/);
+  });
 });

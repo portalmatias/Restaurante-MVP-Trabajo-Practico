@@ -193,6 +193,11 @@
       `brillo-plano` en `globals.css`, apagada en el bloque de `prefers-reduced-motion`. Como el
       plano se pide en el Server Component, el esqueleto se muestra en el `loading.tsx` del
       resultado, debajo del de los pasos (test propio).
+      Ajuste (02/11/2026), por los comentarios de Facundo en #89: la clase `.plano-mesas-cargando`
+      y `brillo-plano` se reemplazan por `motion-safe:animate-pulse`, el mismo pulso de
+      `EsqueletoCarga`, que también se apaga con `prefers-reduced-motion`; el texto accesible pasa
+      a `role="status"`; y el esqueleto del plano va dentro del contenedor de `EsqueletoCarga`
+      (prop `children`), con el mismo `gap-6` que separa `seccionPlano` en la página.
 - [x] 5.6 Tests y manejo de errores: fallo `5xx`/red ⇒ mensaje + "Reintentar" reutilizando
       `error-con-reintento.tsx` y la reserva sigue disponible; `429` ⇒ mensaje específico sin
       reintento automático.
