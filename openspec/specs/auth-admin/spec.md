@@ -23,10 +23,12 @@ devuelve un JWT de acceso si coinciden.
 
 ### Requirement: Contenido y vigencia del JWT
 El sistema SHALL emitir un JWT de acceso que incluye `sub` (id del Usuario) y `rol`, con una
-vigencia de 60 minutos y sin mecanismo de refresh.
+vigencia configurable con `JWT_EXPIRES_IN` (60 minutos si no está definida, que es el valor de
+`.env.example`) y sin mecanismo de refresh.
 
 #### Scenario: Token expirado no sirve para acceder a rutas protegidas
-- **WHEN** pasaron más de 60 minutos desde la emisión de un JWT
+- **WHEN** pasó más tiempo que la vigencia configurada (60 minutos por defecto) desde la
+  emisión de un JWT
 - **THEN** el sistema rechaza ese JWT en cualquier ruta protegida y exige un nuevo login
 
 ### Requirement: Autenticación exigida en rutas de admin

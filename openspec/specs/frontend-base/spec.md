@@ -8,21 +8,27 @@ pantallas reales; este change no implementa ningún flujo de negocio.
 
 Salvo que un escenario diga otra cosa: el viewport de referencia mobile es 375px de ancho
 (iPhone SE / gama baja), y los de verificación adicionales son 768px (tablet), 1024px
-(notebook chica) y 1440px (escritorio). Los tokens de color referidos son los definidos en
-este change: `primary` (`#171717` sobre `#FFFFFF`), `secondary` (`#404040` sobre `#FFFFFF`),
-`accent` (`#A16207` sobre `#FFFFFF`), `background`/`card` (`#FFFFFF`),
-`foreground`/`card-foreground` (`#171717`), `muted` (`#E8ECF0`) con `muted-foreground`
-(`#475569`), `border` (`#E5E5E5`), `destructive` (`#DC2626` sobre `#FFFFFF`) y `ring`
-(`#171717`).
+(notebook chica) y 1440px (escritorio). Los tokens de color referidos tienen su valor vigente
+en `frontend/app/globals.css` (fuente única; la capability `identidad-visual-ichigo` fija la
+paleta y sus contrastes). Los de referencia son `background`
+(`#E8DCC4`), `card` (`#F3EBDA`), `foreground` (`#1F1813`), `muted` (`#D9CBAE`) con
+`muted-foreground` (`#5C4630`), `accent` y `destructive` (`#9A2A19`), `border` (`#8A6A43`,
+3,7:1 sobre `background` y 4,2:1 sobre `card`) y `ring` (`#9A2A19`).
 
 ## Requirements
 
 ### Requirement: Layout compartido y esqueleto de rutas
-El sistema SHALL servir un layout compartido con encabezado y pie de página en todas las
-rutas, y SHALL exponer `/` (landing), `/admin` y `/reservas` como páginas placeholder que usan
-ese layout. Ninguna de las tres SHALL contener lógica de negocio, autenticación ni las
-pantallas reales de reserva o administración: eso es alcance de `frontend-cliente` y
-`frontend-admin`.
+El sistema SHALL servir un layout compartido con encabezado y pie de página públicos en todas
+las rutas públicas (todas las rutas salvo `/admin` y las que cuelgan de `/admin/`, entre ellas
+`/` y `/reservas/**`), y SHALL exponer `/admin` como página accesible por URL
+directa. Las rutas `/admin` y las que cuelgan de `/admin/` SHALL NOT mostrar el encabezado ni
+el pie públicos: el panel tiene su propio encabezado y su propia navegación. La decisión SHALL
+tomarse por la ruta exacta (`/admin` o prefijo `/admin/`), de modo que una ruta como
+`/administrar` conserve el marco público. El encabezado público SHALL mostrar el nombre «Ichigo» como enlace a `/` y la navegación pública
+(«Reservas» y «Consultar reserva»). El idioma del documento y el título de cada página pública
+SHALL seguir el requisito «Metadatos del documento» de la capability `identidad-visual-ichigo`,
+que es la única fuente de ambos (los títulos del panel de administración quedan fuera de ese
+requisito).
 
 #### Scenario: La landing solo muestra el flujo del cliente
 - **WHEN** una persona visita `/`
@@ -32,16 +38,26 @@ pantallas reales de reserva o administración: eso es alcance de `frontend-clien
 
 #### Scenario: El personal entra a la administración por URL directa
 - **WHEN** una persona escribe la dirección `/admin` en el navegador
-- **THEN** la página `/admin` se muestra con el mismo layout, aunque ninguna página pública la
-  enlace
+- **THEN** la página `/admin` se muestra, aunque ninguna página pública la enlace
 
-#### Scenario: Las rutas placeholder comparten el layout
-- **WHEN** una persona visita `/admin` o `/reservas`
-- **THEN** ambas páginas muestran el mismo encabezado y pie de página que `/`
+#### Scenario: Las rutas públicas comparten el layout
+- **WHEN** una persona visita `/` o `/reservas`
+- **THEN** ambas páginas muestran el mismo encabezado y el mismo pie de página
 
-#### Scenario: El idioma del documento es español
-- **WHEN** se carga cualquier página del sitio
-- **THEN** el elemento `<html>` tiene el atributo `lang="es"`
+#### Scenario: El panel de administración no muestra el marco público
+- **WHEN** se visita `/admin`, `/admin/login`, `/admin/reservas` o `/admin/salon`
+- **THEN** la página no muestra el encabezado público («Ichigo», «Reservas», «Consultar
+  reserva») ni el pie «Ichigo es un restaurante ficticio…»
+- **AND** el contenido sigue dentro de un único elemento `main`
+
+#### Scenario: Una ruta parecida a /admin conserva el marco público
+- **WHEN** se evalúa una ruta como `/administrar`
+- **THEN** se la trata como pública y muestra el encabezado y el pie
+
+#### Scenario: El encabezado lleva el nombre del restaurante
+- **WHEN** se carga cualquier página pública
+- **THEN** el encabezado muestra «Ichigo» como enlace a `/`
+- **AND** su navegación incluye «Reservas» y «Consultar reserva» y ningún enlace a `/admin`
 
 ### Requirement: Tokens de diseño como única fuente de color
 Todo color visible en un componente de la interfaz (fondo, texto, borde, foco) SHALL provenir
@@ -89,13 +105,20 @@ mobile con un breakpoint de ancho máximo.
 
 ### Requirement: Contraste de texto accesible
 Todo texto SHALL alcanzar una relación de contraste de al menos 4.5:1 contra su fondo, usando
-las combinaciones de tokens semánticos definidas para el sistema de diseño.
+las combinaciones de tokens semánticos definidas para el sistema de diseño. Los bordes de los
+controles de formulario y de los botones con contorno SHALL alcanzar al menos 3:1 contra el
+fondo sobre el que se dibujan.
 
 #### Scenario: Contraste de las combinaciones definidas
 - **WHEN** se calcula la relación de contraste entre cada color de texto semántico (`primary`,
   `secondary`, `accent`, `foreground`, `card-foreground`, `muted-foreground`,
-  `destructive`) y el fondo sobre el que este change lo define
+  `destructive`) y el fondo sobre el que el sistema de diseño lo define
 - **THEN** la relación es de al menos 4.5:1 en cada combinación
+
+#### Scenario: Contraste de los bordes de controles
+- **WHEN** se calcula la relación de contraste entre el token `border` y los fondos `background`
+  y `card`
+- **THEN** la relación es de al menos 3:1 en ambos casos
 
 ### Requirement: Foco visible y navegación por teclado
 Todo elemento interactivo (enlace, botón, campo de formulario, control de selección) SHALL
@@ -130,12 +153,32 @@ asociado a él mediante `aria-describedby`.
 - **AND** el texto de error es visible junto al campo, no solo dentro de un resumen aparte
 
 ### Requirement: Objetivos táctiles mínimos
-Todo elemento interactivo SHALL tener un área táctil de al menos 44×44px.
+Todo elemento interactivo SHALL tener un área táctil de al menos 44×44px. Como única
+excepción, las acciones compactas del panel de administración (`BotonCompacto`: las de fila de
+sus tablas y las de la barra de sesión, como «Cerrar sesión» y «Renovar sesión») SHALL tener al menos 36px de alto solo cuando ningún dispositivo de entrada
+disponible es un puntero grueso (no coincide `any-pointer: coarse`), y SHALL conservar los 44px
+cuando lo haya. Así un equipo híbrido (pantalla táctil con mouse) conserva el área táctil
+completa.
 
 #### Scenario: Tamaño mínimo de un botón
 - **WHEN** se mide el área táctil renderizada de cualquier variante de `Button` o de un enlace
   de la navegación
 - **THEN** el ancho y el alto son de al menos 44px cada uno
+
+#### Scenario: Acción de fila en una pantalla táctil
+- **WHEN** se mide un `BotonCompacto` del listado de reservas en un dispositivo con
+  `any-pointer: coarse`
+- **THEN** su alto es de al menos 44px
+
+#### Scenario: Equipo híbrido con pantalla táctil y mouse
+- **WHEN** se mide un `BotonCompacto` en un dispositivo cuyo puntero principal es fino pero que
+  también tiene una pantalla táctil (`any-pointer: coarse`)
+- **THEN** su alto es de al menos 44px
+
+#### Scenario: Acción de fila con mouse
+- **WHEN** se mide un `BotonCompacto` del listado de reservas en un dispositivo sin
+  `any-pointer: coarse`
+- **THEN** su alto es de al menos 36px
 
 ### Requirement: Iconografía accesible
 Cuando la interfaz use un ícono, SHALL ser un ícono SVG, nunca un carácter emoji. Un ícono que
