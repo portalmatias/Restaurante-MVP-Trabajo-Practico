@@ -251,5 +251,9 @@
 - [x] 6.4 Actualizar el README (o la documentación de seed) con el layout del plano y la
       nota de que el admin todavía no lo edita (D6).
       README: sección «Plano de mesas del seed», con la nota de D6 y la de producción.
-- [ ] 6.5 Abrir el PR en español enlazado a este change, pedir la aprobación de un compañero y,
+- [x] 6.5 Abrir el PR en español enlazado a este change, pedir la aprobación de un compañero y,
       una vez mergeado, archivar con `openspec archive plano-mesas`.
+      Resultado (02/11/2026): el frontend es #89, aprobado por Facundo y mergeado en `106b8c3`
+      (el backend entró antes, en #86, parte 1/2). Archivado en este PR, con las specs fundidas en
+      `openspec/specs/plano-mesas` (capacidad nueva) y `openspec/specs/modelo-dominio` (tres
+      requisitos nuevos).
