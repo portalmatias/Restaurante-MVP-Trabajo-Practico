@@ -28,7 +28,7 @@
 - [x] 2.2 Escribir `frontend/app/version/route.ts` (`GET`, con `dynamic = "force-dynamic"`).
       Verificar que los tests pasan y que `npm run typecheck -w frontend` y `npx eslint .`
       quedan limpios.
-- [ ] 2.3 `frontend/Dockerfile`: `ARG BUILD_SHA=desconocido` y `ENV BUILD_SHA=${BUILD_SHA}` en
+- [x] 2.3 `frontend/Dockerfile`: `ARG BUILD_SHA=desconocido` y `ENV BUILD_SHA=${BUILD_SHA}` en
       la etapa final, después de los `COPY`. Verificar construyendo la imagen con
       `--build-arg BUILD_SHA=<sha>` y corriendo el contenedor: `GET /version` devuelve el SHA,
       `HEAD` responde `200`, `OPTIONS` responde `204` con `Allow`, `POST` responde `405`, y sin el
@@ -42,8 +42,17 @@
       caché (`npm ci` y `npm run build` en `CACHED`).
       Comprobado en producción (29/10/2026, tras el despliegue de `10cd8ae`): `OPTIONS` → `204`
       con `allow: GET, HEAD, OPTIONS`; `HEAD` → `200` con `Cache-Control: no-store`; `POST` →
-      `405`. Falta (se mantiene abierta): construir la imagen sin el argumento `BUILD_SHA` (se
-      probó con `BUILD_SHA` vacío, no omitido), a hacer en la próxima ocasión con Docker.
+      `405`.
+      Resultado (03/11/2026, con Docker, `main` en `aa10287`; mismo contexto y argumentos que el
+      CD: `-f frontend/Dockerfile`, `--platform linux/amd64`, `NEXT_PUBLIC_API_URL=http://backend:3001`):
+      1) **Sin** `--build-arg BUILD_SHA` (omitido, no vacío): `GET /version` → `200`,
+      `{"sha":"desconocido"}`, `Cache-Control: no-store`; `HEAD` → `200`; `OPTIONS` → `204` con
+      `allow: GET, HEAD, OPTIONS`; `POST` → `405`; `BUILD_SHA` dentro del contenedor = `desconocido`.
+      2) Segundo build cambiando **solo** `BUILD_SHA=aa10287bfc707e664ed5b5a42fcde87406f28798`:
+      los pasos `RUN npm ci --workspace frontend ...` y `RUN npm run build --workspace frontend`
+      salieron de caché (`CACHED`); `GET /version` → `{"sha":"aa10287b…"}` (el SHA pasado), con
+      `HEAD` `200`, `OPTIONS` `204` con `Allow` y `POST` `405`. Imágenes y contenedores de la
+      prueba borrados.
 ## 3. La comprobación (D3 a D6)
 
 - [x] 3.1 Escribir primero `scripts/cd/verificar-version.test.mjs` (`node --test`, sin
