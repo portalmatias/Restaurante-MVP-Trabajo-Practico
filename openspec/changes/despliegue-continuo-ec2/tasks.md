@@ -281,6 +281,13 @@
       `docker stats` y `free -m` el consumo de memoria, ajustar los `mem_limit` si hace falta y
       anotar las mediciones en el PR. Confirmar en la consola que la instancia está en
       `standard` y que la alerta de Budgets existe.
+      Avance (02/11/2026), comprobado desde afuera del servidor: el primer despliegue con
+      `workflow_dispatch` terminó en verde (corrida 39702358427, 22/10/2026, tras un primer
+      intento fallido) y la app responde en `https://<subdominio>/`; la variable `SUBDOMINIO`
+      existe, así que la docente asignó el subdominio. Esa respuesta pasa por Cloudflare, así que
+      no reemplaza la comprobación de `http://<IP-elástica>/`, que sigue pendiente. Falta
+      registrar también, con acceso al servidor y a la consola: `docker stats` y `free -m` con
+      uso, los `mem_limit`, los créditos de CPU en `standard` y la alerta de Budgets.
 - [ ] 6.3 Verificar desde afuera de AWS la superficie y las credenciales, y guardar las salidas
       (sin IPs ni ARNs que no hagan falta) en el PR:
       - `nc -zv <IP> 5432`, `3000` y `3001` no conectan, y el `22` sí;
@@ -296,6 +303,24 @@
       - login con las de producción → `200`;
       - `GET /api/reservas/...` de una reserva de ejemplo → no existe;
       - repetir la prueba de 4.3 contra producción.
+      Avance (02/11/2026), desde fuera de AWS y a través de `https://<subdominio>`: login con
+      las credenciales del README → `401` («Credenciales inválidas»); `POST
+      /api/reservas/consultar` con el cuerpo
+      `{"codigo":"SEEDCNF2","email":"martin.gomez@example.com"}` (una reserva del seed de
+      desarrollo, con su email de ejemplo) → `404` («No se encontró una reserva con ese código y
+      email»). La prueba de 4.3
+      no se repite: detrás de Cloudflare los límites se cuentan por borde y no por cliente (lo
+      resuelve el change `ip-real-detras-de-cloudflare`, #100), y una ráfaga de logins fallidos
+      podría devolver `429` a otros usuarios del mismo borde. Como el subdominio resuelve a
+      Cloudflare, los puertos y SSH se tienen que probar contra la IP elástica.
+      Contra la IP elástica (02/11/2026, conexión TCP desde fuera de AWS): `5432`, `3000` y
+      `3001` no conectan; `22`, `80` y `443` sí (80 y 443 abiertos a todos, como pide la etapa
+      HTTPS; restringirlos a Cloudflare es parte de #100). SSH sin clave ni agente: con
+      `PreferredAuthentications=password` el servidor solo ofrece `publickey` y rechaza
+      (`Permission denied (publickey)`), tanto para `deploy` como para `root`. Que `root` quede
+      rechazado aun con una clave válida (`PermitRootLogin no`) no se puede ver desde afuera sin
+      una clave autorizada. Falta: metadatos de la instancia (`aws ec2 describe-instances` y el
+      `PUT` desde un contenedor) y login con las credenciales de producción.
 - [ ] 6.4 Verificar los límites de la clave de despliegue (con la clave real, desde un equipo
       del equipo, y guardar las salidas sin datos sensibles):
       - `ssh deploy@<IP>` sin comando (shell interactiva) → rechazado;
@@ -312,6 +337,15 @@
 - [ ] 6.5 Mergear un cambio trivial a `main` y verificar que se despliega solo y que una reserva
       creada antes del despliegue sigue consultable. Reiniciar la instancia y verificar que la
       app vuelve sola con los mismos datos.
+      Avance (02/11/2026): el despliegue automático funciona. La corrida de CD 41547000496
+      (`workflow_run`) desplegó `854b817`, el merge de #98 (cambio de una etiqueta de la
+      landing), con las cuatro etapas en verde, incluida «Verificar versión publicada». Dos
+      minutos después, la corrida 41547303364 desplegó `a2e079c` (merge de #92, que ya incluía
+      `854b817`); por eso al consultarlo `GET /version` devolvía `a2e079c…`, y producción
+      mostraba «Consultar una reserva». El SHA desplegado sale del paso «Datos del pedido» del
+      log de cada corrida; el `headSha` de una corrida `workflow_run` no es ese SHA. Hay 17
+      despliegues automáticos con «Desplegar en la instancia» en verde desde el 22/10/2026. Falta comprobar que una reserva creada antes de un despliegue
+      sigue consultable y que la app vuelve sola tras reiniciar la instancia.
 - [ ] 6.6 Activar HTTPS cuando la docente confirme el subdominio: pasarle la IP elástica,
       verificar con `dig +short <subdominio>` que resuelve a esa IP, **cambiar `SITE_ADDRESS` en
       `/opt/reservas/.env` y redesplegar primero, y abrir 80 y 443 a `0.0.0.0/0` después**, cuando
@@ -332,6 +366,12 @@
       con HSTS, redirección `308` desde `http://`, certificado de Let's Encrypt del servidor
       válido y runbook actualizado. Falta registrar la reutilización del certificado tras
       reiniciar, la rotación de la contraseña del admin y la ejecución de `certificado.yml`.
+      Avance (02/11/2026): `curl -I https://<subdominio>/` → `200` con
+      `strict-transport-security: max-age=31536000`, y `curl -I http://<subdominio>/reservas` →
+      `308` a `https://`. La variable `SUBDOMINIO` existe y la ejecución manual de
+      `certificado.yml` terminó en verde (corrida 39702530473, 22/10/2026); desde entonces corre
+      a diario por `schedule`, también en verde. Falta registrar la reutilización del
+      certificado tras redesplegar y reiniciar, y la rotación de la contraseña del admin.
 
 - [x] 6.7 Hacer públicos los paquetes `reservas-backend` y `reservas-frontend` de GHCR tras la
       primera publicación y reintentar el primer despliegue (D3, runbook «Paquetes en GHCR»).
