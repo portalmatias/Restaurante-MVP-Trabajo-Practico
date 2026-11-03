@@ -284,9 +284,10 @@
       Avance (02/11/2026), comprobado desde afuera del servidor: el primer despliegue con
       `workflow_dispatch` terminó en verde (corrida 39702358427, 22/10/2026, tras un primer
       intento fallido) y la app responde en `https://<subdominio>/`; la variable `SUBDOMINIO`
-      existe, así que la docente asignó el subdominio. Falta registrar, con acceso al servidor y
-      a la consola: `docker stats` y `free -m` con uso, los `mem_limit`, los créditos de CPU en
-      `standard` y la alerta de Budgets.
+      existe, así que la docente asignó el subdominio. Esa respuesta pasa por Cloudflare, así que
+      no reemplaza la comprobación de `http://<IP-elástica>/`, que sigue pendiente. Falta
+      registrar también, con acceso al servidor y a la consola: `docker stats` y `free -m` con
+      uso, los `mem_limit`, los créditos de CPU en `standard` y la alerta de Budgets.
 - [ ] 6.3 Verificar desde afuera de AWS la superficie y las credenciales, y guardar las salidas
       (sin IPs ni ARNs que no hagan falta) en el PR:
       - `nc -zv <IP> 5432`, `3000` y `3001` no conectan, y el `22` sí;
@@ -304,7 +305,10 @@
       - repetir la prueba de 4.3 contra producción.
       Avance (02/11/2026), desde fuera de AWS y a través de `https://<subdominio>`: login con
       las credenciales del README → `401` («Credenciales inválidas»); `POST
-      /api/reservas/consultar` con `SEEDCNF2` del seed de desarrollo → `404`. La prueba de 4.3
+      /api/reservas/consultar` con el cuerpo
+      `{"codigo":"SEEDCNF2","email":"martin.gomez@example.com"}` (una reserva del seed de
+      desarrollo, con su email de ejemplo) → `404` («No se encontró una reserva con ese código y
+      email»). La prueba de 4.3
       no se repite: detrás de Cloudflare los límites se cuentan por borde y no por cliente (lo
       resuelve el change `ip-real-detras-de-cloudflare`, #100), y una ráfaga de logins fallidos
       podría devolver `429` a otros usuarios del mismo borde. Como el subdominio resuelve a
@@ -333,11 +337,14 @@
 - [ ] 6.5 Mergear un cambio trivial a `main` y verificar que se despliega solo y que una reserva
       creada antes del despliegue sigue consultable. Reiniciar la instancia y verificar que la
       app vuelve sola con los mismos datos.
-      Avance (02/11/2026): el despliegue automático funciona. El merge de #98 (cambio de una
-      etiqueta de la landing) entró en `a2e079c`, la corrida de CD 41547000496 (`workflow_run`)
-      pasó las cuatro etapas, incluida «Verificar versión publicada», y producción muestra
-      «Consultar una reserva» y `GET /version` → `a2e079c…`. Hay 17 despliegues automáticos en
-      verde desde el 22/10/2026. Falta comprobar que una reserva creada antes de un despliegue
+      Avance (02/11/2026): el despliegue automático funciona. La corrida de CD 41547000496
+      (`workflow_run`) desplegó `854b817`, el merge de #98 (cambio de una etiqueta de la
+      landing), con las cuatro etapas en verde, incluida «Verificar versión publicada». Dos
+      minutos después, la corrida 41547303364 desplegó `a2e079c` (merge de #92, que ya incluía
+      `854b817`); por eso al consultarlo `GET /version` devolvía `a2e079c…`, y producción
+      mostraba «Consultar una reserva». El SHA desplegado sale del paso «Datos del pedido» del
+      log de cada corrida; el `headSha` de una corrida `workflow_run` no es ese SHA. Hay 17
+      despliegues automáticos con «Desplegar en la instancia» en verde desde el 22/10/2026. Falta comprobar que una reserva creada antes de un despliegue
       sigue consultable y que la app vuelve sola tras reiniciar la instancia.
 - [ ] 6.6 Activar HTTPS cuando la docente confirme el subdominio: pasarle la IP elástica,
       verificar con `dig +short <subdominio>` que resuelve a esa IP, **cambiar `SITE_ADDRESS` en
