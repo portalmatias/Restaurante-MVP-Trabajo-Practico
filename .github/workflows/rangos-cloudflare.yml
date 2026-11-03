@@ -1,0 +1,64 @@
+name: Rangos de Cloudflare
+
+# Control semanal de la lista de rangos de Cloudflare (D2 de
+# openspec/changes/ip-real-detras-de-cloudflare/design.md). Compara deploy/cloudflare-ips.txt con
+# las listas que publica Cloudflare y falla, ABRIENDO UN ISSUE (o comentando el que ya está
+# abierto), si hay altas (rangos nuevos: ese tráfico se contaría por el borde y no por el
+# visitante, y el security group los dejaría afuera) o bajas (rangos que Cloudflare ya no usa y
+# siguen siendo de confianza). Una lista que no se pudo obtener también falla: no cuenta como
+# al día.
+#
+# Por qué un issue y no la notificación de GitHub: ver el mismo comentario en certificado.yml.
+# Limitación documentada por GitHub: en un repositorio público, los workflows programados se
+# deshabilitan solos tras 60 días sin actividad; si pasa, volver a habilitarlo en Actions.
+#
+# No usa credenciales de AWS: el token del workflow solo puede leer el código y escribir issues.
+# Qué hacer con las diferencias: docs/despliegue.md §6.
+
+on:
+  schedule:
+    # Los lunes a las 13:41 UTC (10:41 en Argentina).
+    - cron: '41 13 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: rangos-cloudflare
+  cancel-in-progress: false
+
+jobs:
+  comprobar:
+    name: Comparar con la lista publicada
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Comparar deploy/cloudflare-ips.txt con lo que publica Cloudflare
+        id: comparar
+        run: node scripts/cd/verificar-rangos-cloudflare.mjs
+
+      # Solo si falló la comparación: una caída del runner no es un problema de la lista.
+      - name: Abrir un issue si hay diferencias
+        if: failure() && steps.comparar.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL_EJECUCION: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          titulo="Rangos de Cloudflare: la lista de deploy/cloudflare-ips.txt difiere de la publicada"
+          cuerpo="La comprobación semanal encontró diferencias (o no pudo obtener la lista publicada). Detalle: $URL_EJECUCION. Qué hacer: docs/despliegue.md §6 (actualizar el archivo, la línea trusted_proxies del Caddyfile y el security group, juntos)."
+          existente="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$titulo\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$existente" ]; then
+            gh issue comment "$existente" --repo "$GITHUB_REPOSITORY" --body "Sigue sin resolverse. $cuerpo"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$titulo" --body "$cuerpo"
+          fi
