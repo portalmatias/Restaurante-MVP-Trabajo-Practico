@@ -36,9 +36,10 @@
       regresión (un cliente que no es Cloudflare se cuenta por su IP; una conexión de Cloudflare
       sin `CF-Connecting-IP` se cuenta por su IP). Con el `Caddyfile` nuevo pasan las 8. Se
       ejecuta con Docker y falla si no hay Docker (`SALTAR_CADDY=1` para omitirla).
-      Actualización (05/11/2026): después se agregaron la comprobación de que `CF-Connecting-IP`
-      no llega al frontend, 2 de IPv6 y 2 de host y esquema (sección 6, por la revisión del PR),
-      y la prueba tiene 13. Línea base rehecha con el `Caddyfile` de `main`: fallan 8 de 13 (las
+      Actualización (05/11/2026): antes de abrir el PR se agregaron la comprobación de que
+      `CF-Connecting-IP` no llega al frontend y 2 de IPv6 (11, las que ejecuta el run
+      42053799866 del CI de 3.5), y el 05/11/2026, por la revisión del PR, 2 de host y esquema
+      (sección 6). Hoy la prueba tiene 13. Línea base rehecha con el `Caddyfile` de `main`: fallan 8 de 13 (las
       6 de antes, más la de `CF-Connecting-IP` y la del borde de Cloudflare por IPv6) y pasan 5 (las dos
       guardas de regresión, el cliente IPv6 fuera del rango y las dos de host y esquema, que en
       `main` se cumplen porque Caddy no confía en ningún proxy). Con el `Caddyfile` nuevo pasan

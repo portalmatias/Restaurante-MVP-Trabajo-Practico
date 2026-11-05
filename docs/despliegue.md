@@ -450,7 +450,9 @@ rangos de Cloudflare para leer `CF-Connecting-IP` y escribe esa IP, una sola vez
 `X-Forwarded-For` que recibe el frontend (el backend confía en ese único salto, `TRUST_PROXY`) y
 con eso cuenta los límites de solicitudes. Una conexión que no viene de Cloudflare se identifica
 por su propia IP: lo que escriba en `CF-Connecting-IP`, `X-Forwarded-For`, `X-Real-IP` o
-`Forwarded` se ignora. Lo comprueba `deploy/test/cloudflare-caddy.test.sh`
+`Forwarded` se ignora. Caddy también fija `X-Forwarded-Host` y `X-Forwarded-Proto` al host y al
+esquema del pedido, así que el visitante no elige el host que ve Next (URLs absolutas,
+redirecciones y chequeo de origen de las server actions). Lo comprueba `deploy/test/cloudflare-caddy.test.sh`
 (`npm run test:deploy`, necesita Docker).
 
 **La lista de rangos** tiene una única fuente, `deploy/cloudflare-ips.txt` (de
@@ -841,7 +843,7 @@ servidor sigue sirviendo la última versión.
 
 ## 13. Probar `desplegar.sh` y `ssh-entrada.sh` sin AWS (tarea 5.2)
 
-`npm run test:deploy` (también corre en CI) ejecuta tres pruebas. La tercera, `deploy/test/cloudflare-caddy.test.sh` (sección 9), **necesita Docker** y falla a propósito sin un daemon (se saltea con `SALTAR_CADDY=1`); las otras dos no lo necesitan: `deploy/test/desplegar.test.sh`
+`npm run test:deploy` (también corre en CI) ejecuta tres pruebas. La tercera, `deploy/test/cloudflare-caddy.test.sh` (sección 6), **necesita Docker** y falla a propósito sin un daemon (se saltea con `SALTAR_CADDY=1`); las otras dos no lo necesitan: `deploy/test/desplegar.test.sh`
 (la de `desplegar.sh`, abajo) y `deploy/test/ssh-entrada.test.sh` (la del comando forzado, que está
 en el último párrafo de esta sección). La de `desplegar.sh` arma un
 repositorio Git temporal y simula `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker, red ni
