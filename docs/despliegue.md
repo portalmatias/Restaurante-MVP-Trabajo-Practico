@@ -77,7 +77,8 @@ reemplazar `us-east-1` si se elige otra.
 |---|---|---|---|
 | Entrada | TCP 22 | `0.0.0.0/0` | Siempre (despliegue desde Actions y administración) |
 | Entrada | TCP 80 y 443 | IPs públicas del equipo (`/32` cada una) | Etapa HTTP |
-| Entrada | TCP 80 y 443 | `0.0.0.0/0` | Etapa HTTPS |
+| Entrada | TCP 80 y 443 | `0.0.0.0/0` | Etapa HTTPS, **hasta cerrarlo a Cloudflare** (abajo) |
+| Entrada | TCP 80 y 443 | Lista de prefijos `cloudflare-ipv4` (los rangos IPv4 de `deploy/cloudflare-ips.txt`) | Etapa HTTPS con el proxy de Cloudflare, ya verificada (reemplaza a la fila anterior) |
 | Salida | todo | `0.0.0.0/0` | Siempre (imágenes, paquetes, Let's Encrypt) |
 
 **Sin** entrada al 5432, 3000 ni 3001.
@@ -105,6 +106,57 @@ done
 
 **Actualizar las IPs del equipo** (las IPs domésticas cambian): agregar la nueva con el mismo
 `authorize-security-group-ingress` y quitar la vieja con `revoke-security-group-ingress`.
+
+**Cerrar 80 y 443 a Cloudflare** (change `ip-real-detras-de-cloudflare`, lo hace una persona
+con la consola o la CLI de AWS). Con el proxy activado, todo el tráfico web legítimo sale de los
+rangos de Cloudflare; abrirlos solo a ellos evita que alguien llegue al servidor por la IP
+elástica salteando Cloudflare y sus límites. Se crea **una lista de prefijos administrada** con
+los rangos IPv4 de `deploy/cloudflare-ips.txt` (una regla por puerto en vez de una por rango) y
+se la usa como origen. Cloudflare se conecta al servidor por IPv4 (el registro es un `A` a la
+IP elástica), así que los rangos IPv6 del archivo solo sirven para la confianza de Caddy.
+
+> **Estos comandos no se probaron contra AWS** (los escribió quien no tiene acceso a la cuenta).
+> Revisarlos con la ayuda de `aws ec2 <comando> help` y probarlos primero con el sitio abierto en
+> otra pestaña; la verificación es la tarea 5.3 del change.
+
+```bash
+# Rangos IPv4 del archivo, en el formato de la CLI (Cidr=...,Description=...).
+ENTRADAS=$(grep -vE '^#|:' deploy/cloudflare-ips.txt | sed 's/^/Cidr=/; s/$/,Description=cloudflare/')
+LISTA=$(aws ec2 create-managed-prefix-list --region us-east-1 --prefix-list-name cloudflare-ipv4 \
+  --address-family IPv4 --max-entries 20 --entries $ENTRADAS \
+  --query PrefixList.PrefixListId --output text)
+
+# Las dos autorizaciones tienen que salir bien ANTES de revocar nada: si una falla, el bloque se
+# detiene y 0.0.0.0/0 sigue en su lugar (el sitio no se cae).
+for puerto in 80 443; do
+  aws ec2 authorize-security-group-ingress --region us-east-1 --group-id "$SG" \
+    --ip-permissions "IpProtocol=tcp,FromPort=$puerto,ToPort=$puerto,PrefixListIds=[{PrefixListId=$LISTA}]" \
+    || { echo "Falló la autorización del $puerto: NO se revoca nada."; return 1 2>/dev/null || exit 1; }
+done
+# Recién después de comprobar que el sitio sigue respondiendo por Cloudflare:
+for puerto in 80 443; do
+  aws ec2 revoke-security-group-ingress --region us-east-1 --group-id "$SG" \
+    --protocol tcp --port "$puerto" --cidr 0.0.0.0/0
+done
+```
+
+**Cuota de reglas:** una regla que referencia una lista de prefijos cuenta como tantas reglas como
+el `--max-entries` de la lista, no como una. Con 20 y dos puertos son 40 de las 60 reglas de
+entrada que admite por defecto un security group, además del 22 y de las IPs del equipo. Por eso
+la lista se crea con 20 (hoy hay 15 rangos IPv4) y no con un máximo holgado: con 30, las dos
+reglas sumarían 60 y la segunda autorización fallaría. Si Cloudflare agrega rangos y se llega a
+20, subir el máximo con `modify-managed-prefix-list --max-entries` **solo después** de revisar la
+cuota (`aws service-quotas get-service-quota --service-code vpc --quota-code L-0EA8095F`).
+
+**Orden y marcha atrás:** primero se agrega la regla de Cloudflare y se comprueba el sitio; recién
+entonces se revoca la de `0.0.0.0/0`. Para volver atrás, se vuelve a autorizar `0.0.0.0/0` en 80 y
+443 (inmediato). **Antes de cerrar, confirmar que la renovación del certificado sigue andando**
+(«Certificado: aviso y límites», sección 9, y tarea 5.4 del change): Let's Encrypt resuelve el subdominio a
+Cloudflare y valida a través del proxy, pero no está probado con el origen cerrado.
+
+**Consecuencia para el diagnóstico:** con 80 y 443 cerrados a todo salvo Cloudflare, ya no se
+puede pedir a la IP elástica desde una PC (`curl --resolve`, `openssl s_client -connect`). Para
+diagnosticar, autorizar temporalmente la IP propia (`/32`) en 80 y 443 y revocarla al terminar.
 
 **IP elástica**, para que la URL no cambie al reiniciar la instancia:
 
@@ -387,21 +439,51 @@ respecto de lo que supone el resto de este runbook (un registro `A` directo a la
   443. Con *Flexible* el sitio entraría en un bucle de redirecciones, porque Caddy redirige HTTP
   a HTTPS.
 - **El público ve el certificado de Cloudflare**, no el de Let's Encrypt. El de Let's Encrypt
-  solo lo ve Cloudflare. Para revisarlo, conectarse directo al servidor:
+  solo lo ve Cloudflare. Para revisarlo, conectarse directo al servidor (con el security group
+  cerrado a Cloudflare, primero hay que autorizar la IP propia en 443; ver la sección 2):
   `echo | openssl s_client -connect <IP-ELASTICA>:443 -servername <subdominio> 2>/dev/null | openssl x509 -noout -issuer -enddate`.
 - **SSH no pasa por Cloudflare:** `SERVER_HOST` tiene que seguir siendo la IP elástica (no usar
   el subdominio, a diferencia de lo que sugiere el paso 7 de la sección 9).
 
-**Pendiente (otro change):**
+**IP real del visitante** (change `ip-real-detras-de-cloudflare`). Caddy confía solo en los
+rangos de Cloudflare para leer `CF-Connecting-IP` y escribe esa IP, una sola vez, en el
+`X-Forwarded-For` que recibe el frontend (el backend confía en ese único salto, `TRUST_PROXY`) y
+con eso cuenta los límites de solicitudes. Una conexión que no viene de Cloudflare se identifica
+por su propia IP: lo que escriba en `CF-Connecting-IP`, `X-Forwarded-For`, `X-Real-IP` o
+`Forwarded` se ignora. Caddy también fija `X-Forwarded-Host` y `X-Forwarded-Proto` al host y al
+esquema del pedido, así que el visitante no elige el host que ve Next (URLs absolutas,
+redirecciones y chequeo de origen de las server actions). Lo comprueba `deploy/test/cloudflare-caddy.test.sh`
+(`npm run test:deploy`, necesita Docker).
 
-- **IP real del cliente.** Caddy ve como cliente a Cloudflare, así que el límite de intentos y
-  los registros agrupan a todos los visitantes detrás de las mismas IPs. Hay que configurar
-  `trusted_proxies` con los rangos de Cloudflare y leer `CF-Connecting-IP`.
-- **Security group.** Con proxy, lo correcto es abrir 80 y 443 solo a los rangos de Cloudflare
-  (lista de prefijos administrada con <https://www.cloudflare.com/ips-v4>), en lugar de
-  `0.0.0.0/0`. Así nadie llega al servidor salteando Cloudflare. La renovación del certificado
-  no se ve afectada: Let's Encrypt resuelve el subdominio a Cloudflare y valida a través del
-  proxy.
+**La lista de rangos** tiene una única fuente, `deploy/cloudflare-ips.txt` (de
+<https://www.cloudflare.com/ips-v4> y <https://www.cloudflare.com/ips-v6>, con la fecha de
+obtención en el encabezado). La línea `trusted_proxies static` de `deploy/Caddyfile` es una copia y
+una prueba (`scripts/cd/verificar-rangos-cloudflare.test.mjs`) falla si difieren.
+
+### Actualizar los rangos de Cloudflare
+
+Un workflow semanal (**Rangos de Cloudflare**, `rangos-cloudflare.yml`) compara el archivo con lo
+que publica Cloudflare y **abre un issue** si hay diferencias. También se puede correr a mano:
+
+```bash
+node scripts/cd/verificar-rangos-cloudflare.mjs     # 0 = al día; 1 = diferencias (las muestra)
+```
+
+La salida separa las **altas** (rangos nuevos: si no se cargan, ese tráfico se cuenta por el borde y
+el límite se reparte entre bordes como antes del change; si además faltan en el security group,
+esas conexiones directamente no llegan) de las **bajas** (rangos que Cloudflare retiró: siguen
+siendo de confianza hasta quitarlos). Para actualizar, **las tres cosas juntas**, en un solo PR y
+con la lista de prefijos de AWS al mismo tiempo:
+
+1. Actualizar `deploy/cloudflare-ips.txt` (y la fecha del encabezado) con los rangos de las dos
+   URLs de arriba.
+2. Copiar los mismos rangos a la línea `trusted_proxies static` de `deploy/Caddyfile`.
+   `npm run test:scripts` falla si no coinciden.
+3. Actualizar la lista de prefijos del security group (los IPv4):
+   `aws ec2 modify-managed-prefix-list --region us-east-1 --prefix-list-id <ID> --current-version <N> --add-entries Cidr=<alta> --remove-entries Cidr=<baja>`
+   (sin probar contra AWS; ver la sección 2).
+
+Después del despliegue, comprobar que el sitio responde y volver a correr el script.
 
 ## 7. Primer despliegue y pruebas
 
@@ -478,7 +560,9 @@ caso el despliegue en el servidor **terminó bien**; lo que no se confirmó es l
 Separar de qué lado está el problema:
 
 1. **¿Qué sirve el servidor, salteando Cloudflare?** Se pide a la IP elástica con el nombre del
-   sitio (el certificado de Let's Encrypt es válido para ese nombre):
+   sitio (el certificado de Let's Encrypt es válido para ese nombre). Con 80 y 443 cerrados a
+   Cloudflare (sección 2), primero hay que autorizar la IP propia (`/32`) en 443 y revocarla al
+   terminar:
 
    ```bash
    curl -s --resolve <subdominio>:443:<IP-ELASTICA> "https://<subdominio>/version?cb=$RANDOM$RANDOM"
@@ -595,7 +679,9 @@ Para restaurarlo en una base vacía: `gunzip -c respaldo.sql.gz | docker compose
    direcciones que no se publican, así que el 80 tiene que estar abierto a todos para emitir y
    renovar el certificado. La comprobación espera hasta 300 s al certificado y Caddy reintenta
    la validación sola. Este orden evita que el login quede en HTTP, abierto a internet,
-   mientras `SITE_ADDRESS` sigue en `:80`.
+   mientras `SITE_ADDRESS` sigue en `:80`. **Cuando el certificado esté emitido y el sitio
+   responda por HTTPS, cerrar 80 y 443 a Cloudflare** (sección 2) en vez de dejar `0.0.0.0/0`,
+   después de comprobar la renovación.
    - **Si el job termina en `VUELTA ATRÁS`** (no se emitió el certificado a tiempo): el sitio
      volvió a la etapa HTTP con el security group **abierto**. Cerrarlo de nuevo a las IPs del
      equipo antes de seguir, leer el log de Caddy (`sudo docker logs reservas-caddy-1` o el
@@ -639,7 +725,9 @@ Dos cosas que dice la documentación de GitHub y que conviene tener presentes:
   controla el certificado: revisarlo con `curl -I https://<subdominio>/` de vez en cuando.
 
 Si el issue indica que el certificado no se renueva: ver `sudo docker logs` de Caddy y comprobar que
-el puerto 80 siga abierto a `0.0.0.0/0` (la renovación valida por ahí).
+el puerto 80 siga abierto a `0.0.0.0/0` o, si ya se cerró el origen, a la lista de prefijos de
+Cloudflare (la renovación valida por ahí, a través del proxy; si falla con el origen cerrado,
+volver a abrir `0.0.0.0/0` y avisar en el change).
 
 ### Si el DNS falla o el subdominio deja de resolver
 
@@ -647,7 +735,8 @@ Caddy sigue reintentando la emisión y el sitio no responde por HTTPS hasta logr
 a la IP **sin dejar el login en claro abierto a internet**, en este orden:
 
 1. **Primero** restringir otra vez el security group a las IPs del equipo en 80 y 443 (revocar
-   `0.0.0.0/0` y volver a autorizar las IPs `/32`).
+   `0.0.0.0/0`, o la regla de la lista de prefijos de Cloudflare, y volver a autorizar las IPs
+   `/32`).
 2. Después volver a `SITE_ADDRESS=:80` en `/opt/reservas/.env` y redesplegar la versión actual, como
    en el paso 4.
 3. Reintentar la activación cuando el DNS resuelva.
@@ -723,6 +812,10 @@ Alcance y mitigaciones:
 - La etapa dura solo hasta que la docente configure el DNS. Activar HTTPS es un cambio de
   configuración (sección 9) y obliga a rotar la contraseña del admin.
 - En esta etapa Caddy **no** envía `Strict-Transport-Security`.
+- **Sin Cloudflare delante** (el registro todavía no existe): las conexiones llegan directo desde
+  las IPs del equipo, que no son de Cloudflare, así que cada una se identifica por su propia IP y
+  cualquier `CF-Connecting-IP` o `X-Forwarded-For` que mande se ignora. La confianza en Cloudflare
+  solo se activa para conexiones que vengan de sus rangos.
 
 ## 12. Apagar y eliminar todo al terminar la cursada
 
@@ -750,7 +843,7 @@ servidor sigue sirviendo la última versión.
 
 ## 13. Probar `desplegar.sh` y `ssh-entrada.sh` sin AWS (tarea 5.2)
 
-`npm run test:deploy` (también corre en CI) ejecuta dos pruebas: `deploy/test/desplegar.test.sh`
+`npm run test:deploy` (también corre en CI) ejecuta tres pruebas. La tercera, `deploy/test/cloudflare-caddy.test.sh` (sección 6), **necesita Docker** y falla a propósito sin un daemon (se saltea con `SALTAR_CADDY=1`); las otras dos no lo necesitan: `deploy/test/desplegar.test.sh`
 (la de `desplegar.sh`, abajo) y `deploy/test/ssh-entrada.test.sh` (la del comando forzado, que está
 en el último párrafo de esta sección). La de `desplegar.sh` arma un
 repositorio Git temporal y simula `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker, red ni

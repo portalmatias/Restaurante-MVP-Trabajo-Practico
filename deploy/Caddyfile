@@ -6,10 +6,20 @@
 # - `<subdominio>`: etapa HTTPS. Caddy obtiene y renueva solo el certificado de Let's Encrypt
 #   (desafío HTTP-01 por el puerto 80), redirige HTTP a HTTPS y sirve por 443.
 #
-# X-Forwarded-For: `reverse_proxy` ignora los X-Forwarded-* que manda el cliente (no hay
-# `trusted_proxies`) y escribe la IP de la conexión. Es la condición de despliegue de
-# exposicion-red: el proxy de borde SOBRESCRIBE el encabezado. Ver
-# https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
+# Origen del visitante (change ip-real-detras-de-cloudflare). El sitio público pasa por
+# Cloudflare con proxy, así que la conexión que ve Caddy es la de un borde de Cloudflare, no la
+# del visitante. Caddy resuelve la IP real así:
+# - Solo confía en `CF-Connecting-IP` cuando la conexión viene de un rango de Cloudflare
+#   (`trusted_proxies`, abajo). Desde cualquier otra dirección, el origen es la propia conexión
+#   y ese encabezado se ignora.
+# - Hacia el frontend escribe un único `X-Forwarded-For` con esa IP y descarta `X-Real-IP`,
+#   `Forwarded` y `CF-Connecting-IP`: lo que escriba el visitante no pasa. El backend confía
+#   solo en ese salto (TRUST_PROXY, ver docker-compose.prod.yml) y cuenta sus límites por esa IP.
+# - La lista de rangos tiene UNA fuente: deploy/cloudflare-ips.txt. La línea `trusted_proxies
+#   static` de abajo es una copia de ese archivo (Caddy no admite leerla de otro lado en esa
+#   directiva) y una prueba (scripts/cd/verificar-rangos-cloudflare.test.mjs) falla si difieren.
+# Ver https://caddyserver.com/docs/caddyfile/options#trusted-proxies
+# y https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
 {
 	# Sin `email`: Let's Encrypt ya no manda avisos de vencimiento por correo (desde el 4 de
 	# junio de 2025). El vencimiento lo controla .github/workflows/certificado.yml (D2).
@@ -18,6 +28,10 @@
 		# Sin HTTP/3: el security group solo abre TCP 80 y 443, y anunciar h3 por UDP haría
 		# que los navegadores intenten una conexión que no llega.
 		protocols h1 h2
+
+		# Rangos de Cloudflare en los que se confía para leer CF-Connecting-IP.
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP
 	}
 }
 
@@ -42,5 +56,15 @@
 
 	# Todo va al frontend; el backend no tiene ruta propia en el proxy (D1). Next reescribe
 	# /api hacia el backend por la red interna.
-	reverse_proxy frontend:3000
+	reverse_proxy frontend:3000 {
+		header_up X-Forwarded-For {client_ip}
+		# Detrás de un proxy de confianza Caddy conserva los X-Forwarded-Host y X-Forwarded-Proto
+		# que llegan, y Cloudflare deja pasar los del visitante. Se fijan al host y al esquema del
+		# pedido, porque Next los usa para URLs absolutas, redirecciones y el chequeo de origen.
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up -X-Real-IP
+		header_up -Forwarded
+		header_up -CF-Connecting-IP
+	}
 }
