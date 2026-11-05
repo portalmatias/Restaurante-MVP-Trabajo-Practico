@@ -42,13 +42,29 @@ describe('MesasService', () => {
     $transaction: jest.Mock;
   };
 
-  const zonaStandard = { id: 'zona-standard', nombre: 'STANDARD' };
-  const zonaVip = { id: 'zona-vip', nombre: 'VIP' };
+  const zonaStandard = {
+    id: 'zona-standard',
+    nombre: 'STANDARD',
+    planoColumnas: 12,
+    planoFilas: 8,
+  };
+  const zonaVip = {
+    id: 'zona-vip',
+    nombre: 'VIP',
+    planoColumnas: 10,
+    planoFilas: 6,
+  };
+  /** Fila de Prisma completa: sin ubicar en el plano, con el tamaño y la forma por defecto. */
   const mesa = {
     id: 'mesa-1',
     zonaId: zonaStandard.id,
     capacidad: 6,
     etiqueta: 'M1',
+    posX: null,
+    posY: null,
+    ancho: 1,
+    alto: 1,
+    forma: 'RECTANGULAR',
   };
 
   beforeEach(async () => {

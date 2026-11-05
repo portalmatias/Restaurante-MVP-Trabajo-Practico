@@ -47,17 +47,32 @@ además que la mesa no cambió en la base. Cada tarea va con tests primero (rojo
       venga de la validación del campo y no de `forbidNonWhitelisted`, y que la mesa no cambie) y el
       pedido sin campos del plano. Rojo observado: 9 fallidos, 1 pasa (el pedido sin campos del plano
       ya se comportaba así). Verde: el archivo completo 26 de 26.
-- [ ] 3.2 En `MesasService.ejecutarActualizacion`, dentro de la transacción `Serializable`
+- [x] 3.2 En `MesasService.ejecutarActualizacion`, dentro de la transacción `Serializable`
       existente, calcular el lugar final, validar que las coordenadas van juntas (paso 0 de D2) y
       saltear la validación cuando el lugar no cambia (paso 2). Tests: coordenada a medias `400`
       (también con el valor guardado, y con una `null` junto a otra con valor), forma, forma y
       reenvío de la ubicación de una mesa con un problema previo (cargado directo en la base),
       quitar del plano, y las validaciones existentes antes que las de ubicación.
-- [ ] 3.3 Validar la grilla y la superposición con `problemasDeUbicacion` (pasos 3 y 4 de D2).
+      Resultado (05/11/2026): 8 tests en el bloque "coordenadas juntas y lugar final": las tres
+      coordenadas a medias (también con el valor guardado y con una `null` junto a otra con valor),
+      forma, forma y reenvío de la ubicación de S2 cargada a mano en (5,0), quitar del plano (que
+      además consulta `PlanoMesasService` y encuentra S2 sin ubicar en STANDARD) y la reserva activa
+      de S4 que gana sobre la ubicación. Rojo observado: 3 fallidos (dos respondían `200` y uno `500`),
+      5 pasan (sin validación de ubicación todavía no había nada que saltear). Verde: 34 de 34. El
+      lugar final y el atajo del paso 2 se implementaron junto con 3.3, que es la validación que
+      saltean; los tests de problema previo siguen en verde después de 3.3. Mismo commit que 3.3.
+- [x] 3.3 Validar la grilla y la superposición con `problemasDeUbicacion` (pasos 3 y 4 de D2).
       Tests: mover, tocarse, superposición `409` con una y con varias mesas, cambio de tamaño
       `409`, fuera de grilla `400`, tamaño mayor que la grilla en una mesa sin ubicar `400`, y el
       orden de los rechazos (coordenada a medias sobre tamaño, tamaño sobre fuera de grilla, fuera
       de grilla sobre superposición).
+      Resultado (05/11/2026): 10 tests en el bloque "grilla y superposición": mover, tocarse, las
+      tres superposiciones (S3; S2 y S3; S5), fuera de grilla, tamaño mayor que la grilla con S2 sin
+      ubicar y los tres órdenes de rechazo (S6 cargada en la base en (10,7)). Rojo observado: 7
+      fallidos (respondían `200`), 3 pasan (mover, tocarse y la coordenada a medias, que ya cubría
+      3.2). Verde: el archivo completo 44 de 44 y los unitarios del backend 247 de 247. Las mesas y
+      zonas de prueba de `mesas.service.spec.ts` suman las columnas del plano que trae toda fila de
+      Prisma (sin ellas, el cambio de zona leía `posX` como `undefined` y validaba una mesa ubicada).
 - [ ] 3.4 Cambio de zona. Tests: reenviar la misma zona, cambio de zona sin ubicación, con
       ubicación y con ubicación fuera de la grilla nueva (S6, cargada directo en la base), y mesa
       que no entra en la grilla nueva (S8, cargada directo en la base).

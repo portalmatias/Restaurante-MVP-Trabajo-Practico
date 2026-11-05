@@ -6,12 +6,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { Mesa } from '@prisma/client';
+import { DiaSemana, EstadoReserva, Mesa } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
 import { seedCatalogo } from '../prisma/catalogo';
 import { seedPlano } from '../prisma/plano-desarrollo';
+import { fechaCalendarioAIso } from '../src/common/timezone';
 
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -19,7 +20,10 @@ import { AuthModule } from '../src/auth/auth.module';
 import { ZonasModule } from '../src/zonas/zonas.module';
 import { MesasModule } from '../src/mesas/mesas.module';
 import { HorariosModule } from '../src/horarios/horarios.module';
+import { PlanoMesasModule } from '../src/plano-mesas/plano-mesas.module';
+import { PlanoMesasService } from '../src/plano-mesas/plano-mesas.service';
 import { upsertSeguro } from './helpers/upsert-seguro';
+import { diaDe, hoyLocal, sumarDias } from './support/fechas-e2e';
 
 /**
  * Tests HTTP (Supertest) de los tres controllers admin de `gestion-salon`
@@ -346,6 +350,8 @@ describe('Controllers admin de gestión de salón (integration)', () => {
  */
 const SCHEMA_UBICACION = 'gestion_salon_ubicacion_test';
 const ETIQUETAS_SEED = ['S1', 'S2', 'S3', 'S4', 'S5', 'V1', 'V2', 'V3', 'V4'];
+const MENSAJE_COORDENADAS =
+  'posX y posY van juntos: los dos con valor o los dos en null.';
 
 function urlDelSchemaDeUbicacion(): string {
   const base = process.env.DATABASE_URL;
@@ -355,6 +361,15 @@ function urlDelSchemaDeUbicacion(): string {
   const url = new URL(base);
   url.searchParams.set('schema', SCHEMA_UBICACION);
   return url.toString();
+}
+
+/** Primera fecha que cae en `dia` a `minimoDias` días o más de hoy. */
+function proximo(dia: DiaSemana, minimoDias: number): Date {
+  let candidata = sumarDias(hoyLocal(), minimoDias);
+  while (diaDe(candidata) !== dia) {
+    candidata = sumarDias(candidata, 1);
+  }
+  return candidata;
 }
 
 async function borrarSchemaDeUbicacion(): Promise<void> {
@@ -370,6 +385,8 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let adminToken: string;
+  let zonas: { STANDARD: string; VIP: string };
+  let turnos: Record<string, { id: string }>;
   /** Mesas del seed por etiqueta, leídas de nuevo antes de cada caso. */
   let mesas: Record<string, Mesa>;
 
@@ -403,6 +420,7 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
         AuthModule,
         ZonasModule,
         MesasModule,
+        PlanoMesasModule,
       ],
     }).compile();
     process.env.DATABASE_URL = urlCompartida;
@@ -418,6 +436,15 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
     adminToken = app
       .get(JwtService)
       .sign({ sub: 'admin-test-uuid', rol: 'ADMIN' }, { secret: jwtSecret });
+
+    const catalogo = await seedCatalogo(prisma, () => undefined);
+    turnos = catalogo.turnos;
+    const filas = await prisma.zona.findMany({
+      select: { id: true, nombre: true },
+    });
+    zonas = Object.fromEntries(
+      filas.map((z) => [z.nombre, z.id]),
+    ) as typeof zonas;
   }, 120_000);
 
   beforeEach(async () => {
@@ -450,6 +477,27 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
   /** Todo rechazo deja la mesa exactamente como estaba en la base. */
   async function esperarSinCambios(mesa: Mesa): Promise<void> {
     expect(await leer(mesa)).toEqual(mesa);
+  }
+
+  /** Carga una ubicación directo en la base, sin pasar por la API (un layout cargado a mano). */
+  async function ubicarEnLaBase(
+    mesa: Mesa,
+    datos: Partial<Pick<Mesa, 'posX' | 'posY' | 'ancho' | 'alto'>>,
+  ): Promise<Mesa> {
+    return prisma.mesa.update({ where: { id: mesa.id }, data: datos });
+  }
+
+  /** S6: mesa de STANDARD de 1 por 1 y sin reservas, cargada en la base en (10,7). */
+  function cargarS6(): Promise<Mesa> {
+    return prisma.mesa.create({
+      data: {
+        zonaId: zonas.STANDARD,
+        capacidad: 2,
+        etiqueta: 'S6',
+        posX: 10,
+        posY: 7,
+      },
+    });
   }
 
   function mensaje(respuesta: request.Response): unknown {
@@ -490,6 +538,185 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
         ...mesas.S3,
         etiqueta: 'S3-nueva',
       });
+    });
+  });
+
+  describe('coordenadas juntas y lugar final (tarea 3.2)', () => {
+    it.each([
+      ['solo posX', { posX: 4 }],
+      ['solo posX, igual al guardado', { posX: 0 }],
+      ['posX en null junto a posY con valor', { posX: null, posY: 3 }],
+    ])('responde 400 con %s sin modificar la mesa', async (_, body) => {
+      const respuesta = await patch(mesas.S1, body).expect(400);
+
+      expect(mensaje(respuesta)).toBe(MENSAJE_COORDENADAS);
+      await esperarSinCambios(mesas.S1);
+    });
+
+    it('guarda la forma y la mesa conserva su posición y su tamaño', async () => {
+      await patch(mesas.S3, { forma: 'REDONDA' }).expect(200);
+
+      expect(await leer(mesas.S3)).toEqual({ ...mesas.S3, forma: 'REDONDA' });
+    });
+
+    it('cambia la forma de una mesa con un problema previo sin validar la superposición', async () => {
+      // S2 cargada a mano en (5,0), encima de S3.
+      const s2 = await ubicarEnLaBase(mesas.S2, { posX: 5, posY: 0 });
+
+      await patch(s2, { forma: 'CUADRADA' }).expect(200);
+
+      expect(await leer(s2)).toEqual({ ...s2, forma: 'CUADRADA' });
+    });
+
+    it('reenviar la ubicación de una mesa con un problema previo no valida la superposición', async () => {
+      const s2 = await ubicarEnLaBase(mesas.S2, { posX: 5, posY: 0 });
+
+      await patch(s2, {
+        posX: 5,
+        posY: 0,
+        ancho: 1,
+        alto: 1,
+        etiqueta: 'S2-nueva',
+      }).expect(200);
+
+      expect(await leer(s2)).toEqual({ ...s2, etiqueta: 'S2-nueva' });
+    });
+
+    it('quita la mesa del plano y el plano de STANDARD la lista como sin ubicar', async () => {
+      await patch(mesas.S2, { posX: null, posY: null }).expect(200);
+
+      expect(await leer(mesas.S2)).toEqual({
+        ...mesas.S2,
+        posX: null,
+        posY: null,
+      });
+      const fecha = proximo(DiaSemana.SABADO, 3);
+      const plano = await app.get(PlanoMesasService).consultar({
+        fecha: fechaCalendarioAIso(fecha),
+        turnoId: turnos[`${diaDe(fecha)}_CENA`].id,
+        zonaId: zonas.STANDARD,
+        comensales: 2,
+      });
+      expect(plano.mesas.find((m) => m.etiqueta === 'S2')).toMatchObject({
+        posX: null,
+        posY: null,
+      });
+    });
+
+    it('las validaciones existentes corren antes que las de ubicación', async () => {
+      const fecha = proximo(DiaSemana.SABADO, 3);
+      await prisma.reserva.create({
+        data: {
+          mesaId: mesas.S4.id,
+          turnoId: turnos[`${diaDe(fecha)}_CENA`].id,
+          fecha,
+          comensales: 3,
+          estado: EstadoReserva.CONFIRMADA,
+          nombreCliente: 'Cliente de prueba',
+          emailCliente: 'cliente@ejemplo.com',
+          telefonoCliente: '+54 11 5555-0000',
+          codigoReserva: 'UBI00001',
+        },
+      });
+
+      const respuesta = await patch(mesas.S4, {
+        capacidad: 2,
+        posX: 10,
+        posY: 6,
+      }).expect(409);
+
+      expect(mensaje(respuesta)).toBe(
+        'La mesa tiene una reserva activa con más comensales que la nueva capacidad.',
+      );
+      await esperarSinCambios(mesas.S4);
+    });
+  });
+
+  describe('grilla y superposición (tarea 3.3)', () => {
+    it('mueve S4 a un lugar libre', async () => {
+      await patch(mesas.S4, { posX: 8, posY: 5 }).expect(200);
+
+      expect(await leer(mesas.S4)).toEqual({ ...mesas.S4, posX: 8, posY: 5 });
+    });
+
+    it('acepta mesas que se tocan por un lado', async () => {
+      await patch(mesas.S1, { posX: 1, posY: 0 }).expect(200);
+
+      expect(await leer(mesas.S1)).toEqual({ ...mesas.S1, posX: 1, posY: 0 });
+    });
+
+    it.each([
+      ['S1 dentro de S3', 'S1', { posX: 5, posY: 1 }, 'S3'],
+      ['S1 con ancho 6 sobre S2 y S3', 'S1', { ancho: 6 }, 'S2 y S3'],
+      ['S4 con ancho 6 sobre S5', 'S4', { ancho: 6 }, 'S5'],
+    ])(
+      'rechaza con 409 la superposición de %s',
+      async (_, etiqueta, body, superpuestas) => {
+        const respuesta = await patch(mesas[etiqueta], body).expect(409);
+
+        expect(mensaje(respuesta)).toBe(
+          `La mesa se superpone con ${superpuestas}.`,
+        );
+        await esperarSinCambios(mesas[etiqueta]);
+      },
+    );
+
+    it('rechaza con 400 una mesa que queda fuera de la grilla', async () => {
+      const respuesta = await patch(mesas.S5, { posX: 10, posY: 3 }).expect(
+        400,
+      );
+
+      expect(mensaje(respuesta)).toBe(
+        'La mesa queda fuera de la grilla de 12 por 8.',
+      );
+      await esperarSinCambios(mesas.S5);
+    });
+
+    it('rechaza con 400 un tamaño mayor que la grilla en una mesa sin ubicar', async () => {
+      const s2 = await ubicarEnLaBase(mesas.S2, { posX: null, posY: null });
+
+      const respuesta = await patch(s2, { ancho: 13 }).expect(400);
+
+      expect(mensaje(respuesta)).toBe(
+        'La mesa no entra en la grilla de 12 por 8.',
+      );
+      await esperarSinCambios(s2);
+    });
+
+    it('la coordenada a medias gana sobre el tamaño mayor que la grilla', async () => {
+      const respuesta = await patch(mesas.S1, { posX: 4, ancho: 13 }).expect(
+        400,
+      );
+
+      expect(mensaje(respuesta)).toBe(MENSAJE_COORDENADAS);
+      await esperarSinCambios(mesas.S1);
+    });
+
+    it('el tamaño mayor que la grilla gana sobre la mesa fuera de la grilla', async () => {
+      const respuesta = await patch(mesas.S4, {
+        posX: 10,
+        posY: 3,
+        ancho: 13,
+      }).expect(400);
+
+      expect(mensaje(respuesta)).toBe(
+        'La mesa no entra en la grilla de 12 por 8.',
+      );
+      await esperarSinCambios(mesas.S4);
+    });
+
+    it('la mesa fuera de la grilla gana sobre la superposición', async () => {
+      // S4 (3 por 2) en (10,6) se sale por la derecha y además pisa a S6 en (10,7).
+      await cargarS6();
+
+      const respuesta = await patch(mesas.S4, { posX: 10, posY: 6 }).expect(
+        400,
+      );
+
+      expect(mensaje(respuesta)).toBe(
+        'La mesa queda fuera de la grilla de 12 por 8.',
+      );
+      await esperarSinCambios(mesas.S4);
     });
   });
 });

@@ -4,8 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Mesa, Prisma } from '@prisma/client';
 
+import { estaUbicada, problemasDeUbicacion } from '../plano-mesas/layout-plano';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActualizarMesaDto } from './dto/actualizar-mesa.dto';
 import { CrearMesaDto } from './dto/crear-mesa.dto';
@@ -30,6 +31,59 @@ const SELECT_MESA_ADMIN = {
 
 function esCapacidadInvalida(capacidad: number): boolean {
   return !Number.isInteger(capacidad) || capacidad <= 0;
+}
+
+const MENSAJE_COORDENADAS_JUNTAS =
+  'posX y posY van juntos: los dos con valor o los dos en null.';
+
+/**
+ * `posX` y `posY` llegan las dos o ninguna, y las dos con valor o las dos en `null`
+ * (design.md D2 de `plano-mesas-admin`, paso 0). Ausente (`undefined`) no es lo mismo que
+ * `null`: el DTO deja pasar los dos.
+ */
+function coordenadasVanJuntas(dto: ActualizarMesaDto): boolean {
+  if ((dto.posX === undefined) !== (dto.posY === undefined)) {
+    return false;
+  }
+  return (dto.posX === null) === (dto.posY === null);
+}
+
+/** Lo que ocupa una mesa en el plano: zona, posición (nula si no está ubicada) y tamaño. */
+interface LugarDeMesa {
+  zonaId: string;
+  posX: number | null;
+  posY: number | null;
+  ancho: number;
+  alto: number;
+}
+
+/** Paso 1 de D2: el lugar que resulta de aplicar el pedido a la mesa guardada. */
+function lugarFinal(mesa: Mesa, dto: ActualizarMesaDto): LugarDeMesa {
+  return {
+    zonaId: dto.zonaId ?? mesa.zonaId,
+    posX: dto.posX !== undefined ? dto.posX : mesa.posX,
+    posY: dto.posY !== undefined ? dto.posY : mesa.posY,
+    ancho: dto.ancho ?? mesa.ancho,
+    alto: dto.alto ?? mesa.alto,
+  };
+}
+
+function cambiaElLugar(mesa: Mesa, lugar: LugarDeMesa): boolean {
+  return (
+    lugar.zonaId !== mesa.zonaId ||
+    lugar.posX !== mesa.posX ||
+    lugar.posY !== mesa.posY ||
+    lugar.ancho !== mesa.ancho ||
+    lugar.alto !== mesa.alto
+  );
+}
+
+/** "S2", "S2 y S3", "S2, S3 y S4". */
+function enumerar(etiquetas: string[]): string {
+  if (etiquetas.length <= 1) {
+    return etiquetas.join('');
+  }
+  return `${etiquetas.slice(0, -1).join(', ')} y ${etiquetas[etiquetas.length - 1]}`;
 }
 
 /**
@@ -86,6 +140,12 @@ export class MesasService {
    * de la Mesa — violando los invariantes 2/3. `ReservasService.crearReserva` ya corre en
    * `Serializable`, así que Postgres detecta el conflicto real entre ambas transacciones
    * (mismo mecanismo que documenta `ZonasService.actualizar`).
+   *
+   * También edita la ubicación en el plano (`posX`, `posY`, `ancho`, `alto`, `forma`, change
+   * `plano-mesas-admin`, design.md D2): después de las validaciones de arriba, rechaza una
+   * coordenada a medias, un tamaño mayor que la grilla de la zona final, una mesa fuera de la
+   * grilla y una superposición con otra mesa ubicada de la zona, en ese orden, solo si el
+   * pedido cambia el lugar que ocupa la mesa.
    */
   async actualizar(id: string, dto: ActualizarMesaDto) {
     if (dto.capacidad !== undefined && esCapacidadInvalida(dto.capacidad)) {
@@ -160,6 +220,21 @@ export class MesasService {
           }
         }
 
+        // Paso 0 de D2 (`plano-mesas-admin`): va después de las validaciones existentes y
+        // antes de comparar con el lugar guardado. Si no, un `posX` igual al guardado sin
+        // `posY` se completaría con la coordenada guardada y pasaría como "sin cambios".
+        if (!coordenadasVanJuntas(dto)) {
+          throw new BadRequestException(MENSAJE_COORDENADAS_JUNTAS);
+        }
+
+        // Pasos 1 y 2: la comparación es contra la mesa leída en esta transacción, no contra
+        // qué campos trae el pedido. Reenviar los mismos valores o cambiar solo la forma no
+        // valida nada más, así un problema previo no bloquea la edición.
+        const lugar = lugarFinal(mesa, dto);
+        if (cambiaElLugar(mesa, lugar)) {
+          await this.validarLugar(tx, mesa, lugar);
+        }
+
         return tx.mesa.update({
           where: { id },
           data: dto,
@@ -168,6 +243,70 @@ export class MesasService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+  }
+
+  /**
+   * Pasos 3 y 4 de D2 (`plano-mesas-admin`): el tamaño contra la grilla de la zona final
+   * (también si la mesa queda sin ubicar, así un tamaño enorme no llega a la base), y si la
+   * mesa queda ubicada, la grilla y las demás mesas ubicadas de esa zona. Lee dentro de la
+   * transacción `Serializable`: dos ediciones que mueven mesas distintas a la misma celda leen
+   * cada una la fila que escribe la otra, y Postgres aborta una de las dos (D3).
+   */
+  private async validarLugar(
+    tx: Prisma.TransactionClient,
+    mesa: Mesa,
+    lugar: LugarDeMesa,
+  ): Promise<void> {
+    const zona = await tx.zona.findUnique({
+      where: { id: lugar.zonaId },
+      select: { planoColumnas: true, planoFilas: true },
+    });
+    if (!zona) {
+      throw new NotFoundException('La zona indicada no existe.');
+    }
+    const grilla = `${zona.planoColumnas} por ${zona.planoFilas}`;
+
+    if (lugar.ancho > zona.planoColumnas || lugar.alto > zona.planoFilas) {
+      throw new BadRequestException(
+        `La mesa no entra en la grilla de ${grilla}.`,
+      );
+    }
+
+    const ubicada = { ...lugar, etiqueta: mesa.etiqueta };
+    if (!estaUbicada(ubicada)) {
+      return;
+    }
+
+    const otras = await tx.mesa.findMany({
+      where: {
+        zonaId: lugar.zonaId,
+        id: { not: mesa.id },
+        posX: { not: null },
+        posY: { not: null },
+      },
+      select: {
+        etiqueta: true,
+        posX: true,
+        posY: true,
+        ancho: true,
+        alto: true,
+      },
+    });
+    const { fueraDeGrilla, superpuestaCon } = problemasDeUbicacion(
+      zona,
+      ubicada,
+      otras,
+    );
+    if (fueraDeGrilla) {
+      throw new BadRequestException(
+        `La mesa queda fuera de la grilla de ${grilla}.`,
+      );
+    }
+    if (superpuestaCon.length > 0) {
+      throw new ConflictException(
+        `La mesa se superpone con ${enumerar(superpuestaCon)}.`,
+      );
+    }
   }
 
   /**
