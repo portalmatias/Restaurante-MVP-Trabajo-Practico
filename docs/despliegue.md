@@ -126,18 +126,29 @@ LISTA=$(aws ec2 create-managed-prefix-list --region us-east-1 --prefix-list-name
   --address-family IPv4 --max-entries 20 --entries $ENTRADAS \
   --query PrefixList.PrefixListId --output text)
 
-# Las dos autorizaciones tienen que salir bien ANTES de revocar nada: si una falla, el bloque se
-# detiene y 0.0.0.0/0 sigue en su lugar (el sitio no se cae).
+# Las dos autorizaciones tienen que salir bien ANTES de revocar nada: si una falla, el bloque no
+# revoca y 0.0.0.0/0 sigue en su lugar (el sitio no se cae). No usa `exit`: pegado en una
+# terminal, la cerraría y se perderían $SG, $LISTA y el error.
+AUTORIZADO=si
 for puerto in 80 443; do
   aws ec2 authorize-security-group-ingress --region us-east-1 --group-id "$SG" \
     --ip-permissions "IpProtocol=tcp,FromPort=$puerto,ToPort=$puerto,PrefixListIds=[{PrefixListId=$LISTA}]" \
-    || { echo "Falló la autorización del $puerto: NO se revoca nada."; return 1 2>/dev/null || exit 1; }
+    || { echo "Falló la autorización del $puerto: NO se revoca nada."; AUTORIZADO=no; break; }
 done
-# Recién después de comprobar que el sitio sigue respondiendo por Cloudflare:
-for puerto in 80 443; do
-  aws ec2 revoke-security-group-ingress --region us-east-1 --group-id "$SG" \
-    --protocol tcp --port "$puerto" --cidr 0.0.0.0/0
-done
+```
+
+Abrir el sitio por Cloudflare y comprobar que responde. **Recién entonces** pegar este segundo
+bloque, en la misma terminal (usa `$SG` y `$AUTORIZADO` del anterior):
+
+```bash
+if [ "${AUTORIZADO:-no}" = si ]; then
+  for puerto in 80 443; do
+    aws ec2 revoke-security-group-ingress --region us-east-1 --group-id "$SG" \
+      --protocol tcp --port "$puerto" --cidr 0.0.0.0/0
+  done
+else
+  echo "No se revocó 0.0.0.0/0. Revisar el error; la regla del 80 puede haber quedado agregada."
+fi
 ```
 
 **Cuota de reglas:** una regla que referencia una lista de prefijos cuenta como tantas reglas como
