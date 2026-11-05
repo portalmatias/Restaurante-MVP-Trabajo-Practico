@@ -24,7 +24,7 @@ Restricción: la lista de rangos de Cloudflare no se escribe de memoria ni se co
 ## Decisions
 
 ### D1. Caddy resuelve la IP del cliente y la escribe una sola vez
-En `deploy/Caddyfile`: opciones globales con `trusted_proxies static` (rangos de Cloudflare) y `client_ip_headers CF-Connecting-IP`; en `reverse_proxy`, `header_up X-Forwarded-For {client_ip}` y se descartan `X-Real-IP`, `Forwarded` y `CF-Connecting-IP`, para que el frontend reciba un único valor, sobrescrito, nunca el que mande el visitante.
+En `deploy/Caddyfile`: opciones globales con `trusted_proxies static` (rangos de Cloudflare) y `client_ip_headers CF-Connecting-IP`; en `reverse_proxy`, `header_up X-Forwarded-For {client_ip}` y se descartan `X-Real-IP`, `Forwarded` y `CF-Connecting-IP`, para que el frontend reciba un único valor, sobrescrito, nunca el que mande el visitante. También se fijan `header_up X-Forwarded-Host {host}` y `header_up X-Forwarded-Proto {scheme}`: con `trusted_proxies` Caddy deja de sobrescribirlos y conserva los que llegan, y Cloudflare deja pasar los del visitante. Next los usa para URLs absolutas, redirecciones y el chequeo de origen de las server actions (agregado por la revisión del PR, 05/11/2026).
 
 *Alternativa descartada:* que el backend lea `CF-Connecting-IP`. Obliga a código nuevo y a confiar en un encabezado que cualquiera puede mandar si el origen queda expuesto.
 

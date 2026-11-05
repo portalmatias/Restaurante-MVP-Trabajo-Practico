@@ -27,7 +27,8 @@
 
 - [x] 2.1 Escribir primero una prueba de integración de la lógica de confianza (sin Docker de producción: `caddy validate` más un Caddy efímero en CI, o un servidor local que simule las conexiones) para los escenarios del spec: dos visitantes con dos contadores, un mismo visitante por bordes distintos con un solo contador, y `CF-Connecting-IP` o `X-Forwarded-For` inventados desde un origen no confiable ignorados. Verificar que fallan con el `Caddyfile` actual los escenarios de contadores (dos visitantes y mismo visitante por bordes distintos, con tres IP distintas para los visitantes); el de encabezados inventados y el de la conexión de Cloudflare sin `CF-Connecting-IP` ya se cumplen hoy y se escriben como guardas de regresión que deben seguir en verde.
       Resultado (02/11/2026): `deploy/test/cloudflare-caddy.test.sh` (Caddy real de la imagen
-      fijada delante de un eco, en una red temporal con IP conocidas; 8 comprobaciones). Con el
+      fijada delante de un eco, en una red temporal con IP conocidas; 8 comprobaciones en esta
+      primera versión, hoy 13: ver la actualización del 05/11/2026 al final). Con el
       `Caddyfile` de `main` fallan 6 de 8: origen = IP del visitante, tres visitantes por el mismo
       borde con tres orígenes, mismo visitante por dos bordes con un origen, `X-Real-IP`/
       `Forwarded` inventados que hoy llegan, `X-Forwarded-For` inventado con `CF-Connecting-IP`
@@ -35,10 +36,18 @@
       regresión (un cliente que no es Cloudflare se cuenta por su IP; una conexión de Cloudflare
       sin `CF-Connecting-IP` se cuenta por su IP). Con el `Caddyfile` nuevo pasan las 8. Se
       ejecuta con Docker y falla si no hay Docker (`SALTAR_CADDY=1` para omitirla).
+      Actualización (05/11/2026): después se agregaron la comprobación de que `CF-Connecting-IP`
+      no llega al frontend, 2 de IPv6 y 2 de host y esquema (sección 6, por la revisión del PR),
+      y la prueba tiene 13. Línea base rehecha con el `Caddyfile` de `main`: fallan 8 de 13 (las
+      6 de antes, más la de `CF-Connecting-IP` y la del borde de Cloudflare por IPv6) y pasan 5 (las dos
+      guardas de regresión, el cliente IPv6 fuera del rango y las dos de host y esquema, que en
+      `main` se cumplen porque Caddy no confía en ningún proxy). Con el `Caddyfile` nuevo pasan
+      las 13.
 
 - [x] 2.2 Escribir una prueba de coherencia: el bloque `trusted_proxies` del `Caddyfile` debe coincidir con `deploy/cloudflare-ips.txt`; verificar que falla si se altera un rango en cualquiera de los dos.
       Resultado (02/11/2026): en `verificar-rangos-cloudflare.test.mjs`. Con el `Caddyfile` de
-      `main` (sin `trusted_proxies`) fallan 4 de los 40 tests; con el nuevo pasan los 40, y hay
+      `main` (sin `trusted_proxies`) fallan 4 de los 43 tests (línea base rehecha el 05/11/2026;
+      antes decía 40, contados antes de los últimos tests); con el nuevo pasan los 43, y hay
       tests que fallan si se agrega un rango al `Caddyfile` o se quita uno del archivo.
 
 - [x] 2.3 Escribir una prueba del script de comprobación de rangos (diferencia entre la lista local y una lista de ejemplo) y verificar que detecta altas y bajas.
@@ -50,7 +59,9 @@
 
 - [x] 3.1 `deploy/Caddyfile`: `trusted_proxies static` con los rangos, `client_ip_headers CF-Connecting-IP` y `header_up X-Forwarded-For {client_ip}` con el descarte de los demás encabezados. Verificar con `caddy validate` en la imagen fijada y con las pruebas de 2.1 en verde.
       Resultado (02/11/2026): `caddy validate` con la imagen fijada da «Valid configuration» en
-      las dos etapas (`SITE_ADDRESS=:80` y con el subdominio); `cloudflare-caddy.test.sh` 8 de 8
+      las dos etapas (`SITE_ADDRESS=:80` y con el subdominio); `cloudflare-caddy.test.sh` 8 de 8 (hoy 13 de 13,
+      con `header_up X-Forwarded-Host {host}` y `X-Forwarded-Proto {scheme}` agregados el
+      05/11/2026 por la revisión del PR)
       y la prueba de coherencia, en verde.
 
 - [x] 3.2 Si la tarea 1.1 lo exige, ajustar `TRUST_PROXY` en el compose (sin cambiar código del backend) y verificar que pasan las pruebas de `exposicion-red` existentes y las de 2.1.
@@ -61,7 +72,7 @@
 
 - [x] 3.3 Escribir el script de comprobación de rangos (D2) y verificar con las pruebas de 2.3 y ejecutándolo contra la lista oficial real.
       Resultado (02/11/2026): `scripts/cd/verificar-rangos-cloudflare.mjs`; contra la lista real
-      de Cloudflare («Los 22 rangos … coinciden», código 0) y 40 tests propios en verde.
+      de Cloudflare («Los 22 rangos … coinciden», código 0) y 43 tests propios en verde.
 
 - [x] 3.4 Actualizar los comentarios de `deploy/Caddyfile` y de `deploy/docker-compose.prod.yml` (hoy dicen que Caddy ve «la IP real del cliente») y verificar con una lectura que ninguno afirma algo que ya no es cierto.
       Resultado (02/11/2026): comentarios de `deploy/Caddyfile` y del encabezado de
@@ -93,6 +104,8 @@
       148 de 148. `test:deploy` local: `desplegar.test.sh` y `ssh-entrada.test.sh` en verde (56 de
       56 en el segundo); `cloudflare-caddy.test.sh` no corrió porque Docker no estaba levantado.
       En el CI del PR (run 42053799866) corrieron los tres en verde: 79, 56 y 11.
+      Después de agregar la sección 6 de `cloudflare-caddy.test.sh` (05/11/2026), local con
+      Docker: 13 de 13.
 
 ## 5. Después del despliegue (verificaciones posteriores)
 

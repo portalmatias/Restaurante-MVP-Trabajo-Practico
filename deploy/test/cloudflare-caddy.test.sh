@@ -9,7 +9,10 @@
 # confianza que se le pone a Caddy) y otra no. Así se comprueba, sin tocar la red de producción:
 #   - qué IP recibe el backend como origen del visitante (X-Forwarded-For hacia el frontend),
 #   - que un cliente que no es Cloudflare no puede elegir su origen,
-#   - que lo que escribe un visitante en X-Forwarded-For, X-Real-IP o Forwarded no pasa.
+#   - que lo que escribe un visitante en X-Forwarded-For, X-Real-IP o Forwarded no pasa,
+#   - que el visitante no elige el host ni el esquema que ve el frontend (X-Forwarded-Host y
+#     X-Forwarded-Proto), que Next usa para URLs absolutas, redirecciones y el chequeo de origen
+#     de las server actions.
 #
 # Necesita Docker. Sin Docker FALLA a propósito (para que el CI no la saltee en silencio);
 # quien no tenga Docker puede saltearla con SALTAR_CADDY=1.
@@ -100,7 +103,7 @@ cat > "$T/eco.Caddyfile" <<'EOF'
 	admin off
 }
 :3000 {
-	respond "xff={header.X-Forwarded-For}|cf={header.CF-Connecting-IP}|xri={header.X-Real-IP}|fwd={header.Forwarded}"
+	respond "xff={header.X-Forwarded-For}|cf={header.CF-Connecting-IP}|xri={header.X-Real-IP}|fwd={header.Forwarded}|xfh={header.X-Forwarded-Host}|xfp={header.X-Forwarded-Proto}"
 }
 EOF
 docker create --name "$ECO" --network "$RED" --network-alias frontend "$IMAGEN" caddy run --config /etc/caddy/Caddyfile > /dev/null
@@ -217,6 +220,18 @@ R="$(pedir6 "$BORDE_A6" "CF-Connecting-IP: $VISITANTE_1")"
 
 R="$(pedir6 "$AJENO6" "CF-Connecting-IP: $VISITANTE_1" "X-Forwarded-For: 6.6.6.6")"
 [ "$(campo "$R" xff)" = "$AJENO6" ]   && ok "un cliente IPv6 fuera del rango confiable se identifica por su propia IP"   || mal "un cliente IPv6 fuera del rango confiable se identifica por su propia IP" "recibido: $R"
+
+# --- 6. El visitante no elige el host ni el esquema --------------------------------------------
+# Detrás de un proxy de confianza, Caddy conserva el X-Forwarded-Host y el X-Forwarded-Proto que
+# llegan, y Cloudflare deja pasar los del visitante. El Caddyfile tiene que fijarlos.
+echo "6. Host y esquema que ve el frontend"
+R="$(pedir "$BORDE_A" "CF-Connecting-IP: $VISITANTE_1" "X-Forwarded-Host: atacante.example" "X-Forwarded-Proto: https")"
+[ "$(campo "$R" xfh)" = "$PROXY" ] \
+  && ok "X-Forwarded-Host es el host del pedido, no el que inventó el visitante" \
+  || mal "X-Forwarded-Host es el host del pedido, no el que inventó el visitante" "recibido: $R"
+[ "$(campo "$R" xfp)" = "http" ] \
+  && ok "X-Forwarded-Proto es el esquema de la conexión, no el que inventó el visitante" \
+  || mal "X-Forwarded-Proto es el esquema de la conexión, no el que inventó el visitante" "recibido: $R"
 
 echo
 echo "Resultado: $PASO comprobaciones correctas, $FALLO con fallas."

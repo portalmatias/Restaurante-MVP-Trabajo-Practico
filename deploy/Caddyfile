@@ -58,6 +58,11 @@
 	# /api hacia el backend por la red interna.
 	reverse_proxy frontend:3000 {
 		header_up X-Forwarded-For {client_ip}
+		# Detrás de un proxy de confianza Caddy conserva los X-Forwarded-Host y X-Forwarded-Proto
+		# que llegan, y Cloudflare deja pasar los del visitante. Se fijan al host y al esquema del
+		# pedido, porque Next los usa para URLs absolutas, redirecciones y el chequeo de origen.
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
 		header_up -X-Real-IP
 		header_up -Forwarded
 		header_up -CF-Connecting-IP
