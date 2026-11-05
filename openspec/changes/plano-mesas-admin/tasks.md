@@ -83,11 +83,21 @@ además que la mesa no cambió en la base. Cada tarea va con tests primero (rojo
       desde 3.3). Verde: el archivo completo 49 de 49 y los unitarios 247 de 247. En
       `mesas.service.spec.ts`, "permite el cambio de zona sin reservas activas" ahora espera
       `posX: null` y `posY: null` en el `update`, el cambio de comportamiento que fija el spec.
-- [ ] 3.5 Concurrencia (design.md D3). Tests: dos `PATCH` simultáneos con `Promise.all` hacia una
+- [x] 3.5 Concurrencia (design.md D3). Tests: dos `PATCH` simultáneos con `Promise.all` hacia una
       celda libre, de los que exactamente uno responde `200`, y en `mesas.service.spec.ts` el
       reintento en el que el primer intento falla con `P2034` y el segundo responde el `409` de
       superposición. Verificar que los tests actuales de `mesas.service.spec.ts`,
       `mesas.integration-spec.ts` y `gestion-salon-admin.integration-spec.ts` siguen en verde.
+      Resultado (05/11/2026): 1 test de integración con `Promise.all` (S1 y S2 hacia (9,6): uno
+      `200` y queda en (9,6), el otro `409` y no cambia) y 1 unitario del reintento (`P2034` en el
+      primer intento; el segundo lee S2 en la celda y responde "La mesa se superpone con S2."). Sin
+      rojo: los dos pasan en la primera corrida, porque el comportamiento ya lo da la transacción
+      `Serializable` existente con la lectura de 3.3 (D3). Verde: `gestion-salon-admin` y
+      `mesas.integration-spec.ts` 60 de 60, unitarios 248 de 248. En Windows hubo que correr las
+      suites con `DATABASE_URL_TEST` en `127.0.0.1`: con `localhost`, cada conexión nueva prueba
+      primero `::1` (Docker publica solo en `127.0.0.1`), tarda unos 2 s y las transacciones
+      simultáneas fallan con `P2028`; el test de concurrencia de `mesas.integration-spec.ts` ya
+      fallaba así con el service de `main`.
 - [ ] 3.6 Sumar los campos del plano a `MesaRespuestaDto`, `planoColumnas`/`planoFilas` a
       `ZonaRespuestaDto`, y las mismas columnas a `SELECT_MESA_ADMIN` (`mesas.service.ts` y su
       copia en `mesas.service.spec.ts`) y `SELECT_ZONA_ADMIN` (`zonas.service.ts` y su copia en

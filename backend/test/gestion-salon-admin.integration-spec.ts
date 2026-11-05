@@ -788,4 +788,19 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
       await esperarSinCambios(s8);
     });
   });
+
+  describe('ediciones simultáneas (tarea 3.5)', () => {
+    it('de dos pedidos simultáneos hacia la misma celda libre, exactamente uno responde 200', async () => {
+      const [r1, r2] = await Promise.all([
+        patch(mesas.S1, { posX: 9, posY: 6 }),
+        patch(mesas.S2, { posX: 9, posY: 6 }),
+      ]);
+
+      expect([r1.status, r2.status].sort()).toEqual([200, 409]);
+      const [ganadora, perdedora] =
+        r1.status === 200 ? [mesas.S1, mesas.S2] : [mesas.S2, mesas.S1];
+      expect(await leer(ganadora)).toEqual({ ...ganadora, posX: 9, posY: 6 });
+      await esperarSinCambios(perdedora);
+    });
+  });
 });

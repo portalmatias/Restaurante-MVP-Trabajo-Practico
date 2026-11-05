@@ -303,6 +303,46 @@ describe('MesasService', () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     });
 
+    it('tras un conflicto de serialización, el reintento ve la otra mesa ya en la celda y responde el 409 de superposición', async () => {
+      // design.md D3 de `plano-mesas-admin`: dos ediciones mueven M1 y S2 a la misma celda;
+      // Postgres aborta la primera transacción de M1 y el reintento lee S2 ya movida.
+      const ubicada = { ...mesa, posX: 0, posY: 0 };
+      const s2EnLaCelda = {
+        etiqueta: 'S2',
+        posX: 9,
+        posY: 6,
+        ancho: 1,
+        alto: 1,
+      };
+      prisma.mesa.findUnique.mockResolvedValue(ubicada);
+      prisma.zona.findUnique.mockResolvedValue(zonaStandard);
+      prisma.mesa.findMany.mockResolvedValue([s2EnLaCelda]);
+      prisma.$transaction
+        .mockImplementationOnce(() => Promise.reject(errorPrisma('P2034')))
+        .mockImplementationOnce((fn: (tx: unknown) => unknown) => fn(prisma));
+
+      await expect(
+        service.actualizar(mesa.id, { posX: 9, posY: 6 }),
+      ).rejects.toEqual(new ConflictException('La mesa se superpone con S2.'));
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(prisma.mesa.findMany).toHaveBeenCalledWith({
+        where: {
+          zonaId: zonaStandard.id,
+          id: { not: mesa.id },
+          posX: { not: null },
+          posY: { not: null },
+        },
+        select: {
+          etiqueta: true,
+          posX: true,
+          posY: true,
+          ancho: true,
+          alto: true,
+        },
+      });
+      expect(prisma.mesa.update).not.toHaveBeenCalled();
+    });
+
     it('rechaza con 409 tras agotar los reintentos de serialización', async () => {
       prisma.$transaction.mockImplementation(() =>
         Promise.reject(errorPrisma('P2034')),
