@@ -155,6 +155,9 @@ pedir6() {
   docker run --rm --network "$RED" --ip6 "$desde" --entrypoint wget "$IMAGEN"     -q -O - "${args[@]}" "http://[$PROXY6]/" 2> /dev/null
 }
 campo() { printf '%s' "$1" | tr '|' '\n' | sed -n "s/^$2=//p"; }
+# respondio <respuesta>  ->  verdadero si la respuesta es del eco. Las guardas que solo miran que
+# algo NO aparezca la necesitan: si el pedido falla, la respuesta queda vacía y pasarían igual.
+respondio() { printf '%s' "$1" | grep -q '^xff='; }
 
 VISITANTE_1="203.0.113.7"
 VISITANTE_2="198.51.100.9"
@@ -184,7 +187,7 @@ RB="$(pedir "$BORDE_B" "CF-Connecting-IP: $VISITANTE_1")"
 # --- 2. Lo que escribe el visitante no pasa (guardas de regresión) ----------------------------
 echo "2. El visitante no elige su origen"
 R="$(pedir "$BORDE_A" "CF-Connecting-IP: $VISITANTE_1" "X-Forwarded-For: 6.6.6.6" "X-Real-IP: 7.7.7.7" "Forwarded: for=8.8.8.8")"
-{ ! printf '%s' "$R" | grep -qE '6\.6\.6\.6|7\.7\.7\.7|8\.8\.8\.8'; } \
+{ respondio "$R" && ! printf '%s' "$R" | grep -qE '6\.6\.6\.6|7\.7\.7\.7|8\.8\.8\.8'; } \
   && ok "X-Forwarded-For, X-Real-IP y Forwarded inventados no llegan al frontend" \
   || mal "X-Forwarded-For, X-Real-IP y Forwarded inventados no llegan al frontend" "recibido: $R"
 
@@ -202,7 +205,7 @@ R="$(pedir "$AJENO" "CF-Connecting-IP: $VISITANTE_1" "X-Forwarded-For: 6.6.6.6" 
 [ "$(campo "$R" xff)" = "$AJENO" ] \
   && ok "desde un origen que no es Cloudflare, el origen es su propia IP" \
   || mal "desde un origen que no es Cloudflare, el origen es su propia IP" "recibido: $R"
-{ ! printf '%s' "$R" | grep -qE "$VISITANTE_1|6\.6\.6\.6|7\.7\.7\.7"; } \
+{ respondio "$R" && ! printf '%s' "$R" | grep -qE "$VISITANTE_1|6\.6\.6\.6|7\.7\.7\.7"; } \
   && ok "lo que inventó ese cliente no llega al frontend" \
   || mal "lo que inventó ese cliente no llega al frontend" "recibido: $R"
 
