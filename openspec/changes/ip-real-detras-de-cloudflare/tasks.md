@@ -87,11 +87,12 @@
       deploy/Caddyfile»), 148 de 148 tests. `test:deploy` ejecuta los tres archivos: 79, 56 y 11
       comprobaciones correctas, y las 11 son de `cloudflare-caddy.test.sh`.
 
-- [ ] 3.6 Workflow programado (semanal) que ejecuta la comprobación de rangos y falla con las altas y bajas; verificar con `actionlint` (job de lint de CI) y disparándolo a mano una vez.
+- [x] 3.6 Workflow programado (semanal) que ejecuta la comprobación de rangos y falla con las altas y bajas; verificar con `actionlint` (job de lint de CI) y disparándolo a mano una vez.
       Hecho `.github/workflows/rangos-cloudflare.yml` (semanal, abre un issue si falla, acciones
       fijadas por SHA). `actionlint` 1.7.7 en verde en el job «Lint de scripts y workflows» del
-      CI del PR (run 42053799866). Falta dispararlo a mano una vez, que solo se puede después de
-      mergear (un `workflow_dispatch` necesita el workflow en la rama por defecto).
+      CI del PR (run 42053799866). Disparado a mano en `main` después del merge (05/11/2026, run
+      42115649338, `workflow_dispatch`): terminó en verde con «Los 22 rangos de
+      deploy/cloudflare-ips.txt coinciden con los que publica Cloudflare.».
 
 ## 4. Documentación
 
@@ -110,7 +111,16 @@
 
 ## 5. Después del despliegue (verificaciones posteriores)
 
-- [ ] 5.1 Tras el despliegue del `Caddyfile`, confirmar en Actions que `verificar` queda en verde y que `curl` a `/version` devuelve el SHA desplegado.
+- [x] 5.1 Tras el despliegue del `Caddyfile`, confirmar en Actions que `verificar` queda en verde y que `curl` a `/version` devuelve el SHA desplegado.
+      Resultado (05/11/2026): el merge del PR 106 (`4b24d1f`) se desplegó con el run 42114266596
+      del CD, con los cuatro jobs en verde, `Verificar versión publicada` incluido. A las
+      21:46:49 UTC, `curl -sS -D - https://ichigo.alquilerespunilla.com.ar/version` devolvió
+      `HTTP/1.1 200 OK`, `Server: cloudflare`, `CF-RAY: a55f0db31b7d2903-EZE` y
+      `{"sha":"4b24d1f1754d936353c310f37a9991dda1035cd3"}`.
+
+      Las tareas 5.2, 5.3 y 5.4 quedan a cargo de FedeWerk: necesitan acceso por SSH al servidor
+      (logs del backend y de Caddy), dos salidas de red distintas (5.2) y el cambio del security
+      group en la cuenta de AWS (5.3, que hace una persona). La 5.4 va después de la 5.3.
 
 - [ ] 5.2 Prueba de contadores en producción (D5): registrar el `CF-RAY` de cada pedido y la IP que ve el backend para cada salida; verificar que dos orígenes con IP distinta en el backend no se afectan entre sí y que uno solo supera el límite al sexto intento. Si las dos salidas caen en el mismo borde, la prueba no distingue y no vale: repetir desde otra salida. Registrar el resultado en el PR.
 
