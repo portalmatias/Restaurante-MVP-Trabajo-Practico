@@ -31,15 +31,17 @@ Cada tarea se da por hecha cuando ninguno de sus changes tiene un punto sin valo
 ## 4. README (D5)
 
 - [ ] 4.1 Agregar la sección «Decisiones de diseño», con una o dos líneas por decisión y un
-      enlace al `design.md` archivado. Verificar que cada enlace abre el archivo correcto.
-- [ ] 4.2 Corregir el enlace a `openspec/changes/exposicion-red-local/design.md`, que ahora
-      está en `archive/2026-10-05-exposicion-red-local/`, y enlazar `docs/entrega.md`.
+      enlace al `design.md` archivado, o al activo si el change todavía no se archivó (D5).
+      Verificar que cada enlace abre el archivo correcto.
+- [ ] 4.2 Corregir la ruta `openspec/changes/exposicion-red-local/design.md` de `README.md`
+      (línea 277) por `openspec/changes/archive/2026-10-05-exposicion-red-local/design.md`, y
+      enlazar `docs/entrega.md`.
       Verificar que ninguna ruta a `openspec/` de `README.md`, `backend/README.md`,
       `frontend/README.md` y `docs/` apunta a un archivo que no existe.
 
 ## 5. Roadmap (D6)
 
-- [ ] 5.1 Reemplazar «Estado al 2026-09-22» de `docs/roadmap-mvp.md` por el estado a la fecha,
+- [ ] 5.1 Reemplazar «Estado al 2026-10-06» de `docs/roadmap-mvp.md` por el estado a la fecha,
       con cada change en archivado, activo o pendiente y su responsable, y marcar como
       históricas las secciones de planificación. Verificar que ningún change archivado figura
       como pendiente.
@@ -53,12 +55,17 @@ Cada tarea se da por hecha cuando ninguno de sus changes tiene un punto sin valo
 
 ## 7. Cierre
 
-- [ ] 7.1 Correr `openspec validate entrega-final --strict` y `npm run lint`, abrir el primer PR
-      de implementación (D7) con descripción en español enlazada a este change y pedir la
-      revisión de un compañero.
+- [ ] 7.1 Correr `openspec validate entrega-final --strict`, `npm run lint` y
+      `npm run typecheck`, abrir el primer PR de implementación (D7) con descripción en español
+      enlazada a este change y pedir la revisión de un compañero. Verificar que el CI del PR
+      queda en verde antes de pedir el merge.
 - [ ] 7.2 A medida que se archivan `despliegue-continuo-ec2`, `ip-real-detras-de-cloudflare`,
       `verificacion-version-desplegada` y `plano-mesas-admin`, sumar su sección a
       `docs/entrega.md` con el mismo criterio de la sección 2. Verificar que no queda ningún
       change archivado sin sección.
-- [ ] 7.3 En el segundo PR (D7), archivar el change con `openspec archive entrega-final` y
-      verificar que `openspec validate --all --strict` sigue pasando.
+      Actualizar a `archive/` los enlaces de «Decisiones de diseño» que apuntaban a la ruta
+      activa de esos changes (D5).
+
+- [ ] 7.3 En el segundo PR (D7), archivar el change con `openspec archive entrega-final`.
+      Verificar que `openspec validate --all --strict`, `npm run lint` y `npm run typecheck`
+      pasan, y que el CI del PR queda en verde antes del merge.

@@ -9,9 +9,11 @@ considerarse terminado. Nadie lo comprobó todavía de punta a punta: hay 19 cha
 punto y dónde está la evidencia.
 
 `docs/roadmap-mvp.md` (§10, Fase 6) le asigna este cierre a `entrega-final`. El roadmap también
-quedó desactualizado (su estado es del 2026-09-22 y todavía da por pendientes changes que ya
-están archivados), y el README tiene un enlace roto: apunta a
-`openspec/changes/exposicion-red-local/design.md`, que se movió a `archive/` al archivarse.
+quedó desactualizado: su estado es del 2026-10-06, da a `frontend-cliente` por abierto aunque
+ya está archivado, y no menciona `rediseno-frontend-ichigo`, `plano-mesas` ni los changes que
+vinieron después. Además, el README cita una ruta que ya no existe:
+`openspec/changes/exposicion-red-local/design.md`, que al archivarse pasó a
+`openspec/changes/archive/2026-10-05-exposicion-red-local/design.md`.
 
 ## What Changes
 
@@ -25,7 +27,7 @@ están archivados), y el README tiene un enlace roto: apunta a
   README, `openspec validate --all --strict` y el linter de OpenAPI en verde, y el historial
   de PRs y de runs de CI.
 - **README.** Se suma una sección «Decisiones de diseño» que resume las decisiones principales
-  y enlaza al `design.md` archivado de cada change. Se corrige el enlace roto y se enlaza
+  y enlaza al `design.md` archivado de cada change. Se corrige la ruta que ya no existe y se enlaza
   `docs/entrega.md`.
 - **Roadmap.** Se actualiza el estado de `docs/roadmap-mvp.md` a la fecha de la entrega, y las
   secciones de planificación quedan marcadas como históricas.

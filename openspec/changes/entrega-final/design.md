@@ -9,8 +9,9 @@ Ver `proposal.md` — Why. Estado de partida (`main` en `4b24d1f`, 2026-11-05):
 - `openspec validate --all --strict` pasa en todos los changes y specs existentes.
 - Hay 103 PRs mergeados.
 - `README.md` ya explica la arquitectura, el primer arranque, la red, el CI y el seed.
-  No tiene una sección de decisiones, y tiene un solo enlace a `openspec/` que no existe.
-- `docs/roadmap-mvp.md` describe el estado al 2026-09-22.
+  No tiene una sección de decisiones, y cita una sola ruta de `openspec/` que ya no existe
+  (línea 277, `exposicion-red-local`, que ahora está en `archive/`).
+- `docs/roadmap-mvp.md` describe el estado al 2026-10-06.
 
 Los primeros changes (`diseno-general-app`, `fundacion-repo`) son anteriores al CI y a la
 protección de `main`, así que algunos puntos de §13 no les aplican tal como están escritos.
@@ -81,6 +82,10 @@ contract-first, asignación de mesas, concurrencia en las reservas, autenticaci�
 solicitudes, manejo de fechas, despliegue). Cada una tiene una o dos líneas y enlaza al
 `design.md` archivado que la justifica. No copia el razonamiento: si se copia, las dos versiones
 terminan diciendo cosas distintas.
+
+Una decisión cuyo change sigue activo al abrir el primer PR (el despliegue, de
+`despliegue-continuo-ec2`) enlaza la ruta activa, `openspec/changes/<change>/design.md`. Cuando
+ese change se archiva, el segundo PR (D7) actualiza el enlace a `archive/`.
 
 ### D6. El roadmap se actualiza, no se reescribe
 
