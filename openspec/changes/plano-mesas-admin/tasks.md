@@ -73,9 +73,16 @@ además que la mesa no cambió en la base. Cada tarea va con tests primero (rojo
       3.2). Verde: el archivo completo 44 de 44 y los unitarios del backend 247 de 247. Las mesas y
       zonas de prueba de `mesas.service.spec.ts` suman las columnas del plano que trae toda fila de
       Prisma (sin ellas, el cambio de zona leía `posX` como `undefined` y validaba una mesa ubicada).
-- [ ] 3.4 Cambio de zona. Tests: reenviar la misma zona, cambio de zona sin ubicación, con
+- [x] 3.4 Cambio de zona. Tests: reenviar la misma zona, cambio de zona sin ubicación, con
       ubicación y con ubicación fuera de la grilla nueva (S6, cargada directo en la base), y mesa
       que no entra en la grilla nueva (S8, cargada directo en la base).
+      Resultado (05/11/2026): 5 tests en el bloque "cambio de zona": la misma zona, S6 a VIP sin
+      ubicación, con ubicación (7,0) y fuera de la grilla nueva (10,0), y S8 de 11 por 1 que no entra
+      en VIP. Rojo observado: 1 fallido (S6 a VIP sin ubicación respondía `400` fuera de la grilla
+      porque conservaba (10,7)), 4 pasan (la grilla y el tamaño ya se validaban contra la zona final
+      desde 3.3). Verde: el archivo completo 49 de 49 y los unitarios 247 de 247. En
+      `mesas.service.spec.ts`, "permite el cambio de zona sin reservas activas" ahora espera
+      `posX: null` y `posY: null` en el `update`, el cambio de comportamiento que fija el spec.
 - [ ] 3.5 Concurrencia (design.md D3). Tests: dos `PATCH` simultáneos con `Promise.all` hacia una
       celda libre, de los que exactamente uno responde `200`, y en `mesas.service.spec.ts` el
       reintento en el que el primer intento falla con `P2034` y el segundo responde el `409` de

@@ -261,9 +261,12 @@ describe('MesasService', () => {
       await expect(
         service.actualizar(mesa.id, { zonaId: zonaVip.id }),
       ).resolves.toBeDefined();
+      // Sin `posX` ni `posY` en el pedido, la mesa queda sin ubicar en la zona nueva
+      // (`plano-mesas-admin`, spec: "Cambio de zona sin ubicación nueva deja la mesa sin
+      // ubicar").
       expect(prisma.mesa.update).toHaveBeenCalledWith({
         where: { id: mesa.id },
-        data: { zonaId: zonaVip.id },
+        data: { zonaId: zonaVip.id, posX: null, posY: null },
         select: SELECT_MESA_ADMIN,
       });
     });

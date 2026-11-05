@@ -719,4 +719,73 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
       await esperarSinCambios(mesas.S4);
     });
   });
+
+  describe('cambio de zona (tarea 3.4)', () => {
+    it('reenviar la misma zona no es un cambio de zona', async () => {
+      await patch(mesas.S3, { zonaId: zonas.STANDARD }).expect(200);
+
+      expect(await leer(mesas.S3)).toEqual(mesas.S3);
+    });
+
+    it('el cambio de zona sin ubicación nueva deja la mesa sin ubicar', async () => {
+      const s6 = await cargarS6();
+
+      await patch(s6, { zonaId: zonas.VIP }).expect(200);
+
+      expect(await leer(s6)).toEqual({
+        ...s6,
+        zonaId: zonas.VIP,
+        posX: null,
+        posY: null,
+      });
+    });
+
+    it('el cambio de zona con ubicación nueva la valida contra la zona nueva', async () => {
+      const s6 = await cargarS6();
+
+      await patch(s6, { zonaId: zonas.VIP, posX: 7, posY: 0 }).expect(200);
+
+      expect(await leer(s6)).toEqual({
+        ...s6,
+        zonaId: zonas.VIP,
+        posX: 7,
+        posY: 0,
+      });
+    });
+
+    it('rechaza el cambio de zona con una ubicación fuera de la grilla nueva', async () => {
+      const s6 = await cargarS6();
+
+      const respuesta = await patch(s6, {
+        zonaId: zonas.VIP,
+        posX: 10,
+        posY: 0,
+      }).expect(400);
+
+      expect(mensaje(respuesta)).toBe(
+        'La mesa queda fuera de la grilla de 10 por 6.',
+      );
+      await esperarSinCambios(s6);
+    });
+
+    it('rechaza el cambio de zona de una mesa que no entra en la grilla nueva', async () => {
+      // S8: mesa de STANDARD sin ubicar, de 11 por 1 y sin reservas.
+      const s8 = await prisma.mesa.create({
+        data: {
+          zonaId: zonas.STANDARD,
+          capacidad: 2,
+          etiqueta: 'S8',
+          ancho: 11,
+          alto: 1,
+        },
+      });
+
+      const respuesta = await patch(s8, { zonaId: zonas.VIP }).expect(400);
+
+      expect(mensaje(respuesta)).toBe(
+        'La mesa no entra en la grilla de 10 por 6.',
+      );
+      await esperarSinCambios(s8);
+    });
+  });
 });

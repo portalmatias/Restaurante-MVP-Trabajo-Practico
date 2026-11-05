@@ -57,12 +57,26 @@ interface LugarDeMesa {
   alto: number;
 }
 
+/**
+ * Un cambio de zona sin `posX` ni `posY` deja la mesa sin ubicar: sus coordenadas eran de la
+ * grilla de la zona vieja. Un `zonaId` igual al guardado no es un cambio de zona. Supone que
+ * ya se validó que las coordenadas van juntas.
+ */
+function cambiaDeZonaSinUbicacion(mesa: Mesa, dto: ActualizarMesaDto): boolean {
+  return (
+    dto.zonaId !== undefined &&
+    dto.zonaId !== mesa.zonaId &&
+    dto.posX === undefined
+  );
+}
+
 /** Paso 1 de D2: el lugar que resulta de aplicar el pedido a la mesa guardada. */
 function lugarFinal(mesa: Mesa, dto: ActualizarMesaDto): LugarDeMesa {
+  const sinUbicar = cambiaDeZonaSinUbicacion(mesa, dto);
   return {
     zonaId: dto.zonaId ?? mesa.zonaId,
-    posX: dto.posX !== undefined ? dto.posX : mesa.posX,
-    posY: dto.posY !== undefined ? dto.posY : mesa.posY,
+    posX: sinUbicar ? null : dto.posX !== undefined ? dto.posX : mesa.posX,
+    posY: sinUbicar ? null : dto.posY !== undefined ? dto.posY : mesa.posY,
     ancho: dto.ancho ?? mesa.ancho,
     alto: dto.alto ?? mesa.alto,
   };
@@ -237,7 +251,9 @@ export class MesasService {
 
         return tx.mesa.update({
           where: { id },
-          data: dto,
+          data: cambiaDeZonaSinUbicacion(mesa, dto)
+            ? { ...dto, posX: null, posY: null }
+            : dto,
           select: SELECT_MESA_ADMIN,
         });
       },
