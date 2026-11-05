@@ -10,11 +10,12 @@ import { ZonasService } from '../src/zonas/zonas.service';
 import { configurarZonasYConfiguracionDeSeed } from './support/zonas-seed-e2e';
 
 /**
- * Tarea 2.8 de `plano-mesas` (design.md D1, "La salida sí hay que protegerla"): las columnas
- * del plano (`posX`, `posY`, `ancho`, `alto`, `forma`, `planoColumnas`, `planoFilas`) solo
- * salen por `GET /plano-mesas`. Las cinco salidas de admin que devolvían la fila de Prisma tal
- * cual tienen que seguir devolviendo exactamente las claves de `ZonaRespuestaDto` y
- * `MesaRespuestaDto` de `openapi/openapi.yaml`.
+ * Tarea 2.8 de `plano-mesas` (design.md D1, "La salida sí hay que protegerla") y tarea 3.6 de
+ * `plano-mesas-admin` (design.md D4): las cinco salidas de admin devuelven exactamente las
+ * claves de `ZonaRespuestaDto` y `MesaRespuestaDto` de `openapi/openapi.yaml`. Desde
+ * `plano-mesas-admin` esas claves incluyen las columnas del plano (`posX`, `posY`, `ancho`,
+ * `alto` y `forma` de la mesa, `planoColumnas` y `planoFilas` de la zona); cualquier otra
+ * columna nueva sigue sin salir hasta sumarla al `select` y al contrato.
  *
  * Se prueba en el service porque los controllers devuelven su resultado sin transformarlo
  * (`ZonasController.listar`/`actualizar`, `MesasController.crear`/`listar`/`actualizar`).
@@ -27,16 +28,28 @@ const CLAVES_ZONA = [
   'maxComensales',
   'minComensales',
   'nombre',
+  'planoColumnas',
+  'planoFilas',
   'requiereConfirmacionAdmin',
   'ventanaCancelacionHoras',
 ];
-const CLAVES_MESA = ['capacidad', 'etiqueta', 'id', 'zonaId'];
+const CLAVES_MESA = [
+  'alto',
+  'ancho',
+  'capacidad',
+  'etiqueta',
+  'forma',
+  'id',
+  'posX',
+  'posY',
+  'zonaId',
+];
 
 function claves(objeto: object): string[] {
   return Object.keys(objeto).sort();
 }
 
-describe('Salidas de admin de zonas y mesas sin las columnas del plano', () => {
+describe('Salidas de admin de zonas y mesas con las claves del contrato', () => {
   let prisma: PrismaService;
   let zonas: ZonasService;
   let mesas: MesasService;

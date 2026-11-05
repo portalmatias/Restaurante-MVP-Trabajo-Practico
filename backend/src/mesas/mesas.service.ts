@@ -19,14 +19,19 @@ const SERIALIZACION_MAX_INTENTOS = 3;
 
 /**
  * Campos que devuelven las rutas de admin de mesas (`MesaRespuestaDto`). Lista de campos
- * permitidos: una columna nueva de `Mesa` (por ejemplo, la posición en el plano de
- * `plano-mesas`) no sale por estas rutas hasta sumarla acá y al contrato.
+ * permitidos: una columna nueva de `Mesa` no sale por estas rutas hasta sumarla acá y al
+ * contrato. Las del plano se sumaron con `plano-mesas-admin` (design.md D4), que las edita.
  */
 const SELECT_MESA_ADMIN = {
   id: true,
   zonaId: true,
   capacidad: true,
   etiqueta: true,
+  posX: true,
+  posY: true,
+  ancho: true,
+  alto: true,
+  forma: true,
 } satisfies Prisma.MesaSelect;
 
 function esCapacidadInvalida(capacidad: number): boolean {

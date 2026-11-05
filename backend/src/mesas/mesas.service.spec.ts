@@ -10,14 +10,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MesasService } from './mesas.service';
 
 /**
- * Campos exactos de `MesaRespuestaDto` (plano-mesas, tarea 2.8): las columnas del plano no
- * salen por las rutas de admin.
+ * Campos exactos de `MesaRespuestaDto` (plano-mesas, tarea 2.8), con las columnas del plano
+ * que suma `plano-mesas-admin` (design.md D4).
  */
 const SELECT_MESA_ADMIN = {
   id: true,
   zonaId: true,
   capacidad: true,
   etiqueta: true,
+  posX: true,
+  posY: true,
+  ancho: true,
+  alto: true,
+  forma: true,
 };
 
 function errorPrisma(code: string) {

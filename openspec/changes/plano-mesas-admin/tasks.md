@@ -98,7 +98,7 @@ además que la mesa no cambió en la base. Cada tarea va con tests primero (rojo
       primero `::1` (Docker publica solo en `127.0.0.1`), tarda unos 2 s y las transacciones
       simultáneas fallan con `P2028`; el test de concurrencia de `mesas.integration-spec.ts` ya
       fallaba así con el service de `main`.
-- [ ] 3.6 Sumar los campos del plano a `MesaRespuestaDto`, `planoColumnas`/`planoFilas` a
+- [x] 3.6 Sumar los campos del plano a `MesaRespuestaDto`, `planoColumnas`/`planoFilas` a
       `ZonaRespuestaDto`, y las mismas columnas a `SELECT_MESA_ADMIN` (`mesas.service.ts` y su
       copia en `mesas.service.spec.ts`) y `SELECT_ZONA_ADMIN` (`zonas.service.ts` y su copia en
       `zonas.service.spec.ts`), que hoy las excluyen (design.md D4). Tests: los escenarios de los
@@ -106,6 +106,13 @@ además que la mesa no cambió en la base. Cada tarea va con tests primero (rojo
       sin ubicar, S7) y `plano-mesas-salidas-admin.integration-spec.ts` cambiado para que exija
       las claves nuevas en `GET`, `POST` y `PATCH` de mesas y `GET` y `PATCH` de zonas. Verificar
       que `mesas.service.spec.ts` y `zonas.service.spec.ts` siguen en verde.
+      Resultado (05/11/2026): 3 tests nuevos en el bloque "listados" (S3 en `GET /admin/mesas`, la
+      grilla de STANDARD y VIP en `GET /admin/zonas`, S7 sin ubicar en el alta y en el listado), la
+      respuesta de "mueve S4 a un lugar libre" ahora exige (8,5) con `ancho` 3 y `alto` 2, y
+      `plano-mesas-salidas-admin.integration-spec.ts` exige las claves nuevas. Rojo observado: 7
+      fallidos en integración (49 pasan) y 7 en `mesas.service.spec.ts` y `zonas.service.spec.ts` (41
+      pasan), por las copias de los `select`. Verde: unitarios 248 de 248; `gestion-salon-admin`,
+      `plano-mesas-salidas-admin`, `mesas` y `zonas` de integración 68 de 68.
 - [ ] 3.7 Incorporar el fragmento OpenAPI de design.md a `openapi/openapi.yaml` y regenerar los
       tipos del frontend. Verificar con `npm run openapi:check` y `npm run typecheck -w frontend`.
 

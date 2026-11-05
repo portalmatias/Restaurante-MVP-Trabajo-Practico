@@ -634,8 +634,15 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
 
   describe('grilla y superposición (tarea 3.3)', () => {
     it('mueve S4 a un lugar libre', async () => {
-      await patch(mesas.S4, { posX: 8, posY: 5 }).expect(200);
+      const respuesta = await patch(mesas.S4, { posX: 8, posY: 5 }).expect(200);
 
+      expect(respuesta.body).toMatchObject({
+        etiqueta: 'S4',
+        posX: 8,
+        posY: 5,
+        ancho: 3,
+        alto: 2,
+      });
       expect(await leer(mesas.S4)).toEqual({ ...mesas.S4, posX: 8, posY: 5 });
     });
 
@@ -801,6 +808,71 @@ describe('Ubicación de Mesa en el plano (integration)', () => {
         r1.status === 200 ? [mesas.S1, mesas.S2] : [mesas.S2, mesas.S1];
       expect(await leer(ganadora)).toEqual({ ...ganadora, posX: 9, posY: 6 });
       await esperarSinCambios(perdedora);
+    });
+  });
+
+  describe('listados (tarea 3.6)', () => {
+    function get(ruta: string, query: Record<string, string> = {}) {
+      return request(app.getHttpServer())
+        .get(ruta)
+        .query(query)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+    }
+
+    it('GET /admin/mesas incluye la ubicación, el tamaño y la forma', async () => {
+      const respuesta = await get('/admin/mesas');
+
+      const s3 = (respuesta.body as { etiqueta: string }[]).find(
+        (m) => m.etiqueta === 'S3',
+      );
+      expect(s3).toMatchObject({
+        posX: 5,
+        posY: 0,
+        ancho: 2,
+        alto: 2,
+        forma: 'CUADRADA',
+      });
+    });
+
+    it('GET /admin/zonas incluye el tamaño de la grilla', async () => {
+      const respuesta = await get('/admin/zonas');
+
+      const grillas = Object.fromEntries(
+        (
+          respuesta.body as {
+            nombre: string;
+            planoColumnas: number;
+            planoFilas: number;
+          }[]
+        ).map((z) => [z.nombre, [z.planoColumnas, z.planoFilas]]),
+      );
+      expect(grillas).toEqual({ STANDARD: [12, 8], VIP: [10, 6] });
+    });
+
+    it('una mesa recién creada figura sin ubicar en el alta y en el listado', async () => {
+      const sinUbicar = {
+        etiqueta: 'S7',
+        posX: null,
+        posY: null,
+        ancho: 1,
+        alto: 1,
+        forma: 'RECTANGULAR',
+      };
+
+      const alta = await request(app.getHttpServer())
+        .post('/admin/mesas')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ zonaId: zonas.STANDARD, capacidad: 4, etiqueta: 'S7' })
+        .expect(201);
+      expect(alta.body).toMatchObject(sinUbicar);
+
+      const listado = await get('/admin/mesas', { zonaId: zonas.STANDARD });
+      expect(
+        (listado.body as { etiqueta: string }[]).find(
+          (m) => m.etiqueta === 'S7',
+        ),
+      ).toMatchObject(sinUbicar);
     });
   });
 });
