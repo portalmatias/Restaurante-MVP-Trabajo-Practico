@@ -14,8 +14,9 @@ const SERIALIZACION_MAX_INTENTOS = 3;
 
 /**
  * Campos que devuelven las rutas de admin de zonas (`ZonaRespuestaDto`). Lista de campos
- * permitidos: una columna nueva de `Zona` (por ejemplo, las dimensiones del plano de
- * `plano-mesas`) no sale por estas rutas hasta sumarla acá y al contrato.
+ * permitidos: una columna nueva de `Zona` no sale por estas rutas hasta sumarla acá y al
+ * contrato. El tamaño de la grilla se sumó con `plano-mesas-admin` (design.md D4): el editor
+ * del plano lo necesita para ofrecer las columnas y filas válidas.
  */
 const SELECT_ZONA_ADMIN = {
   id: true,
@@ -27,6 +28,8 @@ const SELECT_ZONA_ADMIN = {
   ventanaCancelacionHoras: true,
   requiereConfirmacionAdmin: true,
   aforoMaximo: true,
+  planoColumnas: true,
+  planoFilas: true,
 } satisfies Prisma.ZonaSelect;
 
 /**

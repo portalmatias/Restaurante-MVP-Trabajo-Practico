@@ -10,8 +10,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ZonasService } from './zonas.service';
 
 /**
- * Campos exactos de `ZonaRespuestaDto` (plano-mesas, tarea 2.8): las columnas del plano no
- * salen por las rutas de admin.
+ * Campos exactos de `ZonaRespuestaDto` (plano-mesas, tarea 2.8), con el tamaño de la grilla
+ * que suma `plano-mesas-admin` (design.md D4).
  */
 const SELECT_ZONA_ADMIN = {
   id: true,
@@ -23,6 +23,8 @@ const SELECT_ZONA_ADMIN = {
   ventanaCancelacionHoras: true,
   requiereConfirmacionAdmin: true,
   aforoMaximo: true,
+  planoColumnas: true,
+  planoFilas: true,
 };
 
 function errorSerializacion() {

@@ -33,4 +33,11 @@ export class ZonaRespuestaDto {
 
   @ApiProperty({ example: 20 })
   aforoMaximo!: number;
+
+  /** Tamaño de la grilla del plano (`plano-mesas-admin`, design.md D4). */
+  @ApiProperty({ type: 'integer', minimum: 1, example: 12 })
+  planoColumnas!: number;
+
+  @ApiProperty({ type: 'integer', minimum: 1, example: 8 })
+  planoFilas!: number;
 }

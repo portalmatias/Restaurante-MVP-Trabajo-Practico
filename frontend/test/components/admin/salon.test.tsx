@@ -37,8 +37,17 @@ const ZONA_STD = {
   ventanaCancelacionHoras: 2,
   requiereConfirmacionAdmin: false,
   aforoMaximo: 40,
+  planoColumnas: 12,
+  planoFilas: 8,
 };
-const ZONA_VIP = { ...ZONA_STD, id: "z-vip", nombre: "VIP" as const, aforoMaximo: 20 };
+const ZONA_VIP = {
+  ...ZONA_STD,
+  id: "z-vip",
+  nombre: "VIP" as const,
+  aforoMaximo: 20,
+  planoColumnas: 10,
+  planoFilas: 6,
+};
 
 beforeEach(() => {
   for (const mock of [GET, POST, PATCH, DELETE]) mock.mockReset();
