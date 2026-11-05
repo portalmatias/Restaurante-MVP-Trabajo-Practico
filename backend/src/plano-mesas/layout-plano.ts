@@ -4,10 +4,13 @@
  * La base garantiza con CHECK que cada mesa ubicada tiene coordenadas no negativas y tamaño de
  * al menos 1, pero no puede garantizar que la mesa entre en la grilla de su zona (cruza dos
  * tablas) ni que no se superponga con otra (no es una invariante de negocio, solo visual). Lo
- * valida quien escribe posiciones: hoy el seed, mañana el editor del admin (D6).
+ * valida quien escribe posiciones: el seed con `validarLayout` y la edición de una mesa desde el
+ * admin con `problemasDeUbicacion` (change `plano-mesas-admin`, design.md D2).
  *
- * Función pura, sin Prisma: el seed la importa desde acá.
+ * Funciones puras, sin Prisma: el seed y `MesasService` las importan desde acá.
  */
+
+import { ordenarMesasPorEtiqueta } from './orden-mesas';
 
 /** Dimensiones de la grilla del plano de una zona, en celdas. */
 export interface DimensionesPlano {
@@ -25,12 +28,13 @@ export interface MesaEnPlano {
   alto: number;
 }
 
-interface MesaUbicada extends MesaEnPlano {
+/** Mesa con las dos coordenadas no nulas. */
+export interface MesaUbicada extends MesaEnPlano {
   posX: number;
   posY: number;
 }
 
-function estaUbicada(mesa: MesaEnPlano): mesa is MesaUbicada {
+export function estaUbicada(mesa: MesaEnPlano): mesa is MesaUbicada {
   return mesa.posX !== null && mesa.posY !== null;
 }
 
@@ -41,6 +45,17 @@ function seSuperponen(a: MesaUbicada, b: MesaUbicada): boolean {
     b.posX < a.posX + a.ancho &&
     a.posY < b.posY + b.alto &&
     b.posY < a.posY + a.alto
+  );
+}
+
+/** Una mesa se sale de la grilla si su borde derecho o inferior pasa del de la zona. */
+function quedaFueraDeGrilla(
+  zona: DimensionesPlano,
+  mesa: MesaUbicada,
+): boolean {
+  return (
+    mesa.posX + mesa.ancho > zona.planoColumnas ||
+    mesa.posY + mesa.alto > zona.planoFilas
   );
 }
 
@@ -57,10 +72,7 @@ export function validarLayout(
   const ubicadas = mesas.filter(estaUbicada);
 
   for (const mesa of ubicadas) {
-    if (
-      mesa.posX + mesa.ancho > zona.planoColumnas ||
-      mesa.posY + mesa.alto > zona.planoFilas
-    ) {
+    if (quedaFueraDeGrilla(zona, mesa)) {
       problemas.push(
         `La mesa ${mesa.etiqueta} queda fuera de la grilla de ${zona.planoColumnas} por ${zona.planoFilas}.`,
       );
@@ -78,4 +90,27 @@ export function validarLayout(
   }
 
   return problemas;
+}
+
+/**
+ * Problemas de ubicar `mesa` en la grilla de `zona` junto a las `otras` mesas de esa zona
+ * (design.md D2 de `plano-mesas-admin`). Solo valida la mesa recibida contra las demás: los
+ * problemas que ya existan entre otras mesas no se informan. Las `otras` sin ubicar se ignoran;
+ * quien llama no debe incluir a la propia mesa entre ellas. `superpuestaCon` sale en orden
+ * natural de etiqueta.
+ */
+export function problemasDeUbicacion(
+  zona: DimensionesPlano,
+  mesa: MesaUbicada,
+  otras: MesaEnPlano[],
+): { fueraDeGrilla: boolean; superpuestaCon: string[] } {
+  const superpuestas = otras
+    .filter(estaUbicada)
+    .filter((otra) => seSuperponen(mesa, otra));
+  return {
+    fueraDeGrilla: quedaFueraDeGrilla(zona, mesa),
+    superpuestaCon: ordenarMesasPorEtiqueta(superpuestas).map(
+      (otra) => otra.etiqueta,
+    ),
+  };
 }

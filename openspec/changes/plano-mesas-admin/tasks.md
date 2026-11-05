@@ -16,15 +16,21 @@
 
 ## 2. Regla de ubicación en el backend (tests primero)
 
-- [ ] 2.1 Sumar a `backend/src/plano-mesas/layout-plano.spec.ts` los casos de `problemasDeUbicacion`
+- [x] 2.1 Sumar a `backend/src/plano-mesas/layout-plano.spec.ts` los casos de `problemasDeUbicacion`
       (rojo): con el layout del seed, S4 en (8,5) no tiene problemas; S1 en (1,0) toca a S2 sin
       superponerse; S1 en (5,1) se superpone con S3; S4 con ancho 6 se superpone con S5; S5 en
       (10,3) queda fuera de la grilla de 12 por 8; una mesa superpuesta con dos devuelve las dos
       etiquetas ordenadas; las mesas sin ubicar se ignoran. Verificar que falla.
-- [ ] 2.2 Implementar `problemasDeUbicacion` en `layout-plano.ts` con `mesa: MesaUbicada`,
+      Resultado (05/11/2026): 7 casos nuevos en el bloque `problemasDeUbicacion`. Rojo
+      observado: 7 fallidos, 9 pasan (`problemasDeUbicacion is not a function`).
+- [x] 2.2 Implementar `problemasDeUbicacion` en `layout-plano.ts` con `mesa: MesaUbicada`,
       exportando `MesaUbicada` y `estaUbicada`, y reutilizando `seSuperponen` y
       `ordenarMesasPorEtiqueta` (design.md D2), sin cambiar `validarLayout`. Verificar que 2.1
       pasa y que los tests del seed siguen en verde.
+      Resultado (05/11/2026): verde, `src/plano-mesas` 25 de 25 y
+      `plano-mesas-seed.integration-spec.ts` 5 de 5. La condición de grilla pasó a una función
+      interna `quedaFueraDeGrilla` que usan `validarLayout` y `problemasDeUbicacion`; los
+      mensajes y el resultado de `validarLayout` no cambian.
 
 ## 3. API de administración
 
