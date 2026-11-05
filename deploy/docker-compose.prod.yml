@@ -15,9 +15,14 @@
 # (TRUST_PROXY=172.30.0.10) porque el frontend solo recibe tráfico de Caddy, que lo
 # sobrescribe con UNA sola IP: la del visitante. Detrás de Cloudflare, Caddy la lee de
 # `CF-Connecting-IP`, y solo si la conexión viene de un rango de Cloudflare
-# (deploy/cloudflare-ips.txt); si no, usa la IP de la propia conexión (ver el Caddyfile). Si
-# alguien publicara el puerto del frontend o del backend, un cliente podría inventar su IP y
-# saltear los límites de solicitudes (D5).
+# (deploy/cloudflare-ips.txt); si no, usa la IP de la propia conexión (ver el Caddyfile).
+# Los dos riesgos de publicar un puerto son distintos:
+#   - frontend: recibiría conexiones sin pasar por Caddy, que es quien escribe el
+#     `X-Forwarded-For` con una sola IP; un cliente podría inventar su IP y saltear los
+#     límites de solicitudes (D5).
+#   - backend: con TRUST_PROXY=172.30.0.10 ignora el `X-Forwarded-For` de cualquier conexión que
+#     no venga del frontend, así que por ahí no se puede inventar la IP; el riesgo es otro: la
+#     API quedaría accesible sin pasar por Caddy ni por el frontend.
 
 name: reservas
 

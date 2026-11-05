@@ -70,20 +70,26 @@ trap limpiar EXIT
 
 # --- Red temporal con un rango libre (docker rechaza los que se superponen) -------------------
 BASE=""
+BASE6=""
 for tercer in $(seq 231 250); do
-  if docker network create --subnet "10.$tercer.57.0/24" "$RED" > /dev/null 2>&1; then
+  if docker network create --ipv6 --subnet "10.$tercer.57.0/24" --subnet "fd5a:57:$tercer::/64" "$RED" > /dev/null 2>&1; then
     BASE="10.$tercer.57"
+    BASE6="fd5a:57:$tercer:"
     break
   fi
 done
 if [ -z "$BASE" ]; then
-  echo "FALLA: no se pudo crear una red temporal de Docker."
+  echo "FALLA: no se pudo crear una red temporal de Docker con IPv4 e IPv6."
   exit 1
 fi
 
 # Direcciones: .10 y .11 son "bordes de Cloudflare" (dentro del /25 que se declara de confianza);
 # .200 es un cliente cualquiera que NO es Cloudflare.
-CONFIABLES="$BASE.0/25"
+# IPv6: ::10 es un borde de Cloudflare dentro del /121 de confianza (::0 a ::7f); ::200 queda fuera.
+CONFIABLES="$BASE.0/25 ${BASE6}:/121"
+BORDE_A6="${BASE6}:10"
+AJENO6="${BASE6}:200"
+PROXY6="${BASE6}:5"
 BORDE_A="$BASE.10"
 BORDE_B="$BASE.11"
 AJENO="$BASE.200"
@@ -105,7 +111,7 @@ docker start "$ECO" > /dev/null
 # Copia del Caddyfile con la lista de confianza de la red de prueba. Si la línea no existe (por
 # ejemplo, el Caddyfile viejo, sin `trusted_proxies`), queda igual: es lo que se quiere probar.
 sed "s|^\([[:space:]]*trusted_proxies static\) .*\$|\1 $CONFIABLES|" "$CADDYFILE" > "$T/Caddyfile"
-docker create --name "$PROXY" --network "$RED" \
+docker create --name "$PROXY" --network "$RED" --ip6 "$PROXY6" \
   -e SITE_ADDRESS=:80 \
   "$IMAGEN" caddy run --config /etc/caddy/Caddyfile > /dev/null
 docker cp "$(ruta_docker "$T/Caddyfile")" "$PROXY:/etc/caddy/Caddyfile"
@@ -135,6 +141,15 @@ pedir() {
   for h in "$@"; do args+=("--header=$h"); done
   docker run --rm --network "$RED" --ip "$desde" --entrypoint wget "$IMAGEN" \
     -q -O - "${args[@]}" "http://$PROXY/" 2> /dev/null
+}
+# pedir6 <ip6-de-origen> [encabezado ...]  ->  igual que pedir, pero por IPv6 al proxy
+pedir6() {
+  local desde="$1"
+  shift
+  local args=()
+  local h
+  for h in "$@"; do args+=("--header=$h"); done
+  docker run --rm --network "$RED" --ip6 "$desde" --entrypoint wget "$IMAGEN"     -q -O - "${args[@]}" "http://[$PROXY6]/" 2> /dev/null
 }
 campo() { printf '%s' "$1" | tr '|' '\n' | sed -n "s/^$2=//p"; }
 
@@ -175,6 +190,9 @@ R="$(pedir "$BORDE_A" "CF-Connecting-IP: $VISITANTE_1" "X-Forwarded-For: 6.6.6.6
   && ok "con CF-Connecting-IP válido, el origen es solo ese (sin lo inventado)" \
   || mal "con CF-Connecting-IP válido, el origen es solo ese (sin lo inventado)" "recibido: $R"
 
+R="$(pedir "$BORDE_A" "CF-Connecting-IP: $VISITANTE_1")"
+{ [ -n "$(campo "$R" xff)" ] && [ -z "$(campo "$R" cf)" ]; }   && ok "CF-Connecting-IP se elimina antes de llegar al frontend (el eco lo ve vacío)"   || mal "CF-Connecting-IP se elimina antes de llegar al frontend (el eco lo ve vacío)" "recibido: $R"
+
 # --- 3. Un cliente que no es Cloudflare no puede presentarse como otro ------------------------
 echo "3. El encabezado de Cloudflare solo vale desde Cloudflare"
 R="$(pedir "$AJENO" "CF-Connecting-IP: $VISITANTE_1" "X-Forwarded-For: 6.6.6.6" "X-Real-IP: 7.7.7.7")"
@@ -191,6 +209,14 @@ R="$(pedir "$BORDE_A" "X-Forwarded-For: 6.6.6.6")"
 [ "$(campo "$R" xff)" = "$BORDE_A" ] \
   && ok "se identifica por la dirección de la conexión, sin usar el X-Forwarded-For que traiga" \
   || mal "se identifica por la dirección de la conexión, sin usar el X-Forwarded-For que traiga" "recibido: $R"
+
+# --- 5. Lo mismo por IPv6 ----------------------------------------------------------------------
+echo "5. Conexiones por IPv6"
+R="$(pedir6 "$BORDE_A6" "CF-Connecting-IP: $VISITANTE_1")"
+[ "$(campo "$R" xff)" = "$VISITANTE_1" ]   && ok "un borde de Cloudflare por IPv6 (dentro del rango confiable) informa el origen del visitante"   || mal "un borde de Cloudflare por IPv6 (dentro del rango confiable) informa el origen del visitante" "recibido: $R"
+
+R="$(pedir6 "$AJENO6" "CF-Connecting-IP: $VISITANTE_1" "X-Forwarded-For: 6.6.6.6")"
+[ "$(campo "$R" xff)" = "$AJENO6" ]   && ok "un cliente IPv6 fuera del rango confiable se identifica por su propia IP"   || mal "un cliente IPv6 fuera del rango confiable se identifica por su propia IP" "recibido: $R"
 
 echo
 echo "Resultado: $PASO comprobaciones correctas, $FALLO con fallas."

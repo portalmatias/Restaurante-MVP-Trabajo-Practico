@@ -35,6 +35,8 @@ export function esCidr(rango) {
   const partes = rango.split('/');
   if (partes.length !== 2) return false;
   const [direccion, prefijo] = partes;
+  // Caddy no acepta un identificador de zona (fe80::1%eth0) en un rango de trusted_proxies.
+  if (direccion.includes('%')) return false;
   if (!/^[0-9]{1,3}$/.test(prefijo)) return false;
   const largo = Number(prefijo);
   if (isIPv4(direccion)) return largo <= 32;
@@ -106,12 +108,17 @@ export async function obtenerPublicados(fetchImpl = fetch) {
     descargar(URL_IPS_V4, fetchImpl),
     descargar(URL_IPS_V6, fetchImpl),
   ]);
-  const rangos = [...leerRangos(v4), ...leerRangos(v6)];
-  const invalidos = rangosInvalidos(rangos);
-  if (rangos.length === 0 || invalidos.length > 0) {
-    throw new Error(
-      `La lista publicada no tiene el formato esperado${invalidos.length ? ` (inválidos: ${invalidos.slice(0, 3).join(', ')})` : ' (vacía)'}.`,
-    );
+  // Cada familia se valida por separado: que una URL conteste vacía no se tapa con la otra.
+  const listas = { IPv4: leerRangos(v4), IPv6: leerRangos(v6) };
+  const rangos = [];
+  for (const [familia, lista] of Object.entries(listas)) {
+    const invalidos = rangosInvalidos(lista);
+    if (lista.length === 0 || invalidos.length > 0) {
+      throw new Error(
+        `La lista publicada de ${familia} no tiene el formato esperado${invalidos.length ? ` (inválidos: ${invalidos.slice(0, 3).join(', ')})` : ' (vacía)'}.`,
+      );
+    }
+    rangos.push(...lista);
   }
   return rangos;
 }

@@ -123,12 +123,15 @@ IP elástica), así que los rangos IPv6 del archivo solo sirven para la confianz
 # Rangos IPv4 del archivo, en el formato de la CLI (Cidr=...,Description=...).
 ENTRADAS=$(grep -vE '^#|:' deploy/cloudflare-ips.txt | sed 's/^/Cidr=/; s/$/,Description=cloudflare/')
 LISTA=$(aws ec2 create-managed-prefix-list --region us-east-1 --prefix-list-name cloudflare-ipv4 \
-  --address-family IPv4 --max-entries 30 --entries $ENTRADAS \
+  --address-family IPv4 --max-entries 20 --entries $ENTRADAS \
   --query PrefixList.PrefixListId --output text)
 
+# Las dos autorizaciones tienen que salir bien ANTES de revocar nada: si una falla, el bloque se
+# detiene y 0.0.0.0/0 sigue en su lugar (el sitio no se cae).
 for puerto in 80 443; do
   aws ec2 authorize-security-group-ingress --region us-east-1 --group-id "$SG" \
-    --ip-permissions "IpProtocol=tcp,FromPort=$puerto,ToPort=$puerto,PrefixListIds=[{PrefixListId=$LISTA}]"
+    --ip-permissions "IpProtocol=tcp,FromPort=$puerto,ToPort=$puerto,PrefixListIds=[{PrefixListId=$LISTA}]" \
+    || { echo "Falló la autorización del $puerto: NO se revoca nada."; return 1 2>/dev/null || exit 1; }
 done
 # Recién después de comprobar que el sitio sigue respondiendo por Cloudflare:
 for puerto in 80 443; do
@@ -136,6 +139,14 @@ for puerto in 80 443; do
     --protocol tcp --port "$puerto" --cidr 0.0.0.0/0
 done
 ```
+
+**Cuota de reglas:** una regla que referencia una lista de prefijos cuenta como tantas reglas como
+el `--max-entries` de la lista, no como una. Con 20 y dos puertos son 40 de las 60 reglas de
+entrada que admite por defecto un security group, además del 22 y de las IPs del equipo. Por eso
+la lista se crea con 20 (hoy hay 15 rangos IPv4) y no con un máximo holgado: con 30, las dos
+reglas sumarían 60 y la segunda autorización fallaría. Si Cloudflare agrega rangos y se llega a
+20, subir el máximo con `modify-managed-prefix-list --max-entries` **solo después** de revisar la
+cuota (`aws service-quotas get-service-quota --service-code vpc --quota-code L-0EA8095F`).
 
 **Orden y marcha atrás:** primero se agrega la regla de Cloudflare y se comprueba el sitio; recién
 entonces se revoca la de `0.0.0.0/0`. Para volver atrás, se vuelve a autorizar `0.0.0.0/0` en 80 y
@@ -467,7 +478,7 @@ con la lista de prefijos de AWS al mismo tiempo:
 2. Copiar los mismos rangos a la línea `trusted_proxies static` de `deploy/Caddyfile`.
    `npm run test:scripts` falla si no coinciden.
 3. Actualizar la lista de prefijos del security group (los IPv4):
-   `aws ec2 modify-managed-prefix-list --prefix-list-id <ID> --current-version <N> --add-entries Cidr=<alta> --remove-entries Cidr=<baja>`
+   `aws ec2 modify-managed-prefix-list --region us-east-1 --prefix-list-id <ID> --current-version <N> --add-entries Cidr=<alta> --remove-entries Cidr=<baja>`
    (sin probar contra AWS; ver la sección 2).
 
 Después del despliegue, comprobar que el sitio responde y volver a correr el script.
@@ -830,7 +841,7 @@ servidor sigue sirviendo la última versión.
 
 ## 13. Probar `desplegar.sh` y `ssh-entrada.sh` sin AWS (tarea 5.2)
 
-`npm run test:deploy` (también corre en CI) ejecuta dos pruebas: `deploy/test/desplegar.test.sh`
+`npm run test:deploy` (también corre en CI) ejecuta tres pruebas. La tercera, `deploy/test/cloudflare-caddy.test.sh` (sección 9), **necesita Docker** y falla a propósito sin un daemon (se saltea con `SALTAR_CADDY=1`); las otras dos no lo necesitan: `deploy/test/desplegar.test.sh`
 (la de `desplegar.sh`, abajo) y `deploy/test/ssh-entrada.test.sh` (la del comando forzado, que está
 en el último párrafo de esta sección). La de `desplegar.sh` arma un
 repositorio Git temporal y simula `docker`, `curl`, `flock`, `sleep` y `stat`, sin Docker, red ni

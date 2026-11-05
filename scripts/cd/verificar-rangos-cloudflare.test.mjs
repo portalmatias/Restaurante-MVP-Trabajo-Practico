@@ -31,6 +31,8 @@ describe('esCidr', () => {
     '999.1.1.1/8',
     '2400:cb00::/129',
     '2400:cb00::/-1',
+    'fe80::1%eth0/64',
+    '2400:cb00::%1/32',
     'cloudflare.com/20',
     '<html>/20',
     '1.2.3.4/8 5.6.7.8/8',
@@ -166,16 +168,16 @@ describe('main (comprobación contra la lista publicada)', () => {
   });
 
   test('termina en 1 y nombra las altas cuando Cloudflare publica un rango nuevo', async () => {
-    escribir(['1.0.0.0/8']);
-    const { codigo, salida } = await correr(publicar(['1.0.0.0/8', '2.0.0.0/8'], []));
+    escribir(['1.0.0.0/8', '2400:cb00::/32']);
+    const { codigo, salida } = await correr(publicar(['1.0.0.0/8', '2.0.0.0/8'], ['2400:cb00::/32']));
     assert.equal(codigo, 1);
     assert.match(salida, /ALTAS[^\n]*2\.0\.0\.0\/8/);
     assert.doesNotMatch(salida, /BAJAS/);
   });
 
   test('termina en 1 y nombra las bajas cuando Cloudflare retira un rango', async () => {
-    escribir(['1.0.0.0/8', '3.0.0.0/8']);
-    const { codigo, salida } = await correr(publicar(['1.0.0.0/8'], []));
+    escribir(['1.0.0.0/8', '3.0.0.0/8', '2400:cb00::/32']);
+    const { codigo, salida } = await correr(publicar(['1.0.0.0/8'], ['2400:cb00::/32']));
     assert.equal(codigo, 1);
     assert.match(salida, /BAJAS[^\n]*3\.0\.0\.0\/8/);
     assert.doesNotMatch(salida, /ALTAS/);
@@ -203,10 +205,22 @@ describe('main (comprobación contra la lista publicada)', () => {
     assert.match(salida, /formato esperado/);
   });
 
+  test('termina en 1 si una de las dos listas publicadas llega vacía, aunque la otra tenga rangos', async () => {
+    // El archivo local omite IPv6: antes, la lista IPv4 con datos tapaba la IPv6 vacía y daba 0.
+    escribir(['1.0.0.0/8']);
+    const sinV6 = await correr(publicar(['1.0.0.0/8'], []));
+    assert.equal(sinV6.codigo, 1);
+    assert.match(sinV6.salida, /IPv6/);
+    escribir(['2400:cb00::/32']);
+    const sinV4 = await correr(publicar([], ['2400:cb00::/32']));
+    assert.equal(sinV4.codigo, 1);
+    assert.match(sinV4.salida, /IPv4/);
+  });
+
   test('termina en 1 si el archivo local está vacío o tiene un rango inválido', async () => {
     escribir([]);
-    assert.equal((await correr(publicar(['1.0.0.0/8'], []))).codigo, 1);
+    assert.equal((await correr(publicar(['1.0.0.0/8'], ['2400:cb00::/32']))).codigo, 1);
     escribir(['1.0.0.0/99']);
-    assert.equal((await correr(publicar(['1.0.0.0/8'], []))).codigo, 1);
+    assert.equal((await correr(publicar(['1.0.0.0/8'], ['2400:cb00::/32']))).codigo, 1);
   });
 });
