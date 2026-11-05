@@ -1,13 +1,18 @@
 ## 1. Prerrequisitos
 
-- [ ] 1.1 Confirmar con el equipo que se hace este change antes de la entrega: en `plano-mesas`
+- [x] 1.1 Confirmar con el equipo que se hace este change antes de la entrega: en `plano-mesas`
       (tarea 1.1, pregunta abierta 5) se había decidido que alcanzaba con el layout del seed, sin
       editor de admin. Anotar la respuesta en el PR de esta propuesta. No empezar el Grupo 2 sin
       ella.
-- [ ] 1.2 Esperar a que se integre el PR #89 y se archive `plano-mesas`. Crear
+      Resultado (05/11/2026): confirmado por portalmatias, se hace antes de la entrega. El PR de
+      la propuesta (#96) ya estaba mergeado sin esta respuesta; queda anotada aquí y en el PR de
+      la implementación.
+- [x] 1.2 Esperar a que se integre el PR #89 y se archive `plano-mesas`. Crear
       `feature/plano-mesas-admin` desde `main` actualizado y verificar que existen
       `openspec/specs/plano-mesas/spec.md`, `backend/src/plano-mesas/layout-plano.ts` y
       `frontend/src/components/reservas/plano-mesas.tsx`.
+      Resultado (05/11/2026): #89 mergeado, `plano-mesas` archivado (#104). Rama creada desde
+      `main` en `4b24d1f` y los tres archivos existen.
 
 ## 2. Regla de ubicación en el backend (tests primero)
 
