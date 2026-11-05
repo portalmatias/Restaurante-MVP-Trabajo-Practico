@@ -68,15 +68,18 @@
       `deploy/docker-compose.prod.yml` reescritos (ya no dicen que Caddy ve «la IP real del
       cliente» sin Cloudflare); `desplegar.test.sh` sigue en 79 de 79.
 
-- [ ] 3.5 Agregar las pruebas de 2.1, 2.2 y 2.3 a las listas fijas de `test:scripts` y `test:deploy` en `package.json` (no son globs) y verificar en el CI del PR que los pasos «Tests de las utilidades de scripts/» y «Tests de deploy/desplegar.sh» ejecutan los archivos nuevos (contarlos en la salida), no solo que terminan en verde.
-      Hecho en `package.json`; falta ver en el CI del PR cuántos tests ejecutan los pasos
-      (ver abajo la evidencia cuando termine).
+- [x] 3.5 Agregar las pruebas de 2.1, 2.2 y 2.3 a las listas fijas de `test:scripts` y `test:deploy` en `package.json` (no son globs) y verificar en el CI del PR que los pasos «Tests de las utilidades de scripts/» y «Tests de deploy/desplegar.sh» ejecutan los archivos nuevos (contarlos en la salida), no solo que terminan en verde.
+      Hecho en `package.json`. Evidencia del CI del PR (run 42053799866): `test:scripts` ejecuta
+      `verificar-rangos-cloudflare.test.mjs` (aparecen sus subtests «archivo real
+      deploy/cloudflare-ips.txt» y «coherencia entre deploy/cloudflare-ips.txt y
+      deploy/Caddyfile»), 148 de 148 tests. `test:deploy` ejecuta los tres archivos: 79, 56 y 11
+      comprobaciones correctas, y las 11 son de `cloudflare-caddy.test.sh`.
 
 - [ ] 3.6 Workflow programado (semanal) que ejecuta la comprobación de rangos y falla con las altas y bajas; verificar con `actionlint` (job de lint de CI) y disparándolo a mano una vez.
       Hecho `.github/workflows/rangos-cloudflare.yml` (semanal, abre un issue si falla, acciones
-      fijadas por SHA). Falta: `actionlint` en el CI del PR y dispararlo a mano una vez, que solo
-      se puede después de mergear (un `workflow_dispatch` necesita el workflow en la rama por
-      defecto).
+      fijadas por SHA). `actionlint` 1.7.7 en verde en el job «Lint de scripts y workflows» del
+      CI del PR (run 42053799866). Falta dispararlo a mano una vez, que solo se puede después de
+      mergear (un `workflow_dispatch` necesita el workflow en la rama por defecto).
 
 ## 4. Documentación
 
@@ -85,7 +88,11 @@
       administrada y reglas del security group) no se probaron contra la cuenta; el runbook lo
       dice. Se prueban con la tarea 5.3.
 
-- [ ] 4.2 Correr `openspec validate ip-real-detras-de-cloudflare --strict`, `npx eslint .`, `npm run test:deploy` y `npm run test:scripts`, y verificar que están en verde.
+- [x] 4.2 Correr `openspec validate ip-real-detras-de-cloudflare --strict`, `npx eslint .`, `npm run test:deploy` y `npm run test:scripts`, y verificar que están en verde.
+      Local: `openspec validate --strict` válido, `npx eslint .` sin errores y `test:scripts`
+      148 de 148. `test:deploy` local: `desplegar.test.sh` y `ssh-entrada.test.sh` en verde (56 de
+      56 en el segundo); `cloudflare-caddy.test.sh` no corrió porque Docker no estaba levantado.
+      En el CI del PR (run 42053799866) corrieron los tres en verde: 79, 56 y 11.
 
 ## 5. Después del despliegue (verificaciones posteriores)
 
