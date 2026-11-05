@@ -1,11 +1,17 @@
+import { execFileSync } from 'node:child_process';
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { Mesa } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
+
+import { seedCatalogo } from '../prisma/catalogo';
+import { seedPlano } from '../prisma/plano-desarrollo';
 
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -321,6 +327,169 @@ describe('Controllers admin de gestión de salón (integration)', () => {
         .expect(200);
 
       expect((response.body as { activo: boolean }).activo).toBe(false);
+    });
+  });
+});
+
+/**
+ * Change `plano-mesas-admin`, tareas 3.1 a 3.6: un test por escenario de "Ubicación de Mesa en
+ * el plano" de `specs/gestion-salon/spec.md`, por HTTP (guardas + `ValidationPipe` + service +
+ * Prisma).
+ *
+ * Usa un schema de Postgres propio (mismo patrón que `plano-mesas.integration-spec.ts`): los
+ * escenarios parten del layout exacto del seed y lo modifican, y la base de test compartida
+ * tiene mesas que dejan otras suites. Antes de cada caso se borran las reservas y las mesas que
+ * no son del seed, y se vuelven a cargar el catálogo y el layout.
+ *
+ * La app no registra el `ThrottlerGuard`: los límites de las rutas de admin los prueba
+ * `throttle-rutas-admin.e2e-spec.ts`, y acá se hacen más pedidos por minuto que esos límites.
+ */
+const SCHEMA_UBICACION = 'gestion_salon_ubicacion_test';
+const ETIQUETAS_SEED = ['S1', 'S2', 'S3', 'S4', 'S5', 'V1', 'V2', 'V3', 'V4'];
+
+function urlDelSchemaDeUbicacion(): string {
+  const base = process.env.DATABASE_URL;
+  if (!base) {
+    throw new Error('Falta DATABASE_URL para los tests de integración');
+  }
+  const url = new URL(base);
+  url.searchParams.set('schema', SCHEMA_UBICACION);
+  return url.toString();
+}
+
+async function borrarSchemaDeUbicacion(): Promise<void> {
+  const baseCompartida = new PrismaService();
+  await baseCompartida.$executeRawUnsafe(
+    `DROP SCHEMA IF EXISTS "${SCHEMA_UBICACION}" CASCADE`,
+  );
+  await baseCompartida.$disconnect();
+}
+
+describe('Ubicación de Mesa en el plano (integration)', () => {
+  const urlCompartida = process.env.DATABASE_URL;
+  let app: INestApplication<App>;
+  let prisma: PrismaService;
+  let adminToken: string;
+  /** Mesas del seed por etiqueta, leídas de nuevo antes de cada caso. */
+  let mesas: Record<string, Mesa>;
+
+  beforeAll(async () => {
+    await borrarSchemaDeUbicacion();
+    execFileSync(
+      process.execPath,
+      [
+        require.resolve('prisma/build/index.js'),
+        'migrate',
+        'deploy',
+        '--schema',
+        'prisma/schema.prisma',
+      ],
+      {
+        env: { ...process.env, DATABASE_URL: urlDelSchemaDeUbicacion() },
+        stdio: 'pipe',
+      },
+    );
+
+    // `PrismaService` lee `DATABASE_URL` al construirse: se apunta al schema propio solo
+    // mientras se compila el módulo.
+    process.env.DATABASE_URL = urlDelSchemaDeUbicacion();
+    const moduleFixture = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['../.env', '.env'],
+        }),
+        PrismaModule,
+        AuthModule,
+        ZonasModule,
+        MesasModule,
+      ],
+    }).compile();
+    process.env.DATABASE_URL = urlCompartida;
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+    );
+    await app.init();
+    prisma = app.get(PrismaService);
+
+    const jwtSecret = app.get(ConfigService).getOrThrow<string>('JWT_SECRET');
+    adminToken = app
+      .get(JwtService)
+      .sign({ sub: 'admin-test-uuid', rol: 'ADMIN' }, { secret: jwtSecret });
+  }, 120_000);
+
+  beforeEach(async () => {
+    await prisma.reserva.deleteMany();
+    await prisma.mesa.deleteMany({
+      where: { etiqueta: { notIn: ETIQUETAS_SEED } },
+    });
+    await seedCatalogo(prisma, () => undefined);
+    await seedPlano(prisma, () => undefined);
+    const filas = await prisma.mesa.findMany();
+    mesas = Object.fromEntries(filas.map((m) => [m.etiqueta, m]));
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await borrarSchemaDeUbicacion();
+  });
+
+  function patch(mesa: Mesa, body: Record<string, unknown>) {
+    return request(app.getHttpServer())
+      .patch(`/admin/mesas/${mesa.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(body);
+  }
+
+  function leer(mesa: Mesa): Promise<Mesa> {
+    return prisma.mesa.findUniqueOrThrow({ where: { id: mesa.id } });
+  }
+
+  /** Todo rechazo deja la mesa exactamente como estaba en la base. */
+  async function esperarSinCambios(mesa: Mesa): Promise<void> {
+    expect(await leer(mesa)).toEqual(mesa);
+  }
+
+  function mensaje(respuesta: request.Response): unknown {
+    return (respuesta.body as { message: unknown }).message;
+  }
+
+  describe('valores de entrada (tarea 3.1)', () => {
+    it.each([
+      ['posX', { posX: -1, posY: 0 }],
+      ['posY', { posX: 0, posY: -1 }],
+      ['posX', { posX: 1.5, posY: 0 }],
+      ['ancho', { ancho: 0 }],
+      ['alto', { alto: 0 }],
+      ['ancho', { ancho: null }],
+      ['alto', { alto: null }],
+      ['forma', { forma: null }],
+      ['forma', { forma: 'TRIANGULAR' }],
+    ])(
+      'responde 400 por el valor de %s en %j sin modificar la mesa',
+      async (campo, body) => {
+        const respuesta = await patch(mesas.S1, body).expect(400);
+
+        // El `400` tiene que venir de la validación del campo, no de que el DTO no lo
+        // conozca (`forbidNonWhitelisted`).
+        const mensajes = mensaje(respuesta) as string[];
+        expect(mensajes.some((m) => m.startsWith(`${campo} `))).toBe(true);
+        expect(mensajes.some((m) => m.includes('should not exist'))).toBe(
+          false,
+        );
+        await esperarSinCambios(mesas.S1);
+      },
+    );
+
+    it('un pedido sin campos del plano no cambia la ubicación', async () => {
+      await patch(mesas.S3, { etiqueta: 'S3-nueva' }).expect(200);
+
+      expect(await leer(mesas.S3)).toEqual({
+        ...mesas.S3,
+        etiqueta: 'S3-nueva',
+      });
     });
   });
 });

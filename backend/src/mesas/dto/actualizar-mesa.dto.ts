@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { FormaMesa } from '@prisma/client';
 import {
+  IsEnum,
   IsInt,
   IsString,
   Matches,
@@ -47,4 +49,73 @@ export class ActualizarMesaDto {
     message: 'La etiqueta no puede estar vacía ni contener solo espacios.',
   })
   etiqueta?: string;
+
+  /**
+   * Campos del plano (change `plano-mesas-admin`, design.md D1). En `posX` y `posY`, `null`
+   * y ausente significan cosas distintas: `null` quita la mesa del plano y la ausencia no toca
+   * la posición. Por eso el `@ValidateIf` solo valida cuando hay un valor: `null` pasa el DTO
+   * y `MesasService` lo distingue de `undefined`. Que las dos coordenadas vayan juntas lo
+   * valida el service (D2).
+   */
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: 'integer',
+    minimum: 0,
+    description:
+      'Columna de la esquina superior izquierda en la grilla de la zona, desde 0. Va junto con posY; los dos en null quitan la mesa del plano. Si se cambia la zona sin indicarla, la mesa queda sin ubicar.',
+    example: 8,
+  })
+  @ValidateIf((dto: ActualizarMesaDto) => dto.posX != null)
+  @IsInt()
+  @Min(0)
+  posX?: number | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: 'integer',
+    minimum: 0,
+    description:
+      'Fila de la esquina superior izquierda, desde 0. Va junto con posX.',
+    example: 5,
+  })
+  @ValidateIf((dto: ActualizarMesaDto) => dto.posY != null)
+  @IsInt()
+  @Min(0)
+  posY?: number | null;
+
+  /** `ancho`, `alto` y `forma` no admiten `null`: mismo `@ValidateIf` que los campos de arriba. */
+  @ApiProperty({
+    required: false,
+    type: 'integer',
+    minimum: 1,
+    description: 'Columnas que ocupa la mesa en el plano.',
+    example: 3,
+  })
+  @ValidateIf((_, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  ancho?: number;
+
+  @ApiProperty({
+    required: false,
+    type: 'integer',
+    minimum: 1,
+    description: 'Filas que ocupa la mesa en el plano.',
+    example: 2,
+  })
+  @ValidateIf((_, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  alto?: number;
+
+  @ApiProperty({
+    required: false,
+    enum: FormaMesa,
+    enumName: 'FormaMesa',
+  })
+  @ValidateIf((_, value) => value !== undefined)
+  @IsEnum(FormaMesa)
+  forma?: FormaMesa;
 }

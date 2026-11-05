@@ -38,9 +38,15 @@ Los tests de 3.1 a 3.5 van en `backend/test/gestion-salon-admin.integration-spec
 escenario de "Ubicación de Mesa en el plano" de `specs/gestion-salon/spec.md`. Cada rechazo verifica
 además que la mesa no cambió en la base. Cada tarea va con tests primero (rojo, luego verde).
 
-- [ ] 3.1 Agregar `posX`, `posY`, `ancho`, `alto` y `forma` a `ActualizarMesaDto` con las
+- [x] 3.1 Agregar `posX`, `posY`, `ancho`, `alto` y `forma` a `ActualizarMesaDto` con las
       validaciones de design.md D1 (`null` distinto de ausente). Tests: valores fuera de rango
       `400` (incluido `null` en `ancho`, `alto` o `forma`) y pedido sin campos del plano.
+      Resultado (05/11/2026): bloque nuevo "Ubicación de Mesa en el plano (integration)" en
+      `gestion-salon-admin.integration-spec.ts`, con schema de Postgres propio y el layout del seed
+      recargado antes de cada caso. 10 tests: 9 valores fuera de rango (cada uno exige que el `400`
+      venga de la validación del campo y no de `forbidNonWhitelisted`, y que la mesa no cambie) y el
+      pedido sin campos del plano. Rojo observado: 9 fallidos, 1 pasa (el pedido sin campos del plano
+      ya se comportaba así). Verde: el archivo completo 26 de 26.
 - [ ] 3.2 En `MesasService.ejecutarActualizacion`, dentro de la transacción `Serializable`
       existente, calcular el lugar final, validar que las coordenadas van juntas (paso 0 de D2) y
       saltear la validación cuando el lugar no cambia (paso 2). Tests: coordenada a medias `400`
