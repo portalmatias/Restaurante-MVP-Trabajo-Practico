@@ -441,6 +441,10 @@ export interface components {
             requiereConfirmacionAdmin: boolean;
             /** @example 20 */
             aforoMaximo: number;
+            /** @example 12 */
+            planoColumnas: number;
+            /** @example 8 */
+            planoFilas: number;
         };
         ActualizarZonaDto: {
             /**
@@ -505,6 +509,16 @@ export interface components {
             capacidad: number;
             /** @example M1 */
             etiqueta: string;
+            /** @example 5 */
+            posX: number | null;
+            /** @example 0 */
+            posY: number | null;
+            /** @example 2 */
+            ancho: number;
+            /** @example 2 */
+            alto: number;
+            /** @description Forma con la que se dibuja la mesa. */
+            forma: components["schemas"]["FormaMesa"];
         };
         ActualizarMesaDto: {
             /**
@@ -522,6 +536,28 @@ export interface components {
              * @example M1
              */
             etiqueta?: string;
+            /**
+             * @description Columna de la esquina superior izquierda en la grilla de la zona, desde 0. Va junto con posY; los dos en null quitan la mesa del plano. Si se cambia la zona sin indicarla, la mesa queda sin ubicar.
+             * @example 8
+             */
+            posX?: number | null;
+            /**
+             * @description Fila de la esquina superior izquierda, desde 0. Va junto con posX.
+             * @example 5
+             */
+            posY?: number | null;
+            /**
+             * @description Columnas que ocupa la mesa en el plano.
+             * @example 3
+             */
+            ancho?: number;
+            /**
+             * @description Filas que ocupa la mesa en el plano.
+             * @example 2
+             */
+            alto?: number;
+            /** @description Forma con la que se dibuja la mesa. */
+            forma?: components["schemas"]["FormaMesa"];
         };
         CrearTurnoDto: {
             /**
@@ -1606,6 +1642,13 @@ export interface operations {
                     "application/json": components["schemas"]["MesaRespuestaDto"];
                 };
             };
+            /** @description Datos inválidos: valores fuera de rango; una sola de las dos coordenadas, o una en null junto a otra con valor; un ancho o alto mayor que la grilla de la zona final, aunque la mesa quede sin ubicar o solo cambie de zona; o una ubicación que deja la mesa fuera de la grilla de su zona. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description La mesa o la zona indicada no existe. */
             404: {
                 headers: {
@@ -1613,7 +1656,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description La mesa tiene una reserva activa con más comensales que la nueva capacidad, reservas activas que impiden cambiarla de zona, ya existe otra mesa con la etiqueta indicada, o no se pudo actualizar por una edición concurrente (conflicto de serialización agotando los reintentos). */
+            /** @description La mesa tiene una reserva activa con más comensales que la nueva capacidad, reservas activas que impiden cambiarla de zona, ya existe otra mesa con la etiqueta indicada, no se pudo actualizar por una edición concurrente (conflicto de serialización agotando los reintentos), o la mesa se superpone con otra mesa ubicada de su zona. */
             409: {
                 headers: {
                     [name: string]: unknown;

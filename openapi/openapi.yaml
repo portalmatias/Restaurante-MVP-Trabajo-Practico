@@ -106,6 +106,14 @@ components:
         aforoMaximo:
           type: number
           example: 20
+        planoColumnas:
+          type: integer
+          minimum: 1
+          example: 12
+        planoFilas:
+          type: integer
+          minimum: 1
+          example: 8
       required:
         - id
         - nombre
@@ -116,6 +124,8 @@ components:
         - ventanaCancelacionHoras
         - requiereConfirmacionAdmin
         - aforoMaximo
+        - planoColumnas
+        - planoFilas
     ActualizarZonaDto:
       type: object
       properties:
@@ -181,11 +191,38 @@ components:
         etiqueta:
           type: string
           example: M1
+        posX:
+          type: integer
+          nullable: true
+          minimum: 0
+          example: 5
+        posY:
+          type: integer
+          nullable: true
+          minimum: 0
+          example: 0
+        ancho:
+          type: integer
+          minimum: 1
+          example: 2
+        alto:
+          type: integer
+          minimum: 1
+          example: 2
+        forma:
+          description: Forma con la que se dibuja la mesa.
+          allOf:
+            - $ref: '#/components/schemas/FormaMesa'
       required:
         - id
         - zonaId
         - capacidad
         - etiqueta
+        - posX
+        - posY
+        - ancho
+        - alto
+        - forma
     ActualizarMesaDto:
       type: object
       properties:
@@ -201,6 +238,35 @@ components:
           type: string
           description: Nueva etiqueta identificatoria de la Mesa, única en todo el salón.
           example: M1
+        posX:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: >-
+            Columna de la esquina superior izquierda en la grilla de la zona, desde 0. Va
+            junto con posY; los dos en null quitan la mesa del plano. Si se cambia la zona
+            sin indicarla, la mesa queda sin ubicar.
+          example: 8
+        posY:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Fila de la esquina superior izquierda, desde 0. Va junto con posX.
+          example: 5
+        ancho:
+          type: integer
+          minimum: 1
+          description: Columnas que ocupa la mesa en el plano.
+          example: 3
+        alto:
+          type: integer
+          minimum: 1
+          description: Filas que ocupa la mesa en el plano.
+          example: 2
+        forma:
+          description: Forma con la que se dibuja la mesa.
+          allOf:
+            - $ref: '#/components/schemas/FormaMesa'
     CrearTurnoDto:
       type: object
       properties:
@@ -1683,14 +1749,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MesaRespuestaDto'
+        '400':
+          description: >-
+            Datos inválidos: valores fuera de rango; una sola de las dos coordenadas, o una en
+            null junto a otra con valor; un ancho o alto mayor que la grilla de la zona final,
+            aunque la mesa quede sin ubicar o solo cambie de zona; o una ubicación que deja la
+            mesa fuera de la grilla de su zona.
         '404':
           description: La mesa o la zona indicada no existe.
         '409':
           description: >-
             La mesa tiene una reserva activa con más comensales que la nueva
             capacidad, reservas activas que impiden cambiarla de zona, ya existe otra
-            mesa con la etiqueta indicada, o no se pudo actualizar por una edición
-            concurrente (conflicto de serialización agotando los reintentos).
+            mesa con la etiqueta indicada, no se pudo actualizar por una edición
+            concurrente (conflicto de serialización agotando los reintentos), o la mesa
+            se superpone con otra mesa ubicada de su zona.
         '429':
           description: >-
             Se superó el límite de solicitudes a esta ruta en la ventana configurada. Se

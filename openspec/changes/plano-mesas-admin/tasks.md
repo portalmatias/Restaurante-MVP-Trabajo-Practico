@@ -113,8 +113,15 @@ además que la mesa no cambió en la base. Cada tarea va con tests primero (rojo
       fallidos en integración (49 pasan) y 7 en `mesas.service.spec.ts` y `zonas.service.spec.ts` (41
       pasan), por las copias de los `select`. Verde: unitarios 248 de 248; `gestion-salon-admin`,
       `plano-mesas-salidas-admin`, `mesas` y `zonas` de integración 68 de 68.
-- [ ] 3.7 Incorporar el fragmento OpenAPI de design.md a `openapi/openapi.yaml` y regenerar los
+- [x] 3.7 Incorporar el fragmento OpenAPI de design.md a `openapi/openapi.yaml` y regenerar los
       tipos del frontend. Verificar con `npm run openapi:check` y `npm run typecheck -w frontend`.
+      Resultado (05/11/2026): antes del cambio, `openapi:check` marcaba la desviación (rojo).
+      Después: `openapi:check` sin desviación, tipos regenerados con `npm run api:types -w
+      frontend` y `npm run typecheck -w frontend` en verde. `forma` va como `description` +
+      `allOf: [$ref FormaMesa]`: con un `$ref` solo, Nest pierde la descripción de `FormaMesa`
+      y `openapi:check` falla; el contrato es el mismo. Los fixtures `ZONA_STD` y `ZONA_VIP` de
+      `frontend/test/components/admin/salon.test.tsx` suman `planoColumnas` y `planoFilas`,
+      que ahora son obligatorios (22 de 22 tests del archivo en verde).
 
 ## 4. Pantalla del admin
 

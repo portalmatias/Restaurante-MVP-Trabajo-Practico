@@ -13,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
@@ -102,13 +103,21 @@ export class MesasController {
     type: MesaRespuestaDto,
     description: 'La mesa se actualizó.',
   })
+  @ApiBadRequestResponse({
+    description:
+      'Datos inválidos: valores fuera de rango; una sola de las dos coordenadas, o una en ' +
+      'null junto a otra con valor; un ancho o alto mayor que la grilla de la zona final, ' +
+      'aunque la mesa quede sin ubicar o solo cambie de zona; o una ubicación que deja la ' +
+      'mesa fuera de la grilla de su zona.',
+  })
   @ApiNotFoundResponse({ description: 'La mesa o la zona indicada no existe.' })
   @ApiConflictResponse({
     description:
       'La mesa tiene una reserva activa con más comensales que la nueva capacidad, ' +
       'reservas activas que impiden cambiarla de zona, ya existe otra mesa con la ' +
-      'etiqueta indicada, o no se pudo actualizar por una edición concurrente ' +
-      '(conflicto de serialización agotando los reintentos).',
+      'etiqueta indicada, no se pudo actualizar por una edición concurrente ' +
+      '(conflicto de serialización agotando los reintentos), o la mesa se superpone ' +
+      'con otra mesa ubicada de su zona.',
   })
   @ApiTooManyRequestsResponse({ description: DESCRIPCION_429_ADMIN })
   @Patch(':id')

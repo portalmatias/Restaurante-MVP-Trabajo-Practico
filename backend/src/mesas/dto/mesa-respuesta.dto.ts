@@ -32,6 +32,10 @@ export class MesaRespuestaDto {
   @ApiProperty({ type: 'integer', minimum: 1, example: 2 })
   alto!: number;
 
-  @ApiProperty({ enum: FormaMesa, enumName: 'FormaMesa' })
+  @ApiProperty({
+    description: 'Forma con la que se dibuja la mesa.',
+    enum: FormaMesa,
+    enumName: 'FormaMesa',
+  })
   forma!: FormaMesa;
 }

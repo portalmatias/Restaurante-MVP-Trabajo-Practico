@@ -112,6 +112,7 @@ export class ActualizarMesaDto {
 
   @ApiProperty({
     required: false,
+    description: 'Forma con la que se dibuja la mesa.',
     enum: FormaMesa,
     enumName: 'FormaMesa',
   })
