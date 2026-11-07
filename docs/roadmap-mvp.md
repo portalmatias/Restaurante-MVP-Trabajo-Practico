@@ -4,72 +4,64 @@
 > deja asentados los huecos que hoy bloquean la Definition of Done de `openspec/config.yaml` §13.
 > Las referencias con "§" apuntan a secciones del campo `context:` de `openspec/config.yaml`.
 
-## Estado al 2026-10-06
+## Estado al 2026-11-07
 
-Foto de GitHub y de `main` (`ada5c76`) al 2026-10-06. GitHub es la fuente de verdad para el
+Foto de GitHub y de `main` (`5c70958`) al 2026-11-07. GitHub es la fuente de verdad para el
 estado de cada PR: antes de integrar, volvé a consultarlo con `gh pr list --state open` y
-`gh pr checks <numero>`. El estado del check de cubic no implica que sus observaciones estén
-resueltas.
+`gh pr checks <numero>`. La verificación de la Definition of Done de cada change archivado está
+en [`docs/entrega.md`](entrega.md).
 
 ### Resumen
 
-- **Backend del MVP completo:** disponibilidad, creación, consulta y cancelación de reservas,
-  flujo VIP, gestión del salón, autenticación de admin y límites de solicitudes. Todo está
-  mergeado y archivado; sus requisitos viven en `openspec/specs/` (13 capacidades).
-- **Frontend:** el panel de admin está terminado y archivado. Al frontend del cliente le
-  falta solo el cierre (sección 7 de su `tasks.md`).
-- **Abierto:** despliegue continuo a AWS (`despliegue-continuo-ec2`, spec en revisión en
-  #71).
+- **MVP completo y archivado:** backend (disponibilidad, creación, consulta y cancelación de
+  reservas, flujo VIP, gestión del salón, autenticación de admin y límites de solicitudes),
+  frontend del cliente y panel de admin, rediseño visual y plano de mesas. Son 19 changes
+  archivados; sus requisitos viven en `openspec/specs/`.
+- **En curso:** el despliegue a AWS y sus dos changes derivados, la administración del plano
+  de mesas y el cierre de la entrega. No hay PRs abiertos.
 
 ### Changes
 
-| Change | Responsable | Estado | Próximo paso |
-|---|---|---|---|
-| `diseno-general-app`, `fundacion-repo` | equipo / portalmatias | Archivados (2026-09-07 y 2026-09-14). | — |
-| `modelo-dominio` | FedeWerk | Archivado (#46). | — |
-| `ci-integracion-db` | FedeWerk | Archivado (#46). | — |
-| `auth-admin` | FedeWerk | Archivado (#46). | — |
-| `gestion-salon` | lussofacundo-iresm | Archivado (#46). | — |
-| `disponibilidad` | portalmatias | Archivado (#39). | — |
-| `reservas-crear` | portalmatias | Archivado (#46). | — |
-| `reserva-consultar` | FedeWerk | Archivado (#47). | — |
-| `frontend-base` | portalmatias | Archivado (#47). | — |
-| `catalogo-publico` | portalmatias | Archivado (#55). | — |
-| `cancelacion-turnos` | lussofacundo-iresm | Implementado en #50 y #49; archivado (#59). | — |
-| `reserva-vip` | lussofacundo-iresm | Implementado en #56; archivado (#59). | — |
-| `frontend-admin` | FedeWerk | Implementado en #58; archivado (#64). | — |
-| `throttle-rutas-admin` | FedeWerk | Spec #60, implementación #66; archivado (#70). | — |
-| `exposicion-red-local` | FedeWerk | Spec #62, implementación #68; archivado (#69). | — |
-| `frontend-cliente` | portalmatias | 44/53 tareas: tramos 1 a 6 mergeados (#52, #53, #54, #57, #61, #67). | Sección 7 (cierre: accesibilidad, DoD) y archivar. |
-| `despliegue-continuo-ec2` | FedeWerk | Spec en revisión (#71). Incluye una delta MODIFIED de `exposicion-red` que precisa el salto confiable y el prefijo mínimo (observaciones de cubic en #69). | Aprobar #71; después, PR de implementación y creación de la infraestructura en AWS (Tier gratuito). |
-| `entrega-final` | lussofacundo-iresm | Pendiente. | Checklist contra la consigna: README con arquitectura, specs completas y válidas, historial de PRs y de ejecuciones verdes de CI. |
+| Change | Responsable | Estado |
+|---|---|---|
+| `diseno-general-app`, `fundacion-repo` | equipo / portalmatias | Archivados (2026-09-07 y 2026-09-14). |
+| `modelo-dominio`, `ci-integracion-db`, `auth-admin` | FedeWerk | Archivados (#46). |
+| `gestion-salon` | lussofacundo-iresm | Archivado (#46). |
+| `disponibilidad` | portalmatias | Archivado (#39). |
+| `reservas-crear` | portalmatias | Archivado (#46). |
+| `reserva-consultar` | FedeWerk | Archivado (#47). |
+| `frontend-base` | portalmatias | Archivado (#47). |
+| `catalogo-publico` | portalmatias | Archivado (#55). |
+| `cancelacion-turnos`, `reserva-vip` | lussofacundo-iresm | Archivados (#59). |
+| `frontend-admin` | FedeWerk | Archivado (#64). |
+| `exposicion-red-local`, `throttle-rutas-admin` | FedeWerk | Archivados (#69 y #70). |
+| `frontend-cliente` | portalmatias | Archivado (#84). |
+| `rediseno-frontend-ichigo` | FedeWerk | Archivado (#92). |
+| `plano-mesas` | FedeWerk (spec) / portalmatias (implementación) | Archivado (#104). |
+| `despliegue-continuo-ec2` | FedeWerk | Activo: 24/31 tareas. Implementado en #79 y #83. |
+| `verificacion-version-desplegada` | FedeWerk | Activo: 14/16 tareas. Implementado en #93. |
+| `ip-real-detras-de-cloudflare` | FedeWerk | Activo: 13/18 tareas. Implementado en #106. |
+| `plano-mesas-admin` | portalmatias | Activo: 11/22 tareas. Backend y API en #109; faltan la pantalla del admin y el cierre (grupos 4 y 5). |
+| `entrega-final` | lussofacundo-iresm (spec) / portalmatias (implementación) | Activo: primer PR de implementación en curso. |
 
-### Orden recomendado
-
-1. **Revisión de #71** (spec de despliegue): la puede revisar portalmatias o
-   lussofacundo-iresm.
-2. **Cierre de `frontend-cliente`** (portalmatias): sección 7 y archivado.
-3. **Implementación de `despliegue-continuo-ec2`** (FedeWerk), recién con #71 aprobado
-   (`config.yaml` §14). El dominio será un subdominio que provee la docente: se le pasa la IP
-   elástica cuando exista la instancia.
-4. **`entrega-final`** (lussofacundo-iresm), cuando estén cerrados los dos changes anteriores.
+No queda ningún change pendiente de proponer.
 
 ### Reparto del trabajo
 
-La consigna evalúa la distribución equitativa del trabajo en el historial. Al 2026-10-06
-(`main` en `ada5c76`), los commits sin contar merges se reparten así:
+La consigna evalúa la distribución equitativa del trabajo en el historial. Al 2026-11-07
+(`main` en `5c70958`), los commits sin contar merges se reparten así:
 
 | Autor (nombre y mail del commit) | Commits |
 |---|---|
-| portalmatias (`portalmatias@iresm.edu.ar`) | 139 |
-| FedeWerk (`fedewerk@gmail.com`) | 79 |
-| Facundo (`faculusso@gmail.com`) | 37 |
+| FedeWerk (`fedewerk@gmail.com`) | 245 |
+| portalmatias (`portalmatias@iresm.edu.ar`) | 227 |
+| Facundo (`faculusso@gmail.com`) | 39 |
+| lussofacundo-iresm (`lussofacundo@iresm.edu.ar`) | 2 |
 
-Contado con `git shortlog -sne --no-merges ada5c76`. Los commits de Facundo usan un mail
-que GitHub asocia a otra cuenta (`facu087`), no a `lussofacundo-iresm`: un conteo por usuario
-de GitHub lo deja casi afuera. Conviene tenerlo en cuenta al asignar lo que queda.
+Contado con `git shortlog -sne --no-merges 5c70958`. Los commits de Facundo usan dos mails:
+`faculusso@gmail.com`, que GitHub asocia a otra cuenta (`facu087`), y el de `lussofacundo-iresm`.
 
-### Fundación y protección de main
+### Fundación y protección de main (consulta del 2026-10-06)
 
 - `fundacion-repo` mergeado (#10, #11) y archivado (#13).
 - La protección de `main` se documentó como aplicada el 2026-09-14 (0.2 y 0.4). La consulta
@@ -178,7 +170,7 @@ se usa el archivo del branch head). Por lo tanto el PR que crea `ci.yml` puede t
 sí mismo. No hace falta ninguna excepción a la Definition of Done, ni separar el CI del bootstrap
 en dos changes.
 
-## 3. Decisiones de formato del roadmap
+## 3. Decisiones de formato del roadmap (histórico)
 
 - **Dos PRs por change.** `feature/spec-<x>` mergea los artefactos de OpenSpec; después
   `feature/<x>` mergea el código. Es lo que ya se hizo con `diseno-general-app`, usa los dos
@@ -191,7 +183,7 @@ en dos changes.
   Los tipos HTTP se generan desde el contrato, no se escriben a mano; los paths se incorporan
   al YAML ejecutable junto con los controllers (ver §9).
 
-## 4. Fase 0 — Destrabar (sin código)
+## 4. Fase 0 — Destrabar (sin código) (histórico)
 
 Nada de esto necesita un change de OpenSpec: no son features y no cambian comportamiento.
 
@@ -207,7 +199,7 @@ Facundo ya contribuyó las specs de salón, cancelación y VIP y la implementaci
 Las tareas 0.2/0.4 constan como cerradas: protección, checks y aprobación obligatoria
 confirmados el 2026-10-06; solo queda confirmar la regla de force-push.
 
-## 5. Fase 1 — Fundación (secuencial, bloquea todo)
+## 5. Fase 1 — Fundación (secuencial, bloquea todo) (histórico)
 
 **Change `fundacion-repo`** — dueño: **portalmatias**
 
@@ -270,7 +262,7 @@ quedan en `design.md` hasta que sus controllers se incorporen a la aplicación.
 > tendría CI inexistente y el segundo la agregaría tocando `.github/workflows/` fuera de su propio
 > change, contra §14.
 
-## 6. Fase 2 — Modelo de dominio (secuencial, bloquea todo el backend)
+## 6. Fase 2 — Modelo de dominio (secuencial, bloquea todo el backend) (histórico)
 
 **Change `modelo-dominio`** — dueño: **FedeWerk**
 
@@ -306,7 +298,7 @@ Es la contrapartida directa de haber dejado el job `test` sin base de datos en l
 el merge, los tests de integración contra base real que exige §9 corren en CI en `main` —
 ya no es solo verificación local del PR.
 
-## 7. Fase 3 — Backend en paralelo (tres tracks)
+## 7. Fase 3 — Backend en paralelo (tres tracks) (histórico)
 
 | Change | Dueño | Depende de | Alcance |
 |---|---|---|---|
@@ -325,7 +317,7 @@ El **validador compartido de `disponibilidad` es la pieza de mayor riesgo del pr
 interfaz no queda bien pensada, `reservas-crear` termina duplicando reglas y se rompe la garantía
 de §6 de que consulta y creación validan lo mismo. Merece revisión de los tres.
 
-## 8. Fase 4 — Reservas
+## 8. Fase 4 — Reservas (histórico)
 
 | Change | Dueño | Depende de | Alcance |
 |---|---|---|---|
@@ -337,7 +329,7 @@ de §6 de que consulta y creación validan lo mismo. Merece revisión de los tre
 `reserva-consultar` y `cancelacion-turnos` tocan el mismo servicio: conviene mergear
 `reserva-consultar` primero y que `cancelacion-turnos` rebase sobre él.
 
-## 9. Fase 5 — Frontend
+## 9. Fase 5 — Frontend (histórico)
 
 Puede prepararse en paralelo al backend leyendo las specs y sus contratos planeados.
 
@@ -360,7 +352,7 @@ Puede prepararse en paralelo al backend leyendo las specs y sus contratos planea
 > backend `catalogo-publico` (portalmatias) con `GET /zonas` y `GET /turnos`, públicos y de
 > solo lectura. Se implementa antes de `frontend-cliente`.
 
-## 10. Fase 6 — Entrega
+## 10. Fase 6 — Entrega (histórico)
 
 **Change `entrega-final`** — dueño: **lussofacundo-iresm**
 
@@ -368,7 +360,7 @@ README completo (setup, credenciales del seed admin —que §10 aclara que no so
 decisiones de diseño con enlace a los changes archivados), seed de demo, y **verificación punto
 por punto de la Definition of Done de §13 sobre cada change archivado**.
 
-## 11. Reparto y secuencia
+## 11. Reparto y secuencia (histórico)
 
 ```
 portalmatias        fundacion-repo, disponibilidad, reservas-crear,
@@ -427,7 +419,7 @@ Fase 5  frontend-base -> frontend-cliente / frontend-admin      <- PARALELO al b
 Fase 6  entrega-final (facundo)
 ```
 
-## 12. Riesgos
+## 12. Riesgos (histórico)
 
 - **Cuello de botella actual:** revisión y merge de #35 (`reserva-consultar`, ya
   implementado: consulta pública y listado de admin). Fundación, modelo, auth, PostgreSQL

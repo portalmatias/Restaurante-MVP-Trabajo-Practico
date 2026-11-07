@@ -6,7 +6,8 @@ administrador gestiona mesas, zonas y horarios, y ve el estado del aforo.
 
 Trabajo Práctico grupal. Las reglas del proyecto —stack, reglas de negocio, convenciones,
 flujo de trabajo— viven en [`openspec/config.yaml`](openspec/config.yaml), que es la
-constitución del repo. El orden de trabajo está en [`docs/roadmap-mvp.md`](docs/roadmap-mvp.md).
+constitución del repo. El orden de trabajo está en [`docs/roadmap-mvp.md`](docs/roadmap-mvp.md),
+y la verificación de la entrega, change por change, en [`docs/entrega.md`](docs/entrega.md).
 
 ## Arquitectura
 
@@ -125,6 +126,44 @@ specs, diseño y tareas. Los changes terminados se archivan, y sus requisitos pa
 `openspec/specs/`, que describe el comportamiento vigente del sistema. CI valida las specs, el
 contrato, el lint, los tipos y los tests en cada PR (ver
 [Integración continua](#integración-continua)).
+
+## Decisiones de diseño
+
+Un resumen de las decisiones que explican cómo está hecho el sistema. El razonamiento completo,
+con las alternativas descartadas, está en el `design.md` de cada change.
+
+- **Contrato contract-first.** `openapi/openapi.yaml` se escribe a mano y es la fuente de
+  verdad; el CI compara la app contra el YAML para detectar deriva.
+  [`fundacion-repo`, D1](openspec/changes/archive/2026-09-14-fundacion-repo/design.md)
+- **Asignación de mesas por best fit.** Se elige la mesa libre de menor capacidad que alcanza
+  para los comensales, con desempate por etiqueta, dentro de la transacción que crea la reserva.
+  [`diseno-general-app`](openspec/changes/archive/2026-09-07-diseno-general-app/design.md) ·
+  [`reservas-crear`, D3](openspec/changes/archive/2026-09-28-reservas-crear/design.md)
+- **Concurrencia al reservar.** La transacción toma primero un lock advisory por turno y fecha,
+  con `READ COMMITTED` y sin reintentos, y un índice único parcial impide dos reservas activas
+  sobre la misma mesa, turno y fecha.
+  [`disponibilidad`, D6](openspec/changes/archive/2026-09-23-disponibilidad/design.md) ·
+  [`reservas-crear`, D2](openspec/changes/archive/2026-09-28-reservas-crear/design.md) ·
+  [`modelo-dominio`](openspec/changes/archive/2026-09-28-modelo-dominio/design.md)
+- **Autenticación del administrador.** Login con JWT verificado por `passport-jwt` y
+  autorización por rol con `RolesGuard`; el cliente reserva sin cuenta, con código y email.
+  [`auth-admin`](openspec/changes/archive/2026-09-28-auth-admin/design.md) ·
+  [`reserva-consultar`, D1](openspec/changes/archive/2026-09-28-reserva-consultar/design.md)
+- **Límites de solicitudes.** `@nestjs/throttler` con un límite global, uno más estricto en el
+  login y 60 solicitudes por minuto en cada ruta de admin.
+  [`auth-admin`](openspec/changes/archive/2026-09-28-auth-admin/design.md) ·
+  [`throttle-rutas-admin`, D2](openspec/changes/archive/2026-10-05-throttle-rutas-admin/design.md)
+- **IP del cliente detrás de proxies.** El backend no confía en `X-Forwarded-For` salvo que
+  `TRUST_PROXY` lo habilite con una lista explícita y validada.
+  [`exposicion-red-local`, D3](openspec/changes/archive/2026-10-05-exposicion-red-local/design.md)
+- **Fechas y horas.** La fecha viaja como `YYYY-MM-DD` y los turnos se interpretan en hora de
+  Argentina, con offset fijo UTC-3.
+  [`disponibilidad`, D4 y D5](openspec/changes/archive/2026-09-23-disponibilidad/design.md)
+- **Sesión del panel de admin.** El token vive en `sessionStorage`, no en una cookie.
+  [`frontend-admin`, D1](openspec/changes/archive/2026-10-01-frontend-admin/design.md)
+- **Despliegue.** Una instancia EC2 con Docker Compose, Caddy como único servicio público e
+  imágenes construidas en Actions y publicadas en GHCR con el SHA del commit.
+  [`despliegue-continuo-ec2`, D1 a D3](openspec/changes/despliegue-continuo-ec2/design.md)
 
 ## Requisitos
 
@@ -274,7 +313,8 @@ falta, como mínimo:
    habla directo con Next, el `X-Forwarded-For` que manda llega intacto al backend (el proxy
    `/api` lo reenvía tal cual) y el backend lo tomaría como cierto.
 
-El detalle de las decisiones está en `openspec/changes/exposicion-red-local/design.md`.
+El detalle de las decisiones está en
+[`openspec/changes/archive/2026-10-05-exposicion-red-local/design.md`](openspec/changes/archive/2026-10-05-exposicion-red-local/design.md).
 
 La configuración de producción (`deploy/`) cumple las tres condiciones: Caddy sobrescribe
 `X-Forwarded-For`, el backend declara `TRUST_PROXY=172.30.0.10` (la IP fija del frontend, el único
