@@ -18,7 +18,8 @@ en [`docs/entrega.md`](entrega.md).
   frontend del cliente y panel de admin, rediseño visual y plano de mesas. Son 19 changes
   archivados; sus requisitos viven en `openspec/specs/`.
 - **En curso:** el despliegue a AWS y sus dos changes derivados, la administración del plano
-  de mesas y el cierre de la entrega. No hay PRs abiertos.
+  de mesas y el cierre de la entrega. Los PRs abiertos se consultan con
+  `gh pr list --state open`.
 
 ### Changes
 
@@ -55,11 +56,12 @@ La consigna evalúa la distribución equitativa del trabajo en el historial. Al 
 |---|---|
 | FedeWerk (`fedewerk@gmail.com`) | 245 |
 | portalmatias (`portalmatias@iresm.edu.ar`) | 227 |
-| Facundo (`faculusso@gmail.com`) | 39 |
-| lussofacundo-iresm (`lussofacundo@iresm.edu.ar`) | 2 |
+| Facundo (`faculusso@gmail.com` y `lussofacundo@iresm.edu.ar`) | 41 |
+| **Total** | **513** |
 
 Contado con `git shortlog -sne --no-merges 5c70958`. Los commits de Facundo usan dos mails:
-`faculusso@gmail.com`, que GitHub asocia a otra cuenta (`facu087`), y el de `lussofacundo-iresm`.
+`faculusso@gmail.com` (39), que GitHub asocia a otra cuenta (`facu087`), y el de
+`lussofacundo-iresm` (2).
 
 ### Fundación y protección de main (consulta del 2026-10-06)
 

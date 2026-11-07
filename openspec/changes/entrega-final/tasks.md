@@ -55,7 +55,7 @@ Cada tarea se da por hecha cuando ninguno de sus changes tiene un punto sin valo
 
 ## 7. Cierre
 
-- [ ] 7.1 Correr `openspec validate entrega-final --strict`, `npm run lint` y
+- [x] 7.1 Correr `openspec validate entrega-final --strict`, `npm run lint` y
       `npm run typecheck`, abrir el primer PR de implementación (D7) con descripción en español
       enlazada a este change y pedir la revisión de un compañero. Verificar que el CI del PR
       queda en verde antes de pedir el merge.
