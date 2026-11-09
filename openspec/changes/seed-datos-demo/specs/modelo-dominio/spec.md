@@ -14,7 +14,10 @@ Si ningún turno activo empieza en ese intervalo, el seed SHALL omitir la segund
 en la consola y terminar sin error. Ambas reservas SHALL respetar los invariantes del dominio
 (turno activo del día de la semana de la fecha, mesa de la zona, capacidad) y el seed SHALL seguir
 siendo idempotente: correrlo de nuevo no duplica filas, vuelve a ubicar la reserva VIP según el
-momento de la nueva corrida y no pisa el estado de una reserva que ya se transicionó.
+momento de la nueva corrida y no pisa el estado de una reserva que ya se transicionó. Una reserva
+VIP de demostración que ya está en un estado terminal (`CANCELADA` o `NO_SHOW`) SHALL quedar en su
+fecha y turno, sin re-ubicarse. Si la mesa VIP ya está ocupada en el turno y la fecha elegidos, el
+seed SHALL omitir la reserva VIP, avisarlo en la consola y terminar sin error.
 
 #### Scenario: Reserva lista para marcar NO_SHOW
 - **WHEN** se corre el seed sobre una base vacía
@@ -41,3 +44,14 @@ momento de la nueva corrida y no pisa el estado de una reserva que ya se transic
 - **THEN** cada reserva de demostración existe una sola vez
 - **AND** una reserva de demostración que alguien ya marcó `NO_SHOW` o `CANCELADA` conserva ese
   estado
+
+#### Scenario: Reserva VIP en estado terminal no se re-ubica
+- **WHEN** la reserva VIP de demostración ya está `NO_SHOW` o `CANCELADA` y se corre el seed de
+  nuevo en otro momento
+- **THEN** la reserva conserva su estado, su fecha y su turno
+- **AND** el seed lo avisa en la consola
+
+#### Scenario: Mesa VIP ocupada en el turno elegido
+- **WHEN** la mesa VIP de la demostración ya tiene otra reserva para el turno y la fecha elegidos
+- **THEN** el seed no crea la reserva VIP de la ventana, imprime un aviso que nombra la mesa y
+  termina sin error

@@ -194,7 +194,9 @@ El seed de desarrollo carga reservas con códigos fijos para probar el frontend 
 `SEEDVTN2` se ubica al correr el seed, en el próximo turno activo que empiece dentro de las
 24 h siguientes; cada corrida la mueve al turno que corresponda. Si ningún turno empieza en ese
 lapso (del domingo a la noche al lunes al mediodía, porque los lunes no hay turnos), el seed no
-la crea y lo avisa en la consola.
+la crea y lo avisa en la consola; si quedó una de una corrida anterior, se conserva con su fecha
+vieja. Tampoco la mueve si ya está cancelada o en NO_SHOW, ni si la mesa V2 ya está ocupada en ese
+turno: en los dos casos lo avisa.
 
 El seed no revierte el estado de una reserva que ya se transicionó: para repetir la demo de
 NO_SHOW, resetear la base local (`docker compose down -v`, migrar y volver a correr el seed).

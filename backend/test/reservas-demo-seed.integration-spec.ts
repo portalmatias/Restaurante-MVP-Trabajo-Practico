@@ -238,4 +238,53 @@ describe('Reservas de demostración en el seed (integración)', () => {
     expect(vtn!.turno.diaSemana).toBe(DiaSemana.DOMINGO);
     expect(vtn!.fecha.toISOString()).toBe('2026-11-15T00:00:00.000Z');
   });
+
+  it('no re-ubica SEEDVTN2 si ya está en un estado terminal', async () => {
+    await seedReservasDemo(prisma, silencio, horaArgentina('2026-11-10T10:00'));
+    await prisma.reserva.update({
+      where: { codigoReserva: 'SEEDVTN2' },
+      data: { estado: 'NO_SHOW' },
+    });
+    const log = jest.fn();
+
+    await seedReservasDemo(prisma, log, horaArgentina('2026-11-14T21:00'));
+
+    const vtn = await leerReserva('SEEDVTN2');
+    expect(vtn!.estado).toBe('NO_SHOW');
+    expect(vtn!.turno.diaSemana).toBe(DiaSemana.MARTES);
+    expect(vtn!.fecha.toISOString()).toBe('2026-11-10T00:00:00.000Z');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('SEEDVTN2'));
+  });
+
+  it('si la mesa ya está ocupada en ese turno, avisa y termina sin error', async () => {
+    const ahora = horaArgentina('2026-11-10T10:00');
+    const elegido = elegirTurnoEnVentana(
+      ahora,
+      await prisma.turno.findMany(),
+      24,
+    );
+    const v2 = await prisma.mesa.findUniqueOrThrow({
+      where: { etiqueta: 'V2' },
+    });
+    await prisma.reserva.create({
+      data: {
+        codigoReserva: 'MANUAL22',
+        mesaId: v2.id,
+        turnoId: elegido!.turno.id,
+        fecha: elegido!.fecha,
+        comensales: 4,
+        estado: 'CONFIRMADA',
+        nombreCliente: 'Reserva manual',
+        emailCliente: 'manual@example.com',
+        telefonoCliente: '+54 9 11 5555-0099',
+      },
+    });
+    const log = jest.fn();
+
+    await expect(seedReservasDemo(prisma, log, ahora)).resolves.toBeUndefined();
+
+    expect(await leerReserva('SEEDVTN2')).toBeNull();
+    expect(await leerReserva('SEEDPAS2')).not.toBeNull();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('V2'));
+  });
 });

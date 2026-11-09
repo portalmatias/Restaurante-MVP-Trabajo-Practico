@@ -10,7 +10,7 @@
  *
  * Solo se cargan en desarrollo, nunca en producción.
  */
-import { DiaSemana, PrismaClient } from '@prisma/client';
+import { DiaSemana, EstadoReserva, Prisma, PrismaClient } from '@prisma/client';
 
 import {
   ARGENTINA_OFFSET_MS,
@@ -20,6 +20,11 @@ import {
 
 const MS_POR_HORA = 60 * 60 * 1000;
 const MS_POR_DIA = 24 * MS_POR_HORA;
+
+/** Hora de inicio del turno de cena en el catálogo (`prisma/catalogo.ts`, `seedTurnos`). */
+const HORA_INICIO_CENA = 20;
+
+const ESTADOS_TERMINALES: EstadoReserva[] = ['CANCELADA', 'NO_SHOW'];
 
 /** Índice de `getUTCDay()` (0 = domingo) → día de la semana del dominio. */
 const DIA_POR_INDICE: DiaSemana[] = [
@@ -120,10 +125,13 @@ export async function seedReservasDemo(
   const fechaPasada = new Date(Date.UTC(2026, 0, 7));
   const cenaMiercoles = turnos.find(
     (t) =>
-      t.diaSemana === DiaSemana.MIERCOLES && t.horaInicio.getUTCHours() === 20,
+      t.diaSemana === DiaSemana.MIERCOLES &&
+      t.horaInicio.getUTCHours() === HORA_INICIO_CENA,
   );
   if (!cenaMiercoles) {
-    throw new Error('Falta el turno de cena del miércoles en el catálogo');
+    throw new Error(
+      `Falta el turno de cena del miércoles (${HORA_INICIO_CENA}:00) en el catálogo`,
+    );
   }
   await upsertReserva(prisma, {
     codigoReserva: 'SEEDPAS2',
@@ -136,22 +144,51 @@ export async function seedReservasDemo(
     telefonoCliente: '+54 9 11 5555-0005',
   });
 
-  const ventanaHoras = mesaVip.zona.ventanaCancelacionHoras;
-  const enVentana = elegirTurnoEnVentana(ahora, turnos, ventanaHoras);
-  if (!enVentana) {
+  // Una SEEDVTN2 que ya pasó a un estado terminal no se mueve: quedaría, por ejemplo, un
+  // NO_SHOW con fecha futura, que el dominio no permite.
+  const previa = await prisma.reserva.findUnique({
+    where: { codigoReserva: 'SEEDVTN2' },
+  });
+  if (previa && ESTADOS_TERMINALES.includes(previa.estado)) {
     log(
-      `Seed: no se creó SEEDVTN2 (reserva VIP dentro de la ventana de cancelación): ningún turno activo empieza en las próximas ${ventanaHoras} h. Para crearla, correr el seed de nuevo más tarde.`,
+      `Seed: SEEDVTN2 está ${previa.estado} y no se re-ubica. Para volver a crearla, resetear la base local.`,
     );
     return;
   }
-  await upsertReserva(prisma, {
-    codigoReserva: 'SEEDVTN2',
-    mesaId: mesaVip.id,
-    turnoId: enVentana.turno.id,
-    fecha: enVentana.fecha,
-    comensales: 4,
-    nombreCliente: 'Andrés Molina',
-    emailCliente: 'andres.molina@example.com',
-    telefonoCliente: '+54 9 11 5555-0006',
-  });
+
+  const ventanaHoras = mesaVip.zona.ventanaCancelacionHoras;
+  const enVentana = elegirTurnoEnVentana(ahora, turnos, ventanaHoras);
+  if (!enVentana) {
+    const avisoPrevia = previa
+      ? ' La SEEDVTN2 de una corrida anterior queda como estaba, con su fecha vieja.'
+      : '';
+    log(
+      `Seed: no se creó SEEDVTN2 (reserva VIP dentro de la ventana de cancelación): ningún turno activo empieza en las próximas ${ventanaHoras} h.${avisoPrevia} Para crearla, correr el seed de nuevo más tarde.`,
+    );
+    return;
+  }
+  try {
+    await upsertReserva(prisma, {
+      codigoReserva: 'SEEDVTN2',
+      mesaId: mesaVip.id,
+      turnoId: enVentana.turno.id,
+      fecha: enVentana.fecha,
+      comensales: 4,
+      nombreCliente: 'Andrés Molina',
+      emailCliente: 'andres.molina@example.com',
+      telefonoCliente: '+54 9 11 5555-0006',
+    });
+  } catch (error) {
+    // Exclusividad de mesa: alguien ya reservó V2 en ese turno y fecha (por ejemplo, a mano).
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      log(
+        `Seed: no se pudo ubicar SEEDVTN2: la mesa ${mesaVip.etiqueta} ya tiene una reserva para ese turno y fecha. Liberarla o resetear la base local.`,
+      );
+      return;
+    }
+    throw error;
+  }
 }

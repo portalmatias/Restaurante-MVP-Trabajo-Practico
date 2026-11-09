@@ -44,13 +44,15 @@ mínima, que es justamente igual a la ventana.
 ### D4. Re-ubicación en cada corrida
 El `update` del `upsert` ya escribe `fecha` y `turnoId`, así que volver a correr el seed mueve
 `SEEDVTN2` al turno que corresponda a ese momento. `estado` sigue fuera del `update` (invariante de
-estados terminales).
+estados terminales). Si `SEEDVTN2` ya está `CANCELADA` o `NO_SHOW`, no se mueve: quedaría, por
+ejemplo, un NO_SHOW con fecha futura (hallazgo R3-001 / R4-001 de la revisión). El seed lo avisa.
 
 ### D5. Sin turno posible: aviso y salida limpia
 Si la función devuelve `null`, el seed imprime un aviso que explica por qué (no hay turnos activos
 dentro de la ventana VIP) y sugiere volver a correrlo más tarde. Si `SEEDVTN2` ya existía de una
-corrida anterior, se deja como está. Alternativa descartada: ubicarla en un lunes sin turno activo,
-que rompe el invariante «turno coincide con el día de la semana».
+corrida anterior, se deja como está y el aviso lo dice, para que nadie la dé por ausente.
+Alternativa descartada: ubicarla en un lunes sin turno activo, que rompe el invariante «turno
+coincide con el día de la semana».
 
 ## Risks / Trade-offs
 
@@ -59,5 +61,6 @@ que rompe el invariante «turno coincide con el día de la semana».
   en el próximo turno, alcanza con volver a correr el seed.
 - [Una demo ya marcó `SEEDPAS2` como `NO_SHOW`] → El seed no lo revierte (D4). El README indica
   resetear la base local para repetir la demo.
-- [Choque con una reserva creada a mano en `V2` para el mismo turno y fecha] → El `upsert` fallaría
-  por la exclusividad de mesa. Es una base de desarrollo; el README ya documenta el reset.
+- [Choque con una reserva creada a mano en `V2` para el mismo turno y fecha] → El seed atrapa la
+  violación de exclusividad de mesa, omite `SEEDVTN2` con un aviso que nombra la mesa y termina sin
+  error.

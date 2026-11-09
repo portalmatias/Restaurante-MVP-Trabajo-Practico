@@ -36,3 +36,11 @@
       `npx openspec validate seed-datos-demo --strict`; todo en verde.
       Resultado (09/11/2026): lint y tipos OK; unitarios 248/248; con la base de test seedeada
       como en el CI, integración 199/199 y e2e 168/168; `openspec validate --all --strict` 27/27.
+
+## 4. Hallazgos de la revisión
+
+- [x] 4.1 No re-ubicar `SEEDVTN2` si ya está `CANCELADA` o `NO_SHOW` (R3-001, R4-001), omitirla
+      con aviso si `V2` ya está ocupada en ese turno y fecha (R4-001), nombrar la hora de la cena
+      con una constante (R2-001) y avisar cuando queda una `SEEDVTN2` vieja (R2-002). Tests nuevos
+      vistos en rojo antes del arreglo y en verde después.
+      Resultado (09/11/2026): 13/13 en `reservas-demo-seed.integration-spec.ts`.
