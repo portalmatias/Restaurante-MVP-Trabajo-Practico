@@ -6,7 +6,8 @@ administrador gestiona mesas, zonas y horarios, y ve el estado del aforo.
 
 Trabajo Práctico grupal. Las reglas del proyecto —stack, reglas de negocio, convenciones,
 flujo de trabajo— viven en [`openspec/config.yaml`](openspec/config.yaml), que es la
-constitución del repo. El orden de trabajo está en [`docs/roadmap-mvp.md`](docs/roadmap-mvp.md).
+constitución del repo. El orden de trabajo está en [`docs/roadmap-mvp.md`](docs/roadmap-mvp.md),
+y la verificación de la entrega en [`docs/entrega.md`](docs/entrega.md).
 
 ## Arquitectura
 
@@ -125,6 +126,53 @@ specs, diseño y tareas. Los changes terminados se archivan, y sus requisitos pa
 `openspec/specs/`, que describe el comportamiento vigente del sistema. CI valida las specs, el
 contrato, el lint, los tipos y los tests en cada PR (ver
 [Integración continua](#integración-continua)).
+
+## Decisiones de diseño
+
+Las decisiones que explican cómo está hecho el sistema. Cada una enlaza al `design.md` del change
+que la justifica, donde están las alternativas que se descartaron.
+
+- **Contrato de la API escrito a mano.** `openapi/openapi.yaml` es la fuente de verdad y el CI
+  falla si el backend se aparta de él. Ver D1 y D2 de [`fundacion-repo`](openspec/changes/archive/2026-09-14-fundacion-repo/design.md).
+- **Las reglas del negocio viven en la base cuando se puede.** Dos reservas activas no pueden
+  compartir mesa, fecha y turno por un índice único parcial; las demás invariantes se validan en
+  un único servicio. Ver [`modelo-dominio`](openspec/changes/archive/2026-09-28-modelo-dominio/design.md).
+- **Un solo validador para consultar y para reservar.** `GET /disponibilidad` y `POST /reservas`
+  evalúan las mismas reglas y devuelven todos los motivos de rechazo, no solo el primero. Ver D1
+  y D2 de [`disponibilidad`](openspec/changes/archive/2026-09-23-disponibilidad/design.md).
+- **Fechas en hora de Argentina (UTC−3 fija).** El restaurante tiene una sola zona horaria y
+  Argentina no usa horario de verano desde 2009. Ver D5 de [`disponibilidad`](openspec/changes/archive/2026-09-23-disponibilidad/design.md).
+- **Sin dobles reservas en carreras.** La creación toma un lock por turno y fecha antes de elegir
+  mesa, y asigna la más chica que alcanza (best fit). Ver D2 y D3 de
+  [`reservas-crear`](openspec/changes/archive/2026-09-28-reservas-crear/design.md) y D6 de [`disponibilidad`](openspec/changes/archive/2026-09-23-disponibilidad/design.md).
+- **El cliente no crea cuenta.** Consulta y cancela con el código de la reserva y su email, y la
+  respuesta es la misma si falla el código o el email. Ver D1 y D2 de
+  [`reserva-consultar`](openspec/changes/archive/2026-09-28-reserva-consultar/design.md).
+- **VIP con confirmación del admin.** El estado inicial depende de si la zona pide confirmación,
+  no del nombre de la zona, y confirmar o rechazar solo vale sobre una reserva `PENDIENTE`. Ver D4
+  de [`reservas-crear`](openspec/changes/archive/2026-09-28-reservas-crear/design.md) y [`reserva-vip`](openspec/changes/archive/2026-09-30-reserva-vip/design.md).
+- **Cancelación con ventana inclusiva.** Se puede cancelar hasta el límite exacto de la ventana de
+  la zona. Ver [`cancelacion-turnos`](openspec/changes/archive/2026-09-30-cancelacion-turnos/design.md).
+- **Login de admin con JWT y límite de intentos.** Ver [`auth-admin`](openspec/changes/archive/2026-09-28-auth-admin/design.md).
+- **Límites de solicitudes por origen.** El login tiene el más estricto; el panel de admin, uno
+  propio por ruta. Ver [`throttle-rutas-admin`](openspec/changes/archive/2026-10-05-throttle-rutas-admin/design.md).
+- **El origen del cliente no se puede inventar.** En local los servicios escuchan solo en la
+  propia máquina, y el backend confía en un proxy solo si se lo declara uno por uno. Ver
+  [`exposicion-red-local`](openspec/changes/archive/2026-10-05-exposicion-red-local/design.md).
+- **Frontend tipado contra el contrato y sin CORS.** Los tipos se generan desde `openapi.yaml` y
+  el navegador habla con el backend por el proxy `/api` de Next. Ver D5 y D6 de
+  [`frontend-base`](openspec/changes/archive/2026-09-28-frontend-base/design.md).
+- **El asistente de reserva guarda su estado en la URL**, sin el email. Ver D1 de
+  [`frontend-cliente`](openspec/changes/archive/2026-10-26-frontend-cliente/design.md).
+- **Plano de mesas con las mismas reglas que la reserva real.** Ver D2 y D4 de
+  [`plano-mesas`](openspec/changes/archive/2026-11-02-plano-mesas/design.md).
+- **Despliegue continuo a una instancia de AWS.** Docker Compose detrás de Caddy, imágenes
+  construidas en GitHub Actions y un despliegue por SSH con una clave que solo puede ejecutar ese
+  comando. Ver [`despliegue-continuo-ec2`](openspec/changes/despliegue-continuo-ec2/design.md)
+  (change todavía activo).
+
+La verificación de la Definition of Done de cada change está en
+[`docs/entrega.md`](docs/entrega.md).
 
 ## Requisitos
 
@@ -297,7 +345,8 @@ falta, como mínimo:
    habla directo con Next, el `X-Forwarded-For` que manda llega intacto al backend (el proxy
    `/api` lo reenvía tal cual) y el backend lo tomaría como cierto.
 
-El detalle de las decisiones está en `openspec/changes/exposicion-red-local/design.md`.
+El detalle de las decisiones está en
+[`openspec/changes/archive/2026-10-05-exposicion-red-local/design.md`](openspec/changes/archive/2026-10-05-exposicion-red-local/design.md).
 
 La configuración de producción (`deploy/`) cumple las tres condiciones: Caddy sobrescribe
 `X-Forwarded-For`, el backend declara `TRUST_PROXY=172.30.0.10` (la IP fija del frontend, el único
