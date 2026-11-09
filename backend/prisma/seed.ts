@@ -8,6 +8,8 @@
  * - Mesas de capacidades variadas en cada zona, ubicadas en el plano de su zona.
  * - Los 2 turnos base (almuerzo, cena), activos de martes a domingo.
  * - Algunas reservas de ejemplo en distintos estados.
+ * - Dos reservas de demostración para mostrar a mano el NO_SHOW y la cancelación rechazada
+ *   por ventana (ver prisma/reservas-demo.ts).
  *
  * Idempotencia: todo se escribe con `upsert` por clave natural (design.md → Seed
  * idempotente), nunca con `create`. Correr este script dos veces no duplica filas.
@@ -26,6 +28,7 @@ import {
 } from './admin-desarrollo';
 import { seedCatalogo } from './catalogo';
 import { seedPlano } from './plano-desarrollo';
+import { seedReservasDemo } from './reservas-demo';
 
 const prisma = new PrismaClient();
 
@@ -187,6 +190,9 @@ async function main() {
 
   console.log('Seed: reservas de ejemplo...');
   await seedReservas(mesas, turnos);
+
+  console.log('Seed: reservas de demostración...');
+  await seedReservasDemo(prisma);
 
   console.log('Seed completado.');
 }
