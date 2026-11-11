@@ -19,11 +19,11 @@ en [`docs/entrega.md`](entrega.md).
 
 - **MVP completo y archivado:** backend (disponibilidad, creación, consulta y cancelación de
   reservas, flujo VIP, gestión del salón, autenticación de admin y límites de solicitudes),
-  frontend del cliente, panel de admin, rediseño visual y plano de mesas. Son 19 changes
-  archivados; sus requisitos viven en `openspec/specs/`.
+  frontend del cliente, panel de admin, rediseño visual, plano de mesas y nota del cliente en
+  la reserva. Son 20 changes archivados; sus requisitos viven en `openspec/specs/`.
 - **En curso:** el despliegue a AWS y los dos changes que salieron de él, la administración del
-  plano de mesas, los datos de demostración del seed, la nota del cliente en la reserva y el
-  cierre de la entrega.
+  plano de mesas, los datos de demostración del seed y el cierre de la entrega. La nota del
+  cliente en la reserva (`reserva-nota-cliente`) se archivó el 2026-11-11.
 
 ### Changes
 
@@ -48,7 +48,7 @@ en [`docs/entrega.md`](entrega.md).
 | `ip-real-detras-de-cloudflare` | FedeWerk | Activo: 13 de 18 tareas. Implementado en #106; faltan las pruebas en producción y cerrar el origen a Cloudflare. |
 | `plano-mesas-admin` | portalmatias | Activo: 11 de 22 tareas. Backend y API en #109; la pantalla del admin y el cierre están en revisión (#114). |
 | `seed-datos-demo` | portalmatias | Activo: 8 de 8 tareas. Spec e implementación en #113; falta archivarlo. Agrega al seed los datos del recorrido de punta a punta (issue #111). |
-| `reserva-nota-cliente` | portalmatias (spec) / lussofacundo-iresm (implementación) | Activo: 0 de 13 tareas. Spec en #115; la implementación va después del primer PR de `entrega-final`. |
+| `reserva-nota-cliente` | portalmatias (spec) / lussofacundo-iresm (implementación) | Archivado (#119). Spec en #115, implementación en #118. |
 | `entrega-final` | lussofacundo-iresm | Activo. Spec en #110; primer PR de implementación en curso. |
 
 ### Reparto del trabajo

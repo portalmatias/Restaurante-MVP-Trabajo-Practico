@@ -5,8 +5,8 @@ Definition of Done (`openspec/config.yaml` §13) de cada change archivado, con s
 implementación del change [`entrega-final`](../openspec/changes/entrega-final/).
 
 La Definition of Done de los changes archivados se verificó el 2026-11-09 sobre `main` en
-`5c70958`. Los entregables y el recorrido de punta a punta, el 2026-11-11 sobre `main` en
-`5dd778d`.
+`5c70958`, y la de `reserva-nota-cliente`, el 2026-11-11 sobre `92a35d2`. Los entregables y el
+recorrido de punta a punta, el 2026-11-11 sobre `main` en `5dd778d`.
 
 ## Cómo leer este documento
 
@@ -17,8 +17,8 @@ Cada punto de la Definition of Done tiene uno de tres valores (D2 de `entrega-fi
 - **Desvío:** el punto aplica y no se cumplió. Se explica qué pasó y si se puede corregir.
 
 Los changes que todavía están activos (`despliegue-continuo-ec2`, `ip-real-detras-de-cloudflare`,
-`plano-mesas-admin`, `reserva-nota-cliente`, `seed-datos-demo` y `verificacion-version-desplegada`)
-se suman cuando se archiven (tarea 7.2).
+`plano-mesas-admin`, `seed-datos-demo` y `verificacion-version-desplegada`) se suman cuando se
+archiven (tarea 7.2).
 
 ## Entregables de la consigna
 
@@ -52,8 +52,9 @@ se suman cuando se archiven (tarea 7.2).
 | [`frontend-cliente`](#frontend-cliente) | 2026-10-26 | 8 | 3 | 0 |
 | [`rediseno-frontend-ichigo`](#rediseno-frontend-ichigo) | 2026-10-28 | 8 | 3 | 0 |
 | [`plano-mesas`](#plano-mesas) | 2026-11-02 | 10 | 1 | 0 |
+| [`reserva-nota-cliente`](#reserva-nota-cliente) | 2026-11-11 | 10 | 1 | 0 |
 
-**15 de los 19 changes cumplen todos los puntos que les aplican.** Los otros 4 tienen el mismo
+**16 de los 20 changes cumplen todos los puntos que les aplican.** Los otros 4 tienen el mismo
 desvío: un PR mergeado a `main` sin una aprobación registrada en GitHub.
 
 ## Desvíos
@@ -423,6 +424,24 @@ Archivado el 2026-11-02. PRs: [#76](https://github.com/portalmatias/Restaurante-
 | 9 | PR con descripción en español, enlazado al change | Cumple | Todos sus PRs ([#76](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/76), [#86](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/86), [#89](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/89), [#104](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/104)) tienen título y descripción en español y nombran el change. |
 | 10 | Aprobado por un compañero distinto del autor | Cumple | Cada PR a `main` ([#76](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/76), [#86](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/86), [#89](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/89), [#104](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/104)) tiene la aprobación de un compañero distinto del autor. |
 | 11 | Mergeado a `main` y archivado | Cumple | Archivado en `openspec/changes/archive/2026-11-02-plano-mesas/` con [#104](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/104). |
+
+### `reserva-nota-cliente`
+
+Archivado el 2026-11-11. PRs: [#115](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/115), [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118), [#119](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/119).
+
+| # | Punto de la Definition of Done | Valor | Evidencia |
+|---|---|---|---|
+| 1 | El change existe, está aprobado y `openspec validate --strict` pasa | Cumple | Spec en [#115](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/115), aprobada por lussofacundo-iresm. `openspec validate --all --strict` pasa (2026-11-11, `92a35d2`). |
+| 2 | Todas las tareas de `tasks.md` están marcadas | Cumple | 13/13 tareas marcadas en `openspec/changes/archive/2026-11-11-reserva-nota-cliente/tasks.md`. |
+| 3 | Si tocó el schema: hay migración de Prisma | Cumple | [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118) cambia `schema.prisma` e incluye su migración en `backend/prisma/migrations/` (`20261111230000_reserva_nota_cliente`). |
+| 4 | Si tocó la API: `openapi/openapi.yaml` actualizado en el mismo PR | Cumple | [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118) cambia DTOs y el controller de reservas y actualiza `openapi/openapi.yaml` en el mismo PR. |
+| 5 | Si agregó variables de entorno: `.env.example` actualizado | No aplica | No agrega variables de entorno. |
+| 6 | Hay tests para las reglas de negocio que toca | Cumple | Tests agregados o ampliados en [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118): DTO, mappers, e2e de creación, consulta y listado, migración y frontend. |
+| 7 | `npm run lint` y `tsc --noEmit` pasan | Cumple | El check «Lint y tipos» quedó en verde en [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118). |
+| 8 | CI en verde | Cumple | Todos los checks en verde en el último commit de [#115](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/115), [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118), [#119](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/119). |
+| 9 | PR con descripción en español, enlazado al change | Cumple | Todos sus PRs ([#115](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/115), [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118), [#119](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/119)) tienen título y descripción en español y nombran el change. |
+| 10 | Aprobado por un compañero distinto del autor | Cumple | Cada PR a `main` ([#115](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/115), [#118](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/118), [#119](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/119)) tiene la aprobación de un compañero distinto del autor. |
+| 11 | Mergeado a `main` y archivado | Cumple | Archivado en `openspec/changes/archive/2026-11-11-reserva-nota-cliente/` con [#119](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pull/119). |
 
 ## Recorrido de punta a punta
 
