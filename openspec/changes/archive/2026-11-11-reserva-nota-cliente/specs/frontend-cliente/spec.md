@@ -23,7 +23,7 @@ SHALL enviar la nota en la creación solo si tiene texto además de espacios.
 - **THEN** el contador dice «9 de 500 caracteres»
 
 #### Scenario: Los espacios de los bordes no cuentan
-- **WHEN** la persona escribe una nota de 500 caracteres con dos espacios al principio y envía
+- **WHEN** la persona escribe dos espacios seguidos de 500 caracteres de texto y envía
 - **THEN** el contador dice «500 de 500 caracteres» y el pedido incluye la nota sin esos espacios
 
 #### Scenario: Nota demasiado larga
@@ -34,7 +34,11 @@ SHALL enviar la nota en la creación solo si tiene texto además de espacios.
 La confirmación de la reserva recién creada (`/reservas/nueva/exito`) SHALL mostrar, cuando la
 reserva tiene nota, un apartado «Tu nota» con el texto tal como fue guardado (el de la
 respuesta de la creación), respetando los saltos de línea. Cuando la reserva no tiene nota,
-SHALL NOT mostrar el apartado. La nota SHALL NOT viajar en la URL. El detalle de una reserva
+SHALL NOT mostrar el apartado. La nota SHALL NOT viajar en la URL: llega a la confirmación
+guardada en el navegador al crear la reserva. Por eso, si el navegador no permite guardarla, o
+si ya se borró porque la persona salió de la confirmación navegando por el sitio, la
+confirmación SHALL NOT mostrar el apartado aunque la reserva tenga nota; la nota sigue guardada
+en la reserva y el administrador la ve en el listado. El detalle de una reserva
 consultada con código y email SHALL NOT mostrar la nota, porque la consulta pública no la
 devuelve.
 
@@ -47,6 +51,12 @@ devuelve.
 #### Scenario: Confirmación sin nota
 - **WHEN** la persona crea una reserva sin nota
 - **THEN** la confirmación no muestra el apartado «Tu nota»
+
+#### Scenario: La nota ya no está guardada en el navegador
+- **WHEN** la persona crea una reserva con nota, sale de la confirmación navegando por el sitio
+  y después vuelve a la misma confirmación, o el navegador no permite guardar datos
+- **THEN** la confirmación no muestra el apartado «Tu nota» y el resto de la pantalla se ve igual
+- **AND** la nota sigue guardada en la reserva
 
 #### Scenario: La nota respeta los saltos de línea
 - **WHEN** la persona crea una reserva con la nota "Uno es celíaco.\nLlegamos 20:15."
