@@ -167,8 +167,8 @@ que la justifica, donde están las alternativas que se descartaron.
 - **Plano de mesas con las mismas reglas que la reserva real.** Ver D2 y D4 de
   [`plano-mesas`](openspec/changes/archive/2026-11-02-plano-mesas/design.md).
 - **Despliegue continuo a una instancia de AWS.** Docker Compose detrás de Caddy, imágenes
-  construidas en GitHub Actions y un despliegue por SSH con una clave que solo puede ejecutar ese
-  comando. Ver [`despliegue-continuo-ec2`](openspec/changes/despliegue-continuo-ec2/design.md)
+  construidas en GitHub Actions y un despliegue por SSH con una clave que solo puede pedir dos
+  cosas: desplegar una versión nueva o volver a una ya desplegada. Ver [`despliegue-continuo-ec2`](openspec/changes/despliegue-continuo-ec2/design.md)
   (change todavía activo).
 
 La verificación de la Definition of Done de cada change está en

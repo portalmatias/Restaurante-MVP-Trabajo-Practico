@@ -47,7 +47,7 @@ en [`docs/entrega.md`](entrega.md).
 | `verificacion-version-desplegada` | FedeWerk | Activo: 14 de 16 tareas. Se archiva después de `despliegue-continuo-ec2`. |
 | `ip-real-detras-de-cloudflare` | FedeWerk | Activo: 13 de 18 tareas. Implementado en #106; faltan las pruebas en producción y cerrar el origen a Cloudflare. |
 | `plano-mesas-admin` | portalmatias | Activo: 11 de 22 tareas. Backend y API en #109; la pantalla del admin y el cierre están en revisión (#114). |
-| `seed-datos-demo` | portalmatias | Activo: 8 de 8 tareas. Spec e implementación en #113; falta archivarlo. Agrega al seed los datos del recorrido de punta a punta (#111). |
+| `seed-datos-demo` | portalmatias | Activo: 8 de 8 tareas. Spec e implementación en #113; falta archivarlo. Agrega al seed los datos del recorrido de punta a punta (issue #111). |
 | `reserva-nota-cliente` | portalmatias (spec) / lussofacundo-iresm (implementación) | Activo: 0 de 13 tareas. Spec en #115; la implementación va después del primer PR de `entrega-final`. |
 | `entrega-final` | lussofacundo-iresm | Activo. Spec en #110; primer PR de implementación en curso. |
 

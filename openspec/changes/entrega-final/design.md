@@ -97,7 +97,8 @@ toca, porque documenta cómo se planificó el trabajo.
 
 1. El primero verifica los 19 archivados, suma la sección de entregables, corrige el README y
    el roadmap, y registra el recorrido de punta a punta.
-2. El segundo, cuando se archiven los cuatro changes activos, suma su verificación y archiva
+2. El segundo, cuando se archiven los changes activos (los cuatro del principio, más
+   `seed-datos-demo` y `reserva-nota-cliente`, que se sumaron el 2026-11-11), suma su verificación y archiva
    `entrega-final`.
 
 Así lo verificable no espera a los changes que dependen del servidor de producción (FedeWerk)
@@ -108,7 +109,7 @@ o que están en curso (`plano-mesas-admin`).
 - [Un punto que requiere criterio, como «hay tests para las reglas de negocio que toca», se
   marca distinto según quién lo revise] → Se anota en una línea qué tests lo cubren, y el PR
   pide la revisión de otro integrante, como cualquier otro.
-- [Los cuatro changes activos no se archivan antes de la entrega] → `docs/entrega.md` los lista
+- [Los changes activos no se archivan antes de la entrega] → `docs/entrega.md` los lista
   como «en curso» con su estado de tareas, y se entrega igual. El archivo de `entrega-final`
   queda para después.
 - [La verificación encuentra un desvío grande cerca de la entrega] → Se registra igual. Que lo

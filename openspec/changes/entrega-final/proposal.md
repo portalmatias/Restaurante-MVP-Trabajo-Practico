@@ -22,7 +22,8 @@ vinieron después. Además, el README cita una ruta que ya no existe:
   marcado como cumplido, como «no aplica» (con el motivo) o como desvío, y con su evidencia
   (número de PR, run de CI, archivo). Los changes que todavía están activos
   (`despliegue-continuo-ec2`, `ip-real-detras-de-cloudflare`, `plano-mesas-admin`,
-  `verificacion-version-desplegada`) se suman a medida que se archivan.
+  `verificacion-version-desplegada`, y desde el 2026-11-11 también `seed-datos-demo` y
+  `reserva-nota-cliente`) se suman a medida que se archivan.
 - **Entregables de la consigna.** El mismo documento enlaza cada entregable con su evidencia:
   README, `openspec validate --all --strict` y el linter de OpenAPI en verde, y el historial
   de PRs y de runs de CI.
@@ -55,7 +56,7 @@ _Ninguna._
 - **Archivos:** `docs/entrega.md` (nuevo), `README.md` y `docs/roadmap-mvp.md`.
 - **Código, API, schema, dependencias y workflows:** sin cambios.
 - **Dependencias con otros changes:**
-  - El cierre de este change depende de que se archiven los cuatro changes activos, porque su
+  - El cierre de este change depende de que se archiven los changes activos, porque su
     verificación también tiene que figurar en `docs/entrega.md`.
   - El seed de demo queda fuera de este change hasta que se integre `plano-mesas-admin`, que
     puede cambiar las mesas del seed. Si el recorrido de punta a punta muestra que al seed le
