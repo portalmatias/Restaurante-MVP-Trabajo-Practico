@@ -48,7 +48,7 @@ Cada tarea se da por hecha cuando ninguno de sus changes tiene un punto sin valo
 
 ## 6. Recorrido de punta a punta
 
-- [ ] 6.1 Con la base local migrada y seedeada, recorrer desde el frontend el flujo de
+- [x] 6.1 Con la base local migrada y seedeada, recorrer desde el frontend el flujo de
       `docs/roadmap-mvp.md` §13 («Fase 5 y cierre») y registrar en `docs/entrega.md` cada paso
       con su resultado. Si al seed le faltan datos para algún paso (por ejemplo, un turno ya
       pasado para el `NO_SHOW`), anotarlo y abrir un issue, sin cambiar el seed en este change.

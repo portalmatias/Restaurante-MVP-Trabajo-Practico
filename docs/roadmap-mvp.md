@@ -8,9 +8,9 @@
 > se actualiza. El estado vigente es el de abajo, y la verificación de la entrega está en
 > [`docs/entrega.md`](entrega.md).
 
-## Estado al 2026-11-09
+## Estado al 2026-11-11
 
-Foto de GitHub y de `main` (`5c70958`) al 2026-11-09. GitHub es la fuente de verdad para el
+Foto de GitHub y de `main` (`5dd778d`) al 2026-11-11. GitHub es la fuente de verdad para el
 estado de cada PR: antes de integrar, volvé a consultarlo con `gh pr list --state open` y
 `gh pr checks <numero>`. La verificación de la Definition of Done de cada change archivado está
 en [`docs/entrega.md`](entrega.md).
@@ -22,7 +22,8 @@ en [`docs/entrega.md`](entrega.md).
   frontend del cliente, panel de admin, rediseño visual y plano de mesas. Son 19 changes
   archivados; sus requisitos viven en `openspec/specs/`.
 - **En curso:** el despliegue a AWS y los dos changes que salieron de él, la administración del
-  plano de mesas y el cierre de la entrega.
+  plano de mesas, los datos de demostración del seed, la nota del cliente en la reserva y el
+  cierre de la entrega.
 
 ### Changes
 
@@ -45,22 +46,23 @@ en [`docs/entrega.md`](entrega.md).
 | `despliegue-continuo-ec2` | FedeWerk | Activo: 24 de 31 tareas. Implementado en #79 y #83; faltan verificaciones en la cuenta de AWS. |
 | `verificacion-version-desplegada` | FedeWerk | Activo: 14 de 16 tareas. Se archiva después de `despliegue-continuo-ec2`. |
 | `ip-real-detras-de-cloudflare` | FedeWerk | Activo: 13 de 18 tareas. Implementado en #106; faltan las pruebas en producción y cerrar el origen a Cloudflare. |
-| `plano-mesas-admin` | portalmatias | Activo: 11 de 22 tareas. Backend y API en #109; faltan la pantalla del admin y el cierre. |
-| `seed-datos-demo` | portalmatias | Spec e implementación en revisión (#113). Agrega al seed los datos que faltan para el recorrido de punta a punta (#111). |
+| `plano-mesas-admin` | portalmatias | Activo: 11 de 22 tareas. Backend y API en #109; la pantalla del admin y el cierre están en revisión (#114). |
+| `seed-datos-demo` | portalmatias | Activo: 8 de 8 tareas. Spec e implementación en #113; falta archivarlo. Agrega al seed los datos del recorrido de punta a punta (#111). |
+| `reserva-nota-cliente` | portalmatias (spec) / lussofacundo-iresm (implementación) | Activo: 0 de 13 tareas. Spec en #115; la implementación va después del primer PR de `entrega-final`. |
 | `entrega-final` | lussofacundo-iresm | Activo. Spec en #110; primer PR de implementación en curso. |
 
 ### Reparto del trabajo
 
-La consigna evalúa la distribución equitativa del trabajo en el historial. Al 2026-11-09
-(`main` en `5c70958`), los commits sin contar merges se reparten así:
+La consigna evalúa la distribución equitativa del trabajo en el historial. Al 2026-11-11
+(`main` en `5dd778d`), los commits sin contar merges se reparten así:
 
 | Autor (nombre y mail del commit) | Commits |
 |---|---|
-| FedeWerk (`fedewerk@gmail.com`) | 245 |
-| portalmatias (`portalmatias@iresm.edu.ar`) | 227 |
+| FedeWerk (`fedewerk@gmail.com`) | 246 |
+| portalmatias (`portalmatias@iresm.edu.ar`) | 232 |
 | Facundo (`faculusso@gmail.com` y `lussofacundo@iresm.edu.ar`) | 41 |
 
-Contado con `git shortlog -sne --no-merges 5c70958`. De los commits de Facundo, 39 usan
+Contado con `git shortlog -sne --no-merges 5dd778d`. De los commits de Facundo, 39 usan
 `faculusso@gmail.com`, que GitHub asocia a otra cuenta (`facu087`), y 2 el mail de
 `lussofacundo-iresm`. Las revisiones, aprobaciones y merges de PRs no cuentan como commits:
 se ven en el historial de cada PR.

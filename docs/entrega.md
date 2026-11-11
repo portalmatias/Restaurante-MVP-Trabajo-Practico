@@ -4,7 +4,9 @@ Verificación de la entrega del Trabajo Práctico: los entregables que pide la c
 Definition of Done (`openspec/config.yaml` §13) de cada change archivado, con su evidencia. Es la
 implementación del change [`entrega-final`](../openspec/changes/entrega-final/).
 
-Verificado el 2026-11-09 sobre `main` en `5c70958`.
+La Definition of Done de los changes archivados se verificó el 2026-11-09 sobre `main` en
+`5c70958`. Los entregables y el recorrido de punta a punta, el 2026-11-11 sobre `main` en
+`5dd778d`.
 
 ## Cómo leer este documento
 
@@ -15,16 +17,17 @@ Cada punto de la Definition of Done tiene uno de tres valores (D2 de `entrega-fi
 - **Desvío:** el punto aplica y no se cumplió. Se explica qué pasó y si se puede corregir.
 
 Los changes que todavía están activos (`despliegue-continuo-ec2`, `ip-real-detras-de-cloudflare`,
-`plano-mesas-admin` y `verificacion-version-desplegada`) se suman cuando se archiven (tarea 7.2).
+`plano-mesas-admin`, `reserva-nota-cliente`, `seed-datos-demo` y `verificacion-version-desplegada`)
+se suman cuando se archiven (tarea 7.2).
 
 ## Entregables de la consigna
 
 | Entregable | Evidencia |
 |---|---|
 | URL del repositorio, con un `README.md` que explique la arquitectura y cómo ejecutarlo | https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico. El [`README.md`](../README.md) explica la arquitectura («Arquitectura»), el primer arranque, los comandos y las [decisiones de diseño](../README.md#decisiones-de-diseño). |
-| Especificaciones de OpenSpec completas y válidas | `npx openspec validate --all --strict`: 26 de 26 válidos (19 changes archivados, 4 activos y las specs de `openspec/specs/`). `npm run openapi:lint`: sin errores en `openapi/openapi.yaml`. Los dos, el 2026-11-09 sobre `main` en `5c70958`. |
-| Historial de Pull Requests cerrados | [PRs mergeados](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pulls?q=is%3Apr+is%3Amerged): 107 al 2026-11-09. |
-| Ejecuciones verdes en GitHub Actions | [Runs del CI en `main`](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/actions/workflows/ci.yml?query=branch%3Amain). El run de `5c70958` terminó en verde ([42131994019](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/actions/runs/42131994019)). El CI bloquea el merge de un PR si falla la validación de OpenSpec, el lint o los tests (`openspec/config.yaml` §12). |
+| Especificaciones de OpenSpec completas y válidas | `npx openspec validate --all --strict`: 28 de 28 válidos (los changes activos y las specs de `openspec/specs/`; los archivados ya están fundidos en ellas). `npm run openapi:lint`: sin errores en `openapi/openapi.yaml`. Los dos, el 2026-11-11 sobre `main` en `5dd778d`. |
+| Historial de Pull Requests cerrados | [PRs mergeados](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/pulls?q=is%3Apr+is%3Amerged): 109 al 2026-11-11. |
+| Ejecuciones verdes en GitHub Actions | [Runs del CI en `main`](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/actions/workflows/ci.yml?query=branch%3Amain). El run de `5dd778d` terminó en verde ([43100362411](https://github.com/portalmatias/Restaurante-MVP-Trabajo-Practico/actions/runs/43100362411)). El CI bloquea el merge de un PR si falla la validación de OpenSpec, el lint o los tests (`openspec/config.yaml` §12). |
 
 ## Resumen
 
@@ -423,7 +426,28 @@ Archivado el 2026-11-02. PRs: [#76](https://github.com/portalmatias/Restaurante-
 
 ## Recorrido de punta a punta
 
-_Pendiente (tarea 6.1)._
+Corrido el 2026-11-11 a las 18:10 (hora de Argentina) contra la app local (`npm run dev`), con
+una base PostgreSQL migrada y con el seed de desarrollo de `main` en `5dd778d`, que ya incluye
+las reservas de demostración de `seed-datos-demo` (#113). Es el flujo de `docs/roadmap-mvp.md`
+§13 («Fase 5 y cierre»), hecho en el navegador con Playwright: cada paso usa las pantallas del
+cliente y del admin. La única excepción es la elección de fecha, turno, zona y comensales del
+paso 1, que se cargó por la URL de la pantalla de resultado (el asistente guarda esa selección
+en la URL, D1 de `frontend-cliente`) en lugar de tocar el calendario.
+
+| # | Paso | Resultado esperado | Resultado |
+|---|---|---|---|
+| 1 | Consultar disponibilidad: viernes 13/11, cena, STANDARD, 2 comensales | Hay lugar | OK: «¡Hay lugar!», 40 lugares y el plano con S1 a S5 libres. |
+| 2 | Reservar en STANDARD | `CONFIRMADA` y un código de 8 caracteres | OK: `ZTMVJNEC`, «Tu reserva está confirmada». |
+| 3 | Reservar en VIP: sábado 14/11, cena, 2 comensales | `PENDIENTE` | OK: `3YYQLGNT`, «Tu reserva está pendiente de confirmación». |
+| 4 | Consultar `ZTMVJNEC` con su código y su email | Muestra el detalle | OK: estado, fecha, turno, zona y comensales. |
+| 5 | Consultar `ZTMVJNEC` con otro email | No devuelve nada | OK: «No encontramos una reserva con esos datos». |
+| 6 | Cancelar `ZTMVJNEC` dentro de la ventana | Se cancela | OK: «Tu reserva fue cancelada». |
+| 7 | Cancelar fuera de la ventana: `SEEDVTN2` (VIP, hoy 20:00; la ventana VIP es de 24 h) | Rechazado | OK: la pantalla no ofrece «Cancelar mi reserva», como pide `frontend-cliente` («Una reserva fuera de la ventana no ofrece cancelar»). Pedida directo a la API, `POST /reservas/SEEDVTN2/cancelar` responde `409` «La reserva ya no se puede cancelar: está fuera de la ventana mínima de cancelación de su zona». |
+| 8 | Como admin, confirmar la VIP `3YYQLGNT` | Pasa a `CONFIRMADA` | OK: de «Pendiente» a «Confirmada» en `/admin/reservas` (mesa V1). |
+| 9 | Marcar `NO_SHOW` en `SEEDPAS2` (07/01/2026, turno ya pasado) | Se acepta | OK: de «Confirmada» a «Ausente». |
+| 10 | El aforo no cuenta `CANCELADA` ni `NO_SHOW` | Solo cuenta las activas | OK. Viernes 13, cena: STANDARD 0/40 (la única reserva es `ZTMVJNEC`, cancelada) y VIP 2/20 (`SEEDPND2`, pendiente). 07/01, cena: 0 (`SEEDPAS2`, `NO_SHOW`). Control, sábado 14, cena: 6 (STANDARD 4 de `SEEDCNF2` y VIP 2 de `3YYQLGNT`). Los números coinciden con la base. |
+
+Los 10 pasos dan el resultado esperado.
 
 ## Cómo repetir la verificación
 
