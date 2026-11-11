@@ -129,11 +129,11 @@ Los tests de 4.3 a 4.8 van en el bloque `MesasPanel` de
 `frontend/test/components/admin/salon.test.tsx`, uno por escenario de "Ubicación de la Mesa en el
 plano" de `specs/frontend-admin/spec.md`. Cada tarea va con tests primero (rojo, luego verde).
 
-- [ ] 4.1 Extraer `CELDA`, `MARGEN` y `Silueta` de `plano-mesas.tsx` a
+- [x] 4.1 Extraer `CELDA`, `MARGEN` y `Silueta` de `plano-mesas.tsx` a
       `frontend/src/components/reservas/plano-geometria.tsx` (design.md D5) sin cambiar el plano
       del cliente. Verificar que los tests actuales de `plano-mesas.test.tsx` pasan sin
       modificarlos.
-- [ ] 4.2 Sumar a `frontend/test/lib/plano-mesas.test.ts` los casos de `frontend/src/lib/plano-mesas.ts` (rojo) y luego implementar: los
+- [x] 4.2 Sumar a `frontend/test/lib/plano-mesas.test.ts` los casos de `frontend/src/lib/plano-mesas.ts` (rojo) y luego implementar: los
       valores válidos de columna y fila según ancho, alto y grilla; la corrección al último valor
       válido; el texto de la ubicación ("las columnas 6 y 7", "la columna 6", "las columnas 6 a
       8") y la lista de superposiciones, con los casos del seed. Verificar que pasan.
