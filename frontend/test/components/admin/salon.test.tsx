@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MesasPanel } from "../../../src/components/admin/mesas-panel";
 import { TurnosPanel } from "../../../src/components/admin/turnos-panel";
 import { ZonasPanel } from "../../../src/components/admin/zonas-panel";
@@ -715,9 +715,11 @@ describe("MesasPanel", () => {
       fireEvent.change(within(formulario).getByLabelText("Zona"), { target: { value: "z-std" } });
       await waitFor(() => expect(dibujo(formulario).querySelector('[data-mesa="S5"]')).not.toBeNull());
 
-      resolverVip({ data: [V4, V5], response: { ok: true, status: 200 } });
-      await vipDemorada;
-      await Promise.resolve();
+      // La respuesta vieja llega al final; se espera a que React termine de procesarla.
+      await act(async () => {
+        resolverVip({ data: [V4, V5], response: { ok: true, status: 200 } });
+        await vipDemorada;
+      });
 
       expect(dibujo(formulario).querySelector('[data-mesa="V4"]')).toBeNull();
       expect(dibujo(formulario).querySelector('[data-mesa="S5"]')).not.toBeNull();

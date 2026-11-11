@@ -148,7 +148,7 @@ plano" de `specs/frontend-admin/spec.md`. Cada tarea va con tests primero (rojo,
       `ancho`, `alto` y `forma` solo si cambiaron, y reubicar la mesa guardada fuera de la grilla.
 - [x] 4.6 Errores y listado. Tests: la superposición, el tamaño y la ubicación fuera de la
       grilla rechazados por la API junto a la sección, y la columna "Plano" del listado
-      ("Columna 9, fila 6", "Sin ubicar" y "Fuera de la grilla"). Implementar la regla `ubicacion` de `errores-campo.ts`.
+      ("Columna 9, fila 6", "Sin ubicar" y "Fuera de la grilla"). Implementar la regla `ubicacion` en `REGLAS` de `mesas-panel.tsx`.
 - [x] 4.7 Cambio de zona. Tests: cambio de zona, cambio a una zona más chica que ajusta el
       tamaño, cambio de zona sin elegir ubicación, con la misma columna y fila (envía las dos
       coordenadas aunque coincidan con las de la zona vieja), y volver a la zona original que
