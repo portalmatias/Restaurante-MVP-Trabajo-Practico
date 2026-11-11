@@ -1,19 +1,58 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsInt,
+  IsOptional,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
   Min,
   Validate,
+  ValidatorConstraint,
+  type ValidationArguments,
+  type ValidatorConstraintInterface,
 } from 'class-validator';
 
 import { EsFechaDeCalendarioExistente } from '../../disponibilidad/dto/consultar-disponibilidad.dto';
 
 /** El mismo patrón que publica el contrato en `openapi/openapi.yaml` (design.md D6). */
 const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Largo máximo de la nota del cliente, en puntos de código (design.md D1 y D2 de `reserva-nota-cliente`). */
+export const NOTA_CLIENTE_MAX = 500;
+
+/**
+ * Largo en puntos de código Unicode, como `varchar(n)` de PostgreSQL y el contador del
+ * frontend: un emoji simple cuenta uno, y uno compuesto o con selector de variación, varios
+ * (D2 de `reserva-nota-cliente`). `@MaxLength` de class-validator no sirve porque cuenta
+ * unidades UTF-16.
+ */
+@ValidatorConstraint({ name: 'maxPuntosDeCodigo', async: false })
+export class MaxPuntosDeCodigo implements ValidatorConstraintInterface {
+  validate(valor: unknown, argumentos: ValidationArguments): boolean {
+    if (typeof valor !== 'string') return true; // lo rechaza `@IsString`
+    const [maximo] = argumentos.constraints as [number];
+    return Array.from(valor).length <= maximo;
+  }
+
+  defaultMessage(argumentos: ValidationArguments): string {
+    const [maximo] = argumentos.constraints as [number];
+    return `${argumentos.property} puede tener hasta ${maximo} caracteres`;
+  }
+}
+
+/**
+ * Quita los espacios de los bordes y convierte el texto vacío en `undefined` antes de validar,
+ * así el límite se mide sobre lo que se guarda (D2). Un valor que no es texto no se toca, para
+ * que `@IsString` lo rechace.
+ */
+function normalizarNota({ value }: { value: unknown }): unknown {
+  if (typeof value !== 'string') return value;
+  const recortada = value.trim();
+  return recortada === '' ? undefined : recortada;
+}
 
 /**
  * Body de `POST /reservas` (design.md D6). Los nombres de campo son los del modelo de #12,
@@ -25,8 +64,8 @@ const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
  * `@Type` un `"4"` string se rechaza en vez de convertirse (D6).
  *
  * El `ValidationPipe` global de `main.ts` tiene `whitelist: true` y `forbidNonWhitelisted: true`
- * (1.4), así que un body con un campo fuera de estos siete (`mesaId`, `estado`,
- * `codigoReserva`, ...) se rechaza con `400` antes de llegar al controller (D6).
+ * (1.4), así que un body con un campo fuera de estos siete y la nota opcional (`mesaId`,
+ * `estado`, `codigoReserva`, ...) se rechaza con `400` antes de llegar al controller (D6).
  *
  * Los `@ApiProperty` tienen que generar exactamente lo que declara `openapi/openapi.yaml`:
  * `npm run openapi:check` compara los dos documentos de forma literal.
@@ -122,4 +161,23 @@ export class CrearReservaDto {
   })
   @MaxLength(30)
   telefonoCliente!: string;
+
+  /**
+   * Opcional: ausente, `null`, vacía o de solo espacios, la reserva queda sin nota (D2 de
+   * `reserva-nota-cliente`). La nota puede traer datos de salud: no se escribe en logs (D6).
+   */
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    maxLength: NOTA_CLIENTE_MAX,
+    description:
+      'Nota opcional del cliente para el restaurante. Se guarda sin los espacios de los bordes; ausente, `null`, vacía o con solo espacios, la reserva queda sin nota. El largo se cuenta en puntos de código.',
+    example: 'Es un cumpleaños.',
+  })
+  @Transform(normalizarNota)
+  @IsOptional()
+  @IsString({ message: 'notaCliente debe ser un texto' })
+  @Validate(MaxPuntosDeCodigo, [NOTA_CLIENTE_MAX])
+  notaCliente?: string | null;
 }

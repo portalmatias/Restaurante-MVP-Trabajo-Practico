@@ -90,6 +90,16 @@ export class ReservaAdminRespuesta {
   })
   telefonoCliente!: string;
 
+  /** La nota del cliente (change `reserva-nota-cliente`, D3). No es un filtro del listado. */
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Nota del cliente tal como se guardó, o `null` si no dejó nota.',
+    example: 'Es un cumpleaños.',
+  })
+  notaCliente!: string | null;
+
   @ApiProperty({ type: TurnoReservaRespuesta })
   turno!: TurnoReservaRespuesta;
 

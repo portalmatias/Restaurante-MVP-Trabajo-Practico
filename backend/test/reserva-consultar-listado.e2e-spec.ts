@@ -149,6 +149,7 @@ describe('GET /admin/reservas (e2e)', () => {
     let turnoId: string;
     let mesaId: string;
     let reservaId: string;
+    let reservaSinNotaId: string;
 
     beforeAll(async () => {
       const moduleRef = await Test.createTestingModule({
@@ -193,14 +194,33 @@ describe('GET /admin/reservas (e2e)', () => {
           nombreCliente: 'Cliente Listado E2E',
           emailCliente: 'listado-admin-e2e@example.com',
           telefonoCliente: '+54 9 11 5555-9876',
+          notaCliente: 'Vamos con un cochecito',
           codigoReserva: 'RCOADME2',
         },
       });
       reservaId = reserva.id;
+      // Segunda Reserva, sin nota. Cancelada para no chocar con el índice único parcial de la
+      // mesa (solo cuenta reservas activas); igual aparece en el listado.
+      const sinNota = await prisma.reserva.create({
+        data: {
+          mesaId,
+          turnoId,
+          fecha: FECHA,
+          comensales: 2,
+          estado: EstadoReserva.CANCELADA,
+          nombreCliente: 'Cliente Listado E2E Sin Nota',
+          emailCliente: 'listado-admin-e2e-sin-nota@example.com',
+          telefonoCliente: '+54 9 11 5555-9877',
+          codigoReserva: 'RCOADME3',
+        },
+      });
+      reservaSinNotaId = sinNota.id;
     });
 
     afterAll(async () => {
-      await prisma.reserva.deleteMany({ where: { id: reservaId } });
+      await prisma.reserva.deleteMany({
+        where: { id: { in: [reservaId, reservaSinNotaId] } },
+      });
       await prisma.mesa.deleteMany({ where: { id: mesaId } });
       await prisma.turno.deleteMany({ where: { id: turnoId } });
       await app.close();
@@ -231,6 +251,31 @@ describe('GET /admin/reservas (e2e)', () => {
         telefonoCliente: '+54 9 11 5555-9876',
         mesa: { id: mesaId, etiqueta: 'RCO-ADMIN-E2E' },
       });
+    });
+
+    it('el listado trae la nota de cada Reserva, o null si no tiene', async () => {
+      const jwtService = app.get(JwtService);
+      const jwtSecret = app.get(ConfigService).getOrThrow<string>('JWT_SECRET');
+      const token = jwtService.sign(
+        { sub: 'admin-listado-nota-e2e', rol: 'ADMIN' },
+        { secret: jwtSecret },
+      );
+
+      const respuesta = await request(app.getHttpServer())
+        .get(`/admin/reservas?turnoId=${turnoId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const items = (
+        respuesta.body as { items: Array<Record<string, unknown>> }
+      ).items;
+      expect(items.find((i) => i.id === reservaId)?.notaCliente).toBe(
+        'Vamos con un cochecito',
+      );
+      expect(items.find((i) => i.id === reservaSinNotaId)).toHaveProperty(
+        'notaCliente',
+        null,
+      );
     });
   });
 

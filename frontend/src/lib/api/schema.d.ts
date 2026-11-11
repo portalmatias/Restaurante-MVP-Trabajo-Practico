@@ -707,6 +707,11 @@ export interface components {
              * @example +54 9 11 5555-1234
              */
             telefonoCliente: string;
+            /**
+             * @description Nota opcional del cliente para el restaurante. Se guarda sin los espacios de los bordes; ausente, `null`, vacía o con solo espacios, la reserva queda sin nota. El largo se cuenta en puntos de código.
+             * @example Es un cumpleaños.
+             */
+            notaCliente?: string | null;
         };
         /** @description Reserva recién creada, sin datos internos ni de contacto. */
         ReservaCreadaRespuesta: {
@@ -744,6 +749,11 @@ export interface components {
              * @example 4
              */
             comensales: number;
+            /**
+             * @description Nota del cliente tal como se guardó, o `null` si no dejó nota.
+             * @example Es un cumpleaños.
+             */
+            notaCliente: string | null;
         };
         /** @description Cuerpo del `409` de la creación de reservas. */
         ReservaRechazadaRespuesta: {
@@ -902,6 +912,11 @@ export interface components {
              * @example +54 9 11 5555-1234
              */
             telefonoCliente: string;
+            /**
+             * @description Nota del cliente tal como se guardó, o `null` si no dejó nota.
+             * @example Es un cumpleaños.
+             */
+            notaCliente: string | null;
             turno: components["schemas"]["TurnoReservaRespuesta"];
             zona: components["schemas"]["ZonaReservaRespuesta"];
             mesa: components["schemas"]["MesaReservaRespuesta"];
@@ -1253,7 +1268,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReservaCreadaRespuesta"];
                 };
             };
-            /** @description El body está mal formado: falta un campo, la fecha no es `YYYY-MM-DD` o no existe, un id no es UUID, `comensales` no es un entero mayor o igual a 1, el email no es válido o el nombre o el teléfono están vacíos o son demasiado largos, o el body trae un campo que no es de los siete (por ejemplo `mesaId` o `estado`). */
+            /** @description El body está mal formado: falta un campo, la fecha no es `YYYY-MM-DD` o no existe, un id no es UUID, `comensales` no es un entero mayor o igual a 1, el email no es válido o el nombre o el teléfono están vacíos o son demasiado largos, la nota no es un texto o supera los 500 caracteres, o el body trae un campo que no es de los siete ni la nota (por ejemplo `mesaId` o `estado`). */
             400: {
                 headers: {
                     [name: string]: unknown;

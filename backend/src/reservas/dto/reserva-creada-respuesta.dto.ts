@@ -4,7 +4,7 @@ import { ApiProperty, ApiSchema } from '@nestjs/swagger';
  * Cuerpo del `201` de `POST /reservas` (design.md D7). Solo lo mínimo que necesita el
  * cliente: sin el `id` interno (lo usan las rutas de admin), sin la mesa asignada (no es un
  * concepto del cliente y el admin la puede reasignar) y sin los datos de contacto (el cliente
- * ya los tiene).
+ * ya los tiene). Sí lleva la nota guardada, para que la confirmación muestre lo que quedó.
  *
  * `estado` se declara como enum **inline** (sin `enumName`), a propósito: una reserva recién
  * creada solo puede quedar en dos de los cuatro valores de `EstadoReserva`, y generar un
@@ -64,4 +64,17 @@ export class ReservaCreadaRespuesta {
     example: 4,
   })
   comensales!: number;
+
+  /**
+   * La nota tal como se guardó (sin los espacios de los bordes), o `null` si no hay. Siempre
+   * presente (D3 de `reserva-nota-cliente`): quien la envía es quien la recibe.
+   */
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Nota del cliente tal como se guardó, o `null` si no dejó nota.',
+    example: 'Es un cumpleaños.',
+  })
+  notaCliente!: string | null;
 }

@@ -25,6 +25,7 @@ function reservaDePrueba(
     nombreCliente: 'Ana Pérez',
     emailCliente: 'ana.perez@example.com',
     telefonoCliente: '+54 9 11 5555-1234',
+    notaCliente: 'Es un cumpleaños',
     codigoReserva: 'K7PM3QXA',
     createdAt: new Date('2026-09-17T14:32:10.000Z'),
     updatedAt: new Date('2026-09-17T14:32:10.000Z'),
@@ -134,6 +135,13 @@ describe('aReservaConsultadaRespuesta', () => {
     ]) {
       expect(cuerpo).not.toContain(excluido);
     }
+  });
+
+  it('no devuelve la nota del cliente (spec reserva-consultar, "La consulta no devuelve la nota")', () => {
+    const respuesta = aReservaConsultadaRespuesta(reservaDePrueba());
+
+    expect(respuesta).not.toHaveProperty('notaCliente');
+    expect(JSON.stringify(respuesta)).not.toContain('Es un cumpleaños');
   });
 
   it.each([

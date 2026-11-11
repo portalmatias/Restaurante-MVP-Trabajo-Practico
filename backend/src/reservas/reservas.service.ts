@@ -69,6 +69,8 @@ export interface CrearReservaInput {
   nombreCliente: string;
   emailCliente: string;
   telefonoCliente: string;
+  /** Ya normalizada por el DTO (sin espacios en los bordes); ausente o `null` si no hay nota. */
+  notaCliente?: string | null;
 }
 
 /** Cuerpo `409` fijo de D8/D9: `motivos` vacío significa choque de concurrencia, no regla. */
@@ -209,6 +211,7 @@ export class ReservasService {
                 nombreCliente: input.nombreCliente,
                 emailCliente: input.emailCliente,
                 telefonoCliente: input.telefonoCliente,
+                notaCliente: input.notaCliente ?? null,
                 codigoReserva,
               },
             });

@@ -506,6 +506,15 @@ components:
           maxLength: 30
           description: Teléfono de contacto, en formato libre.
           example: +54 9 11 5555-1234
+        notaCliente:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: >-
+            Nota opcional del cliente para el restaurante. Se guarda sin los espacios de los
+            bordes; ausente, `null`, vacía o con solo espacios, la reserva queda sin nota. El
+            largo se cuenta en puntos de código.
+          example: Es un cumpleaños.
       required:
         - fecha
         - turnoId
@@ -552,6 +561,11 @@ components:
           minimum: 1
           description: Cantidad de comensales reservados.
           example: 4
+        notaCliente:
+          type: string
+          nullable: true
+          description: Nota del cliente tal como se guardó, o `null` si no dejó nota.
+          example: Es un cumpleaños.
       required:
         - codigoReserva
         - estado
@@ -559,6 +573,7 @@ components:
         - turnoId
         - zonaId
         - comensales
+        - notaCliente
     ReservaRechazadaRespuesta:
       type: object
       description: Cuerpo del `409` de la creación de reservas.
@@ -753,6 +768,11 @@ components:
           type: string
           description: Teléfono de contacto, en formato libre.
           example: '+54 9 11 5555-1234'
+        notaCliente:
+          type: string
+          nullable: true
+          description: Nota del cliente tal como se guardó, o `null` si no dejó nota.
+          example: Es un cumpleaños.
         turno:
           $ref: '#/components/schemas/TurnoReservaRespuesta'
         zona:
@@ -773,6 +793,7 @@ components:
         - nombreCliente
         - emailCliente
         - telefonoCliente
+        - notaCliente
         - turno
         - zona
         - mesa
@@ -1329,6 +1350,7 @@ paths:
                     turnoId: 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
                     zonaId: b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19
                     comensales: 4
+                    notaCliente: null
                 vip:
                   summary: VIP, queda pendiente de confirmación
                   value:
@@ -1338,12 +1360,14 @@ paths:
                     turnoId: 3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73
                     zonaId: 5d2a9c41-7e3b-4f6a-a1d8-0c9b2e7f4a63
                     comensales: 6
+                    notaCliente: Es un cumpleaños.
         '400':
           description: >-
             El body está mal formado: falta un campo, la fecha no es `YYYY-MM-DD` o no existe, un
             id no es UUID, `comensales` no es un entero mayor o igual a 1, el email no es válido
-            o el nombre o el teléfono están vacíos o son demasiado largos, o el body trae un campo
-            que no es de los siete (por ejemplo `mesaId` o `estado`).
+            o el nombre o el teléfono están vacíos o son demasiado largos, la nota no es un texto o
+            supera los 500 caracteres, o el body trae un campo que no es de los siete ni la nota
+            (por ejemplo `mesaId` o `estado`).
           content:
             application/json:
               schema:

@@ -78,6 +78,7 @@ export class ReservasController {
           turnoId: '3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73',
           zonaId: 'b8e4d7c2-1a6f-4c3b-8e95-2f7a0d6c4b19',
           comensales: 4,
+          notaCliente: null,
         },
       },
       vip: {
@@ -89,6 +90,7 @@ export class ReservasController {
           turnoId: '3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73',
           zonaId: '5d2a9c41-7e3b-4f6a-a1d8-0c9b2e7f4a63',
           comensales: 6,
+          notaCliente: 'Es un cumpleaños.',
         },
       },
     },
@@ -96,7 +98,7 @@ export class ReservasController {
   @ApiBadRequestResponse({
     type: ErrorRespuesta,
     description:
-      'El body está mal formado: falta un campo, la fecha no es `YYYY-MM-DD` o no existe, un id no es UUID, `comensales` no es un entero mayor o igual a 1, el email no es válido o el nombre o el teléfono están vacíos o son demasiado largos, o el body trae un campo que no es de los siete (por ejemplo `mesaId` o `estado`).',
+      'El body está mal formado: falta un campo, la fecha no es `YYYY-MM-DD` o no existe, un id no es UUID, `comensales` no es un entero mayor o igual a 1, el email no es válido o el nombre o el teléfono están vacíos o son demasiado largos, la nota no es un texto o supera los 500 caracteres, o el body trae un campo que no es de los siete ni la nota (por ejemplo `mesaId` o `estado`).',
     examples: {
       bodyInvalido: {
         summary: 'Email inválido y comensales en cero',
@@ -178,6 +180,7 @@ export class ReservasController {
       nombreCliente: dto.nombreCliente,
       emailCliente: dto.emailCliente,
       telefonoCliente: dto.telefonoCliente,
+      notaCliente: dto.notaCliente ?? null,
     });
 
     // D7: la respuesta pública no expone `id` ni `mesaId`. `zonaId` no sale de `reserva` (el
@@ -190,6 +193,7 @@ export class ReservasController {
       turnoId: reserva.turnoId,
       zonaId: dto.zonaId,
       comensales: reserva.comensales,
+      notaCliente: reserva.notaCliente,
     };
   }
 

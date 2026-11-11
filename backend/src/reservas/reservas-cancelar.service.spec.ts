@@ -43,6 +43,7 @@ describe('ReservasService.cancelar', () => {
       nombreCliente: 'Ana Pérez',
       emailCliente: 'ana.perez@example.com',
       telefonoCliente: '+54 9 11 5555-1234',
+      notaCliente: null,
       codigoReserva: 'K7PM3QXA',
       createdAt: new Date('2026-09-17T14:32:10.000Z'),
       updatedAt: new Date('2026-09-17T14:32:10.000Z'),
