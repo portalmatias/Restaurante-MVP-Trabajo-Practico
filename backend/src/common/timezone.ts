@@ -29,6 +29,9 @@ export const ARGENTINA_OFFSET_MS = -3 * 60 * 60 * 1000;
 /** Offset fijo de Argentina respecto a UTC en horas. */
 export const ARGENTINA_OFFSET_HORAS = -3;
 
+/** Milisegundos en una hora, para las reglas que se miden en horas (ventana de cancelación). */
+export const MS_POR_HORA = 60 * 60 * 1000;
+
 /**
  * Combina una fecha calendario local (`@db.Date`) con una hora local del restaurante
  * (`@db.Time`, `Date` en época 1970 con la hora en su parte UTC) y devuelve el instante

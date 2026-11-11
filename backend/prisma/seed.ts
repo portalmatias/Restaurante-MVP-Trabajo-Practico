@@ -29,6 +29,7 @@ import {
 import { seedCatalogo } from './catalogo';
 import { seedPlano } from './plano-desarrollo';
 import { seedReservasDemo } from './reservas-demo';
+import { DIAS } from '../src/disponibilidad/reglas/tipos';
 
 const prisma = new PrismaClient();
 
@@ -56,16 +57,7 @@ async function seedAdmin() {
 
 /** Próxima fecha (a partir de mañana) que cae en el día de semana pedido. */
 function proximaFecha(dia: DiaSemana): Date {
-  const orden: DiaSemana[] = [
-    DiaSemana.DOMINGO,
-    DiaSemana.LUNES,
-    DiaSemana.MARTES,
-    DiaSemana.MIERCOLES,
-    DiaSemana.JUEVES,
-    DiaSemana.VIERNES,
-    DiaSemana.SABADO,
-  ];
-  const objetivo = orden.indexOf(dia);
+  const objetivo = DIAS.indexOf(dia);
   const base = new Date();
   base.setUTCHours(0, 0, 0, 0);
   for (let i = 1; i <= 7; i++) {
@@ -192,7 +184,7 @@ async function main() {
   await seedReservas(mesas, turnos);
 
   console.log('Seed: reservas de demostración...');
-  await seedReservasDemo(prisma);
+  await seedReservasDemo(prisma, turnos);
 
   console.log('Seed completado.');
 }

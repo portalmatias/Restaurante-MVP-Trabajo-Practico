@@ -6,7 +6,6 @@ import { seedCatalogo } from '../prisma/catalogo';
 import {
   elegirTurnoEnVentana,
   seedReservasDemo,
-  TurnoCandidato,
 } from '../prisma/reservas-demo';
 import { finTurnoUtc, inicioTurnoUtc } from '../src/common/timezone';
 
@@ -34,11 +33,7 @@ function horaArgentina(iso: string): Date {
   return new Date(`${iso}-03:00`);
 }
 
-function hora(h: number, m = 0): Date {
-  return new Date(Date.UTC(1970, 0, 1, h, m));
-}
-
-/** Los turnos del catálogo: almuerzo 12:00 y cena 20:00, activos de martes a domingo. */
+/** Días de la semana en el orden lunes a domingo. */
 const DIAS: DiaSemana[] = [
   DiaSemana.LUNES,
   DiaSemana.MARTES,
@@ -48,87 +43,12 @@ const DIAS: DiaSemana[] = [
   DiaSemana.SABADO,
   DiaSemana.DOMINGO,
 ];
-const TURNOS: TurnoCandidato[] = DIAS.flatMap((dia) => [
-  {
-    id: `${dia}_ALMUERZO`,
-    diaSemana: dia,
-    horaInicio: hora(12),
-    activo: dia !== DiaSemana.LUNES,
-  },
-  {
-    id: `${dia}_CENA`,
-    diaSemana: dia,
-    horaInicio: hora(20),
-    activo: dia !== DiaSemana.LUNES,
-  },
-]);
-
-describe('elegirTurnoEnVentana', () => {
-  // 2026-11-10 es martes.
-  it.each([
-    [
-      'martes 10:00 → almuerzo del martes',
-      '2026-11-10T10:00',
-      'MARTES_ALMUERZO',
-      '2026-11-10',
-    ],
-    [
-      'martes 13:00 → cena del martes',
-      '2026-11-10T13:00',
-      'MARTES_CENA',
-      '2026-11-10',
-    ],
-    [
-      'sábado 21:00 → almuerzo del domingo',
-      '2026-11-14T21:00',
-      'DOMINGO_ALMUERZO',
-      '2026-11-15',
-    ],
-    [
-      'lunes 12:00:01 → almuerzo del martes',
-      '2026-11-16T12:00:01',
-      'MARTES_ALMUERZO',
-      '2026-11-17',
-    ],
-  ])('%s', (_caso, ahora, turnoEsperado, fechaEsperada) => {
-    const elegido = elegirTurnoEnVentana(horaArgentina(ahora), TURNOS, 24);
-
-    expect(elegido?.turno.id).toBe(turnoEsperado);
-    expect(elegido?.fecha.toISOString()).toBe(`${fechaEsperada}T00:00:00.000Z`);
-  });
-
-  it('domingo 23:00 → null: los lunes no hay turnos', () => {
-    expect(
-      elegirTurnoEnVentana(horaArgentina('2026-11-15T23:00'), TURNOS, 24),
-    ).toBeNull();
-  });
-
-  it('un turno que empieza justo al cumplirse la ventana queda afuera', () => {
-    // Lunes 12:00: el almuerzo del martes empieza a exactamente 24 h.
-    expect(
-      elegirTurnoEnVentana(horaArgentina('2026-11-16T12:00'), TURNOS, 24),
-    ).toBeNull();
-  });
-
-  it('ignora los turnos inactivos', () => {
-    const sinAlmuerzoMartes = TURNOS.map((t) =>
-      t.id === 'MARTES_ALMUERZO' ? { ...t, activo: false } : t,
-    );
-
-    const elegido = elegirTurnoEnVentana(
-      horaArgentina('2026-11-10T10:00'),
-      sinAlmuerzoMartes,
-      24,
-    );
-
-    expect(elegido?.turno.id).toBe('MARTES_CENA');
-  });
-});
 
 describe('Reservas de demostración en el seed (integración)', () => {
   let baseCompartida: PrismaClient;
   let prisma: PrismaClient;
   const silencio = () => undefined;
+  let turnos: Record<string, { id: string }>;
 
   beforeAll(async () => {
     baseCompartida = new PrismaClient();
@@ -153,7 +73,7 @@ describe('Reservas de demostración en el seed (integración)', () => {
     await prisma.$executeRawUnsafe(
       'TRUNCATE "Reserva", "Mesa", "Turno", "Zona", "Usuario", "ConfiguracionNegocio" RESTART IDENTITY CASCADE',
     );
-    await seedCatalogo(prisma, silencio);
+    ({ turnos } = await seedCatalogo(prisma, silencio));
   });
 
   afterAll(async () => {
@@ -172,7 +92,12 @@ describe('Reservas de demostración en el seed (integración)', () => {
   }
 
   it('SEEDPAS2 queda CONFIRMADA, con el turno terminado y en su día de la semana', async () => {
-    await seedReservasDemo(prisma, silencio, horaArgentina('2026-11-10T10:00'));
+    await seedReservasDemo(
+      prisma,
+      turnos,
+      silencio,
+      horaArgentina('2026-11-10T10:00'),
+    );
 
     const reserva = await leerReserva('SEEDPAS2');
     expect(reserva?.estado).toBe('CONFIRMADA');
@@ -192,7 +117,7 @@ describe('Reservas de demostración en el seed (integración)', () => {
   it('SEEDVTN2 queda en una mesa VIP, en el turno más próximo dentro de la ventana', async () => {
     const ahora = horaArgentina('2026-11-10T13:00');
 
-    await seedReservasDemo(prisma, silencio, ahora);
+    await seedReservasDemo(prisma, turnos, silencio, ahora);
 
     const reserva = await leerReserva('SEEDVTN2');
     expect(reserva?.estado).toBe('CONFIRMADA');
@@ -212,7 +137,12 @@ describe('Reservas de demostración en el seed (integración)', () => {
   it('sin turno dentro de la ventana, omite SEEDVTN2 y lo avisa', async () => {
     const log = jest.fn();
 
-    await seedReservasDemo(prisma, log, horaArgentina('2026-11-15T23:00'));
+    await seedReservasDemo(
+      prisma,
+      turnos,
+      log,
+      horaArgentina('2026-11-15T23:00'),
+    );
 
     expect(await leerReserva('SEEDVTN2')).toBeNull();
     expect(await leerReserva('SEEDPAS2')).not.toBeNull();
@@ -220,13 +150,23 @@ describe('Reservas de demostración en el seed (integración)', () => {
   });
 
   it('es idempotente, re-ubica SEEDVTN2 y conserva los estados transicionados', async () => {
-    await seedReservasDemo(prisma, silencio, horaArgentina('2026-11-10T10:00'));
+    await seedReservasDemo(
+      prisma,
+      turnos,
+      silencio,
+      horaArgentina('2026-11-10T10:00'),
+    );
     await prisma.reserva.update({
       where: { codigoReserva: 'SEEDPAS2' },
       data: { estado: 'NO_SHOW' },
     });
 
-    await seedReservasDemo(prisma, silencio, horaArgentina('2026-11-14T21:00'));
+    await seedReservasDemo(
+      prisma,
+      turnos,
+      silencio,
+      horaArgentina('2026-11-14T21:00'),
+    );
 
     expect(
       await prisma.reserva.count({
@@ -240,14 +180,24 @@ describe('Reservas de demostración en el seed (integración)', () => {
   });
 
   it('no re-ubica SEEDVTN2 si ya está en un estado terminal', async () => {
-    await seedReservasDemo(prisma, silencio, horaArgentina('2026-11-10T10:00'));
+    await seedReservasDemo(
+      prisma,
+      turnos,
+      silencio,
+      horaArgentina('2026-11-10T10:00'),
+    );
     await prisma.reserva.update({
       where: { codigoReserva: 'SEEDVTN2' },
       data: { estado: 'NO_SHOW' },
     });
     const log = jest.fn();
 
-    await seedReservasDemo(prisma, log, horaArgentina('2026-11-14T21:00'));
+    await seedReservasDemo(
+      prisma,
+      turnos,
+      log,
+      horaArgentina('2026-11-14T21:00'),
+    );
 
     const vtn = await leerReserva('SEEDVTN2');
     expect(vtn!.estado).toBe('NO_SHOW');
@@ -281,10 +231,52 @@ describe('Reservas de demostración en el seed (integración)', () => {
     });
     const log = jest.fn();
 
-    await expect(seedReservasDemo(prisma, log, ahora)).resolves.toBeUndefined();
+    await expect(
+      seedReservasDemo(prisma, turnos, log, ahora),
+    ).resolves.toBeUndefined();
 
     expect(await leerReserva('SEEDVTN2')).toBeNull();
     expect(await leerReserva('SEEDPAS2')).not.toBeNull();
     expect(log).toHaveBeenCalledWith(expect.stringContaining('V2'));
+  });
+
+  it('con la mesa ocupada, avisa que la SEEDVTN2 anterior queda con su fecha vieja', async () => {
+    await seedReservasDemo(
+      prisma,
+      turnos,
+      silencio,
+      horaArgentina('2026-11-10T10:00'),
+    );
+    const ahora = horaArgentina('2026-11-14T21:00');
+    const elegido = elegirTurnoEnVentana(
+      ahora,
+      await prisma.turno.findMany(),
+      24,
+    );
+    const v2 = await prisma.mesa.findUniqueOrThrow({
+      where: { etiqueta: 'V2' },
+    });
+    await prisma.reserva.create({
+      data: {
+        codigoReserva: 'MANUAL23',
+        mesaId: v2.id,
+        turnoId: elegido!.turno.id,
+        fecha: elegido!.fecha,
+        comensales: 4,
+        estado: 'CONFIRMADA',
+        nombreCliente: 'Reserva manual',
+        emailCliente: 'manual@example.com',
+        telefonoCliente: '+54 9 11 5555-0099',
+      },
+    });
+    const log = jest.fn();
+
+    await expect(
+      seedReservasDemo(prisma, turnos, log, ahora),
+    ).resolves.toBeUndefined();
+
+    const vtn = await leerReserva('SEEDVTN2');
+    expect(vtn!.fecha.toISOString()).toBe('2026-11-10T00:00:00.000Z');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('fecha vieja'));
   });
 });

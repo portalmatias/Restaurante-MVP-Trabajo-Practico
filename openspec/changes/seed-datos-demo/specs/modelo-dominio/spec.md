@@ -17,7 +17,9 @@ siendo idempotente: correrlo de nuevo no duplica filas, vuelve a ubicar la reser
 momento de la nueva corrida y no pisa el estado de una reserva que ya se transicionó. Una reserva
 VIP de demostración que ya está en un estado terminal (`CANCELADA` o `NO_SHOW`) SHALL quedar en su
 fecha y turno, sin re-ubicarse. Si la mesa VIP ya está ocupada en el turno y la fecha elegidos, el
-seed SHALL omitir la reserva VIP, avisarlo en la consola y terminar sin error.
+seed SHALL omitir la reserva VIP, avisarlo en la consola y terminar sin error. Si una corrida
+anterior ya había creado la reserva VIP, en ese caso SHALL quedar con su fecha y turno anteriores
+y el aviso SHALL decirlo.
 
 #### Scenario: Reserva lista para marcar NO_SHOW
 - **WHEN** se corre el seed sobre una base vacía
@@ -55,3 +57,5 @@ seed SHALL omitir la reserva VIP, avisarlo en la consola y terminar sin error.
 - **WHEN** la mesa VIP de la demostración ya tiene otra reserva para el turno y la fecha elegidos
 - **THEN** el seed no crea la reserva VIP de la ventana, imprime un aviso que nombra la mesa y
   termina sin error
+- **AND** si la reserva VIP ya existía de una corrida anterior, conserva su fecha y su turno y el
+  aviso lo dice

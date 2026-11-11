@@ -14,28 +14,16 @@ import { DiaSemana, EstadoReserva, Prisma, PrismaClient } from '@prisma/client';
 
 import {
   ARGENTINA_OFFSET_MS,
+  diaSemanaDeFecha,
   inicioTurnoUtc,
+  MS_POR_HORA,
   normalizarFechaCalendarioUtc,
 } from '../src/common/timezone';
+import { DIAS } from '../src/disponibilidad/reglas/tipos';
 
-const MS_POR_HORA = 60 * 60 * 1000;
 const MS_POR_DIA = 24 * MS_POR_HORA;
 
-/** Hora de inicio del turno de cena en el catálogo (`prisma/catalogo.ts`, `seedTurnos`). */
-const HORA_INICIO_CENA = 20;
-
 const ESTADOS_TERMINALES: EstadoReserva[] = ['CANCELADA', 'NO_SHOW'];
-
-/** Índice de `getUTCDay()` (0 = domingo) → día de la semana del dominio. */
-const DIA_POR_INDICE: DiaSemana[] = [
-  DiaSemana.DOMINGO,
-  DiaSemana.LUNES,
-  DiaSemana.MARTES,
-  DiaSemana.MIERCOLES,
-  DiaSemana.JUEVES,
-  DiaSemana.VIERNES,
-  DiaSemana.SABADO,
-];
 
 export interface TurnoCandidato {
   id: string;
@@ -65,7 +53,7 @@ export function elegirTurnoEnVentana<T extends TurnoCandidato>(
   let elegido: { fecha: Date; turno: T; inicio: number } | null = null;
   for (let d = 0; d <= dias; d++) {
     const fecha = new Date(hoy.getTime() + d * MS_POR_DIA);
-    const dia = DIA_POR_INDICE[fecha.getUTCDay()];
+    const dia = DIAS[diaSemanaDeFecha(fecha)];
     for (const turno of turnos) {
       if (!turno.activo || turno.diaSemana !== dia) continue;
       const inicio = inicioTurnoUtc(fecha, turno.horaInicio).getTime();
@@ -104,11 +92,13 @@ async function upsertReserva(prisma: PrismaClient, reserva: ReservaDemo) {
 }
 
 /**
- * Carga `SEEDPAS2` y `SEEDVTN2`. Necesita el catálogo ya cargado (mesas S2 y V2, turnos).
+ * Carga `SEEDPAS2` y `SEEDVTN2`. Necesita el catálogo ya cargado (mesas S2 y V2, turnos) y
+ * recibe los turnos por clave que devuelve `seedCatalogo` (por ejemplo, `MIERCOLES_CENA`).
  * `ahora` se puede inyectar para los tests; el seed usa el reloj real.
  */
 export async function seedReservasDemo(
   prisma: PrismaClient,
+  turnosCatalogo: Record<string, { id: string }>,
   log: (mensaje: string) => void = console.log,
   ahora: Date = new Date(),
 ) {
@@ -123,20 +113,10 @@ export async function seedReservasDemo(
 
   // Miércoles 07/01/2026, fijo para que sea reproducible y siempre pasado (como SEEDNSW2).
   const fechaPasada = new Date(Date.UTC(2026, 0, 7));
-  const cenaMiercoles = turnos.find(
-    (t) =>
-      t.diaSemana === DiaSemana.MIERCOLES &&
-      t.horaInicio.getUTCHours() === HORA_INICIO_CENA,
-  );
-  if (!cenaMiercoles) {
-    throw new Error(
-      `Falta el turno de cena del miércoles (${HORA_INICIO_CENA}:00) en el catálogo`,
-    );
-  }
   await upsertReserva(prisma, {
     codigoReserva: 'SEEDPAS2',
     mesaId: mesaStandard.id,
-    turnoId: cenaMiercoles.id,
+    turnoId: turnosCatalogo[`${DiaSemana.MIERCOLES}_CENA`].id,
     fecha: fechaPasada,
     comensales: 2,
     nombreCliente: 'Valeria Sosa',
@@ -156,12 +136,12 @@ export async function seedReservasDemo(
     return;
   }
 
+  const avisoPrevia = previa
+    ? ' La SEEDVTN2 de una corrida anterior queda como estaba, con su fecha vieja.'
+    : '';
   const ventanaHoras = mesaVip.zona.ventanaCancelacionHoras;
   const enVentana = elegirTurnoEnVentana(ahora, turnos, ventanaHoras);
   if (!enVentana) {
-    const avisoPrevia = previa
-      ? ' La SEEDVTN2 de una corrida anterior queda como estaba, con su fecha vieja.'
-      : '';
     log(
       `Seed: no se creó SEEDVTN2 (reserva VIP dentro de la ventana de cancelación): ningún turno activo empieza en las próximas ${ventanaHoras} h.${avisoPrevia} Para crearla, correr el seed de nuevo más tarde.`,
     );
@@ -185,7 +165,7 @@ export async function seedReservasDemo(
       error.code === 'P2002'
     ) {
       log(
-        `Seed: no se pudo ubicar SEEDVTN2: la mesa ${mesaVip.etiqueta} ya tiene una reserva para ese turno y fecha. Liberarla o resetear la base local.`,
+        `Seed: no se pudo ubicar SEEDVTN2: la mesa ${mesaVip.etiqueta} ya tiene una reserva para ese turno y fecha.${avisoPrevia} Liberarla o resetear la base local.`,
       );
       return;
     }
