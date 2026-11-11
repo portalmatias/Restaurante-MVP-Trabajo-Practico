@@ -167,9 +167,10 @@ que la justifica, donde están las alternativas que se descartaron.
 - **Plano de mesas con las mismas reglas que la reserva real.** Ver D2 y D4 de
   [`plano-mesas`](openspec/changes/archive/2026-11-02-plano-mesas/design.md).
 - **Despliegue continuo a una instancia de AWS.** Docker Compose detrás de Caddy, imágenes
-  construidas en GitHub Actions y un despliegue por SSH con una clave que solo puede ejecutar ese
-  comando. Ver [`despliegue-continuo-ec2`](openspec/changes/despliegue-continuo-ec2/design.md)
-  (change todavía activo).
+  construidas en GitHub Actions y un despliegue por SSH con una clave que solo puede pedir dos
+  cosas: desplegar una versión nueva o volver a una ya desplegada. Ver
+  [`despliegue-continuo-ec2`](openspec/changes/despliegue-continuo-ec2/design.md) (change todavía
+  activo).
 
 La verificación de la Definition of Done de cada change está en
 [`docs/entrega.md`](docs/entrega.md).
@@ -358,8 +359,9 @@ Producción corre en **una instancia EC2** del Tier gratuito de AWS, con Docker 
 único servicio público (Caddy, en los puertos 80 y 443). Cada commit con CI en verde sobre
 `main` se despliega solo (salvo que otro commit verde posterior lo supere: entonces se omite y se
 despliega ese) (`.github/workflows/cd.yml`), por SSH con una clave dedicada que, en el
-servidor, solo puede pedir un despliegue (comando forzado). Si la versión nueva no responde, el
-script vuelve solo a la anterior.
+servidor, solo puede pedir un despliegue o una vuelta atrás a una versión ya desplegada (comando
+forzado, `deploy/ssh-entrada.sh`). Si la versión nueva no responde, el script vuelve solo a la
+anterior.
 
 Cómo se crea la infraestructura, en qué etapa está producción (HTTP o HTTPS), qué datos quedan
 expuestos en la etapa HTTP, cómo volver atrás, rotar la contraseña del admin y apagar todo:

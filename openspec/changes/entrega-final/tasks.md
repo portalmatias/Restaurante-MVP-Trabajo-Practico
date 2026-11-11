@@ -3,7 +3,7 @@
 - [x] 1.1 Crear `docs/entrega.md` con la estructura de D1 y D2: una sección de entregables, una
       sección por change archivado con los 11 puntos de `config.yaml` §13, y el apéndice de
       comandos de D3. Verificar que los 19 changes de `openspec/changes/archive/` tienen su
-      sección (todavía vacía).
+      sección.
 
 ## 2. Verificación de la Definition of Done (D2, D3)
 
@@ -55,12 +55,13 @@ Cada tarea se da por hecha cuando ninguno de sus changes tiene un punto sin valo
 
 ## 7. Cierre
 
-- [ ] 7.1 Correr `openspec validate entrega-final --strict`, `npm run lint` y
+- [x] 7.1 Correr `openspec validate entrega-final --strict`, `npm run lint` y
       `npm run typecheck`, abrir el primer PR de implementación (D7) con descripción en español
       enlazada a este change y pedir la revisión de un compañero. Verificar que el CI del PR
       queda en verde antes de pedir el merge.
 - [ ] 7.2 A medida que se archivan `despliegue-continuo-ec2`, `ip-real-detras-de-cloudflare`,
-      `verificacion-version-desplegada` y `plano-mesas-admin`, sumar su sección a
+      `verificacion-version-desplegada`, `plano-mesas-admin`, `seed-datos-demo` y
+      `reserva-nota-cliente`, sumar su sección a
       `docs/entrega.md` con el mismo criterio de la sección 2. Verificar que no queda ningún
       change archivado sin sección.
       Actualizar a `archive/` los enlaces de «Decisiones de diseño» que apuntaban a la ruta
