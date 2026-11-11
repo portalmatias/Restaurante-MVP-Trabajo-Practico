@@ -455,6 +455,19 @@ describe("MesasPanel", () => {
       expect(within(formulario).getByRole("button", { name: "Guardar cambios" })).toBeEnabled();
     });
 
+    it("Avisa la superposición con una mesa fuera de la grilla aunque no la dibuje", async () => {
+      // S4_FUERA ocupa las columnas 11 a 13 de una grilla de 12: la API la cuenta igual (409).
+      await renderizarSalon([S2, S3, S4_FUERA, S5]);
+      const formulario = editar("S5");
+      await vistaPreviaCargada(formulario);
+
+      elegir(formulario, "Columna", "9");
+      elegir(formulario, "Fila", "4");
+
+      expect(textoUbicacion(formulario)).toHaveTextContent("Se superpone con S4.");
+      expect(dibujo(formulario).querySelector('[data-mesa="S4"]')).toBeNull();
+    });
+
     it("Falla la carga de las mesas de la zona: dibuja la grilla y S4, avisa y deja guardar", async () => {
       await renderizarSalon(undefined, { "z-std": () => error(500, "Error interno") });
       const formulario = editar("S4");

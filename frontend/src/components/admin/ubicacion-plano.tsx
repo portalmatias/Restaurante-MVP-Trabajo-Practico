@@ -108,9 +108,12 @@ export function UbicacionPlano({
 }) {
   const { columna, fila, ancho, alto, forma } = ubicacion;
   const ubicada = columna !== undefined && fila !== undefined;
-  const mesasOtras = otras.estado === "ok" ? otras.mesas.filter((m) => entraEnGrilla(m, grilla)) : [];
+  const todasOtras = otras.estado === "ok" ? otras.mesas : [];
+  // Solo se dibujan las que entran en la grilla, pero el aviso cuenta todas las ubicadas, como
+  // `problemasDeUbicacion` del backend: una mesa que quedó fuera de la grilla también da 409.
+  const mesasOtras = todasOtras.filter((m) => entraEnGrilla(m, grilla));
   const superpuestas = ubicada
-    ? superposiciones({ posX: columna - 1, posY: fila - 1, ancho, alto }, mesasOtras)
+    ? superposiciones({ posX: columna - 1, posY: fila - 1, ancho, alto }, todasOtras)
     : [];
 
   let texto: string;
