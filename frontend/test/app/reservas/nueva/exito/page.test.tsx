@@ -1,4 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { claveNotaDeReserva } from "../../../../../src/lib/nota-cliente";
 import ExitoPage from "../../../../../app/reservas/nueva/exito/page";
 import { apiClient } from "../../../../../src/lib/api/client";
 import {
@@ -62,6 +63,7 @@ async function destinoDeRedireccion(searchParams: Record<string, string | string
 beforeEach(() => {
   GET.mockReset();
   responder();
+  window.sessionStorage.clear();
 });
 
 describe("/reservas/nueva/exito - sin los parámetros esperados", () => {
@@ -213,5 +215,76 @@ describe("/reservas/nueva/exito - el catálogo no responde", () => {
     );
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Resumen de tu selección" })).not.toBeInTheDocument();
+  });
+});
+
+// Nota para el restaurante (change `reserva-nota-cliente`, tarea 3.2).
+describe("/reservas/nueva/exito - la nota de la reserva", () => {
+  it("muestra «Tu nota» con la nota guardada al crear, respetando los saltos de línea", async () => {
+    window.sessionStorage.setItem(
+      claveNotaDeReserva(CONFIRMADA.codigo),
+      "Uno es celíaco.\nLlegamos 20:15.",
+    );
+
+    await renderizar();
+
+    const apartado = await screen.findByRole("region", { name: "Tu nota" });
+    const texto = within(apartado).getByText(/Uno es celíaco\./);
+    expect(texto.textContent).toBe("Uno es celíaco.\nLlegamos 20:15.");
+    expect(texto).toHaveClass("whitespace-pre-line");
+  });
+
+  it("sin nota guardada no muestra el apartado", async () => {
+    await renderizar();
+
+    await screen.findByText(CONFIRMADA.codigo);
+    expect(screen.queryByRole("region", { name: "Tu nota" })).not.toBeInTheDocument();
+  });
+
+  it("no muestra la nota de otra reserva", async () => {
+    window.sessionStorage.setItem(claveNotaDeReserva("OTRA1234"), "Es un cumpleaños");
+
+    await renderizar();
+
+    await screen.findByText(CONFIRMADA.codigo);
+    expect(screen.queryByText("Es un cumpleaños")).not.toBeInTheDocument();
+  });
+
+  it("la URL de la confirmación no lleva la nota: solo los seis parámetros", async () => {
+    expect(Object.keys(CONFIRMADA).sort()).toEqual(
+      ["codigo", "comensales", "estado", "fecha", "turnoId", "zonaId"],
+    );
+  });
+
+  it("al salir de la confirmación borra la nota guardada", async () => {
+    window.sessionStorage.setItem(claveNotaDeReserva(CONFIRMADA.codigo), "Es un cumpleaños");
+    const { unmount } = render(
+      await ExitoPage({ searchParams: Promise.resolve(CONFIRMADA) }),
+    );
+    await screen.findByRole("region", { name: "Tu nota" });
+
+    unmount();
+
+    // El borrado se agenda al desmontar (no se hace en el acto) para sobrevivir al doble montaje
+    // de React en desarrollo.
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem(claveNotaDeReserva(CONFIRMADA.codigo))).toBeNull(),
+    );
+  });
+
+  it("un desmontaje seguido de un nuevo montaje inmediato no borra la nota", async () => {
+    window.sessionStorage.setItem(claveNotaDeReserva(CONFIRMADA.codigo), "Es un cumpleaños");
+    const pagina = await ExitoPage({ searchParams: Promise.resolve(CONFIRMADA) });
+    const primero = render(pagina);
+    await screen.findByRole("region", { name: "Tu nota" });
+
+    primero.unmount();
+    render(pagina);
+
+    expect(await screen.findByText("Es un cumpleaños")).toBeInTheDocument();
+    await new Promise((resolver) => setTimeout(resolver, 10));
+    expect(window.sessionStorage.getItem(claveNotaDeReserva(CONFIRMADA.codigo))).toBe(
+      "Es un cumpleaños",
+    );
   });
 });

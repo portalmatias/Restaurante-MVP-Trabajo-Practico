@@ -413,7 +413,17 @@ function FilaReserva({
       <td className="tabular px-3 py-2 text-right">{reserva.comensales}</td>
       <td className="px-3 py-2">{reserva.nombreCliente}</td>
       <td className="px-3 py-2">{correoSinRomper(reserva.emailCliente)}</td>
-      <td className="tabular whitespace-nowrap px-3 py-2">{reserva.telefonoCliente}</td>
+      <td className="px-3 py-2">
+        <span className="tabular whitespace-nowrap">{reserva.telefonoCliente}</span>
+        {/* La nota va debajo del teléfono, con sus saltos de línea (D5 de `reserva-nota-cliente`).
+            La búsqueda de la página no la mira. */}
+        {reserva.notaCliente ? (
+          <div className="mt-2 min-w-48 max-w-xs">
+            <p className="text-sm font-medium text-muted-foreground">Nota</p>
+            <p className="whitespace-pre-line text-sm">{reserva.notaCliente}</p>
+          </div>
+        ) : null}
+      </td>
       <td className="px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
           {reserva.estado === "PENDIENTE" ? (

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ConsultaReserva } from "../../../src/components/reservas/consulta-reserva";
 import { apiClient } from "../../../src/lib/api/client";
+import { claveNotaDeReserva } from "../../../src/lib/nota-cliente";
 
 // Se mockea solo `apiClient`: `toApiResult` es el real, así el mapeo de errores es el de
 // producción. Sin red (design.md D10: el componente se prueba con datos de prueba locales).
@@ -650,5 +651,24 @@ describe("ConsultaReserva - detalle: gating de 'Cancelar mi reserva'", () => {
       expect(screen.getByRole("button", { name: "Reintentar" })).toBeDisabled();
       expect(screen.getByText(NOMBRE_ALERTA)).toBeInTheDocument();
     });
+  });
+});
+
+// La consulta pública no devuelve la nota (change `reserva-nota-cliente`, D3), y el detalle no
+// la toma de ningún otro lado, aunque haya una guardada en este navegador.
+describe("ConsultaReserva - nota del cliente", () => {
+  afterEach(() => window.sessionStorage.clear());
+
+  it("el detalle consultado no muestra «Tu nota»", async () => {
+    window.sessionStorage.setItem(claveNotaDeReserva(RESERVA.codigoReserva), "Es un cumpleaños");
+    POST.mockResolvedValue(respuestaOk(RESERVA));
+    render(<ConsultaReserva />);
+
+    completarFormulario();
+    enviar();
+
+    await screen.findByText("Resumen de tu reserva");
+    expect(screen.queryByText("Tu nota")).not.toBeInTheDocument();
+    expect(screen.queryByText("Es un cumpleaños")).not.toBeInTheDocument();
   });
 });

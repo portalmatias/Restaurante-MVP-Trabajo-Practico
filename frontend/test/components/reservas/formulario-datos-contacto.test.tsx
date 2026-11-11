@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { FormularioDatosContacto } from "../../../src/components/reservas/formulario-datos-contacto";
 import { apiClient } from "../../../src/lib/api/client";
 import { TURNO_CENA_SABADO, ZONA_STANDARD } from "../../fixtures/reservas";
+import { claveNotaDeReserva } from "../../../src/lib/nota-cliente";
 
 const push = jest.fn();
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -29,6 +30,7 @@ const CREADA = {
   turnoId: SELECCION.turnoId,
   zonaId: SELECCION.zonaId,
   comensales: SELECCION.comensales,
+  notaCliente: null,
 };
 
 function respuestaOk(data: unknown) {
@@ -60,6 +62,7 @@ function renderizar() {
 beforeEach(() => {
   POST.mockReset();
   push.mockReset();
+  window.sessionStorage.clear();
 });
 
 describe("FormularioDatosContacto - validación en línea", () => {
@@ -543,5 +546,136 @@ describe("FormularioDatosContacto - error de servidor o de red", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+// Nota para el restaurante (change `reserva-nota-cliente`, tareas 3.1 y 3.2).
+const ETIQUETA_NOTA = "Nota para el restaurante (opcional)";
+
+function bodyEnviado(): Record<string, unknown> {
+  return (POST.mock.calls[0][1] as { body: Record<string, unknown> }).body;
+}
+
+describe("FormularioDatosContacto - nota para el restaurante", () => {
+  it("muestra el campo de varias líneas con la ayuda y el contador enlazados", () => {
+    renderizar();
+
+    const nota = screen.getByLabelText(ETIQUETA_NOTA);
+    expect(nota.tagName).toBe("TEXTAREA");
+    expect(nota).toHaveAccessibleDescription(
+      "Por ejemplo: es un cumpleaños, vamos con un cochecito o alguien tiene una alergia. 0 de 500 caracteres",
+    );
+  });
+
+  it("reservar sin nota: no muestra error y el pedido no incluye la nota", async () => {
+    POST.mockResolvedValue(respuestaOk(CREADA));
+    renderizar();
+
+    completarFormulario();
+    enviar();
+
+    await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
+    expect(bodyEnviado()).not.toHaveProperty("notaCliente");
+    expect(screen.queryByText("La nota puede tener hasta 500 caracteres.")).not.toBeInTheDocument();
+  });
+
+  it("una nota de solo espacios no se envía", async () => {
+    POST.mockResolvedValue(respuestaOk(CREADA));
+    renderizar();
+
+    completarFormulario();
+    escribir(ETIQUETA_NOTA, "   ");
+    enviar();
+
+    await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
+    expect(bodyEnviado()).not.toHaveProperty("notaCliente");
+  });
+
+  it("reservar con nota: el pedido incluye la nota", async () => {
+    POST.mockResolvedValue(respuestaOk({ ...CREADA, notaCliente: "Es un cumpleaños" }));
+    renderizar();
+
+    completarFormulario();
+    escribir(ETIQUETA_NOTA, "Es un cumpleaños");
+    enviar();
+
+    await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
+    expect(bodyEnviado().notaCliente).toBe("Es un cumpleaños");
+  });
+
+  it("el contador cuenta puntos de código: «Celíaco 🎂» son 9", () => {
+    renderizar();
+
+    escribir(ETIQUETA_NOTA, "Celíaco 🎂");
+
+    expect(screen.getByText("9 de 500 caracteres")).toBeInTheDocument();
+  });
+
+  it("los espacios de los bordes no cuentan y se envía la nota recortada", async () => {
+    POST.mockResolvedValue(respuestaOk(CREADA));
+    renderizar();
+    const nota = "a".repeat(500);
+
+    completarFormulario();
+    escribir(ETIQUETA_NOTA, `  ${nota}`);
+    expect(screen.getByText("500 de 500 caracteres")).toBeInTheDocument();
+    enviar();
+
+    await waitFor(() => expect(POST).toHaveBeenCalledTimes(1));
+    expect(bodyEnviado().notaCliente).toBe(nota);
+  });
+
+  it("una nota de 501 caracteres muestra el error y no envía el pedido", () => {
+    renderizar();
+
+    completarFormulario();
+    escribir(ETIQUETA_NOTA, "a".repeat(501));
+    enviar();
+
+    expect(screen.getByText("La nota puede tener hasta 500 caracteres.")).toBeInTheDocument();
+    expect(screen.getByLabelText(ETIQUETA_NOTA)).toHaveAttribute("aria-invalid", "true");
+    expect(POST).not.toHaveBeenCalled();
+  });
+
+  it("un 400 del servidor sobre la nota se muestra junto al campo", async () => {
+    POST.mockResolvedValue(
+      respuestaError(400, {
+        statusCode: 400,
+        message: ["notaCliente puede tener hasta 500 caracteres"],
+      }),
+    );
+    renderizar();
+
+    completarFormulario();
+    escribir(ETIQUETA_NOTA, "Es un cumpleaños");
+    enviar();
+
+    expect(await screen.findByText("Puede tener hasta 500 caracteres")).toBeInTheDocument();
+    expect(screen.getByLabelText(ETIQUETA_NOTA)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByText(/notaCliente/)).not.toBeInTheDocument();
+  });
+
+  it("al crear la reserva guarda en sessionStorage la nota de la respuesta, por código, sin llevarla a la URL", async () => {
+    POST.mockResolvedValue(respuestaOk({ ...CREADA, notaCliente: "Es un cumpleaños" }));
+    renderizar();
+
+    completarFormulario();
+    escribir(ETIQUETA_NOTA, "  Es un cumpleaños  ");
+    enviar();
+
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    expect(window.sessionStorage.getItem(claveNotaDeReserva("K7PM3QXA"))).toBe("Es un cumpleaños");
+    expect(push.mock.calls[0][0]).not.toMatch(/cumplea/i);
+  });
+
+  it("sin nota en la respuesta no guarda nada", async () => {
+    POST.mockResolvedValue(respuestaOk(CREADA));
+    renderizar();
+
+    completarFormulario();
+    enviar();
+
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    expect(window.sessionStorage.getItem(claveNotaDeReserva("K7PM3QXA"))).toBeNull();
   });
 });

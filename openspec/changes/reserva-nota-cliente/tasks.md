@@ -70,13 +70,18 @@ Cada tarea va con tests primero: escribir el test, verlo fallar (rojo), implemen
 
 ## 3. Frontend (tests primero)
 
-- [ ] 3.1 Campo «Nota para el restaurante (opcional)» en `formulario-datos-contacto.tsx`, con la
+- [x] 3.1 Campo «Nota para el restaurante (opcional)» en `formulario-datos-contacto.tsx`, con la
       ayuda, el contador y el error de largo (design.md D5). Tests en
       `frontend/test/components/reservas/formulario-datos-contacto.test.tsx`: reservar sin nota
       (el pedido no la incluye), reservar con nota, el contador con "Celíaco 🎂" en «9 de 500
       caracteres», una nota de 500 con espacios en los bordes que se envía recortada y la nota
       de 501 que no se envía. El contador y el pedido usan `texto.trim()` y `Array.from`.
-- [ ] 3.2 Apartado «Tu nota» en la confirmación (design.md D5): el formulario guarda en
+      Rojo: 9 de 10 tests nuevos (solo pasaba «reservar sin nota»). Verde: 42/42. Además de los
+      que pide la tarea: una nota de solo espacios no se envía, y un `400` del backend sobre la
+      nota se muestra junto al campo (`notaCliente` entra en `CAMPOS_DEL_DTO`; observación de la
+      revisión de #115). El `<textarea>` es propio del formulario, con la ayuda, el contador y el
+      error enlazados por `aria-describedby`; el conteo vive en `src/lib/nota-cliente.ts`.
+- [x] 3.2 Apartado «Tu nota» en la confirmación (design.md D5): el formulario guarda en
       `sessionStorage` la `notaCliente` de la respuesta (clave por código) antes de navegar a
       `/reservas/nueva/exito`, y un componente cliente de esa página la muestra con
       `whitespace-pre-line`. Tests: en `formulario-datos-contacto.test.tsx`, la nota guardada
@@ -85,9 +90,16 @@ Cada tarea va con tests primero: escribir el test, verlo fallar (rojo), implemen
       a la URL de éxito y ver «Tu nota» con la nota recortada y un salto de línea; sin nota no
       hay apartado; la URL no contiene la nota). El detalle de `consulta-reserva.tsx` no
       cambia: test de que no muestra «Tu nota».
-- [ ] 3.3 La nota en `listado-reservas.tsx`, debajo del teléfono, con el rótulo «Nota». Tests en
+      Rojo: 2 de los 6 tests nuevos de la página de éxito (mostrar la nota y borrarla al salir);
+      los de «no muestra» ya pasaban. Verde: 125/125 entre la página, `consulta-reserva` y el
+      formulario. La nota se borra de `sessionStorage` al desmontarse la confirmación, no al
+      leerla (design.md D5; observación de la revisión de #115).
+- [x] 3.3 La nota en `listado-reservas.tsx`, debajo del teléfono, con el rótulo «Nota». Tests en
       `frontend/test/components/admin/listado-reservas.test.tsx`: reserva con nota, reserva con
       la nota "Uno es celíaco.\nLlegamos 20:15." (dos líneas separadas), reserva sin nota y la búsqueda «cochecito» que no mira las notas.
+      Rojo: 2 de 4 (la nota no se mostraba; «sin nota» y la búsqueda ya pasaban). Verde: 26/26.
+      El teléfono deja de llevar `whitespace-nowrap` en la celda y lo lleva en su propio `span`,
+      para que la nota pueda cortar línea debajo. Tests del frontend: 891/891.
 
 ## 4. Cierre
 

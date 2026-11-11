@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BotonCopiarCodigo } from "../../../../src/components/reservas/boton-copiar-codigo";
 import { ErrorDeCarga } from "../../../../src/components/reservas/error-de-carga";
+import { NotaDeLaReserva } from "../../../../src/components/reservas/nota-de-la-reserva";
 import { ResumenSeleccion } from "../../../../src/components/reservas/resumen-seleccion";
 import { Alert } from "../../../../src/components/ui/alert";
 import { buttonVariants } from "../../../../src/components/ui/button";
@@ -19,7 +20,9 @@ type ExitoPageProps = {
  * Reserva registrada (design.md D3 Pantalla 5). El código y el estado llegan por la URL; el
  * catálogo solo traduce `turnoId`/`zonaId` para el resumen. Como la reserva ya existe, un
  * catálogo que no responde nunca oculta el código: solo el resumen se reemplaza por el error.
- * No promete ningún email: el MVP no tiene proveedor de email.
+ * No promete ningún email: el MVP no tiene proveedor de email. La nota del cliente, si dejó una,
+ * no viene en la URL: la muestra `NotaDeLaReserva` desde `sessionStorage` (D5 de
+ * `reserva-nota-cliente`).
  */
 export default async function ExitoPage({ searchParams }: ExitoPageProps) {
   const confirmacion = leerConfirmacionDeQuery(await searchParams);
@@ -54,6 +57,7 @@ export default async function ExitoPage({ searchParams }: ExitoPageProps) {
         Guardá este código: junto con tu email, es la única forma de consultar o cancelar tu
         reserva.
       </p>
+      <NotaDeLaReserva codigoReserva={confirmacion.codigo} />
       {catalogo.error ? (
         <ErrorDeCarga error={catalogo.error} />
       ) : zona && turno ? (
