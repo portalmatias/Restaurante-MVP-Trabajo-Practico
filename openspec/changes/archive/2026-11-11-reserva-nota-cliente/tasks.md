@@ -124,4 +124,6 @@ Cada tarea va con tests primero: escribir el test, verlo fallar (rojo), implemen
       fila muestra «Nota» con las dos líneas. La reserva sin nota no muestra el apartado ni el
       rótulo. Al salir de la confirmación con «Volver al inicio» la nota se borra de
       `sessionStorage`; con una navegación completa queda hasta cerrar la pestaña (design.md D5).
-- [ ] 4.3 Pedir la aprobación de un compañero y, una vez integrado, archivar el change.
+- [x] 4.3 Pedir la aprobación de un compañero y, una vez integrado, archivar el change.
+      Aprobado por portalmatias en #118 y mergeado en `4dfdae0` (2026-11-11). Se archiva en
+      `chore/archivar-reserva-nota-cliente`.
