@@ -137,23 +137,23 @@ plano" de `specs/frontend-admin/spec.md`. Cada tarea va con tests primero (rojo,
       valores válidos de columna y fila según ancho, alto y grilla; la corrección al último valor
       válido; el texto de la ubicación ("las columnas 6 y 7", "la columna 6", "las columnas 6 a
       8") y la lista de superposiciones, con los casos del seed. Verificar que pasan.
-- [ ] 4.3 Campos de la sección "Ubicación en el plano". Tests: la columna limitada por el ancho,
+- [x] 4.3 Campos de la sección "Ubicación en el plano". Tests: la columna limitada por el ancho,
       el ancho mayor que corrige la columna, la mesa sin ubicar, la mesa guardada fuera de la
       grilla (campos vacíos y aviso), y que el alta no muestra la sección.
-- [ ] 4.4 Vista previa y su texto. Tests: la vista previa que sigue los valores (sin avisar
+- [x] 4.4 Vista previa y su texto. Tests: la vista previa que sigue los valores (sin avisar
       superposición con la propia posición guardada), el aviso de superposición con el botón
       habilitado, la falla al cargar las mesas de la zona, y la alternativa textual.
-- [ ] 4.5 Armado del pedido. Tests: mover, ubicar una mesa sin ubicar, guardar sin ubicación sin
+- [x] 4.5 Armado del pedido. Tests: mover, ubicar una mesa sin ubicar, guardar sin ubicación sin
       error, ubicación a medias que no se envía, quitar del plano, las coordenadas juntas con
       `ancho`, `alto` y `forma` solo si cambiaron, y reubicar la mesa guardada fuera de la grilla.
-- [ ] 4.6 Errores y listado. Tests: la superposición, el tamaño y la ubicación fuera de la
+- [x] 4.6 Errores y listado. Tests: la superposición, el tamaño y la ubicación fuera de la
       grilla rechazados por la API junto a la sección, y la columna "Plano" del listado
       ("Columna 9, fila 6", "Sin ubicar" y "Fuera de la grilla"). Implementar la regla `ubicacion` de `errores-campo.ts`.
-- [ ] 4.7 Cambio de zona. Tests: cambio de zona, cambio a una zona más chica que ajusta el
+- [x] 4.7 Cambio de zona. Tests: cambio de zona, cambio a una zona más chica que ajusta el
       tamaño, cambio de zona sin elegir ubicación, con la misma columna y fila (envía las dos
       coordenadas aunque coincidan con las de la zona vieja), y volver a la zona original que
       restaura la ubicación (también con una mesa fuera de la grilla).
-- [ ] 4.8 Cambios de zona rápidos con la respuesta vieja llegando última (design.md D5, "Datos").
+- [x] 4.8 Cambios de zona rápidos con la respuesta vieja llegando última (design.md D5, "Datos").
       Verificar que pasa y que los tests actuales del panel siguen en verde.
 
 ## 5. Cierre
