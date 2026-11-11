@@ -420,7 +420,7 @@ function FilaReserva({
         {reserva.notaCliente ? (
           <div className="mt-2 min-w-48 max-w-xs">
             <p className="text-sm font-medium text-muted-foreground">Nota</p>
-            <p className="whitespace-pre-line text-sm">{reserva.notaCliente}</p>
+            <p className="whitespace-pre-line break-words text-sm">{reserva.notaCliente}</p>
           </div>
         ) : null}
       </td>

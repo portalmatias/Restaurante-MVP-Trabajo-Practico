@@ -99,7 +99,8 @@ Cada tarea va con tests primero: escribir el test, verlo fallar (rojo), implemen
       la nota "Uno es celíaco.\nLlegamos 20:15." (dos líneas separadas), reserva sin nota y la búsqueda «cochecito» que no mira las notas.
       Rojo: 2 de 4 (la nota no se mostraba; «sin nota» y la búsqueda ya pasaban). Verde: 26/26.
       El teléfono deja de llevar `whitespace-nowrap` en la celda y lo lleva en su propio `span`,
-      para que la nota pueda cortar línea debajo. Tests del frontend: 891/891.
+      para que la nota pueda cortar línea debajo. Tests del frontend: 891/891 en ese momento; al
+      cierre son 892 por el test de montaje doble que se sumó después en 3.2 (ver 4.1).
 
 ## 4. Cierre
 

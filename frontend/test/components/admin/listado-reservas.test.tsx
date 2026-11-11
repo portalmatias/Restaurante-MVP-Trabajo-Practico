@@ -369,6 +369,13 @@ describe("ListadoReservas - nota del cliente", () => {
     expect(texto).toHaveClass("whitespace-pre-line");
   });
 
+  it("una nota larga sin espacios puede cortarse dentro de la celda", async () => {
+    reservas = [{ ...PENDIENTE, notaCliente: "a".repeat(500) }];
+    await renderizar();
+
+    expect(within(fila("PEND0001")).getByText("a".repeat(500))).toHaveClass("break-words");
+  });
+
   it("una reserva sin nota no muestra el rótulo", async () => {
     reservas = [{ ...PENDIENTE, notaCliente: "Vamos con un cochecito" }, CONFIRMADA];
     await renderizar();

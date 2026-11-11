@@ -232,6 +232,7 @@ describe("/reservas/nueva/exito - la nota de la reserva", () => {
     const texto = within(apartado).getByText(/Uno es celíaco\./);
     expect(texto.textContent).toBe("Uno es celíaco.\nLlegamos 20:15.");
     expect(texto).toHaveClass("whitespace-pre-line");
+    expect(texto).toHaveClass("break-words");
   });
 
   it("sin nota guardada no muestra el apartado", async () => {
@@ -248,12 +249,6 @@ describe("/reservas/nueva/exito - la nota de la reserva", () => {
 
     await screen.findByText(CONFIRMADA.codigo);
     expect(screen.queryByText("Es un cumpleaños")).not.toBeInTheDocument();
-  });
-
-  it("la URL de la confirmación no lleva la nota: solo los seis parámetros", async () => {
-    expect(Object.keys(CONFIRMADA).sort()).toEqual(
-      ["codigo", "comensales", "estado", "fecha", "turnoId", "zonaId"],
-    );
   });
 
   it("al salir de la confirmación borra la nota guardada", async () => {

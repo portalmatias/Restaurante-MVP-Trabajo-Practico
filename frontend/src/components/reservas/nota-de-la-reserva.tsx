@@ -61,7 +61,7 @@ export function NotaDeLaReserva({ codigoReserva }: NotaDeLaReservaProps) {
       <h2 id={idTitulo} className="font-display text-xl font-medium">
         Tu nota
       </h2>
-      <p className="whitespace-pre-line text-base text-foreground">{nota}</p>
+      <p className="whitespace-pre-line break-words text-base text-foreground">{nota}</p>
     </section>
   );
 }
