@@ -158,10 +158,18 @@ plano" de `specs/frontend-admin/spec.md`. Cada tarea va con tests primero (rojo,
 
 ## 5. Cierre
 
-- [ ] 5.1 Correr `npm run lint`, `npm run typecheck -w frontend`, los tests del backend (unitarios
+- [x] 5.1 Correr `npm run lint`, `npm run typecheck -w frontend`, los tests del backend (unitarios
       y e2e) y del frontend, `npm run openapi:check` y `openspec validate plano-mesas-admin
       --strict`, y anotar los resultados en el PR.
-- [ ] 5.2 Revisión visual en `/admin/salon` con el backend local: mover S4, intentar superponerla
+      Resultado (11/11/2026): lint limpio; typecheck del frontend sin errores; frontend 915 tests
+      (63 suites); backend 248 unitarios, 188 de integración y 168 e2e; `openapi:check` sin
+      desvíos; `openspec validate plano-mesas-admin --strict` válido.
+- [x] 5.2 Revisión visual en `/admin/salon` con el backend local: mover S4, intentar superponerla
       con S5, quitar S2 del plano y verificar en `/reservas/nueva/resultado` que el plano del
       cliente refleja los cambios. Anotar el resultado en el PR.
+      Resultado (11/11/2026, con Playwright): S4 pasó de "Columna 1, fila 4" a "Columna 9, fila 6";
+      en la columna 6, fila 4 la vista previa avisó "Se superpone con S5." y la API respondió
+      `409` "La mesa se superpone con S5.", mostrado junto a la sección; S2 quedó "Sin ubicar". El
+      plano del cliente dibuja S1, S3, S4 y S5, con S4 en su lugar nuevo, y lista S2 "sin ubicar
+      en el plano".
 - [ ] 5.3 Pedir la aprobación de un compañero y, una vez integrado, archivar el change.
