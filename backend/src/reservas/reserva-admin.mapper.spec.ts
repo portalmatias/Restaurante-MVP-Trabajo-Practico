@@ -20,6 +20,7 @@ function reservaDePrueba(
     nombreCliente: 'Ana Pérez',
     emailCliente: 'ana.perez@example.com',
     telefonoCliente: '+54 9 11 5555-1234',
+    notaCliente: null,
     codigoReserva: 'R2WN8HDE',
     createdAt: new Date('2026-09-17T14:32:10.000Z'),
     updatedAt: new Date('2026-09-17T14:32:10.000Z'),
@@ -59,6 +60,14 @@ function reservaDePrueba(
 }
 
 describe('aReservaAdminRespuesta', () => {
+  it('incluye la nota del cliente tal como se guardó', () => {
+    const respuesta = aReservaAdminRespuesta(
+      reservaDePrueba({ notaCliente: 'Uno es celíaco.\nLlegamos 20:15.' }),
+    );
+
+    expect(respuesta.notaCliente).toBe('Uno es celíaco.\nLlegamos 20:15.');
+  });
+
   it('devuelve todos los campos de la vista de admin, incluido lo que la vista pública excluye', () => {
     const respuesta = aReservaAdminRespuesta(reservaDePrueba());
 
@@ -71,6 +80,7 @@ describe('aReservaAdminRespuesta', () => {
       nombreCliente: 'Ana Pérez',
       emailCliente: 'ana.perez@example.com',
       telefonoCliente: '+54 9 11 5555-1234',
+      notaCliente: null,
       turno: {
         id: '3f1c2a9e-5b7d-4e8a-9c21-6d4b0f8e1a73',
         horaInicio: '20:00',

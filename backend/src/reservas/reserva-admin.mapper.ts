@@ -26,6 +26,7 @@ export function aReservaAdminRespuesta(
     nombreCliente: reserva.nombreCliente,
     emailCliente: reserva.emailCliente,
     telefonoCliente: reserva.telefonoCliente,
+    notaCliente: reserva.notaCliente,
     turno: {
       id: reserva.turno.id,
       horaInicio: formatearHoraLocal(reserva.turno.horaInicio),

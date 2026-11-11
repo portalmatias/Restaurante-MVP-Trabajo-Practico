@@ -1,21 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "../ui/alert";
 import { Button, buttonVariants } from "../ui/button";
 import { Field } from "../ui/field";
+import { Label } from "../ui/label";
 import { apiClient, toApiResult } from "../../lib/api/client";
 import type { ErrorApi } from "../../lib/api/errors";
 import { agruparPorCampo, sinNombreDeCampo } from "../../lib/agrupar-por-campo";
+import { guardarNotaDeReserva, largoDeNota, NOTA_CLIENTE_MAX } from "../../lib/nota-cliente";
 import {
   urlConSeleccion,
   urlDeExito,
   type SeleccionReserva,
 } from "../../lib/seleccion-reserva";
 
-type Campo = "nombre" | "email" | "telefono";
+type Campo = "nombre" | "email" | "telefono" | "nota";
 type Errores = Partial<Record<Campo, string>>;
 
 const FORMATO_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,6 +27,7 @@ const CAMPOS_DEL_DTO: Record<string, Campo> = {
   nombreCliente: "nombre",
   emailCliente: "email",
   telefonoCliente: "telefono",
+  notaCliente: "nota",
 };
 
 const MENSAJE_CHOQUE =
@@ -49,6 +52,21 @@ function errorDeTelefono(telefono: string): string | undefined {
   return telefono.trim() === "" ? "Falta ingresar tu teléfono." : undefined;
 }
 
+// La nota es opcional: solo se valida el largo, contado como el backend (D5 de
+// `reserva-nota-cliente`).
+function errorDeNota(nota: string): string | undefined {
+  return largoDeNota(nota) > NOTA_CLIENTE_MAX
+    ? `La nota puede tener hasta ${NOTA_CLIENTE_MAX} caracteres.`
+    : undefined;
+}
+
+const CLASES_NOTA = [
+  "min-h-28 w-full rounded-sm border bg-background px-3 py-2 text-base text-foreground",
+  "placeholder:text-muted-foreground",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+  "disabled:cursor-not-allowed disabled:opacity-50",
+].join(" ");
+
 export type FormularioDatosContactoProps = {
   /** Selección de los pasos anteriores, ya validada en su forma por la página (design.md D1). */
   seleccion: SeleccionReserva;
@@ -64,6 +82,8 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [nota, setNota] = useState("");
+  const idNota = useId();
   // Errores de la validación en línea y los que el servidor asoció a un campo (`400`, D8).
   const [errores, setErrores] = useState<Errores>({});
   const [erroresDelServidor, setErroresDelServidor] = useState<Errores>({});
@@ -101,6 +121,7 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
 
   function validar(campo: Campo, valor: string): string | undefined {
     if (campo === "nombre") return errorDeNombre(valor);
+    if (campo === "nota") return errorDeNota(valor);
     return campo === "email" ? errorDeEmail(valor) : errorDeTelefono(valor);
   }
 
@@ -116,11 +137,14 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
       nombre: errorDeNombre(nombre),
       email: errorDeEmail(email),
       telefono: errorDeTelefono(telefono),
+      nota: errorDeNota(nota),
     };
     setErrores(nuevosErrores);
-    if (nuevosErrores.nombre || nuevosErrores.email || nuevosErrores.telefono) {
+    if (nuevosErrores.nombre || nuevosErrores.email || nuevosErrores.telefono || nuevosErrores.nota) {
       return;
     }
+    // Se envía solo si tiene texto además de espacios (spec `frontend-cliente`).
+    const notaRecortada = nota.trim();
 
     const solicitud = ++ultimaSolicitud.current;
     enCurso.current = true;
@@ -135,6 +159,7 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
           nombreCliente: nombre.trim(),
           emailCliente: email.trim(),
           telefonoCliente: telefono.trim(),
+          ...(notaRecortada === "" ? {} : { notaCliente: notaRecortada }),
         },
       }),
     );
@@ -144,7 +169,11 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
 
     if (!resultado.error) {
       // El botón sigue deshabilitado hasta que la navegación desmonte el formulario.
-      const { codigoReserva, estado, fecha, turnoId, zonaId, comensales } = resultado.data;
+      const { codigoReserva, estado, fecha, turnoId, zonaId, comensales, notaCliente } =
+        resultado.data;
+      // La nota guardada (la de la respuesta, ya recortada) va a la confirmación por
+      // `sessionStorage`, nunca por la URL (D5).
+      if (notaCliente) guardarNotaDeReserva(codigoReserva, notaCliente);
       const destino = urlDeExito({ codigo: codigoReserva, estado, fecha, turnoId, zonaId, comensales });
       setDestinoExito(destino);
       router.push(destino);
@@ -163,6 +192,7 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
         nombre: enLinea("nombre"),
         email: enLinea("email"),
         telefono: enLinea("telefono"),
+        nota: enLinea("nota"),
       });
       setGenerales(sinCampo);
       return;
@@ -230,6 +260,17 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
         onChange={(evento) => editar("telefono", evento.target.value, setTelefono)}
         onBlur={() => alSalir("telefono", telefono)}
       />
+      <CampoNota
+        id={idNota}
+        valor={nota}
+        deshabilitado={enviando}
+        error={errores.nota ?? erroresDelServidor.nota}
+        onChange={(valor) => {
+          editar("nota", valor, setNota);
+          // El error de largo se actualiza mientras se escribe, junto con el contador.
+          setErrores((actuales) => ({ ...actuales, nota: errorDeNota(valor) }));
+        }}
+      />
       {errorApi ? (
         <div className="flex flex-col gap-3">
           {errorApi.tipo === "conflicto" && conMotivos ? (
@@ -291,6 +332,52 @@ export function FormularioDatosContacto({ seleccion }: FormularioDatosContactoPr
         {enviando ? "Confirmando…" : enEspera ? "Esperá un momento para reintentar" : "Confirmar reserva"}
       </Button>
     </form>
+  );
+}
+
+type CampoNotaProps = {
+  id: string;
+  valor: string;
+  deshabilitado: boolean;
+  error?: string;
+  onChange: (valor: string) => void;
+};
+
+/**
+ * «Nota para el restaurante (opcional)» (D5 de `reserva-nota-cliente`): un `<textarea>` con la
+ * ayuda, el contador y el error enlazados por `aria-describedby`. El contador usa el mismo
+ * conteo que el backend.
+ */
+function CampoNota({ id, valor, deshabilitado, error, onChange }: CampoNotaProps) {
+  const idAyuda = `${id}-ayuda`;
+  const idContador = `${id}-contador`;
+  const idError = `${id}-error`;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>Nota para el restaurante (opcional)</Label>
+      <textarea
+        id={id}
+        name="nota"
+        rows={3}
+        value={valor}
+        disabled={deshabilitado}
+        className={`${CLASES_NOTA} ${error ? "border-destructive" : "border-border"}`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={[idAyuda, idContador, error ? idError : undefined].filter(Boolean).join(" ")}
+        onChange={(evento) => onChange(evento.target.value)}
+      />
+      <p id={idAyuda} className="text-sm text-muted-foreground">
+        Por ejemplo: es un cumpleaños, vamos con un cochecito o alguien tiene una alergia.
+      </p>
+      <p id={idContador} className="tabular text-sm text-muted-foreground">
+        {largoDeNota(valor)} de {NOTA_CLIENTE_MAX} caracteres
+      </p>
+      {error ? (
+        <p id={idError} role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

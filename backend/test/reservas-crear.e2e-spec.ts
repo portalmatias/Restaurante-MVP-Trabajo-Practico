@@ -270,6 +270,7 @@ describe('POST /reservas (e2e)', () => {
         'comensales',
         'estado',
         'fecha',
+        'notaCliente',
         'turnoId',
         'zonaId',
       ]);
@@ -320,6 +321,156 @@ describe('POST /reservas (e2e)', () => {
         },
       });
       expect(persistida?.estado).toBe(EstadoReserva.PENDIENTE);
+    });
+  });
+
+  // --- Nota del cliente (change reserva-nota-cliente, tarea 2.3) -----------------------------
+  describe('notaCliente', () => {
+    async function crearCon(notaCliente: unknown, sinNota = false) {
+      const turno = await crearTurno(diaDe(FECHA));
+      const body = bodyValido({ turnoId: turno.id, zonaId: zonaStandardId });
+      return crear(sinNota ? body : { ...body, notaCliente });
+    }
+
+    async function notaPersistida(codigoReserva: string) {
+      const reserva = await prisma.reserva.findUnique({
+        where: { codigoReserva },
+      });
+      return reserva?.notaCliente;
+    }
+
+    async function esperar400SinPersistir(notaCliente: unknown) {
+      const antes = await prisma.reserva.count();
+      const respuesta = await crearCon(notaCliente);
+      expect(respuesta.status).toBe(400);
+      expect(await prisma.reserva.count()).toBe(antes);
+      return (respuesta.body as { message: string[] }).message;
+    }
+
+    it('sin notaCliente: 201 y la reserva queda sin nota (null)', async () => {
+      const respuesta = await crearCon(undefined, true);
+
+      expect(respuesta.status).toBe(201);
+      const cuerpo = respuesta.body as {
+        codigoReserva: string;
+        notaCliente: unknown;
+      };
+      expect(cuerpo.notaCliente).toBeNull();
+      expect(await notaPersistida(cuerpo.codigoReserva)).toBeNull();
+    });
+
+    it('notaCliente en null: 201 y sin nota', async () => {
+      const respuesta = await crearCon(null);
+
+      expect(respuesta.status).toBe(201);
+      const cuerpo = respuesta.body as {
+        codigoReserva: string;
+        notaCliente: unknown;
+      };
+      expect(cuerpo.notaCliente).toBeNull();
+      expect(await notaPersistida(cuerpo.codigoReserva)).toBeNull();
+    });
+
+    it('la respuesta devuelve la nota guardada, sin los espacios de los bordes', async () => {
+      const respuesta = await crearCon('  Es un cumpleaños  ');
+
+      expect(respuesta.status).toBe(201);
+      const cuerpo = respuesta.body as {
+        codigoReserva: string;
+        notaCliente: unknown;
+      };
+      expect(cuerpo.notaCliente).toBe('Es un cumpleaños');
+      expect(await notaPersistida(cuerpo.codigoReserva)).toBe(
+        'Es un cumpleaños',
+      );
+    });
+
+    it('guarda los saltos de línea y los acentos', async () => {
+      const respuesta = await crearCon('  Uno es celíaco.\nLlegamos 20:15.  ');
+
+      expect(respuesta.status).toBe(201);
+      expect(
+        await notaPersistida(
+          (respuesta.body as { codigoReserva: string }).codigoReserva,
+        ),
+      ).toBe('Uno es celíaco.\nLlegamos 20:15.');
+    });
+
+    it('una nota de solo espacios se guarda como sin nota', async () => {
+      const respuesta = await crearCon('   ');
+
+      expect(respuesta.status).toBe(201);
+      const cuerpo = respuesta.body as {
+        codigoReserva: string;
+        notaCliente: unknown;
+      };
+      expect(cuerpo.notaCliente).toBeNull();
+      expect(await notaPersistida(cuerpo.codigoReserva)).toBeNull();
+    });
+
+    it('acepta una nota de 500 caracteres y la guarda completa', async () => {
+      const nota = 'a'.repeat(500);
+      const respuesta = await crearCon(nota);
+
+      expect(respuesta.status).toBe(201);
+      expect(
+        await notaPersistida(
+          (respuesta.body as { codigoReserva: string }).codigoReserva,
+        ),
+      ).toBe(nota);
+    });
+
+    it('rechaza una nota de 501 caracteres con 400, sin persistir', async () => {
+      expect(await esperar400SinPersistir('a'.repeat(501))).toEqual([
+        'notaCliente puede tener hasta 500 caracteres',
+      ]);
+    });
+
+    it('rechaza 499 letras seguidas de "❤️" (dos puntos de código) con 400, sin persistir', async () => {
+      expect(await esperar400SinPersistir(`${'a'.repeat(499)}❤️`)).toEqual([
+        'notaCliente puede tener hasta 500 caracteres',
+      ]);
+    });
+
+    it('rechaza una nota que no es texto (42) con 400, sin persistir', async () => {
+      expect(await esperar400SinPersistir(42)).toContain(
+        'notaCliente debe ser un texto',
+      );
+    });
+
+    it('sin lugar en el turno, la nota no cambia el rechazo', async () => {
+      const turno = await crearTurno(diaDe(FECHA));
+      const mesaDoce = await crearMesa(zonaVipId, 12, 'NOTA-M12');
+      const mesaSeis = await crearMesa(zonaVipId, 6, 'NOTA-M6');
+      await crearMesa(zonaVipId, 4, 'NOTA-M4');
+      await crearReservaExistente({
+        mesaId: mesaDoce.id,
+        turnoId: turno.id,
+        fecha: FECHA,
+        comensales: 12,
+        estado: EstadoReserva.CONFIRMADA,
+      });
+      await crearReservaExistente({
+        mesaId: mesaSeis.id,
+        turnoId: turno.id,
+        fecha: FECHA,
+        comensales: 6,
+        estado: EstadoReserva.PENDIENTE,
+      });
+      const body = bodyValido({
+        turnoId: turno.id,
+        zonaId: zonaVipId,
+        comensales: 4,
+      });
+      const antes = await prisma.reserva.count();
+
+      const sinNota = await crear(body);
+      const conNota = await crear({ ...body, notaCliente: 'Es un cumpleaños' });
+
+      expect(sinNota.status).toBe(409);
+      expect(conNota.status).toBe(409);
+      expect(conNota.body).toEqual(sinNota.body);
+      expect(await prisma.reserva.count()).toBe(antes);
     });
   });
 

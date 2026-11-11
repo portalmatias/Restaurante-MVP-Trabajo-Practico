@@ -39,6 +39,7 @@ function reserva(id: string, codigo: string, estado: string) {
     nombreCliente: "Ana Pérez",
     emailCliente: "ana.perez@example.com",
     telefonoCliente: "+54 9 11 5555-1234",
+    notaCliente: null as string | null,
     turno: { id: "t-1", horaInicio: "20:00", horaFin: "23:30" },
     zona: { id: "z-vip", nombre: "VIP" },
     mesa: { id: "m-1", etiqueta: "V1" },
@@ -345,5 +346,53 @@ describe("ListadoReservas - marcar no show", () => {
     expect(screen.getByRole("rowheader", { name: "PEND0001" })).toBeInTheDocument();
     expect(screen.queryByRole("rowheader", { name: "CANC0003" })).not.toBeInTheDocument();
     expect(screen.getByText("No se pudo confirmar.")).toBeInTheDocument();
+  });
+});
+
+// Nota del cliente (change `reserva-nota-cliente`, tarea 3.3).
+describe("ListadoReservas - nota del cliente", () => {
+  it("una reserva con nota la muestra con el rótulo «Nota»", async () => {
+    reservas = [{ ...PENDIENTE, notaCliente: "Vamos con un cochecito" }, CONFIRMADA];
+    await renderizar();
+
+    const conNota = within(fila("PEND0001"));
+    expect(conNota.getByText("Nota")).toBeInTheDocument();
+    expect(conNota.getByText("Vamos con un cochecito")).toBeInTheDocument();
+  });
+
+  it("la nota respeta los saltos de línea", async () => {
+    reservas = [{ ...PENDIENTE, notaCliente: "Uno es celíaco.\nLlegamos 20:15." }];
+    await renderizar();
+
+    const texto = within(fila("PEND0001")).getByText(/Uno es celíaco\./);
+    expect(texto.textContent).toBe("Uno es celíaco.\nLlegamos 20:15.");
+    expect(texto).toHaveClass("whitespace-pre-line");
+  });
+
+  it("una nota larga sin espacios puede cortarse dentro de la celda", async () => {
+    reservas = [{ ...PENDIENTE, notaCliente: "a".repeat(500) }];
+    await renderizar();
+
+    expect(within(fila("PEND0001")).getByText("a".repeat(500))).toHaveClass("break-words");
+  });
+
+  it("una reserva sin nota no muestra el rótulo", async () => {
+    reservas = [{ ...PENDIENTE, notaCliente: "Vamos con un cochecito" }, CONFIRMADA];
+    await renderizar();
+
+    expect(within(fila("CONF0002")).queryByText("Nota")).not.toBeInTheDocument();
+  });
+
+  it("la búsqueda en la página no mira el texto de las notas", async () => {
+    reservas = [{ ...PENDIENTE, notaCliente: "Vamos con un cochecito" }, CONFIRMADA];
+    await renderizar();
+
+    fireEvent.change(screen.getByLabelText("Buscar en esta página"), {
+      target: { value: "cochecito" },
+    });
+
+    expect(
+      screen.getByText(/Ninguna reserva de esta página coincide con «cochecito»/),
+    ).toBeInTheDocument();
   });
 });

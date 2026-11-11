@@ -85,6 +85,7 @@ describe('POST /reservas/consultar (e2e)', () => {
         nombreCliente: 'Cliente Consulta E2E',
         emailCliente: 'consulta-e2e@example.com',
         telefonoCliente: '+54 9 11 5555-1234',
+        notaCliente: 'Es un cumpleaños',
         codigoReserva: 'RCOE2EC1',
       },
     });
@@ -168,6 +169,16 @@ describe('POST /reservas/consultar (e2e)', () => {
         },
         zona: { id: expect.any(String) as string, nombre: 'STANDARD' },
       });
+    });
+
+    it('la consulta no devuelve la nota del cliente', async () => {
+      const respuesta = await consultar({
+        codigo: reservaConfirmada.codigoReserva,
+        email: reservaConfirmada.emailCliente,
+      }).expect(200);
+
+      expect(respuesta.body).not.toHaveProperty('notaCliente');
+      expect(JSON.stringify(respuesta.body)).not.toContain('Es un cumpleaños');
     });
 
     it('200 con el código en minúsculas', async () => {

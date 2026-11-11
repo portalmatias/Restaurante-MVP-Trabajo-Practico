@@ -152,6 +152,11 @@ model Reserva {
   emailCliente    String
   telefonoCliente String
 
+  /// Nota opcional del cliente para el restaurante (change `reserva-nota-cliente`, D1). Se
+  /// guarda sin los espacios de los bordes; `varchar(500)` cuenta puntos de código, igual que
+  /// el DTO, así el límite también queda en la base.
+  notaCliente String? @db.VarChar(500)
+
   /// Código alfanumérico de 8 caracteres, único, que junto al email permite al cliente
   /// consultar o cancelar su Reserva sin cuenta (config.yaml §5).
   codigoReserva String @unique
