@@ -103,11 +103,24 @@ Cada tarea va con tests primero: escribir el test, verlo fallar (rojo), implemen
 
 ## 4. Cierre
 
-- [ ] 4.1 Correr `npm run lint`, `npm run typecheck -w frontend`, los tests del backend
+- [x] 4.1 Correr `npm run lint`, `npm run typecheck -w frontend`, los tests del backend
       (unitarios, de integración y e2e) y del frontend, `npm run openapi:check` y
       `openspec validate reserva-nota-cliente --strict`, y anotar los resultados en el PR.
-- [ ] 4.2 Revisión en el navegador con el backend local: crear una reserva con la nota "Es un
+      Resultados (2026-11-11, base de test migrada y seedeada como en CI): `npm run lint` y
+      `npm run typecheck -w frontend` en verde; backend unitarios 269/269, integración 196/196,
+      e2e 180/180; frontend 892/892; `openapi:check` sin deriva y `openapi:lint` sin errores;
+      `openspec validate reserva-nota-cliente --strict` válido. En la primera corrida de
+      integración fallaron por timeout 7 tests de `auth.integration-spec.ts` (archivo que este
+      change no toca); solo ese archivo dio 12/12, y la suite completa repetida dio 196/196.
+- [x] 4.2 Revisión en el navegador con el backend local: crear una reserva con la nota "Es un
       cumpleaños" y un salto de línea, verla en la confirmación, consultarla con código y email (el detalle no trae la nota),
       y verla en `/admin/reservas`; crear otra sin nota y verificar que no aparece el apartado.
       Anotar el resultado en el PR.
+      Hecho el 2026-11-11 con Playwright contra la app local (`npm run dev`, base de desarrollo
+      seedeada): la reserva con la nota «Es un cumpleaños.» y un salto de línea (con espacios en
+      los bordes) muestra «Tu nota» recortada y en dos líneas, también al recargar; la URL no
+      la lleva. Consultada con código y email, el detalle no la muestra. En `/admin/reservas` la
+      fila muestra «Nota» con las dos líneas. La reserva sin nota no muestra el apartado ni el
+      rótulo. Al salir de la confirmación con «Volver al inicio» la nota se borra de
+      `sessionStorage`; con una navegación completa queda hasta cerrar la pestaña (design.md D5).
 - [ ] 4.3 Pedir la aprobación de un compañero y, una vez integrado, archivar el change.

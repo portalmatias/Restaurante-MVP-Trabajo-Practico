@@ -24,9 +24,10 @@ const borradosPendientes = new Map<string, ReturnType<typeof setTimeout>>();
  * la hidratación) no hay `sessionStorage`, así que el HTML inicial no la incluye. Sin nota
  * guardada, o sin almacenamiento disponible, no muestra nada.
  *
- * Al salir de la confirmación la borra, porque puede traer datos de salud y no hace falta que
- * quede en el navegador. Recargar la página no pasa por esa limpieza, así que la nota se sigue
- * viendo hasta que la persona se va.
+ * Al salir de la confirmación navegando por la app la borra, porque puede traer datos de salud y
+ * no hace falta que quede en el navegador. Recargar la página no pasa por esa limpieza, así que
+ * la nota se sigue viendo. Una navegación completa o cerrar la pestaña tampoco pasan: ahí queda
+ * hasta que se cierra la pestaña, cuando el navegador vacía `sessionStorage` (D5).
  */
 export function NotaDeLaReserva({ codigoReserva }: NotaDeLaReservaProps) {
   const nota = useSyncExternalStore(

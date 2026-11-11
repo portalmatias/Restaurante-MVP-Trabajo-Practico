@@ -112,10 +112,13 @@ components:
   respetar los saltos de línea. Sin nota guardada, o con `sessionStorage` no disponible, no
   muestra el apartado. React escapa el texto, así que no hace falta sanitizar. Alternativa
   descartada: hacerla viajar por la query.
-  Al salir de la confirmación (cuando el componente se desmonta) la nota se borra de
-  `sessionStorage`, porque puede traer datos de salud y no hace falta que quede en el navegador.
-  No se borra al leerla: recargar la confirmación la seguiría mostrando hasta que la persona se
-  va. (Observación de la revisión de #115.)
+  Al salir de la confirmación navegando por la app (cuando el componente se desmonta) la nota
+  se borra de `sessionStorage`, porque puede traer datos de salud y no hace falta que quede en
+  el navegador. No se borra al leerla: recargar la confirmación la sigue mostrando. Una
+  navegación completa (escribir otra URL) o cerrar la pestaña no pasan por esa limpieza: ahí
+  la nota queda hasta que se cierra la pestaña, que es cuando el navegador vacía
+  `sessionStorage`. Borrarla también al descargar la página la haría desaparecer al recargar.
+  (Observación de la revisión de #115.)
 - **Detalle de la consulta:** no cambia, porque la consulta pública no devuelve la nota (D3).
 - **Admin:** la nota va en la celda de contacto, debajo del teléfono, con `whitespace-pre-line`
   para respetar los saltos de línea. La búsqueda en la página
