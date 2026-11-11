@@ -178,6 +178,29 @@ fuera de la grilla, nada superpuesto). Volver a correr `db:seed` lo restaura.
   que allí el plano muestra solo la lista textual hasta que un change propio cargue las
   posiciones.
 
+### Reservas de ejemplo del seed
+
+El seed de desarrollo carga reservas con códigos fijos para probar el frontend a mano:
+
+| Código | Estado | Para qué sirve |
+|---|---|---|
+| `SEEDPND2` | Pendiente | Confirmar o rechazar desde el admin (próximo viernes, cena, V1). |
+| `SEEDCNF2` | Confirmada | Consultar o cancelar desde el cliente (próximo sábado, cena, S3). |
+| `SEEDCAN2` | Cancelada | Ver un estado terminal (próximo domingo, almuerzo, S1). |
+| `SEEDNSW2` | No-show | Ver un NO_SHOW ya marcado (06/01/2026). |
+| `SEEDPAS2` | Confirmada | Marcarla NO_SHOW desde el admin: su turno ya pasó (07/01/2026, cena, S2). |
+| `SEEDVTN2` | Confirmada | Intentar cancelarla con el email `andres.molina@example.com`: se rechaza porque su turno empieza dentro de la ventana VIP de 24 h (V2). |
+
+`SEEDVTN2` se ubica al correr el seed, en el próximo turno activo que empiece dentro de las
+24 h siguientes; cada corrida la mueve al turno que corresponda. Si ningún turno empieza en ese
+lapso (del domingo a la noche al lunes al mediodía, porque los lunes no hay turnos), el seed no
+la crea y lo avisa en la consola; si quedó una de una corrida anterior, se conserva con su fecha
+vieja. Tampoco la mueve si ya está cancelada o en NO_SHOW, ni si la mesa V2 ya está ocupada en ese
+turno: en los dos casos lo avisa.
+
+El seed no revierte el estado de una reserva que ya se transicionó: para repetir la demo de
+NO_SHOW, resetear la base local (`docker compose down -v`, migrar y volver a correr el seed).
+
 ## Puertos y bases
 
 | Qué | Dónde |

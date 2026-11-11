@@ -1,4 +1,8 @@
-import { diaSemanaDeFecha, inicioTurnoUtc } from '../../common/timezone';
+import {
+  diaSemanaDeFecha,
+  inicioTurnoUtc,
+  MS_POR_HORA,
+} from '../../common/timezone';
 import {
   CodigoMotivo,
   DIAS,
@@ -7,7 +11,6 @@ import {
   SolicitudDisponibilidad,
 } from './tipos';
 
-const MS_POR_HORA = 60 * 60 * 1000;
 // La anticipación máxima se mide en días de 24 horas (spec.md → "Regla de anticipación máxima").
 const MS_POR_DIA = 24 * MS_POR_HORA;
 

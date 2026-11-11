@@ -8,6 +8,8 @@
  * - Mesas de capacidades variadas en cada zona, ubicadas en el plano de su zona.
  * - Los 2 turnos base (almuerzo, cena), activos de martes a domingo.
  * - Algunas reservas de ejemplo en distintos estados.
+ * - Dos reservas de demostración para mostrar a mano el NO_SHOW y la cancelación rechazada
+ *   por ventana (ver prisma/reservas-demo.ts).
  *
  * Idempotencia: todo se escribe con `upsert` por clave natural (design.md → Seed
  * idempotente), nunca con `create`. Correr este script dos veces no duplica filas.
@@ -26,6 +28,8 @@ import {
 } from './admin-desarrollo';
 import { seedCatalogo } from './catalogo';
 import { seedPlano } from './plano-desarrollo';
+import { seedReservasDemo } from './reservas-demo';
+import { DIAS } from '../src/disponibilidad/reglas/tipos';
 
 const prisma = new PrismaClient();
 
@@ -53,16 +57,7 @@ async function seedAdmin() {
 
 /** Próxima fecha (a partir de mañana) que cae en el día de semana pedido. */
 function proximaFecha(dia: DiaSemana): Date {
-  const orden: DiaSemana[] = [
-    DiaSemana.DOMINGO,
-    DiaSemana.LUNES,
-    DiaSemana.MARTES,
-    DiaSemana.MIERCOLES,
-    DiaSemana.JUEVES,
-    DiaSemana.VIERNES,
-    DiaSemana.SABADO,
-  ];
-  const objetivo = orden.indexOf(dia);
+  const objetivo = DIAS.indexOf(dia);
   const base = new Date();
   base.setUTCHours(0, 0, 0, 0);
   for (let i = 1; i <= 7; i++) {
@@ -187,6 +182,9 @@ async function main() {
 
   console.log('Seed: reservas de ejemplo...');
   await seedReservas(mesas, turnos);
+
+  console.log('Seed: reservas de demostración...');
+  await seedReservasDemo(prisma, turnos);
 
   console.log('Seed completado.');
 }

@@ -19,6 +19,7 @@ import {
   fechaCalendarioDesdeIso,
   finTurnoUtc,
   inicioTurnoUtc,
+  MS_POR_HORA,
 } from '../common/timezone';
 import { PrismaService } from '../prisma/prisma.service';
 import { elegirMesaBestFit } from './elegir-mesa-best-fit';
@@ -35,8 +36,6 @@ import { reservaNoEncontrada } from './reserva-no-encontrada';
 /** `limit`/`offset` por defecto del listado de admin cuando no llegan en la query (D6). */
 const LISTADO_LIMIT_DEFAULT = 20;
 const LISTADO_OFFSET_DEFAULT = 0;
-
-const MS_POR_HORA = 60 * 60 * 1000;
 
 const CODIGO_RESERVA_LONGITUD = 8;
 // Sin caracteres ambiguos (0/O, 1/I/L) para que sea legible por teléfono/email.
