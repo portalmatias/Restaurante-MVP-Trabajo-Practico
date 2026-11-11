@@ -111,7 +111,7 @@ ni el estado inicial.
 - **AND** la cantidad de reservas en la base no cambia
 
 #### Scenario: Los espacios de los bordes no cuentan para el límite
-- **WHEN** se envía una nota de 500 caracteres con dos espacios al principio
+- **WHEN** se envía una nota con dos espacios al principio seguidos de 500 caracteres de texto
 - **THEN** el sistema responde `201 Created`
 
 #### Scenario: Un emoji simple cuenta como un carácter
