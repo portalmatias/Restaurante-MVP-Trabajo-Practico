@@ -3,9 +3,10 @@
 ### Requirement: La consulta pública devuelve solo una vista mínima de la Reserva
 El sistema SHALL devolver en la consulta pública únicamente el código de la Reserva, su
 estado, la fecha, la cantidad de comensales, el turno (identificador, hora de inicio y hora
-de fin), la zona (identificador y nombre) y la nota del cliente (`notaCliente`, en `null` si
-no hay). El sistema SHALL NOT incluir el identificador interno de la Reserva, la mesa
-asignada, el nombre, el email ni el teléfono del cliente, ni marcas de creación o
+de fin) y la zona (identificador y nombre). El sistema SHALL NOT incluir el identificador
+interno de la Reserva, la mesa asignada, el nombre, el email ni el teléfono del cliente, la
+nota del cliente (`notaCliente`: puede traer datos sensibles y el código no es un secreto),
+ni marcas de creación o
 modificación. La fecha SHALL viajar como fecha de calendario local (`YYYY-MM-DD`) y las horas
 del turno como horas locales del restaurante (`HH:mm`), sin conversión de zona horaria.
 
@@ -19,14 +20,10 @@ del turno como horas locales del restaurante (`HH:mm`), sin conversión de zona 
 - **THEN** la respuesta informa la fecha `2026-09-19` y las horas `20:00` y `23:30`,
   con el mismo resultado sin importar la zona horaria del servidor
 
-#### Scenario: La consulta devuelve la nota
+#### Scenario: La consulta no devuelve la nota
 - **WHEN** el cliente consulta con código y email correctos una Reserva creada con la nota
   "Es un cumpleaños"
-- **THEN** la respuesta trae `notaCliente: "Es un cumpleaños"`
-
-#### Scenario: La consulta fallida no revela la nota
-- **WHEN** se consulta una Reserva con el código correcto y un email que no coincide
-- **THEN** la respuesta no contiene la nota
+- **THEN** la respuesta no contiene `notaCliente` ni el texto de la nota
 
 ## ADDED Requirements
 

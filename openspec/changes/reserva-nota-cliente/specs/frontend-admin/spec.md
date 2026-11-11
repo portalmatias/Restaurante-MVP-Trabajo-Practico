@@ -10,6 +10,10 @@ texto de las notas.
 - **WHEN** el listado muestra una Reserva con la nota "Vamos con un cochecito"
 - **THEN** la fila muestra «Nota» con "Vamos con un cochecito"
 
+#### Scenario: La nota respeta los saltos de línea
+- **WHEN** el listado muestra una Reserva con la nota "Uno es celíaco.\nLlegamos 20:15."
+- **THEN** la fila muestra las dos oraciones en líneas separadas
+
 #### Scenario: Reserva sin nota
 - **WHEN** el listado muestra una Reserva sin nota
 - **THEN** la fila no muestra el rótulo «Nota»
