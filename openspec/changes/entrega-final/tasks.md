@@ -66,6 +66,8 @@ Cada tarea se da por hecha cuando ninguno de sus changes tiene un punto sin valo
       change archivado sin sección.
       Actualizar a `archive/` los enlaces de «Decisiones de diseño» que apuntaban a la ruta
       activa de esos changes (D5).
+      Avance: `reserva-nota-cliente` (archivado en #119) ya tiene su sección, verificada el
+      2026-11-11 sobre `92a35d2`. Faltan los otros cinco.
 
 - [ ] 7.3 En el segundo PR (D7), archivar el change con `openspec archive entrega-final`.
       Verificar que `openspec validate --all --strict`, `npm run lint` y `npm run typecheck`
