@@ -174,7 +174,7 @@ tipos desde `openapi.yaml` en el mismo PR.
   superpone con S5." cuando corresponde. La superposición se calcula en el cliente con una
   función de `frontend/src/lib/plano-mesas.ts`: duplica la regla del backend, que no se puede
   importar (`config.yaml` §4). Es solo un aviso: la API decide.
-- **Errores.** `errores-campo.ts` suma una regla `ubicacion` que reconoce "fuera de la grilla",
+- **Errores.** `mesas-panel.tsx` suma una regla `ubicacion` a `REGLAS` que reconoce "fuera de la grilla",
   "no entra en la grilla", "se superpone" y "posX y posY van juntos", y los muestra junto a la
   sección.
 - **Mesa fuera de la grilla.** Si una mesa guardada no entra en la grilla de su zona (la grilla se

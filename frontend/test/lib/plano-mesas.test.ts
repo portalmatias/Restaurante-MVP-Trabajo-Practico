@@ -1,5 +1,10 @@
 import {
+  corregirInicio,
   describirMesa,
+  describirUbicacion,
+  entraEnGrilla,
+  opcionesInicio,
+  superposiciones,
   ordenarMesas,
   resumirPlano,
   mesasUbicadas,
@@ -166,5 +171,76 @@ describe("resumirPlano - estado que el frontend no conoce", () => {
     expect(resumirPlano({ zona: "STANDARD", comensales: 4, mesas })).toBe(
       "En la zona STANDARD hay 1 mesa libre para 4 comensales, 0 ocupadas, 0 que no alcanzan y 1 sin información.",
     );
+  });
+});
+
+// Change `plano-mesas-admin` (design.md D5): cálculos del formulario de ubicación del admin.
+// Casos con el layout del seed: STANDARD de 12 por 8, S3 en (5,0) 2 por 2, S4 en (0,3) 3 por 2 y
+// S5 en (5,3) 4 por 2. La pantalla numera desde 1; la API, desde 0.
+describe("opcionesInicio", () => {
+  it("ofrece las columnas con las que la mesa entra en la grilla según su ancho", () => {
+    expect(opcionesInicio(4, 12)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  it("con el tamaño igual a la grilla ofrece solo el 1", () => {
+    expect(opcionesInicio(6, 6)).toEqual([1]);
+  });
+});
+
+describe("corregirInicio", () => {
+  it("pasa al último valor que entra cuando crece el tamaño", () => {
+    expect(corregirInicio(12, 2, 12)).toBe(11);
+  });
+
+  it("deja el valor si sigue entrando", () => {
+    expect(corregirInicio(6, 3, 12)).toBe(6);
+  });
+
+  it("deja vacío lo que está vacío", () => {
+    expect(corregirInicio(undefined, 3, 12)).toBeUndefined();
+  });
+});
+
+describe("describirUbicacion", () => {
+  it.each([
+    [{ etiqueta: "S3", columna: 6, fila: 1, ancho: 2, alto: 2 }, "S3 ocupa las columnas 6 y 7, filas 1 y 2."],
+    [{ etiqueta: "S2", columna: 6, fila: 1, ancho: 1, alto: 1 }, "S2 ocupa la columna 6, fila 1."],
+    [{ etiqueta: "S3", columna: 6, fila: 1, ancho: 3, alto: 2 }, "S3 ocupa las columnas 6 a 8, filas 1 y 2."],
+    [{ etiqueta: "S5", columna: 6, fila: 4, ancho: 4, alto: 3 }, "S5 ocupa las columnas 6 a 9, filas 4 a 6."],
+  ])("describe %p", (ubicacion, texto) => {
+    expect(describirUbicacion(ubicacion)).toBe(texto);
+  });
+});
+
+describe("superposiciones", () => {
+  const S3 = { etiqueta: "S3", posX: 5, posY: 0, ancho: 2, alto: 2 };
+  const S5 = { etiqueta: "S5", posX: 5, posY: 3, ancho: 4, alto: 2 };
+  const S7 = { etiqueta: "S7", posX: null, posY: null, ancho: 1, alto: 1 };
+
+  it("nombra las mesas que comparten al menos una celda, en orden natural", () => {
+    const s4 = { posX: 4, posY: 0, ancho: 3, alto: 5 };
+    expect(superposiciones(s4, [S5, S3])).toEqual(["S3", "S5"]);
+  });
+
+  it("tocarse por un lado no es superponerse", () => {
+    expect(superposiciones({ posX: 2, posY: 3, ancho: 3, alto: 2 }, [S5])).toEqual([]);
+  });
+
+  it("ignora las mesas sin ubicar", () => {
+    expect(superposiciones({ posX: 0, posY: 0, ancho: 12, alto: 8 }, [S7])).toEqual([]);
+  });
+});
+
+describe("entraEnGrilla", () => {
+  it("una mesa ubicada que entra entera está en la grilla", () => {
+    expect(entraEnGrilla({ posX: 0, posY: 3, ancho: 3, alto: 2 }, GRILLA)).toBe(true);
+  });
+
+  it("una mesa que pasa el borde derecho queda fuera", () => {
+    expect(entraEnGrilla({ posX: 10, posY: 3, ancho: 3, alto: 2 }, GRILLA)).toBe(false);
+  });
+
+  it("una mesa sin ubicar no está en la grilla", () => {
+    expect(entraEnGrilla({ posX: null, posY: null, ancho: 1, alto: 1 }, GRILLA)).toBe(false);
   });
 });

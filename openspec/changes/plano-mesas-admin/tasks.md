@@ -129,39 +129,47 @@ Los tests de 4.3 a 4.8 van en el bloque `MesasPanel` de
 `frontend/test/components/admin/salon.test.tsx`, uno por escenario de "Ubicación de la Mesa en el
 plano" de `specs/frontend-admin/spec.md`. Cada tarea va con tests primero (rojo, luego verde).
 
-- [ ] 4.1 Extraer `CELDA`, `MARGEN` y `Silueta` de `plano-mesas.tsx` a
+- [x] 4.1 Extraer `CELDA`, `MARGEN` y `Silueta` de `plano-mesas.tsx` a
       `frontend/src/components/reservas/plano-geometria.tsx` (design.md D5) sin cambiar el plano
       del cliente. Verificar que los tests actuales de `plano-mesas.test.tsx` pasan sin
       modificarlos.
-- [ ] 4.2 Sumar a `frontend/test/lib/plano-mesas.test.ts` los casos de `frontend/src/lib/plano-mesas.ts` (rojo) y luego implementar: los
+- [x] 4.2 Sumar a `frontend/test/lib/plano-mesas.test.ts` los casos de `frontend/src/lib/plano-mesas.ts` (rojo) y luego implementar: los
       valores válidos de columna y fila según ancho, alto y grilla; la corrección al último valor
       válido; el texto de la ubicación ("las columnas 6 y 7", "la columna 6", "las columnas 6 a
       8") y la lista de superposiciones, con los casos del seed. Verificar que pasan.
-- [ ] 4.3 Campos de la sección "Ubicación en el plano". Tests: la columna limitada por el ancho,
+- [x] 4.3 Campos de la sección "Ubicación en el plano". Tests: la columna limitada por el ancho,
       el ancho mayor que corrige la columna, la mesa sin ubicar, la mesa guardada fuera de la
       grilla (campos vacíos y aviso), y que el alta no muestra la sección.
-- [ ] 4.4 Vista previa y su texto. Tests: la vista previa que sigue los valores (sin avisar
+- [x] 4.4 Vista previa y su texto. Tests: la vista previa que sigue los valores (sin avisar
       superposición con la propia posición guardada), el aviso de superposición con el botón
       habilitado, la falla al cargar las mesas de la zona, y la alternativa textual.
-- [ ] 4.5 Armado del pedido. Tests: mover, ubicar una mesa sin ubicar, guardar sin ubicación sin
+- [x] 4.5 Armado del pedido. Tests: mover, ubicar una mesa sin ubicar, guardar sin ubicación sin
       error, ubicación a medias que no se envía, quitar del plano, las coordenadas juntas con
       `ancho`, `alto` y `forma` solo si cambiaron, y reubicar la mesa guardada fuera de la grilla.
-- [ ] 4.6 Errores y listado. Tests: la superposición, el tamaño y la ubicación fuera de la
+- [x] 4.6 Errores y listado. Tests: la superposición, el tamaño y la ubicación fuera de la
       grilla rechazados por la API junto a la sección, y la columna "Plano" del listado
-      ("Columna 9, fila 6", "Sin ubicar" y "Fuera de la grilla"). Implementar la regla `ubicacion` de `errores-campo.ts`.
-- [ ] 4.7 Cambio de zona. Tests: cambio de zona, cambio a una zona más chica que ajusta el
+      ("Columna 9, fila 6", "Sin ubicar" y "Fuera de la grilla"). Implementar la regla `ubicacion` en `REGLAS` de `mesas-panel.tsx`.
+- [x] 4.7 Cambio de zona. Tests: cambio de zona, cambio a una zona más chica que ajusta el
       tamaño, cambio de zona sin elegir ubicación, con la misma columna y fila (envía las dos
       coordenadas aunque coincidan con las de la zona vieja), y volver a la zona original que
       restaura la ubicación (también con una mesa fuera de la grilla).
-- [ ] 4.8 Cambios de zona rápidos con la respuesta vieja llegando última (design.md D5, "Datos").
+- [x] 4.8 Cambios de zona rápidos con la respuesta vieja llegando última (design.md D5, "Datos").
       Verificar que pasa y que los tests actuales del panel siguen en verde.
 
 ## 5. Cierre
 
-- [ ] 5.1 Correr `npm run lint`, `npm run typecheck -w frontend`, los tests del backend (unitarios
+- [x] 5.1 Correr `npm run lint`, `npm run typecheck -w frontend`, los tests del backend (unitarios
       y e2e) y del frontend, `npm run openapi:check` y `openspec validate plano-mesas-admin
       --strict`, y anotar los resultados en el PR.
-- [ ] 5.2 Revisión visual en `/admin/salon` con el backend local: mover S4, intentar superponerla
+      Resultado (11/11/2026): lint limpio; typecheck del frontend sin errores; frontend 915 tests
+      (63 suites); backend 248 unitarios, 188 de integración y 168 e2e; `openapi:check` sin
+      desvíos; `openspec validate plano-mesas-admin --strict` válido.
+- [x] 5.2 Revisión visual en `/admin/salon` con el backend local: mover S4, intentar superponerla
       con S5, quitar S2 del plano y verificar en `/reservas/nueva/resultado` que el plano del
       cliente refleja los cambios. Anotar el resultado en el PR.
+      Resultado (11/11/2026, con Playwright): S4 pasó de "Columna 1, fila 4" a "Columna 9, fila 6";
+      en la columna 6, fila 4 la vista previa avisó "Se superpone con S5." y la API respondió
+      `409` "La mesa se superpone con S5.", mostrado junto a la sección; S2 quedó "Sin ubicar". El
+      plano del cliente dibuja S1, S3, S4 y S5, con S4 en su lugar nuevo, y lista S2 "sin ubicar
+      en el plano".
 - [ ] 5.3 Pedir la aprobación de un compañero y, una vez integrado, archivar el change.

@@ -26,12 +26,15 @@ function comensales(cantidad: number): string {
 /** Columnas y filas de la grilla de la zona. */
 export type Grilla = Pick<PlanoMesas, "columnas" | "filas">;
 
+/** Lo que hace falta saber de una mesa para ubicarla: dónde empieza y cuánto ocupa (desde 0). */
+export type Ubicable = Pick<MesaPlano, "posX" | "posY" | "ancho" | "alto">;
+
 /**
  * Una mesa se dibuja si tiene posición y entra entera en la grilla de su zona. Una mesa que
  * cambió de zona conserva su posición anterior y puede quedar afuera (design.md, riesgos): se
  * trata como sin ubicar en vez de dibujarla recortada.
  */
-function estaUbicada(mesa: MesaPlano, { columnas, filas }: Grilla): boolean {
+export function entraEnGrilla(mesa: Ubicable, { columnas, filas }: Grilla): boolean {
   return (
     mesa.posX !== null &&
     mesa.posY !== null &&
@@ -45,7 +48,7 @@ function estaUbicada(mesa: MesaPlano, { columnas, filas }: Grilla): boolean {
 /** Fila de la lista textual: "Mesa S3, para 4 comensales: libre" (design.md D7). */
 export function describirMesa(mesa: MesaPlano, grilla: Grilla): string {
   const descripcion = `Mesa ${mesa.etiqueta}, para ${comensales(mesa.capacidad)}: ${textoEstado(mesa.estado).toLowerCase()}`;
-  return estaUbicada(mesa, grilla) ? descripcion : `${descripcion} (sin ubicar en el plano)`;
+  return entraEnGrilla(mesa, grilla) ? descripcion : `${descripcion} (sin ubicar en el plano)`;
 }
 
 /**
@@ -83,7 +86,7 @@ export function resumirPlano({
  * backend (`orden-mesas.ts`): si el orden natural empata (por ejemplo "S1" y "S01"), desempata
  * el texto exacto, así el resultado no depende del orden de entrada.
  */
-export function ordenarMesas(mesas: readonly MesaPlano[]): MesaPlano[] {
+export function ordenarMesas<M extends Pick<MesaPlano, "etiqueta">>(mesas: readonly M[]): M[] {
   return [...mesas].sort(
     (a, b) =>
       a.etiqueta.localeCompare(b.etiqueta, "es", { numeric: true }) ||
@@ -96,5 +99,73 @@ export function ordenarMesas(mesas: readonly MesaPlano[]): MesaPlano[] {
  * (design.md D5), que muestra todas las mesas y las marca con `describirMesa`.
  */
 export function mesasUbicadas(mesas: readonly MesaPlano[], grilla: Grilla): MesaPlano[] {
-  return mesas.filter((mesa) => estaUbicada(mesa, grilla));
+  return mesas.filter((mesa) => entraEnGrilla(mesa, grilla));
+}
+
+// Formulario de ubicación del admin (change `plano-mesas-admin`, design.md D5). Columna y fila
+// se numeran desde 1, como en la pantalla; las coordenadas de la API, desde 0.
+
+/** Valores de inicio (columna o fila, desde 1) con los que una mesa de `tamano` celdas entra. */
+export function opcionesInicio(tamano: number, total: number): number[] {
+  return Array.from({ length: Math.max(total - tamano + 1, 0) }, (_, i) => i + 1);
+}
+
+/** Pasa al último inicio que entra si el tamaño creció; lo vacío sigue vacío. */
+export function corregirInicio(
+  valor: number | undefined,
+  tamano: number,
+  total: number,
+): number | undefined {
+  if (valor === undefined) return undefined;
+  return Math.max(Math.min(valor, total - tamano + 1), 1);
+}
+
+/** "la columna 6", "las columnas 6 y 7" o "las columnas 6 a 8". */
+function rango(inicio: number, tamano: number, singular: string, plural: string): string {
+  if (tamano === 1) return `${singular} ${inicio}`;
+  const fin = inicio + tamano - 1;
+  return tamano === 2 ? `${plural} ${inicio} y ${fin}` : `${plural} ${inicio} a ${fin}`;
+}
+
+/** Texto de la vista previa: "S3 ocupa las columnas 6 y 7, filas 1 y 2." */
+export function describirUbicacion({
+  etiqueta,
+  columna,
+  fila,
+  ancho,
+  alto,
+}: {
+  etiqueta: string;
+  columna: number;
+  fila: number;
+  ancho: number;
+  alto: number;
+}): string {
+  const columnas = rango(columna, ancho, "la columna", "las columnas");
+  const filas = rango(fila, alto, "fila", "filas");
+  return `${etiqueta} ocupa ${columnas}, ${filas}.`;
+}
+
+/**
+ * Etiquetas de las `otras` mesas ubicadas que comparten al menos una celda con `mesa`, en orden
+ * natural. Tocarse por un lado no cuenta. Es la misma regla que `problemasDeUbicacion` del
+ * backend, que no se puede importar desde acá (`config.yaml` §4): solo arma un aviso, la API
+ * decide. Quien llama no incluye a la propia mesa entre las `otras`.
+ */
+export function superposiciones(
+  mesa: Ubicable,
+  otras: readonly (Ubicable & Pick<MesaPlano, "etiqueta">)[],
+): string[] {
+  if (mesa.posX === null || mesa.posY === null) return [];
+  const { posX, posY } = mesa;
+  const superpuestas = otras.filter(
+    (otra) =>
+      otra.posX !== null &&
+      otra.posY !== null &&
+      posX < otra.posX + otra.ancho &&
+      otra.posX < posX + mesa.ancho &&
+      posY < otra.posY + otra.alto &&
+      otra.posY < posY + mesa.alto,
+  );
+  return ordenarMesas(superpuestas).map((otra) => otra.etiqueta);
 }

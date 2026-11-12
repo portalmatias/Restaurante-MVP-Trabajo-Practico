@@ -8,16 +8,13 @@ import {
   type MesaPlano,
   type PlanoMesas as Plano,
 } from "../../lib/plano-mesas";
+import { CELDA, rectDeMesa, Silueta, type Rect } from "./plano-geometria";
 
 export type PlanoMesasProps = {
   plano: Plano;
   /** Comensales de la selección, para el resumen. */
   comensales: number;
 };
-
-/** Lado de una celda de la grilla en unidades del `viewBox` (design.md D5). */
-const CELDA = 48;
-const MARGEN = 4;
 
 const ESTADOS: readonly EstadoMesa[] = ["LIBRE", "OCUPADA", "NO_ALCANZA"];
 
@@ -90,25 +87,6 @@ function claseTexto(estado: EstadoMesa): string {
 /** Atributos del halo, comunes a todos los textos de la mesa. */
 const HALO = { paintOrder: "stroke", strokeWidth: 3, strokeLinejoin: "round" } as const;
 
-type Rect = { x: number; y: number; ancho: number; alto: number };
-
-/** Silueta de la mesa: la usan la cara y el canto, que es la misma forma corrida hacia abajo. */
-type PropsSilueta = { forma: MesaPlano["forma"] } & Rect & {
-  className: string;
-  fill?: string;
-  strokeWidth?: number;
-  "data-canto"?: string;
-  "data-forma"?: string;
-};
-
-function Silueta({ forma, x, y, ancho, alto, ...resto }: PropsSilueta) {
-  if (forma === "REDONDA") {
-    return <ellipse {...resto} cx={x + ancho / 2} cy={y + alto / 2} rx={ancho / 2} ry={alto / 2} />;
-  }
-  // Esquinas apenas redondeadas, como los radios del tema (`--radius-sm` a `--radius-lg`).
-  return <rect {...resto} x={x} y={y} width={ancho} height={alto} rx={forma === "CUADRADA" ? 2 : 4} />;
-}
-
 /**
  * Tablilla de la mesa: el canto (madera vista de costado) asoma debajo de la cara, que lleva el
  * patrón del estado. El borde `border` mide 3,66:1 contra el fondo (WCAG 1.4.11).
@@ -161,12 +139,7 @@ function posicionesTexto(mesa: MesaPlano, rect: Rect) {
 }
 
 function MesaDibujada({ mesa }: { mesa: MesaPlano }) {
-  const rect: Rect = {
-    x: (mesa.posX ?? 0) * CELDA + MARGEN,
-    y: (mesa.posY ?? 0) * CELDA + MARGEN,
-    ancho: mesa.ancho * CELDA - 2 * MARGEN,
-    alto: mesa.alto * CELDA - 2 * MARGEN,
-  };
+  const rect = rectDeMesa(mesa.posX ?? 0, mesa.posY ?? 0, mesa.ancho, mesa.alto);
   const texto = claseTexto(mesa.estado);
   const { marca, etiqueta, capacidad } = posicionesTexto(mesa, rect);
   return (
